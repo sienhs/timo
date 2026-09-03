@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: timo
+  profiles:
+    default: local #프로필 미지정 시 application-local.yml
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  Jackson:
+    time-zone: Asia/Seoul
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, env, configprops
+  endpoint:
+    health:
+      show-details: always
