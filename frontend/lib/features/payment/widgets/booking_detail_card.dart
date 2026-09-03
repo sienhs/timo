@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import '../formatters.dart';
+import '../../../core/utils/formatters.dart';
 import '../models/ticket_order.dart';
 import 'order_info_row.dart';
 import 'payment_card.dart';

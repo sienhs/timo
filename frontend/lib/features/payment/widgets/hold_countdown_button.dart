@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import '../formatters.dart';
+import '../../../core/utils/formatters.dart';
 import 'primary_action_button.dart';
 
 /// 좌석 선점 남은 시간을 함께 보여주는 결제 버튼.
