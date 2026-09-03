@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const seedColor = Colors.indigo; // TODO: 디자인 확정되면 브랜드 색으로 변경
+  static const seedColor = Color(0xFF149F5C);
 
   static ThemeData get light => ThemeData(
         colorSchemeSeed: seedColor,
