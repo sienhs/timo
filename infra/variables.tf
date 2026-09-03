@@ -71,13 +71,12 @@ variable "db_name" {
 }
 
 variable "db_username" {
-  description = "RDS master username. Password is managed by AWS Secrets Manager."
+  description = "RDS master username"
   type        = string
   default     = "admin"
 }
 
 variable "db_password" {
-  description = "This is db password"
+  description = "RDS password"
   type        = string
-  default     = "I_am_Jaemin"
 }
