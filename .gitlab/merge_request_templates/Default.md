@@ -22,4 +22,6 @@
 
 ## 관련 이슈
 
-Closes #
+Closes S15P21D206-
+
+<!-- Jira 이슈 키를 적으세요 (예: Closes S15P21D206-130) -->

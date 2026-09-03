@@ -8,14 +8,14 @@
 
 | 브랜치 | 역할 | 병합 방향 |
 | --- | --- | --- |
-| `master` | 릴리스 브랜치. 릴리스 시점의 안정 버전을 태깅/보관 | ← `development` |
-| `development` | 실 배포 브랜치. 작업이 통합되어 실제로 배포됨 | ← `feature/*`, `refactor/*` |
-| `feature/*` | 기능 개발 단위 브랜치 | → `development` |
-| `refactor/*` | 리팩터링 단위 브랜치 | → `development` |
-| `hotfix/*` | 긴급 수정 | → `master`, `development` |
+| `master` | 릴리스 브랜치. 릴리스 시점의 안정 버전을 태깅/보관 | ← `develop` |
+| `develop` | 실 배포 브랜치. 작업이 통합되어 실제로 배포됨 | ← `feature/*`, `refactor/*` |
+| `feature/*` | 기능 개발 단위 브랜치 | → `develop` |
+| `refactor/*` | 리팩터링 단위 브랜치 | → `develop` |
+| `hotfix/*` | 긴급 수정 | → `master`, `develop` |
 
-- 평소 작업은 `development`에 통합되어 배포됩니다.
-- 릴리스 시점에 `development` → `master`로 병합하고 버전 태그(`v1.0.0` 등)를 붙입니다.
+- 평소 작업은 `develop`에 통합되어 배포됩니다.
+- 릴리스 시점에 `develop` → `master`로 병합하고 버전 태그(`v1.0.0` 등)를 붙입니다.
 
 **브랜치 이름 규칙**
 
@@ -36,11 +36,15 @@ hotfix/토큰-만료-버그
 작업 브랜치에 쌓는 개별 커밋은 아래 형식으로 작성합니다.
 
 ```
-<type>: <메시지>
+<type>: <메시지> <Jira 이슈 키>
 ```
 
 - `type`은 **소문자**, 콜론(`:`) 뒤에 **한 칸 띄우고** 메시지 작성
 - 메시지는 무엇을 했는지 간결하게(권장 50자 이내)
+- 메시지 끝에 한 칸 띄우고 **Jira 이슈 키**를 붙입니다 (예: `S15P21D206-130`)
+- **개별 커밋에는 괄호를 쓰지 않습니다.** 괄호는 MR 제목에만 사용합니다 (3번 참고)
+- 이슈 키를 넣으면 Jira 이슈 화면에서 관련 커밋을 바로 추적할 수 있습니다
+- 이슈와 무관한 작업(오타 수정 등)은 이슈 키를 생략할 수 있습니다
 
 ### 타입 정의
 
@@ -63,13 +67,18 @@ hotfix/토큰-만료-버그
 ### 예시
 
 ```
-feat: 카카오 소셜 로그인 추가
-feat: 사용자 프로필 이미지 업로드 기능 구현
-env: 프로덕션 환경변수 설정 추가
-env: eslint 규칙 업데이트
-chore: 사용하지 않는 import 제거
+feat: 카카오 소셜 로그인 추가 S15P21D206-130
+feat: 사용자 프로필 이미지 업로드 기능 구현 S15P21D206-142
+env: 프로덕션 환경변수 설정 추가 S15P21D206-118
+env: eslint 규칙 업데이트 S15P21D206-118
+chore: 사용하지 않는 import 제거 S15P21D206-130
 chore: README 오타 수정
 ```
+
+> 이슈 키를 빠뜨린 채 커밋했다면 `git commit --amend`(마지막 커밋) 또는
+> `git rebase -i --autostash HEAD~N`의 `reword`(이전 커밋)로 수정합니다.
+> 이미 push한 뒤라면 `git push --force-with-lease`가 필요하므로,
+> **공용 브랜치(`develop`, `master`)에서는 하지 않습니다.**
 
 ---
 
@@ -79,8 +88,16 @@ MR(Merge Request)을 통해 **상위 브랜치로 머지**할 때의 머지 커�
 개별 커밋과 구분하기 위해 **대괄호 접두사**를 사용합니다.
 
 ```
-[Prefix] <머지 커밋 메시지>
+[Prefix] <머지 커밋 메시지> (<Jira 이슈 키>)
 ```
+
+- **MR 제목이 곧 스쿼시 머지 커밋 메시지입니다.** 스쿼시 머지 시 MR 제목이
+  그대로 커밋 메시지로 사용되므로, 제목에 반드시 Jira 이슈 키를 포함합니다.
+- 이슈 키는 제목 끝에 **괄호로 감싸서** 붙입니다 (예: `(S15P21D206-130)`).
+  개별 커밋(2번)과 달리 MR 제목에는 괄호를 사용합니다.
+- 제목의 이슈 키는 **스쿼시 머지 커밋 메시지용**이고, MR 본문의
+  `Closes S15P21D206-130`은 **이슈를 자동 전환시키는 용도**입니다. 역할이
+  다르므로 **둘 다 적어야 합니다.**
 
 ### 접두사 정의
 
@@ -100,10 +117,10 @@ MR(Merge Request)을 통해 **상위 브랜치로 머지**할 때의 머지 커�
 ### 예시
 
 ```
-[Feature] 소셜 로그인 전체 기능 추가
-[Feature] 사용자 프로필 관리 기능
-[Refactor] 결제 모듈 구조 개선
-[Refactor] 인증 로직 중복 제거
+[Feature] 소셜 로그인 전체 기능 추가 (S15P21D206-130)
+[Feature] 프론트엔드 Flutter 앱 뼈대 만들기 (S15P21D206-130)
+[Refactor] 결제 모듈 구조 개선 (S15P21D206-155)
+[Refactor] 인증 로직 중복 제거 (S15P21D206-161)
 ```
 
 ---
@@ -111,22 +128,24 @@ MR(Merge Request)을 통해 **상위 브랜치로 머지**할 때의 머지 커�
 ## 4. 전체 흐름 요약
 
 ```
-1. development 에서 작업 브랜치 생성
-   git checkout development
+1. develop 에서 작업 브랜치 생성
+   git checkout develop
    git pull
    git checkout -b feature/소셜로그인
 
-2. 작업하며 커밋 (커밋 컨벤션 준수)
-   git commit -m "feat: 카카오 소셜 로그인 추가"
-   git commit -m "env: 소셜 로그인 관련 환경변수 추가"
+2. 작업하며 커밋 (커밋 컨벤션 준수 - 이슈 키 포함)
+   git commit -m "feat: 카카오 소셜 로그인 추가 S15P21D206-130"
+   git commit -m "env: 소셜 로그인 관련 환경변수 추가 S15P21D206-130"
 
-3. 원격 푸시 후 MR 생성 (development ← feature/소셜로그인)
+3. 원격 푸시 후 MR 생성 (develop ← feature/소셜로그인)
    git push origin feature/소셜로그인
+   MR 제목: [Feature] 소셜 로그인 전체 기능 추가 (S15P21D206-130)
+   MR 본문: Closes S15P21D206-130
 
-4. 리뷰 후 머지 → development 배포 (머지 커밋 컨벤션 준수)
-   [Feature] 소셜 로그인 전체 기능 추가
+4. 리뷰 후 머지 → develop 배포 (MR 제목이 머지 커밋 메시지가 됨)
+   [Feature] 소셜 로그인 전체 기능 추가 (S15P21D206-130)
 
-5. 릴리스 시점에 development → master 병합 + 태깅
+5. 릴리스 시점에 develop → master 병합 + 태깅
    [Feature] v1.1.0 릴리스
    git tag v1.1.0
 ```
@@ -138,9 +157,12 @@ MR(Merge Request)을 통해 **상위 브랜치로 머지**할 때의 머지 커�
 **커밋 전**
 - [ ] 커밋 타입(`feat` / `env` / `chore`)이 작업 내용과 맞는가
 - [ ] 메시지가 간결하고 명확한가
+- [ ] **메시지 끝에 Jira 이슈 키가 들어갔는가** (괄호 없이, 예: `S15P21D206-130`)
 - [ ] 한 커밋에 하나의 논리적 변경만 담겼는가
 
 **MR 생성 시**
-- [ ] 대상 브랜치가 올바른가 (`development`, 릴리스 시 `master`)
+- [ ] 대상 브랜치가 올바른가 (`develop`, 릴리스 시 `master`)
 - [ ] MR 제목이 `[Feature]` / `[Refactor]` 접두사 규칙을 따르는가
+- [ ] **MR 제목 끝에 Jira 이슈 키가 괄호로 들어갔는가** (스쿼시 커밋 메시지로 사용됨)
+- [ ] **MR 본문에 `Closes <이슈 키>`를 적었는가**
 - [ ] 리뷰어를 지정했는가
