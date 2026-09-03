@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import '../formatters.dart';
+import '../../../core/utils/formatters.dart';
 import '../models/ticket_order.dart';
 import 'order_info_row.dart';
 import 'payment_card.dart';
@@ -68,7 +68,7 @@ class _ConcertHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              _MetaLine(formatPerformedAt(order.performedAt, separator: '/')),
+              _MetaLine(formatPerformedAt(order.performedAt)),
               _MetaLine(order.venue),
               _MetaLine(order.seat),
             ],

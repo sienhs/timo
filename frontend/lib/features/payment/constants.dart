@@ -70,6 +70,10 @@ class PaymentColors {
   static const value = Color(0xFF1F2124);
 
   /// 티켓 가격·수수료 강조색. 브랜드 그린을 그대로 쓴다.
+  ///
+  /// 시안에서는 이 두 값이 검은 글자이고 로즈는 TOTAL 에만 쓰였다. 개별 항목
+  /// (초록)과 최종 결제 금액(코랄)을 색으로 구분하기로 **정한 것**이므로,
+  /// 시안과 다른 것을 이탈로 보고 되돌리지 않는다.
   static const price = AppTheme.seedColor;
 
   /// 최종 결제 금액 강조색.
