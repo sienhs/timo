@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    # 좌석 선점에 있어 h2와 mySQL 동작 방식이 달라 test 스키마 생성
+    url: jdbc:mysql://localhost:3306/timo_test?connectionTimeZone=Asia/Seoul
+    username: timo
+    password: timo1234
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 1
+jwt:
+  secret: local-dev-only-secret-please-change-in-prod-0123456789

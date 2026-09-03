@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  docker:
+    compose:
+      lifecycle-management: start-only    # 앱 껐다 켤 때마다 DB가 내려가지 않게
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+jwt:
+  secret: local-dev-only-secret-please-change-in-prod-0123456789
