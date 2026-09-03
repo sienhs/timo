@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
+  /// 브랜드 메인 색. Material 3 팔레트를 생성하는 시드로 쓴다.
   static const seedColor = Color(0xFF149F5C);
+
+  /// 브랜드 강조 색. 금액·경고처럼 시선을 끌어야 하는 곳에 쓴다.
+  static const accentColor = Color(0xFFFF6B5E);
 
   static ThemeData get light => ThemeData(
         colorSchemeSeed: seedColor,

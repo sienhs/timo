@@ -11,7 +11,8 @@ class App extends StatelessWidget {
     return MaterialApp(
       title: 'D206', // TODO: 서비스 이름 정해지면 변경
       theme: AppTheme.light,
-      initialRoute: AppRoutes.home,
+      // TODO: 발표용으로 결제 화면부터 시작한다. 다른 화면이 붙으면 AppRoutes.home으로 되돌린다.
+      initialRoute: AppRoutes.payment,
       routes: AppRoutes.routes,
     );
   }
