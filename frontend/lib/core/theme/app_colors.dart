@@ -47,10 +47,7 @@ class AppColors {
   static const seatSelected = primary;
   static const seatSold = Color(0xFFD6D6D6);
 
-  /// 예매 완료 좌석의 번호. 고를 수 없는 좌석이므로 낮은 대비로 눌러 둔다.
-  static const seatSoldLabel = Color(0xFFA9A9A9);
-
-  /// [primary] 위에 올리는 글자색.
+  /// [primary] 위에 올리는 글자색. 대비가 3.43:1 이므로 굵은 큰 글자에만 쓴다.
   static const onPrimary = Color(0xFFFFFFFF);
 
   static const surface = Color(0xFFFFFFFF);

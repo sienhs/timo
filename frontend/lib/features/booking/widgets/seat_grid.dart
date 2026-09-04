@@ -32,8 +32,9 @@ const _canvasPadding = EdgeInsets.fromLTRB(12, 8, 12, 8);
 /// onDoubleTap 이 제스처 아레나에서 좌석의 단일 탭을 붙잡아 선택이 한 박자
 /// 늦어졌다. 확대는 핀치만으로 충분하므로 더블탭은 두지 않는다.
 ///
-/// 셀이 44px 이 되면서 칸 안에 좌석 번호를 넣을 수 있게 됐다. 시안에는
-/// 번호 축이 없어 탭하기 전에는 몇 번 자리인지 알 수 없었다.
+/// 셀 안에 좌석 번호는 넣지 않는다. 시안대로 색만 칠한 사각형이며, 고른 자리가
+/// 몇 번인지는 결제 직전 확인 다이얼로그가 알려준다. 44px 는 번호를 넣기 위한
+/// 크기가 아니라 터치 타겟 기준이므로, 번호가 없어도 줄이지 않는다.
 class SeatGrid extends StatefulWidget {
   const SeatGrid({
     super.key,
@@ -120,8 +121,9 @@ class _SeatGridState extends State<SeatGrid> {
                 ),
               ),
             ),
-            // 열 라벨은 가로로 밀어도 남아야 한다. 좌석 번호만으로는 몇 열인지
-            // 알 수 없기 때문이다. 캔버스 밖에 두고 세로 이동·배율만 따라간다.
+            // 열 라벨은 가로로 밀어도 남아야 한다. 셀에 아무 글자도 없어서
+            // 라벨이 사라지면 어디를 보고 있는지 알 수 있는 단서가 없다.
+            // 캔버스 밖에 두고 세로 이동·배율만 따라간다.
             //
             // Positioned 로 감싸는 이유: Stack 의 일반 자식은 Stack 높이로
             // 제약되어 열이 많으면 Column 이 넘친다. top/left 만 준 Positioned
@@ -277,16 +279,6 @@ class _SeatCell extends StatelessWidget {
             color: colors.fill,
             border: Border.all(color: colors.border),
             borderRadius: const BorderRadius.all(Radius.circular(4)),
-          ),
-          child: Center(
-            child: Text(
-              '${seat.number}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: colors.label,
-              ),
-            ),
           ),
         ),
       ),

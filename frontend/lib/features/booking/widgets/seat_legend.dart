@@ -40,7 +40,7 @@ class _LegendChip extends StatelessWidget {
   });
 
   final String label;
-  final ({Color fill, Color border, Color label}) colors;
+  final ({Color fill, Color border}) colors;
   final TextStyle? labelStyle;
 
   @override
