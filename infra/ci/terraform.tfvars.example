@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and enter the actual project ID. This is not a secret.
+# Do NOT put Runner tokens, AWS keys, or Webhook secrets in this file.
+gitlab_project_id = 1444183
+aws_region        = "ap-northeast-2"
+
+# Change to true after set-secret.ps1 and a successful manual CodeBuild run.
+webhook_enabled = false
