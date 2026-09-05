@@ -1,0 +1,79 @@
+frontend_analyze:
+  stage: test
+  image: ghcr.io/cirruslabs/flutter:stable
+
+  before_script:
+    - cd frontend
+    - flutter --version
+    - flutter pub get
+
+  script:
+    - flutter analyze
+
+  rules:
+    - changes:
+        - frontend/**/*
+
+
+frontend_test:
+  stage: test
+  image: ghcr.io/cirruslabs/flutter:stable
+
+  before_script:
+    - cd frontend
+    - flutter pub get
+
+  script:
+    - flutter test
+
+  rules:
+    - changes:
+        - frontend/**/*
+
+
+frontend_build:
+  stage: build
+  image: ghcr.io/cirruslabs/flutter:stable
+
+  before_script:
+    - cd frontend
+    - flutter pub get
+
+  script:
+    - flutter build apk --release --build-number="$CI_PIPELINE_IID"
+
+  artifacts:
+    paths:
+      - frontend/build/app/outputs/flutter-apk/app-release.apk
+    expire_in: 7 days
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - frontend/**/*
+
+
+frontend_deploy:
+  stage: deploy
+  image: node:22-bookworm-slim
+
+  needs:
+    - job: frontend_build
+      artifacts: true
+
+  before_script:
+    - npm install -g firebase-tools
+    - export GOOGLE_APPLICATION_CREDENTIALS="$FIREBASE_SERVICE_ACCOUNT"
+
+  script:
+    - >
+      firebase appdistribution:distribute
+      frontend/build/app/outputs/flutter-apk/app-release.apk
+      --app "$FIREBASE_APP_ID"
+      --groups "$FIREBASE_TESTER_GROUP"
+      --release-notes "${CI_COMMIT_SHORT_SHA} - ${CI_COMMIT_TITLE}"
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - frontend/**/*
