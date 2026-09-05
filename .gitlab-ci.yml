@@ -1,0 +1,7 @@
+stages:
+  - test
+  - build
+  - deploy
+
+include:
+  - local: "/frontend/.gitlab-ci.yml"
