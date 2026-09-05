@@ -11,8 +11,10 @@ frontend_analyze:
     - flutter analyze
 
   rules:
-    - changes:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
         - frontend/**/*
+    - when: never
 
 
 frontend_test:
@@ -27,8 +29,10 @@ frontend_test:
     - flutter test
 
   rules:
-    - changes:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
         - frontend/**/*
+    - when: never
 
 
 frontend_build:
@@ -48,9 +52,10 @@ frontend_build:
     expire_in: 7 days
 
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
       changes:
         - frontend/**/*
+    - when: never
 
 
 frontend_deploy:
@@ -74,6 +79,7 @@ frontend_deploy:
       --release-notes "${CI_COMMIT_SHORT_SHA} - ${CI_COMMIT_TITLE}"
 
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
       changes:
         - frontend/**/*
+    - when: never

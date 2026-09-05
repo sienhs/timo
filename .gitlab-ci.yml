@@ -3,5 +3,16 @@ stages:
   - build
   - deploy
 
+workflow:
+  rules:
+    # develop 대상으로 생성/업데이트되는 MR pipeline
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+
+    # MR이 develop에 merge된 이후 생성되는 develop push pipeline
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
+
+    # 그 외 feature branch push, tag, schedule 등은 pipeline 자체를 만들지 않음
+    - when: never
+
 include:
   - local: "/frontend/.gitlab-ci.yml"
