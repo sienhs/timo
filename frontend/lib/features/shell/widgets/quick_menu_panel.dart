@@ -54,7 +54,10 @@ class _QuickMenuPanel extends StatelessWidget {
           ShellMetrics.panelHorizontalMargin,
           0,
           ShellMetrics.panelHorizontalMargin,
-          ShellMetrics.barTotalHeight + bottomInset + ShellMetrics.panelGap,
+          ShellMetrics.barHeight +
+              ShellMetrics.fabProtrusion +
+              bottomInset +
+              ShellMetrics.panelGap,
         ),
         child: Material(
           color: AppColors.surface,

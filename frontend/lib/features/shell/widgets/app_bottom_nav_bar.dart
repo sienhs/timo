@@ -5,12 +5,11 @@ import '../constants.dart';
 
 /// 앱 전역 하단 바. 홈 · 빠른 메뉴 · 마이페이지 3분할이다.
 ///
-/// 가운데 원형 버튼은 탭이 아니라 빠른 메뉴 토글이라 [selectedIndex] 에
-/// 들어가지 않는다. 그래서 인덱스는 0(홈) · 1(마이페이지) 둘뿐이다.
+/// 가운데 원형 버튼은 이 위젯에 없다. 탭이 아니라 빠른 메뉴 토글이고 바 위로
+/// 솟아 있어서 `Scaffold.floatingActionButton` 이 그린다([QuickMenuButton]).
+/// 바 안쪽에는 가운데 칸의 라벨만 남는다.
 ///
-/// 원형 버튼이 바 위로 솟은 만큼([ShellMetrics.fabLift])까지 포함해 높이를
-/// 잡는다. Stack 을 clip 없이 넘치게 그리면 화면에는 보여도 넘친 부분의 탭이
-/// 부모 박스 밖이라 먹지 않는다.
+/// 그래서 [selectedIndex] 는 0(홈) · 1(마이페이지) 둘뿐이다.
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -21,57 +20,14 @@ class AppBottomNavBar extends StatelessWidget {
 
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
+
+  /// 가운데 '빠른 메뉴' 라벨을 눌렀을 때. 원형 버튼과 같은 동작이다.
   final VoidCallback onQuickMenuPressed;
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
-    return SizedBox(
-      height: ShellMetrics.barTotalHeight + bottomInset,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: ShellMetrics.barHeight + bottomInset,
-            child: _Bar(
-              selectedIndex: selectedIndex,
-              onTabSelected: onTabSelected,
-              onQuickMenuPressed: onQuickMenuPressed,
-              bottomInset: bottomInset,
-            ),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: _QuickMenuButton(onPressed: onQuickMenuPressed),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Bar extends StatelessWidget {
-  const _Bar({
-    required this.selectedIndex,
-    required this.onTabSelected,
-    required this.onQuickMenuPressed,
-    required this.bottomInset,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onTabSelected;
-  final VoidCallback onQuickMenuPressed;
-  final double bottomInset;
-
-  @override
-  Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -79,34 +35,37 @@ class _Bar extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
-        child: Row(
-          children: [
-            Expanded(
-              child: _NavTab(
-                icon: Icons.home_outlined,
-                label: ShellStrings.homeTab,
-                selected: selectedIndex == 0,
-                onTap: () => onTabSelected(0),
+        child: SizedBox(
+          height: ShellMetrics.barHeight,
+          child: Row(
+            children: [
+              Expanded(
+                child: _NavTab(
+                  icon: Icons.home_outlined,
+                  label: ShellStrings.homeTab,
+                  selected: selectedIndex == 0,
+                  onTap: () => onTabSelected(0),
+                ),
               ),
-            ),
-            // 가운데 칸은 라벨만 있다. 아이콘 자리는 위로 솟은 원형 버튼이
-            // 차지하므로 아이콘 높이만큼 비워 라벨 줄을 양옆과 맞춘다.
-            Expanded(
-              child: _NavTab(
-                label: ShellStrings.quickMenuTab,
-                selected: false,
-                onTap: onQuickMenuPressed,
+              // 가운데 칸은 라벨만 있다. 아이콘 자리는 위로 솟은 원형 버튼이
+              // 차지하므로 아이콘 높이만큼 비워 라벨 줄을 양옆과 맞춘다.
+              Expanded(
+                child: _NavTab(
+                  label: ShellStrings.quickMenuTab,
+                  selected: false,
+                  onTap: onQuickMenuPressed,
+                ),
               ),
-            ),
-            Expanded(
-              child: _NavTab(
-                icon: Icons.person_outline,
-                label: ShellStrings.myPageTab,
-                selected: selectedIndex == 1,
-                onTap: () => onTabSelected(1),
+              Expanded(
+                child: _NavTab(
+                  icon: Icons.person_outline,
+                  label: ShellStrings.myPageTab,
+                  selected: selectedIndex == 1,
+                  onTap: () => onTabSelected(1),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -152,36 +111,6 @@ class _NavTab extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QuickMenuButton extends StatelessWidget {
-  const _QuickMenuButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: ShellMetrics.fabSize,
-      child: Material(
-        color: AppColors.primary,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: Semantics(
-            button: true,
-            label: ShellStrings.openQuickMenu,
-            child: const Icon(
-              Icons.add,
-              size: ShellMetrics.fabIconSize,
-              color: AppColors.onPrimary,
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -53,3 +53,25 @@ String _formatTime(DateTime at) =>
     '${_twoDigits(at.hour)}:${_twoDigits(at.minute)}';
 
 String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+/// 공연 기간을 표시 형식으로 바꾼다.
+///
+/// 하루 공연은 날짜 하나(`2026.11.15`), 기간 공연은 물결로 잇는다
+/// (`2026.07.05 ~ 07.07`). 끝 날짜의 연도는 시작과 같으면 생략한다 —
+/// 홈 카드는 폭이 좁아 `2026.07.05 ~ 2026.07.07` 이 두 줄로 접힌다.
+String formatShowPeriod(DateTime startAt, [DateTime? endAt]) {
+  if (endAt == null) return _formatDate(startAt);
+  final end = startAt.year == endAt.year
+      ? '${_twoDigits(endAt.month)}.${_twoDigits(endAt.day)}'
+      : _formatDate(endAt);
+  return '${_formatDate(startAt)} ~ $end';
+}
+
+/// 연도를 뺀 월·일과 요일. (예: `10.25 (금)`)
+/// 올해 안의 가까운 일정처럼 연도가 자명한 자리에 쓴다.
+String formatMonthDayWithWeekday(DateTime at) =>
+    '${_twoDigits(at.month)}.${_twoDigits(at.day)} '
+    '(${_weekdayNames[at.weekday - 1]})';
+
+/// 시:분만. (예: `14:00`) 날짜가 문맥으로 이미 정해진 자리에 쓴다.
+String formatClock(DateTime at) => _formatTime(at);

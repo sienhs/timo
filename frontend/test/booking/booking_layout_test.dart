@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 
 /// 레이아웃 스모크 테스트.
 ///
@@ -15,14 +16,23 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  /// 홈에서 예매 흐름으로 들어간다.
+  ///
+  /// 공연 상세 화면이 아직 없어 홈의 배너·카드 탭이 곧 좌석 선택 진입이다
+  /// (`HomeScreen._startBooking` 주석 참고). 상세가 생기면 이 함수만 고치면
+  /// 예매 흐름 테스트는 그대로 돈다.
+  Future<void> enterBookingFromHome(WidgetTester tester) async {
+    await tester.tap(find.byType(HomeBannerCarousel));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('폰 크기에서 예매 흐름 화면이 오버플로 없이 그려진다', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
-    await tester.tap(find.text('예매 화면 보기'));
-    await tester.pumpAndSettle();
+    await enterBookingFromHome(tester);
 
     expect(find.text('STAGE'), findsOneWidget);
     expect(find.text('* 1인 1매만 예매할 수 있어요'), findsOneWidget);
@@ -59,8 +69,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
-    await tester.tap(find.text('예매 화면 보기'));
-    await tester.pumpAndSettle();
+    await enterBookingFromHome(tester);
 
     await tester.tap(find.text('FLOOR B'));
     await tester.pumpAndSettle();
