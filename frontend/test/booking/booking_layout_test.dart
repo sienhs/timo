@@ -20,7 +20,10 @@ void main() {
     await tester.pumpWidget(const App());
     await tester.pumpAndSettle();
 
-    // 홈이 준비되기 전이라 구역 배치도에서 시작한다.
+    // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
+    await tester.tap(find.text('예매 화면 보기'));
+    await tester.pumpAndSettle();
+
     expect(find.text('STAGE'), findsOneWidget);
     expect(find.text('* 1인 1매만 예매할 수 있어요'), findsOneWidget);
 
@@ -53,6 +56,10 @@ void main() {
   testWidgets('매진 구역을 누르면 안내만 뜨고 진입하지 않는다', (tester) async {
     usePhoneSize(tester);
     await tester.pumpWidget(const App());
+    await tester.pumpAndSettle();
+
+    // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
+    await tester.tap(find.text('예매 화면 보기'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('FLOOR B'));
