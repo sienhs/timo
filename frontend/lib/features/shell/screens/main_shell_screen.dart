@@ -4,6 +4,7 @@ import '../../home/screens/home_screen.dart';
 import '../../mypage/screens/my_page_screen.dart';
 import '../constants.dart';
 import '../widgets/app_bottom_nav_bar.dart';
+import '../widgets/quick_menu_button.dart';
 import '../widgets/quick_menu_panel.dart';
 
 /// 하단 바를 소유하는 껍데기 화면. 탭이 바뀌면 본문만 갈아끼운다.
@@ -47,6 +48,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
         onTabSelected: (index) => setState(() => _selectedIndex = index),
         onQuickMenuPressed: _openQuickMenu,
       ),
+      // 원형 버튼은 바 위로 솟아 본문에 겹친다. 바 위젯에 넣으면 솟은 만큼을
+      // 바 높이에 더해야 하고, 그 띠가 흰 배경으로 채워져 바가 두 겹으로 보인다.
+      floatingActionButton: QuickMenuButton(onPressed: _openQuickMenu),
+      floatingActionButtonLocation: quickMenuButtonLocation,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
+import 'package:timo/features/shell/widgets/quick_menu_button.dart';
 
 void main() {
   Future<void> pumpShell(WidgetTester tester) async {
@@ -12,10 +13,8 @@ void main() {
     );
   }
 
-  Finder quickMenuButton() => find.descendant(
-        of: find.byType(AppBottomNavBar),
-        matching: find.byIcon(Icons.add),
-      );
+  // 원형 버튼은 바 안이 아니라 Scaffold 가 띄운다.
+  Finder quickMenuButton() => find.byType(QuickMenuButton);
 
   testWidgets('하단 바에 홈 · 빠른 메뉴 · 마이페이지가 있다', (tester) async {
     await pumpShell(tester);
@@ -31,6 +30,19 @@ void main() {
       findsOneWidget,
     );
     expect(quickMenuButton(), findsOneWidget);
+  });
+
+  testWidgets('+ 버튼은 바 위로 지름의 1/3 만 솟는다', (tester) async {
+    await pumpShell(tester);
+
+    final fab = tester.getRect(quickMenuButton());
+    final bar = tester.getRect(find.byType(AppBottomNavBar));
+
+    // 눈으로는 절반과 1/3 이 잘 구별되지 않아 수치로 굳힌다.
+    expect(bar.top - fab.top, closeTo(ShellMetrics.fabProtrusion, 0.5));
+    expect(fab.height, ShellMetrics.fabSize);
+    // 바 밖으로 삐져나가지 않는다.
+    expect(fab.bottom, lessThanOrEqualTo(bar.bottom));
   });
 
   testWidgets('탭을 바꿔도 하단 바는 그대로 있다', (tester) async {
