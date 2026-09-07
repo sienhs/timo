@@ -11,6 +11,14 @@ terraform {
       version = "~> 2.7"
     }
   }
+
+  backend "s3" {
+    bucket       = "timo-terraform-state-023433588174-ap-northeast-2-an"
+    key          = "ci/prod/terraform.tfstate"
+    region       = "ap-northeast-2"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 # Independent root: terraform -chdir=infra/ci init/plan/apply.
