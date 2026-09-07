@@ -43,9 +43,9 @@ class _AppState extends State<App> {
       child: MaterialApp(
         title: 'TIMO',
         theme: AppTheme.light,
-        // 좌석 선택 → 결제 → 완료가 이어졌으므로 흐름의 처음에서 시작한다.
-        // 홈 화면이 준비되면 AppRoutes.home 으로 되돌린다.
-        initialRoute: AppRoutes.zoneSelection,
+        // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+        // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+        initialRoute: AppRoutes.home,
         routes: AppRoutes.routes,
       ),
     );

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
-import '../features/home/screens/home_screen.dart';
+import '../features/shell/screens/main_shell_screen.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
 
@@ -25,7 +25,9 @@ class AppRoutes {
   static const paymentComplete = '/payment/complete';
 
   static final Map<String, WidgetBuilder> routes = {
-    home: (_) => const HomeScreen(),
+    // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
+    // 라우트로 노출하지 않는다.
+    home: (_) => const MainShellScreen(),
     zoneSelection: (_) => const ZoneSelectionScreen(),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.
