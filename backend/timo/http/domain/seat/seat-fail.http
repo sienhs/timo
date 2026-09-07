@@ -1,0 +1,396 @@
+###############################################################################
+# 좌석 등록 - 실패 케이스
+#
+# seat-common.http 를 먼저 실행해 {{seatVenueId}} 를 채워 둬야 한다.
+# 그 뒤로는 이 파일만 몇 번이든 다시 돌려도 되고, seat-success.http 와의 실행 순서도
+# 상관없다. 아래 헬스 체크가 실행마다 새 접미사를 뽑고, 구역명 중복 케이스는 자기가 쓸
+# 구역을 직접 등록해서 쓴다.
+#
+# 모든 에러 응답은 RFC 9457 Problem Details 를 따른다.
+#   type / title / status / instance / errorMessage / timestamp / exception
+#   @Valid 검증 실패일 때만 errors 배열이 추가로 붙는다.
+###############################################################################
+
+### 이번 실행의 구역명 접미사를 뽑는다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+
+    client.global.set("failSuffix", Math.floor(Math.random() * 900000) + 100000);
+%}
+
+### 필수값이 모두 빠지면 400 과 필드별 에러를 돌려준다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+}
+
+> {%
+    client.test("400 을 반환한다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "MethodArgumentNotValidException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("빠진 필드 2개가 errors 에 담긴다", function () {
+        const fields = (response.body.errors || []).map(e => e.field).sort();
+        client.assert(fields.length === 2, "errors: " + JSON.stringify(fields));
+        ["sections", "venueId"].forEach(function (f) {
+            client.assert(fields.indexOf(f) >= 0, "빠진 필드: " + f);
+        });
+    });
+%}
+
+### 구역이 빈 배열이면 400
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": []
+}
+
+> {%
+    const error = (response.body.errors || [])[0] || {};
+
+    client.test("최소 1개 규칙에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(error.field === "sections", "field: " + error.field);
+        client.assert(error.reason === "구역은 최소 1개여야 합니다.", "reason: " + error.reason);
+    });
+%}
+
+### 좌석 목록이 없으면 400 - 좌석은 나열해서만 등록된다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "좌석 없는 구역-{{failSuffix}}",
+      "price": 99000,
+      "rowCount": 10,
+      "seatPerRow": 20
+    }
+  ]
+}
+
+> {%
+    const error = (response.body.errors || [])[0] || {};
+
+    client.test("격자 크기만으로는 좌석을 만들 수 없다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(error.field === "sections[0].seats", "field: " + error.field);
+        client.assert(error.reason === "좌석은 최소 1개여야 합니다.", "reason: " + error.reason);
+    });
+%}
+
+### 좌석 목록이 빈 배열이면 400
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "빈 좌석 구역-{{failSuffix}}",
+      "price": 99000,
+      "seats": []
+    }
+  ]
+}
+
+> {%
+    const error = (response.body.errors || [])[0] || {};
+
+    client.test("빈 배열도 없는 것과 같이 걸러진다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(error.field === "sections[0].seats", "field: " + error.field);
+        client.assert(error.reason === "좌석은 최소 1개여야 합니다.", "reason: " + error.reason);
+    });
+%}
+
+### 같은 자리가 두 번 들어오면 400 - 유니크 제약에 걸려 500 이 되기 전에 막는다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "중복 자리 구역-{{failSuffix}}",
+      "price": 99000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 },
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("어느 자리가 겹쳤는지 알려준다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "DuplicatedSeatPositionException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "같은 좌석 자리가 두 번 들어왔습니다. (section=중복 자리 구역-"
+            + client.global.get("failSuffix") + ", seatNo=1, seatCol=1)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 선언한 격자 크기를 벗어난 자리가 있으면 400
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "범위 초과 구역-{{failSuffix}}",
+      "price": 99000,
+      "rowCount": 2,
+      "seatPerRow": 3,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 3, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("배치 범위 규칙에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "SeatPositionOutOfBoundsException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "좌석 자리가 구역의 배치 범위를 벗어났습니다. (section=범위 초과 구역-"
+            + client.global.get("failSuffix") + ", seatNo=3, seatCol=1, rowCount=2, seatPerRow=3)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 행 수가 상한을 넘으면 400 - 오타로 배치도가 터지는 것을 막는 장치
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "거대 구역-{{failSuffix}}",
+      "price": 99000,
+      "rowCount": 100000,
+      "seatPerRow": 20,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const error = (response.body.errors || [])[0] || {};
+
+    client.test("행 수 상한에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(error.field === "sections[0].rowCount", "field: " + error.field);
+        client.assert(error.reason === "행 수는 200 이하여야 합니다.", "reason: " + error.reason);
+    });
+%}
+
+### 좌석 번호가 0 이면 400 - 행·자리 번호는 1 부터 시작한다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "0번 자리 구역-{{failSuffix}}",
+      "price": 99000,
+      "seats": [
+        { "seatNo": 0, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const error = (response.body.errors || [])[0] || {};
+
+    client.test("어느 좌석의 어느 값이 틀렸는지 알려준다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(error.field === "sections[0].seats[0].seatNo", "field: " + error.field);
+        client.assert(error.reason === "행 번호는 1 이상이어야 합니다.", "reason: " + error.reason);
+    });
+%}
+
+### 존재하지 않는 공연장이면 404
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": 99999,
+  "sections": [
+    {
+      "name": "없는 공연장 구역-{{failSuffix}}",
+      "price": 150000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("404 와 공연장 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "VenueNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 공연장입니다. (venueId=99999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 중복 검사용 구역을 먼저 등록한다 - 다음 요청이 이 구역명을 다시 넣는다
+# seat-success.http 에 의존하지 않도록 이 파일이 직접 만든다.
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "중복 확인용 구역-{{failSuffix}}",
+      "price": 150000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("선행 구역이 만들어진다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+    });
+%}
+
+### 이미 등록된 구역명이면 409
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "중복 확인용 구역-{{failSuffix}}",
+      "price": 150000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("409 와 구역명 중복 예외를 반환한다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SectionNameDuplicatedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "이미 등록된 구역명입니다. (name=중복 확인용 구역-"
+            + client.global.get("failSuffix") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 한 요청 안에 같은 구역명이 두 번 들어오면 409 - 제약에 걸려 500 이 되기 전에 막는다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "4층 A블록-{{failSuffix}}",
+      "price": 50000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    },
+    {
+      "name": "4층 A블록-{{failSuffix}}",
+      "price": 40000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("요청 안의 중복도 409 로 걸러진다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SectionNameDuplicatedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "이미 등록된 구역명입니다. (name=4층 A블록-"
+            + client.global.get("failSuffix") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 필드 타입이 맞지 않으면 400 - 본문 파싱 단계에서 경로를 알려준다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "타입 오류 구역-{{failSuffix}}",
+      "price": 99000,
+      "rowCount": "열 개",
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const errors = response.body.errors || [];
+    const error = errors[0] || {};
+
+    client.test("본문 파싱 단계에서 400 이 된다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "HttpMessageNotReadableException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("어느 필드가 문제인지 알려준다", function () {
+        client.assert(errors.length === 1, "errors: " + JSON.stringify(errors));
+        client.assert(error.field === "sections[0].rowCount", "field: " + error.field);
+        client.assert(error.reason === "값의 형식이 올바르지 않습니다.", "reason: " + error.reason);
+    });
+%}
+
+### POST 전용 경로에 GET 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
+GET {{baseUrl}}/api/v1/seats
+
+> {%
+    client.test("405 도 Problem Details 로 내려온다", function () {
+        client.assert(response.status === 405, "status: " + response.status);
+        client.assert(response.body.exception === "HttpRequestMethodNotSupportedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage !== undefined, "errorMessage 가 없다");
+    });
+%}

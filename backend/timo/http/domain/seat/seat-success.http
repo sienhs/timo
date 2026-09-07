@@ -1,0 +1,211 @@
+###############################################################################
+# 좌석 등록 - 성공 케이스
+#
+# seat-common.http 를 먼저 실행해 {{seatVenueId}} 를 채워 둬야 한다.
+# 그 뒤로는 이 파일만 몇 번이든 다시 돌려도 된다. 아래 헬스 체크가 실행마다 새 접미사를
+# 뽑아 구역명에 붙이므로 uk_section_venue_name 에 걸리지 않는다.
+#
+# 좌석은 seats 에 자리를 나열해서만 등록된다. 실제 공연장은 통로로 비는 자리나 행마다
+# 다른 좌석 수가 흔해서 격자로 찍어내는 방식으로는 표현되지 않기 때문이다.
+#
+# rowCount / seatPerRow 는 배치도를 그릴 때 쓰는 격자 크기이고 선택값이다. 생략하면
+# 좌석 목록의 최대 번호에서 뽑아내고, 함께 보내면 그 값이 유지되면서 범위 검사 기준이 된다.
+#
+# seatCount 와 grade 는 요청으로 받지 않는다. 좌석 수는 실제로 만들어진 개수로,
+# 등급은 등급 구분이 생기기 전이라 COMMON 으로 서버가 채운다.
+###############################################################################
+
+### 이번 실행의 구역명 접미사를 뽑는다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+
+    client.global.set("sectionSuffix", Math.floor(Math.random() * 900000) + 100000);
+%}
+
+### 좌석을 나열해 등록한다 - 2행 2번 자리가 통로로 비어 있는 배치
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "1층 A블록-{{sectionSuffix}}",
+      "price": 150000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 },
+        { "seatNo": 1, "seatCol": 3 },
+        { "seatNo": 2, "seatCol": 1 },
+        { "seatNo": 2, "seatCol": 3 }
+      ]
+    }
+  ]
+}
+
+> {%
+    // 실패했을 때 단정 실패 위에 TypeError 가 겹치지 않도록 없는 필드는 빈 객체로 받는다.
+    const section = (response.body.sections || [])[0] || {};
+
+    client.test("201 로 구역이 만들어진다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(section.id !== undefined, "구역 id 가 비어 있다: " + JSON.stringify(response.body));
+    });
+
+    client.test("격자를 채우지 않고 나열한 5석만 등록된다", function () {
+        client.assert(section.seatCount === 5, "seatCount: " + section.seatCount);
+        client.assert(response.body.totalSeatCount === 5,
+            "totalSeatCount: " + response.body.totalSeatCount);
+    });
+
+    client.test("배치도 격자 크기는 좌석의 최대 번호에서 뽑아낸다", function () {
+        // 격자 크기는 2 x 3 = 6 이지만 실제 좌석은 5석이다.
+        client.assert(section.rowCount === 2, "rowCount: " + section.rowCount);
+        client.assert(section.seatPerRow === 3, "seatPerRow: " + section.seatPerRow);
+    });
+
+    client.test("등급과 가격은 구역 단위로 정해진다", function () {
+        client.assert(section.grade === "COMMON", "grade: " + section.grade);
+        client.assert(section.price === 150000, "price: " + section.price);
+    });
+
+    client.test("공연장 정보가 함께 내려온다", function () {
+        client.assert(response.body.venueName === client.global.get("seatVenueName"),
+            "venueName: " + response.body.venueName);
+    });
+
+    client.global.set("sectionId", section.id);
+%}
+
+### 행마다 좌석 수가 다른 배치도 그대로 등록된다
+# 1행 4석, 2행 3석, 3행 2석. 무대에 가까워질수록 좁아지는 구역 모양이다.
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "1층 B블록-{{sectionSuffix}}",
+      "price": 130000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 },
+        { "seatNo": 1, "seatCol": 3 },
+        { "seatNo": 1, "seatCol": 4 },
+        { "seatNo": 2, "seatCol": 1 },
+        { "seatNo": 2, "seatCol": 2 },
+        { "seatNo": 2, "seatCol": 3 },
+        { "seatNo": 3, "seatCol": 1 },
+        { "seatNo": 3, "seatCol": 2 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const section = (response.body.sections || [])[0] || {};
+
+    client.test("9석이 등록된다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(section.seatCount === 9, "seatCount: " + section.seatCount);
+    });
+
+    client.test("격자 크기는 가장 긴 행을 기준으로 잡힌다", function () {
+        // 3 x 4 = 12 자리 중 9석만 실제로 존재한다.
+        client.assert(section.rowCount === 3, "rowCount: " + section.rowCount);
+        client.assert(section.seatPerRow === 4, "seatPerRow: " + section.seatPerRow);
+    });
+%}
+
+### 배치도 격자 크기를 직접 보낸다 - 좌석이 격자 끝까지 닿지 않는 구역
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "2층 A블록-{{sectionSuffix}}",
+      "price": 99000,
+      "rowCount": 10,
+      "seatPerRow": 20,
+      "seats": [
+        { "seatNo": 1, "seatCol": 5 },
+        { "seatNo": 1, "seatCol": 6 },
+        { "seatNo": 9, "seatCol": 18 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const section = (response.body.sections || [])[0] || {};
+
+    client.test("보낸 격자 크기는 유도값으로 덮이지 않는다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        // 좌석의 최대 번호는 9 x 18 이지만 선언한 10 x 20 이 유지된다.
+        client.assert(section.rowCount === 10, "rowCount: " + section.rowCount);
+        client.assert(section.seatPerRow === 20, "seatPerRow: " + section.seatPerRow);
+    });
+
+    client.test("좌석 수는 격자 크기가 아니라 나열한 개수다", function () {
+        client.assert(section.seatCount === 3, "seatCount: " + section.seatCount);
+    });
+%}
+
+### 구역 여러 개를 한 번에 등록한다
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "3층 A블록-{{sectionSuffix}}",
+      "price": 70000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 },
+        { "seatNo": 2, "seatCol": 1 }
+      ]
+    },
+    {
+      "name": "3층 B블록-{{sectionSuffix}}",
+      "price": 50000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 }
+      ]
+    }
+  ]
+}
+
+> {%
+    const sections = response.body.sections || [];
+
+    client.test("구역 2개가 한 번에 만들어진다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(sections.length === 2, "sections: " + JSON.stringify(response.body));
+    });
+
+    client.test("전체 좌석 수는 구역별 좌석 수의 합이다", function () {
+        client.assert((sections[0] || {}).seatCount === 3,
+            "3층 A블록 seatCount: " + (sections[0] || {}).seatCount);
+        client.assert((sections[1] || {}).seatCount === 2,
+            "3층 B블록 seatCount: " + (sections[1] || {}).seatCount);
+        client.assert(response.body.totalSeatCount === 5,
+            "totalSeatCount: " + response.body.totalSeatCount);
+    });
+
+    client.test("보낸 순서대로 내려온다", function () {
+        const first = (sections[0] || {}).name || "";
+        const second = (sections[1] || {}).name || "";
+        client.assert(first.startsWith("3층 A블록"), "첫 번째 구역: " + first);
+        client.assert(second.startsWith("3층 B블록"), "두 번째 구역: " + second);
+    });
+%}

@@ -1,0 +1,55 @@
+###############################################################################
+# 좌석 API 공통 준비
+#
+# 실행 순서: seat-common.http 를 먼저 한 번. 그 뒤 seat-success.http 와
+# seat-fail.http 는 순서에 상관없이, 몇 번이든 다시 돌려도 된다.
+#
+# 이 파일은 좌석 등록에 필요한 선행 데이터를 만들고, 만들어진 식별자를
+# client.global 에 담아 둔다. 같은 실행 세션 안에서는 다른 .http 파일에서도
+# {{seatVenueId}} 로 꺼내 쓸 수 있다.
+#
+# [재실행] 구역명은 공연장 안에서만 유일하다(uk_section_venue_name). 그래서 이 파일을
+#   다시 실행하면 새 공연장이 만들어지고, 뒤따르는 파일들의 구역명 충돌도 함께 사라진다.
+#   공연장명에 실행마다 다른 runId 를 붙여 공연장명 유니크 제약(uk_venue_name)을 피한다.
+#   앱을 재기동할 필요가 없다.
+#
+# 공연 쪽 파일이 쓰는 {{venueId}} 와 이름을 겹치지 않게 {{seatVenueId}} 로 둔다.
+# 한 세션에서 concert-common.http 와 함께 돌려도 서로의 공연장을 덮지 않는다.
+#
+# 환경 변수는 프로젝트 루트의 http-client.env.json 에 있는 local 을 쓴다.
+# 실행 전에 우측 상단 드롭다운에서 local 을 선택해야 {{baseUrl}} 이 치환된다.
+###############################################################################
+
+### 헬스 체크 - 애플리케이션이 떠 있는지 먼저 확인하고 이번 실행의 runId 를 뽑는다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "UP", "health: " + response.body.status);
+    });
+
+    // 공연장명은 10자 제한이다. "아레나" + 6자리 = 9자로 맞춘다.
+    client.global.set("runId", Math.floor(Math.random() * 900000) + 100000);
+%}
+
+### 공연장 등록 - 좌석은 공연장이 있어야 등록할 수 있다
+POST {{baseUrl}}/api/v1/venues
+Content-Type: application/json
+
+{
+  "name": "아레나{{runId}}",
+  "address": "서울시 송파구 올림픽로 25",
+  "totalSeatCount": 11000
+}
+
+> {%
+    client.test("201 로 공연장이 만들어진다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.id !== null, "id 가 비어 있다");
+    });
+
+    // 이후 파일에서 {{seatVenueId}} / {{seatVenueName}} 으로 참조한다.
+    client.global.set("seatVenueId", response.body.id);
+    client.global.set("seatVenueName", response.body.name);
+%}
