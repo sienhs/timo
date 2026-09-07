@@ -1,7 +1,8 @@
 ###############################################################################
-# 공연 생성 - 성공 케이스
+# 공연 생성·조회 - 성공 케이스
 #
 # concert-common.http 를 먼저 실행해 {{venueId}} 를 채워 둬야 한다.
+# 조회 요청은 이 파일 첫 번째 생성 요청이 채워 둔 {{concertId}} 를 그대로 쓴다.
 ###############################################################################
 
 ### 모든 필드를 채워 공연을 생성한다
@@ -99,5 +100,33 @@ Content-Type: application/json
     client.test("중복이 제거돼 한 명만 등록된다", function () {
         client.assert(response.status === 201, "status: " + response.status);
         client.assert(response.body.artists.length === 1, "artists: " + response.body.artists.length);
+    });
+%}
+
+### 방금 생성한 공연을 조회한다 (앞의 첫 번째 요청이 {{concertId}} 를 채워 둔다)
+GET {{baseUrl}}/api/v1/concerts/{{concertId}}
+
+> {%
+    client.test("200 과 함께 공연장·아티스트·이미지까지 담긴 상세가 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.id === client.global.get("concertId"), "id: " + response.body.id);
+        client.assert(response.body.title === "아이유 HEREH WORLD TOUR", "title: " + response.body.title);
+        client.assert(response.body.venueName === "고척돔", "venueName: " + response.body.venueName);
+        client.assert(response.body.artists.length === 2, "artists: " + response.body.artists.length);
+        client.assert(response.body.imageUrls.length === 2, "imageUrls: " + response.body.imageUrls.length);
+    });
+
+    client.test("조회수가 1 증가했다", function () {
+        client.assert(response.body.viewCount === 1, "viewCount: " + response.body.viewCount);
+    });
+%}
+
+### 조회할 때마다 조회수가 1씩 더 오른다
+GET {{baseUrl}}/api/v1/concerts/{{concertId}}
+
+> {%
+    client.test("두 번째 조회라 조회수가 2 다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.viewCount === 2, "viewCount: " + response.body.viewCount);
     });
 %}
