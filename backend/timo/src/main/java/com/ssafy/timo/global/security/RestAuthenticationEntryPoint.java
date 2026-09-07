@@ -1,7 +1,6 @@
 package com.ssafy.timo.global.security;
 
 import com.ssafy.timo.global.exception.BusinessException;
-import com.ssafy.timo.global.security.exception.ForbiddenException;
 import com.ssafy.timo.global.security.exception.TokenExpiredException;
 import com.ssafy.timo.global.security.exception.TokenInvalidException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,21 +9,19 @@ import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerExceptionResolver;
-// BE 패키지 컨벤션 적용 X - security  
+
 @Slf4j
 @Component
-public class AuthExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
+public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private final HandlerExceptionResolver handlerExceptionResolver;
 
-    public AuthExceptionHandler(
+    public RestAuthenticationEntryPoint(
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver handlerExceptionResolver) {
         this.handlerExceptionResolver = handlerExceptionResolver;
     }
@@ -43,18 +40,11 @@ public class AuthExceptionHandler implements AuthenticationEntryPoint, AccessDen
                 authenticationException.getMessage());
 
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-        resolve(request, response, exception);
-    }
 
-    @Override
-    public void handle(HttpServletRequest request,
-                       HttpServletResponse response,
-                       AccessDeniedException accessDeniedException) throws IOException {
-
-        log.warn("Access denied: method={}, uri={}, reason={}",
-                request.getMethod(), request.getRequestURI(), accessDeniedException.getMessage());
-
-        resolve(request, response, new ForbiddenException());
+        if (handlerExceptionResolver.resolveException(request, response, null, exception) == null) {
+            log.error("Failed to resolve authentication exception, falling back to sendError");
+            response.sendError(exception.getErrorCode().getStatus().value());
+        }
     }
 
     private boolean isExpired(AuthenticationException authenticationException) {
@@ -64,16 +54,5 @@ public class AuthExceptionHandler implements AuthenticationEntryPoint, AccessDen
             }
         }
         return false;
-    }
-
-    private void resolve(HttpServletRequest request,
-                         HttpServletResponse response,
-                         BusinessException exception) throws IOException {
-
-        if (handlerExceptionResolver.resolveException(request, response, null, exception) == null) {
-            log.error("Failed to resolve security exception, falling back to sendError: exception={}",
-                    exception.getClass().getSimpleName());
-            response.sendError(exception.getErrorCode().getStatus().value());
-        }
     }
 }

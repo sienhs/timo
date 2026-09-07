@@ -1,9 +1,11 @@
 package com.ssafy.timo.global.config;
 
-import com.ssafy.timo.global.security.AuthExceptionHandler;
+import com.ssafy.timo.global.security.RestAccessDeniedHandler;
+import com.ssafy.timo.global.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,7 +21,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            JwtAuthenticationConverter jwtAuthenticationConverter,
-                                           AuthExceptionHandler authExceptionHandler) {
+                                           RestAuthenticationEntryPoint restAuthenticationEntryPoint,
+                                           RestAccessDeniedHandler restAccessDeniedHandler) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -27,15 +30,18 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/sms/send",
+                                "/api/v1/auth/sms/verify").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(e -> e
-                        .authenticationEntryPoint(authExceptionHandler)
-                        .accessDeniedHandler(authExceptionHandler)
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationEntryPoint(authExceptionHandler)
-                        .accessDeniedHandler(authExceptionHandler)
+                        .authenticationEntryPoint(restAuthenticationEntryPoint)
+                        .accessDeniedHandler(restAccessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
         return http.build();
