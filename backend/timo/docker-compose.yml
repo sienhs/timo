@@ -12,6 +12,8 @@ services:
       - "13306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      # 컨테이너 최초 생성 시에만 실행됨 (데이터 볼륨이 비어 있을 때)
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
