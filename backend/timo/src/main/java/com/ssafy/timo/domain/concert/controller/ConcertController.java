@@ -2,10 +2,13 @@ package com.ssafy.timo.domain.concert.controller;
 
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
+import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
 import com.ssafy.timo.domain.concert.service.ConcertService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,5 +40,11 @@ public class ConcertController {
         return ResponseEntity
                 .created(URI.create(BASE_PATH + "/" + response.id()))
                 .body(response);
+    }
+
+    /** 공연 상세를 조회한다. 조회할 때마다 조회수가 1 증가한다. */
+    @GetMapping("/{concertId}")
+    public ResponseEntity<ConcertDetailResponseDto> find(@PathVariable Long concertId) {
+        return ResponseEntity.ok(concertService.find(concertId));
     }
 }

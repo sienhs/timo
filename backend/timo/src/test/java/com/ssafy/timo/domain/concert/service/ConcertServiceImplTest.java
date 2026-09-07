@@ -5,11 +5,13 @@ import com.ssafy.timo.domain.artist.exception.ArtistNotFoundException;
 import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
+import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
 import com.ssafy.timo.domain.concert.entity.ConcertImage;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
+import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
 import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
@@ -271,6 +273,59 @@ class ConcertServiceImplTest {
         then(concertRepository).shouldHaveNoInteractions();
     }
 
+    @Test
+    @DisplayName("공연을 조회하면 공연장·아티스트·이미지까지 담긴 응답이 반환된다")
+    void find_success() {
+        // given
+        Concert concert = concertWithId(1L);
+        given(concertRepository.increaseViewCount(1L)).willReturn(1);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        givenImageStoragePrefixesKeys();
+
+        // when
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        // then
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.title()).isEqualTo("아이유 콘서트");
+        assertThat(response.venueId()).isEqualTo(10L);
+        assertThat(response.venueName()).isEqualTo("고척돔");
+        assertThat(response.artists())
+                .extracting(ConcertDetailResponseDto.ArtistSummary::name)
+                .containsExactly("아이유", "박효신");
+        assertThat(response.imageUrls()).containsExactly(
+                "https://cdn.timo.io/concert/1/detail-1.png",
+                "https://cdn.timo.io/concert/1/detail-2.png");
+    }
+
+    @Test
+    @DisplayName("조회할 때마다 조회수가 원자적으로 1 증가한다")
+    void find_increasesViewCountAtomically() {
+        // given
+        given(concertRepository.increaseViewCount(1L)).willReturn(1);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concertWithId(1L)));
+
+        // when
+        concertService.find(1L);
+
+        // then
+        then(concertRepository).should().increaseViewCount(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 공연이면 조회하지 않고 예외를 던진다")
+    void find_throwsWhenNotFound() {
+        // given
+        given(concertRepository.increaseViewCount(99L)).willReturn(0);
+
+        // when & then
+        assertThatThrownBy(() -> concertService.find(99L))
+                .isInstanceOf(ConcertNotFoundException.class)
+                .hasMessageContaining("99");
+
+        then(concertRepository).should(never()).findByIdWithVenue(any());
+    }
+
     private void givenVenueExists() {
         given(venueRepository.findById(10L)).willReturn(Optional.of(venue()));
     }
@@ -336,5 +391,24 @@ class ConcertServiceImplTest {
     private Concert withId(Concert concert, Long id) {
         ReflectionTestUtils.setField(concert, "id", id);
         return concert;
+    }
+
+    /** 상세 조회 응답을 검증하기 위해 공연장·아티스트·이미지가 모두 채워진 공연을 만든다. */
+    private Concert concertWithId(Long id) {
+        Concert concert = Concert.builder()
+                .title("아이유 콘서트")
+                .genre(ConcertGenre.CONCERT)
+                .posterImageKey(POSTER_KEY)
+                .description("2026 아이유 단독 콘서트")
+                .ageRating(AgeRating.AGE_7)
+                .startDate(START)
+                .endDate(END)
+                .openAt(OPEN_AT)
+                .venue(venue())
+                .build();
+        concert.addArtist(artist(20L, "아이유"));
+        concert.addArtist(artist(21L, "박효신"));
+        IMAGE_KEYS.forEach(concert::addImage);
+        return withId(concert, id);
     }
 }

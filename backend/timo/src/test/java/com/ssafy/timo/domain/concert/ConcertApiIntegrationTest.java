@@ -18,13 +18,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -350,6 +353,93 @@ class ConcertApiIntegrationTest {
                 .andExpect(jsonPath("$.exception").value("InvalidTicketOpenTimeException"));
 
         assertNothingSaved();
+    }
+
+    @Test
+    @DisplayName("공연을 조회하면 공연장·아티스트·이미지까지 담긴 상세가 반환된다")
+    void find_returnsConcertDetail() throws Exception {
+        Long concertId = saveFullConcert().getId();
+
+        mvc.perform(get("/api/v1/concerts/{concertId}", concertId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(concertId.intValue()))
+                .andExpect(jsonPath("$.title").value("아이유 콘서트"))
+                .andExpect(jsonPath("$.venueId").value(venueId.intValue()))
+                .andExpect(jsonPath("$.venueName").value("고척돔"))
+                .andExpect(jsonPath("$.artists.length()").value(2))
+                .andExpect(jsonPath("$.artists[0].name").value("아이유"))
+                .andExpect(jsonPath("$.artists[1].name").value("박효신"))
+                .andExpect(jsonPath("$.imageUrls.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("조회할 때마다 조회수가 1씩 증가한다")
+    void find_increasesViewCountOnEachCall() throws Exception {
+        Long concertId = saveFullConcert().getId();
+        em.flush();
+        em.clear();
+
+        mvc.perform(get("/api/v1/concerts/{concertId}", concertId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewCount").value(1));
+
+        // 벌크 업데이트는 영속성 컨텍스트를 갱신하지 않으므로, 직전 조회로 캐시된 엔티티를
+        // 비워야 두 번째 조회가 DB 에 반영된 최신 조회수를 읽는다.
+        em.clear();
+
+        mvc.perform(get("/api/v1/concerts/{concertId}", concertId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewCount").value(2));
+
+        em.clear();
+        assertThat(concertRepository.findById(concertId).orElseThrow().getViewCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("취소·종료된 공연도 상세는 그대로 조회된다")
+    void find_returnsConcertRegardlessOfStatus() throws Exception {
+        Concert concert = saveFullConcert();
+        ReflectionTestUtils.setField(concert, "status", ConcertStatus.CANCELED);
+        concertRepository.save(concert);
+        em.flush();
+        em.clear();
+
+        mvc.perform(get("/api/v1/concerts/{concertId}", concert.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 공연을 조회하면 404 를 반환한다")
+    void find_returnsNotFoundWhenMissing() throws Exception {
+        long missingConcertId = 999_999L;
+
+        mvc.perform(get("/api/v1/concerts/{concertId}", missingConcertId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("존재하지 않는 공연입니다. (concertId=" + missingConcertId + ")"))
+                .andExpect(jsonPath("$.exception").value("ConcertNotFoundException"));
+    }
+
+    private Concert saveFullConcert() {
+        Concert concert = Concert.builder()
+                .title("아이유 콘서트")
+                .genre(ConcertGenre.CONCERT)
+                .posterImageKey("concert/1/poster.png")
+                .description("2026 아이유 단독 콘서트")
+                .ageRating(AgeRating.AGE_7)
+                .startDate(LocalDateTime.of(2026, 4, 10, 19, 0))
+                .endDate(LocalDateTime.of(2026, 4, 12, 21, 0))
+                .openAt(LocalDateTime.of(2026, 3, 1, 20, 0))
+                .venue(venueRepository.getReferenceById(venueId))
+                .build();
+
+        concert.addArtist(artistRepository.getReferenceById(iuId));
+        concert.addArtist(artistRepository.getReferenceById(parkId));
+        concert.addImage("concert/1/detail-1.png");
+        concert.addImage("concert/1/detail-2.png");
+
+        return concertRepository.save(concert);
     }
 
     private String fullBody() {

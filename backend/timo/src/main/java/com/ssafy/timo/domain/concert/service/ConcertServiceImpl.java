@@ -5,7 +5,9 @@ import com.ssafy.timo.domain.artist.exception.ArtistNotFoundException;
 import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
+import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
 import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
 import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
@@ -58,6 +60,24 @@ public class ConcertServiceImpl implements ConcertService {
         request.imageKeysOrEmpty().forEach(concert::addImage);
 
         return CommandConcertResponseDto.from(concertRepository.save(concert), imageStorage);
+    }
+
+    /**
+     * 상태(취소·종료 포함)와 무관하게 조회할 수 있다 — 취소·종료된 공연도 상세 페이지는 남는다.
+     *
+     * <p>조회수는 매 조회마다 원자적으로 1 증가시킨다. 대상이 없으면 갱신된 행이 0 이므로,
+     * 그 시점에 바로 {@link ConcertNotFoundException} 을 던지고 뒤이은 조회는 하지 않는다.
+     */
+    @Override
+    public ConcertDetailResponseDto find(Long concertId) {
+        if (concertRepository.increaseViewCount(concertId) == 0) {
+            throw new ConcertNotFoundException(concertId);
+        }
+
+        Concert concert = concertRepository.findByIdWithVenue(concertId)
+                .orElseThrow(() -> new ConcertNotFoundException(concertId));
+
+        return ConcertDetailResponseDto.from(concert, imageStorage);
     }
 
     /**

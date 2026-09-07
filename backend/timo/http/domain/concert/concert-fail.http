@@ -1,5 +1,5 @@
 ###############################################################################
-# 공연 생성 - 실패 케이스
+# 공연 생성·조회 - 실패 케이스
 #
 # concert-common.http 를 먼저 실행해 {{venueId}} 를 채워 둬야 한다.
 #
@@ -211,5 +211,18 @@ GET {{baseUrl}}/api/v1/concerts
         client.assert(response.body.exception === "HttpRequestMethodNotSupportedException",
             "exception: " + response.body.exception);
         client.assert(response.body.errorMessage !== undefined, "errorMessage 가 없다");
+    });
+%}
+
+### 존재하지 않는 공연을 조회하면 404
+GET {{baseUrl}}/api/v1/concerts/999999999
+
+> {%
+    client.test("404 와 공연 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "ConcertNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 공연입니다. (concertId=999999999)",
+            "errorMessage: " + response.body.errorMessage);
     });
 %}
