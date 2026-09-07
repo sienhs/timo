@@ -1,23 +1,15 @@
 package com.ssafy.timo.global.exception;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+import com.ssafy.timo.support.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
 
+import static com.ssafy.timo.global.exception.ExceptionProbeConfig.ProbeController.CUSTOM_MESSAGE;
+import static com.ssafy.timo.global.exception.ExceptionProbeConfig.ProbeController.DUPLICATE_MESSAGE;
+import static com.ssafy.timo.global.exception.ExceptionProbeConfig.ProbeController.LEAKY_MESSAGE;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -29,15 +21,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * GlobalExceptionHandler 슬라이스 테스트.
+ * GlobalExceptionHandler 통합 테스트.
  *
- * <p>테스트 전용 컨트롤러를 등록해 실제 MVC 파이프라인(HandlerExceptionResolver -> @RestControllerAdvice)을
- * 그대로 태운 뒤, 응답이 합의된 스키마와 정확히 일치하는지 검증한다.
- * 시큐리티 필터는 예외 처리 자체와 무관하므로 비활성화한다.
+ * <p>{@link ExceptionProbeConfig} 의 프로브 컨트롤러로 실제 MVC 파이프라인
+ * (HandlerExceptionResolver -> @RestControllerAdvice)을 그대로 태운 뒤,
+ * 응답이 합의된 스키마와 정확히 일치하는지 검증한다.
  */
-@WebMvcTest(controllers = GlobalExceptionHandlerTest.TestController.class)
-@AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandlerTest.TestControllerConfig.class)
+@IntegrationTest
 class GlobalExceptionHandlerTest {
 
     private static final String TIMESTAMP_PATTERN = "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}";
@@ -55,7 +45,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.title").value("Bad Request"))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.instance").value("/test/duplicate"))
-                .andExpect(jsonPath("$.errorMessage").value(TestController.DUPLICATE_MESSAGE))
+                .andExpect(jsonPath("$.errorMessage").value(DUPLICATE_MESSAGE))
                 .andExpect(jsonPath("$.timestamp").value(matchesPattern(TIMESTAMP_PATTERN)))
                 // 실제 던져진 예외 클래스명이 그대로 찍힌다.
                 .andExpect(jsonPath("$.exception").value("DuplicateComponentException"))
@@ -81,7 +71,7 @@ class GlobalExceptionHandlerTest {
     void businessException_usesOverriddenMessage() throws Exception {
         mvc.perform(get("/test/business-exception/custom"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorMessage").value(TestController.CUSTOM_MESSAGE));
+                .andExpect(jsonPath("$.errorMessage").value(CUSTOM_MESSAGE));
     }
 
     @Test
@@ -122,6 +112,45 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("정의되지 않은 enum 값이면 어느 필드가 왜 틀렸는지 알려준다")
+    void unknownEnumValue_reportsFieldAndAllowedValues() throws Exception {
+        mvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"좌석A\",\"quantity\":1,\"genre\":\"GAMMA\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorMessage").value(ErrorCode.INVALID_INPUT_VALUE.getMessage()))
+                .andExpect(jsonPath("$.exception").value("HttpMessageNotReadableException"))
+                .andExpect(jsonPath("$.errors.length()").value(1))
+                .andExpect(jsonPath("$.errors[0].field").value("genre"))
+                .andExpect(jsonPath("$.errors[0].reason")
+                        .value("허용되지 않는 값입니다: GAMMA (가능한 값: ALPHA, BETA)"))
+                .andExpect(jsonPath("$.length()").value(8));
+    }
+
+    @Test
+    @DisplayName("배열 원소의 타입이 틀리면 몇 번째인지까지 알려준다")
+    void typeMismatchInArray_reportsIndexedPath() throws Exception {
+        mvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"좌석A\",\"quantity\":1,\"counts\":[1,\"틀린값\"]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("counts[1]"))
+                .andExpect(jsonPath("$.errors[0].reason").value("값의 형식이 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("JSON 자체가 깨졌으면 필드를 특정할 수 없으므로 errors 를 붙이지 않는다")
+    void malformedJson_hasNoFieldErrors() throws Exception {
+        mvc.perform(post("/test/validate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.exception").value("HttpMessageNotReadableException"))
+                .andExpect(jsonPath("$.errors").doesNotExist())
+                .andExpect(jsonPath("$.length()").value(7));
+    }
+
+    @Test
     @DisplayName("처리되지 않은 예외는 내부 정보를 숨기고 고정 메시지로 응답한다")
     void unhandledException_hidesInternalDetails() throws Exception {
         mvc.perform(get("/test/runtime-exception"))
@@ -129,7 +158,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.errorMessage").value(ErrorCode.INTERNAL_SERVER_ERROR.getMessage()))
                 .andExpect(jsonPath("$.exception").value("IllegalStateException"))
                 // 원본 메시지가 응답에 새어 나가면 안 된다.
-                .andExpect(content().string(not(containsString(TestController.LEAKY_MESSAGE))));
+                .andExpect(content().string(not(containsString(LEAKY_MESSAGE))));
     }
 
     @Test
@@ -146,66 +175,5 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.exception").value("HttpRequestMethodNotSupportedException"))
                 .andExpect(jsonPath("$.detail").doesNotExist())
                 .andExpect(jsonPath("$.length()").value(7));
-    }
-
-    @TestConfiguration
-    static class TestControllerConfig {
-
-        @Bean
-        TestController testController() {
-            return new TestController();
-        }
-    }
-
-    @RestController
-    static class TestController {
-
-        static final String CUSTOM_MESSAGE = "좌석이 이미 선점되었습니다.";
-        static final String DUPLICATE_MESSAGE = "이미 배치된 아이템이에요.";
-        static final String LEAKY_MESSAGE = "jdbc password is hunter2";
-
-        @GetMapping("/test/duplicate")
-        String duplicate() {
-            throw new DuplicateComponentException(DUPLICATE_MESSAGE);
-        }
-
-        @GetMapping("/test/business-exception")
-        String businessException() {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-
-        @GetMapping("/test/business-exception/custom")
-        String businessExceptionWithCustomMessage() {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, CUSTOM_MESSAGE);
-        }
-
-        @GetMapping("/test/business-exception/domain")
-        String businessExceptionWithDomainErrorCode() {
-            throw new BusinessException(TestErrorCode.TARGET_NOT_FOUND);
-        }
-
-        @PostMapping("/test/validate")
-        String validate(@Valid @RequestBody TestRequest request) {
-            return "ok";
-        }
-
-        @GetMapping("/test/runtime-exception")
-        String runtimeException() {
-            throw new IllegalStateException(LEAKY_MESSAGE);
-        }
-    }
-
-    /**
-     * 응답의 exception 필드에 구체적인 이름을 찍으려면 BusinessException 을 상속한다는 것을
-     * 확인하기 위한 테스트 전용 예외.
-     */
-    static class DuplicateComponentException extends BusinessException {
-
-        DuplicateComponentException(String message) {
-            super(ErrorCode.INVALID_INPUT_VALUE, message);
-        }
-    }
-
-    record TestRequest(@NotBlank String name, @Min(1) int quantity) {
     }
 }

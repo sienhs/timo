@@ -1,0 +1,340 @@
+package com.ssafy.timo.domain.concert.service;
+
+import com.ssafy.timo.domain.artist.entity.Artist;
+import com.ssafy.timo.domain.artist.exception.ArtistNotFoundException;
+import com.ssafy.timo.domain.artist.repository.ArtistRepository;
+import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
+import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
+import com.ssafy.timo.domain.concert.entity.AgeRating;
+import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.concert.entity.ConcertGenre;
+import com.ssafy.timo.domain.concert.entity.ConcertImage;
+import com.ssafy.timo.domain.concert.entity.ConcertStatus;
+import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
+import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
+import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.venue.entity.Venue;
+import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
+import com.ssafy.timo.domain.venue.repository.VenueRepository;
+import com.ssafy.timo.global.storage.ImageStorage;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.assertj.core.groups.Tuple;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+
+@ExtendWith(MockitoExtension.class)
+class ConcertServiceImplTest {
+
+    private static final LocalDateTime OPEN_AT = LocalDateTime.of(2026, 3, 1, 20, 0);
+    private static final LocalDateTime START = LocalDateTime.of(2026, 4, 10, 19, 0);
+    private static final LocalDateTime END = LocalDateTime.of(2026, 4, 12, 21, 0);
+
+    private static final String POSTER_KEY = "concert/1/poster.png";
+    private static final List<String> IMAGE_KEYS =
+            List.of("concert/1/detail-1.png", "concert/1/detail-2.png");
+
+    @Mock
+    private ConcertRepository concertRepository;
+
+    @Mock
+    private VenueRepository venueRepository;
+
+    @Mock
+    private ArtistRepository artistRepository;
+
+    @Mock
+    private ImageStorage imageStorage;
+
+    @InjectMocks
+    private ConcertServiceImpl concertService;
+
+    @Captor
+    private ArgumentCaptor<Concert> concertCaptor;
+
+    @Test
+    @DisplayName("공연을 생성하면 공연장·아티스트 정보까지 담긴 응답이 반환된다")
+    void create_success() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+        givenImageStoragePrefixesKeys();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(request(List.of(20L, 21L)));
+
+        // then
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.title()).isEqualTo("아이유 콘서트");
+        assertThat(response.genre()).isEqualTo(ConcertGenre.CONCERT);
+        assertThat(response.ageRating()).isEqualTo(AgeRating.AGE_7);
+        assertThat(response.venueId()).isEqualTo(10L);
+        assertThat(response.venueName()).isEqualTo("고척돔");
+    }
+
+    @Test
+    @DisplayName("출연 아티스트가 요청한 순서 그대로 응답에 담긴다")
+    void create_keepsRequestedArtistOrder() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(request(List.of(21L, 20L)));
+
+        // then
+        assertThat(response.artists())
+                .extracting(CommandConcertResponseDto.ArtistSummary::id)
+                .containsExactly(21L, 20L);
+        assertThat(response.artists())
+                .extracting(CommandConcertResponseDto.ArtistSummary::name)
+                .containsExactly("박효신", "아이유");
+    }
+
+    @Test
+    @DisplayName("이미지 key 는 저장소를 거쳐 URL 로 변환돼 응답에 담긴다")
+    void create_resolvesImageKeysToUrls() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+        givenImageStoragePrefixesKeys();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(request(List.of(20L)));
+
+        // then
+        assertThat(response.posterImageUrl()).isEqualTo("https://cdn.timo.io/" + POSTER_KEY);
+        assertThat(response.imageUrls()).containsExactly(
+                "https://cdn.timo.io/concert/1/detail-1.png",
+                "https://cdn.timo.io/concert/1/detail-2.png");
+    }
+
+    @Test
+    @DisplayName("상세 이미지는 요청 순서대로 노출 순서가 매겨진다")
+    void create_assignsSortOrderByRequestOrder() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+
+        // when
+        concertService.create(request(List.of(20L)));
+
+        // then
+        then(concertRepository).should().save(concertCaptor.capture());
+
+        assertThat(concertCaptor.getValue().getImages())
+                .extracting(ConcertImage::getImageKey, ConcertImage::getSortOrder)
+                .containsExactly(
+                        Tuple.tuple("concert/1/detail-1.png", 0),
+                        Tuple.tuple("concert/1/detail-2.png", 1));
+    }
+
+    @Test
+    @DisplayName("생성된 공연은 항상 예매 전 상태이고 조회수는 0이다")
+    void create_startsAsScheduledWithZeroViewCount() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(request(List.of(20L)));
+
+        // then
+        assertThat(response.status()).isEqualTo(ConcertStatus.SCHEDULED);
+        assertThat(response.viewCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 아티스트가 중복으로 들어오면 한 번만 등록된다")
+    void create_deduplicatesArtistIds() {
+        // given
+        givenVenueExists();
+        given(artistRepository.findAllById(anyList())).willReturn(List.of(artist(20L, "아이유")));
+        givenConcertSaved();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(request(List.of(20L, 20L, 20L)));
+
+        // then
+        assertThat(response.artists()).hasSize(1);
+        assertThat(response.artists().get(0).id()).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("이미지를 넣지 않아도 공연은 생성된다")
+    void create_allowsNoImages() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(
+                new CommandConcertRequestDto("아이유 콘서트", ConcertGenre.CONCERT, null, null,
+                        "설명", AgeRating.AGE_7, START, END, OPEN_AT, 10L, List.of(20L)));
+
+        // then
+        assertThat(response.imageUrls()).isEmpty();
+        assertThat(response.posterImageUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("일정을 넣지 않아도 공연은 생성된다")
+    void create_allowsNullSchedule() {
+        // given
+        givenVenueExists();
+        givenArtistsExist();
+        givenConcertSaved();
+
+        // when
+        CommandConcertResponseDto response = concertService.create(
+                request(List.of(20L), null, null, null));
+
+        // then
+        assertThat(response.startDate()).isNull();
+        assertThat(response.endDate()).isNull();
+        assertThat(response.openAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 공연장이면 저장하지 않고 예외를 던진다")
+    void create_throwsWhenVenueNotFound() {
+        // given
+        given(venueRepository.findById(10L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> concertService.create(request(List.of(20L))))
+                .isInstanceOf(VenueNotFoundException.class)
+                .hasMessageContaining("10");
+
+        then(concertRepository).should(never()).save(any(Concert.class));
+    }
+
+    @Test
+    @DisplayName("아티스트 중 하나라도 없으면 저장하지 않고 그 ID로 예외를 던진다")
+    void create_throwsWhenAnyArtistNotFound() {
+        // given
+        givenVenueExists();
+        given(artistRepository.findAllById(anyList())).willReturn(List.of(artist(20L, "아이유")));
+
+        // when & then
+        assertThatThrownBy(() -> concertService.create(request(List.of(20L, 99L))))
+                .isInstanceOf(ArtistNotFoundException.class)
+                .hasMessageContaining("99");
+
+        then(concertRepository).should(never()).save(any(Concert.class));
+    }
+
+    @Test
+    @DisplayName("종료일이 시작일보다 빠르면 조회조차 하지 않고 예외를 던진다")
+    void create_rejectsEndDateBeforeStartDate() {
+        // when & then
+        assertThatThrownBy(() -> concertService.create(
+                request(List.of(20L), START, START.minusDays(1), OPEN_AT)))
+                .isInstanceOf(InvalidConcertPeriodException.class);
+
+        then(venueRepository).shouldHaveNoInteractions();
+        then(artistRepository).shouldHaveNoInteractions();
+        then(concertRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("예매 오픈이 공연 시작 이후면 예외를 던진다")
+    void create_rejectsOpenAtAfterStartDate() {
+        // when & then
+        assertThatThrownBy(() -> concertService.create(
+                request(List.of(20L), START, END, START.plusHours(1))))
+                .isInstanceOf(InvalidTicketOpenTimeException.class);
+
+        then(concertRepository).shouldHaveNoInteractions();
+    }
+
+    private void givenVenueExists() {
+        given(venueRepository.findById(10L)).willReturn(Optional.of(venue()));
+    }
+
+    private void givenArtistsExist() {
+        given(artistRepository.findAllById(anyList()))
+                .willReturn(List.of(artist(20L, "아이유"), artist(21L, "박효신")));
+    }
+
+    private void givenConcertSaved() {
+        given(concertRepository.save(any(Concert.class))).willAnswer(inv -> withId(inv.getArgument(0), 1L));
+    }
+
+    private void givenImageStoragePrefixesKeys() {
+        given(imageStorage.getUrl(any())).willAnswer(inv -> {
+            String key = inv.getArgument(0);
+            return key == null ? null : "https://cdn.timo.io/" + key;
+        });
+    }
+
+    private CommandConcertRequestDto request(List<Long> artistIds) {
+        return request(artistIds, START, END, OPEN_AT);
+    }
+
+    private CommandConcertRequestDto request(List<Long> artistIds,
+                                             LocalDateTime startDate,
+                                             LocalDateTime endDate,
+                                             LocalDateTime openAt) {
+        return new CommandConcertRequestDto(
+                "아이유 콘서트",
+                ConcertGenre.CONCERT,
+                POSTER_KEY,
+                IMAGE_KEYS,
+                "2026 아이유 단독 콘서트",
+                AgeRating.AGE_7,
+                startDate,
+                endDate,
+                openAt,
+                10L,
+                artistIds);
+    }
+
+    private Venue venue() {
+        Venue venue = Venue.builder()
+                .name("고척돔")
+                .address("서울시 구로구 경인로 430")
+                .totalSeatCount(16000)
+                .build();
+        ReflectionTestUtils.setField(venue, "id", 10L);
+        return venue;
+    }
+
+    private Artist artist(Long id, String name) {
+        Artist artist = Artist.builder()
+                .name(name)
+                .profileImage("https://cdn.timo.io/" + id + ".png")
+                .build();
+        ReflectionTestUtils.setField(artist, "id", id);
+        return artist;
+    }
+
+    /** save() 이후 상태를 재현하기 위해 식별자만 리플렉션으로 채운다. */
+    private Concert withId(Concert concert, Long id) {
+        ReflectionTestUtils.setField(concert, "id", id);
+        return concert;
+    }
+}

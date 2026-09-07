@@ -1,0 +1,103 @@
+###############################################################################
+# 공연 생성 - 성공 케이스
+#
+# concert-common.http 를 먼저 실행해 {{venueId}} 를 채워 둬야 한다.
+###############################################################################
+
+### 모든 필드를 채워 공연을 생성한다
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "아이유 HEREH WORLD TOUR",
+  "genre": "CONCERT",
+  "posterImageKey": "concert/poster/iu-2026.png",
+  "imageKeys": [
+    "concert/detail/iu-1.png",
+    "concert/detail/iu-2.png"
+  ],
+  "description": "2026 아이유 월드투어 서울 공연",
+  "ageRating": "AGE_7",
+  "startDate": "2026-04-10T19:00:00",
+  "endDate": "2026-04-12T21:00:00",
+  "openAt": "2026-03-01T20:00:00",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}, {{artistId2}}]
+}
+
+> {%
+    client.test("201 과 Location 헤더를 반환한다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.headers.valueOf("Location") === "/api/v1/concerts/" + response.body.id,
+            "Location: " + response.headers.valueOf("Location"));
+    });
+
+    client.test("상태와 조회수는 서버가 정한다", function () {
+        client.assert(response.body.status === "SCHEDULED", "status: " + response.body.status);
+        client.assert(response.body.viewCount === 0, "viewCount: " + response.body.viewCount);
+    });
+
+    client.test("이미지 key 가 URL 로 변환돼 요청 순서대로 담긴다", function () {
+        client.assert(response.body.imageUrls.length === 2, "imageUrls: " + response.body.imageUrls.length);
+        client.assert(response.body.imageUrls[0].endsWith("concert/detail/iu-1.png"),
+            "첫 번째 이미지: " + response.body.imageUrls[0]);
+        client.assert(response.body.imageUrls[1].endsWith("concert/detail/iu-2.png"),
+            "두 번째 이미지: " + response.body.imageUrls[1]);
+        client.assert(response.body.posterImageUrl.endsWith("concert/poster/iu-2026.png"),
+            "포스터: " + response.body.posterImageUrl);
+    });
+
+    client.test("출연 아티스트 두 명이 함께 내려온다", function () {
+        client.assert(response.body.artists.length === 2, "artists: " + response.body.artists.length);
+        client.assert(response.body.artists[0].name, "첫 번째 아티스트 이름이 비어 있다");
+        client.assert(response.body.artists[1].name, "두 번째 아티스트 이름이 비어 있다");
+    });
+
+    client.test("공연장 정보가 함께 내려온다", function () {
+        client.assert(response.body.venueName === "고척돔", "venueName: " + response.body.venueName);
+    });
+
+    client.global.set("concertId", response.body.id);
+%}
+
+### 선택값 없이 최소 필드만으로 생성한다
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "소극장 단독 공연",
+  "genre": "PLAY",
+  "ageRating": "ALL",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("일정과 이미지가 없어도 생성된다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.startDate === null, "startDate: " + response.body.startDate);
+        client.assert(response.body.endDate === null, "endDate: " + response.body.endDate);
+        client.assert(response.body.openAt === null, "openAt: " + response.body.openAt);
+        client.assert(response.body.posterImageUrl === null, "posterImageUrl: " + response.body.posterImageUrl);
+        client.assert(response.body.imageUrls.length === 0, "imageUrls: " + response.body.imageUrls.length);
+    });
+%}
+
+### 같은 아티스트를 여러 번 넣으면 한 명으로 합쳐진다
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "중복 아티스트 확인용 공연",
+  "genre": "FESTIVAL",
+  "ageRating": "AGE_12",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}, {{artistId1}}, {{artistId1}}]
+}
+
+> {%
+    client.test("중복이 제거돼 한 명만 등록된다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.artists.length === 1, "artists: " + response.body.artists.length);
+    });
+%}

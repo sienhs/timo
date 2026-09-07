@@ -1,7 +1,13 @@
+# 좌석 선점 검증에 H2와 MySQL의 락 동작이 달라 실제 MySQL 스키마를 쓴다.
+#
+# worktree 병렬 작업 주의:
+#   ddl-auto: create-drop 이라 여러 워크트리가 같은 스키마에 테스트를 돌리면
+#   서로의 테이블을 drop 한다. 워크트리마다 TEST_DB / TEST_REDIS_DB 를 다르게 준다.
+#   사용 가능한 값: timo_test(기본) / timo_test_a / timo_test_b / timo_test_c / timo_test_d
+#   예) TEST_DB=timo_test_a TEST_REDIS_DB=11 ./gradlew test
 spring:
   datasource:
-    # 좌석 선점에 있어 h2와 mySQL 동작 방식이 달라 test 스키마 생성
-    url: jdbc:mysql://localhost:13306/timo_test?connectionTimeZone=Asia/Seoul
+    url: jdbc:mysql://localhost:13306/${TEST_DB:timo_test}?connectionTimeZone=Asia/Seoul
     username: timo
     password: timo1234
   jpa:
@@ -12,6 +18,12 @@ spring:
     redis:
       host: localhost
       port: 6379
-      database: 1
+      database: ${TEST_REDIS_DB:1}
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789
+
+# 이미지 key -> URL 변환을 검증할 수 있도록 base URL 을 준다.
+# 비워 두면 PlaceholderImageStorage 가 key 를 그대로 돌려주어 변환됐는지 구분할 수 없다.
+app:
+  image:
+    base-url: https://cdn.test.timo.io

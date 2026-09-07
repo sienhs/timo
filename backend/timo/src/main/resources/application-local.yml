@@ -3,6 +3,17 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
+    # 시드 SQL 을 Hibernate 가 스키마를 만든 뒤에 실행한다. 이게 없으면 테이블이
+    # 생기기 전에 스크립트가 돌아 실패한다.
+    defer-datasource-initialization: true
+  sql:
+    init:
+      # 기본값 embedded 는 H2 같은 내장 DB 에만 스크립트를 돌린다. MySQL 은 대상이 아니라 always 가 필요하다.
+      mode: always
+      # data.sql 대신 경로를 명시해, 프로필을 안 타는 위치에 시드가 놓여 실수로 운영에서 돌 일이 없게 한다.
+      data-locations: classpath:db/seed-local.sql
+      # 명시하지 않으면 플랫폼 기본 charset(윈도우는 MS949)으로 읽어 한글이 깨진다.
+      encoding: UTF-8
   docker:
     compose:
       lifecycle-management: start-only    # 앱 껐다 켤 때마다 DB가 내려가지 않게

@@ -1,0 +1,215 @@
+###############################################################################
+# 공연 생성 - 실패 케이스
+#
+# concert-common.http 를 먼저 실행해 {{venueId}} 를 채워 둬야 한다.
+#
+# 모든 에러 응답은 RFC 9457 Problem Details 를 따른다.
+#   type / title / status / instance / errorMessage / timestamp / exception
+#   @Valid 검증 실패일 때만 errors 배열이 추가로 붙는다.
+###############################################################################
+
+### 필수값이 모두 빠지면 400 과 필드별 에러를 돌려준다
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "description": "필수값 없음",
+  "venueId": null,
+  "artistIds": null
+}
+
+> {%
+    client.test("400 을 반환한다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "MethodArgumentNotValidException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("빠진 필드 5개가 errors 에 담긴다", function () {
+        const fields = response.body.errors.map(e => e.field).sort();
+        client.assert(fields.length === 5, "errors: " + JSON.stringify(fields));
+        ["ageRating", "artistIds", "genre", "title", "venueId"].forEach(function (f) {
+            client.assert(fields.indexOf(f) >= 0, "빠진 필드: " + f);
+        });
+    });
+%}
+
+### 출연 아티스트가 빈 배열이면 400
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "아티스트 없는 공연",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "venueId": {{venueId}},
+  "artistIds": []
+}
+
+> {%
+    client.test("최소 1명 규칙에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.errors[0].field === "artistIds",
+            "field: " + response.body.errors[0].field);
+        client.assert(response.body.errors[0].reason === "출연 아티스트는 최소 1명이어야 합니다.",
+            "reason: " + response.body.errors[0].reason);
+    });
+%}
+
+### 공연명이 200자를 넘으면 400
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("길이 제한에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.errors[0].field === "title",
+            "field: " + response.body.errors[0].field);
+        client.assert(response.body.errors[0].reason === "공연명은 200자 이하여야 합니다.",
+            "reason: " + response.body.errors[0].reason);
+    });
+%}
+
+### 존재하지 않는 공연장이면 404
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "없는 공연장의 공연",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "venueId": 99999,
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("404 와 공연장 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "VenueNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 공연장입니다. (venueId=99999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 존재하지 않는 아티스트가 섞여 있으면 404
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "없는 아티스트의 공연",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}, 99999]
+}
+
+> {%
+    client.test("404 와 문제가 된 아티스트 ID 를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "ArtistNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 아티스트입니다. (artistId=99999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 공연 종료일이 시작일보다 빠르면 400
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "기간이 뒤집힌 공연",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "startDate": "2026-04-10T19:00:00",
+  "endDate": "2026-04-09T21:00:00",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("공연 기간 규칙에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "InvalidConcertPeriodException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "공연 종료일은 시작일보다 빠를 수 없습니다.",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 예매 오픈이 공연 시작 이후면 400
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "예매가 늦게 열리는 공연",
+  "genre": "CONCERT",
+  "ageRating": "ALL",
+  "startDate": "2026-04-10T19:00:00",
+  "endDate": "2026-04-12T21:00:00",
+  "openAt": "2026-04-11T20:00:00",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("예매 오픈 시각 규칙에 걸린다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "InvalidTicketOpenTimeException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "예매 오픈은 공연 시작 전이어야 합니다.",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 정의되지 않은 장르 값이면 400 - 허용되는 값까지 알려준다
+# enum 파싱 실패는 @Valid 이전 Jackson 매핑 단계에서 터지지만,
+# GlobalExceptionHandler 가 경로를 꺼내 검증 실패와 같은 errors 배열로 맞춰 준다.
+POST {{baseUrl}}/api/v1/concerts
+Content-Type: application/json
+
+{
+  "title": "없는 장르의 공연",
+  "genre": "OPERA",
+  "ageRating": "ALL",
+  "venueId": {{venueId}},
+  "artistIds": [{{artistId1}}]
+}
+
+> {%
+    client.test("본문 파싱 단계에서 400 이 된다", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "HttpMessageNotReadableException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("어느 필드가 왜 틀렸는지 알려준다", function () {
+        client.assert(response.body.errors.length === 1, "errors: " + response.body.errors.length);
+        client.assert(response.body.errors[0].field === "genre",
+            "field: " + response.body.errors[0].field);
+        client.assert(response.body.errors[0].reason ===
+            "허용되지 않는 값입니다: OPERA (가능한 값: CONCERT, MUSICAL, PLAY, CLASSIC, FESTIVAL, SPORTS)",
+            "reason: " + response.body.errors[0].reason);
+    });
+%}
+
+### POST 전용 경로에 GET 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
+GET {{baseUrl}}/api/v1/concerts
+
+> {%
+    client.test("405 도 Problem Details 로 내려온다", function () {
+        client.assert(response.status === 405, "status: " + response.status);
+        client.assert(response.body.exception === "HttpRequestMethodNotSupportedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage !== undefined, "errorMessage 가 없다");
+    });
+%}

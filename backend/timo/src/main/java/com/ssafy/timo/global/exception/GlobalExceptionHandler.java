@@ -5,18 +5,26 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.databind.exc.MismatchedInputException;
+
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 전역 예외 처리. 응답은 RFC 9457 Problem Details(application/problem+json) 를 사용한다.
@@ -40,7 +48,9 @@ import java.util.Map;
  * <p>{@code exception} 은 실제로 던져진 예외의 클래스명이다. 위 예시처럼 구체적인 이름이 찍히게 하려면
  * {@link BusinessException} 을 상속한 예외를 만들어 던진다.
  *
- * <p>{@code @Valid} 검증 실패일 때만 어느 필드가 왜 틀렸는지 {@code errors} 배열이 추가로 붙는다.
+ * <p>어느 필드가 왜 틀렸는지 알 수 있을 때 {@code errors} 배열이 추가로 붙는다.
+ * {@code @Valid} 검증 실패가 대표적이고, enum 오타나 날짜 형식 오류처럼 본문 매핑 단계에서
+ * 실패한 경우에도 Jackson 이 알려주는 경로를 같은 모양으로 실어 보낸다.
  */
 @Slf4j
 @RestControllerAdvice
@@ -76,6 +86,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
                 .toList();
         body.setProperty("errors", errors);
+
+        return handleExceptionInternal(e, body, headers, status, request);
+    }
+
+    /**
+     * 본문을 읽지 못한 경우. enum 오타나 날짜 형식 오류처럼 Jackson 이 값을 매핑하지 못하면
+     * 여기로 오는데, 기본 응답은 어느 필드가 문제인지 알려주지 않는다.
+     * 그래서 Jackson 이 들고 있는 경로 정보를 꺼내 {@code @Valid} 실패와 같은 모양의
+     * {@code errors} 배열로 만들어 준다. 경로를 알 수 없는 경우(깨진 JSON 등)에는 붙이지 않는다.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException e,
+                                                                  HttpHeaders headers,
+                                                                  HttpStatusCode status,
+                                                                  WebRequest request) {
+        log.warn("Request body not readable: {}", e.getMessage());
+
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+        ProblemDetail body = problemDetail(errorCode.getStatus(), errorCode.getMessage(), e);
+        toFieldError(e.getCause()).ifPresent(fieldError -> body.setProperty("errors", List.of(fieldError)));
 
         return handleExceptionInternal(e, body, headers, status, request);
     }
@@ -128,6 +158,59 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problemDetail.setDetail(null);
         problemDetail.setProperty("timestamp", now());
         problemDetail.setProperty("exception", e.getClass().getSimpleName());
+    }
+
+    /** Jackson 매핑 실패에서 문제가 된 필드와 사유를 뽑아낸다. 경로를 알 수 없으면 비어 있다. */
+    private Optional<FieldError> toFieldError(Throwable cause) {
+        if (!(cause instanceof MismatchedInputException mismatch)) {
+            return Optional.empty();
+        }
+
+        String field = toFieldPath(mismatch.getPath());
+        if (field.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new FieldError(field, toReason(mismatch)));
+    }
+
+    /** 중첩 객체와 배열을 {@code artistIds[1]}, {@code venue.name} 처럼 이어 붙인다. */
+    private String toFieldPath(List<JacksonException.Reference> references) {
+        StringBuilder path = new StringBuilder();
+
+        for (JacksonException.Reference reference : references) {
+            if (reference.getPropertyName() != null) {
+                if (!path.isEmpty()) {
+                    path.append('.');
+                }
+                path.append(reference.getPropertyName());
+            } else if (reference.getIndex() >= 0) {
+                path.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+
+        return path.toString();
+    }
+
+    /**
+     * enum 은 허용되는 값을 함께 알려준다. 상수명은 API 규약의 일부라 노출해도 되는 정보다.
+     * 그 밖의 타입은 내부 클래스명이 새지 않도록 고정 문구만 쓴다.
+     */
+    private String toReason(MismatchedInputException e) {
+        Class<?> targetType = e.getTargetType();
+
+        if (targetType != null && targetType.isEnum()) {
+            String allowed = Arrays.stream(targetType.getEnumConstants())
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+            String rejected = e instanceof InvalidFormatException invalid
+                    ? String.valueOf(invalid.getValue())
+                    : "";
+
+            return "허용되지 않는 값입니다: %s (가능한 값: %s)".formatted(rejected, allowed);
+        }
+
+        return "값의 형식이 올바르지 않습니다.";
     }
 
     private String now() {
