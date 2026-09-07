@@ -1,0 +1,124 @@
+/// 회원가입 도메인의 문구·크기 상수.
+///
+/// 글자수 한계 같은 숫자와 그 숫자를 설명하는 문구를 같은 곳에 두어
+/// 한쪽만 바뀌는 일을 막는다(결제 도메인의 PaymentConstants 와 같은 방식).
+class AuthMetrics {
+  AuthMetrics._();
+
+  /// 회원가입 단계 수. 화면 오른쪽 위 'n/5' 의 분모.
+  static const totalSteps = 5;
+
+  static const pagePadding = 20.0;
+  static const headerLogoHeight = 24.0;
+  static const completeLogoHeight = 32.0;
+
+  /// 가입 완료 화면 가운데 그림 자리. 일러스트 파일이 오면 같은 크기로 바꾼다.
+  static const completeIllustrationSize = 120.0;
+
+  /// 입력칸 높이. 옆에 붙는 '중복 확인' 버튼도 이 높이에 맞춘다.
+  static const fieldHeight = 48.0;
+
+  /// 010 + 8자리.
+  static const phoneDigits = 11;
+  static const codeLength = 6;
+
+  /// DB `member.name` 컬럼 길이.
+  static const nameMinLength = 2;
+  static const nameMaxLength = 50;
+
+  /// DB `login_info.username` 은 50자까지지만 UX 상 20자로 막는다.
+  static const usernameMinLength = 4;
+  static const usernameMaxLength = 20;
+
+  /// 시안 문구 '닉네임 입력 (20글자까지)'. DB `member.nickname` 은 30자.
+  static const nicknameMinLength = 2;
+  static const nicknameMaxLength = 20;
+
+  static const passwordMinLength = 8;
+  static const passwordMaxLength = 20;
+
+  /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태를 눈으로 볼 수 있다.
+  static const mockLatency = Duration(milliseconds: 400);
+}
+
+class AuthAssets {
+  AuthAssets._();
+
+  /// 로고 이미지. 파일이 없으면 TimoLogo 가 글자로 대신 그린다.
+  static const logo = 'assets/images/timo_logo.png';
+}
+
+class AuthStrings {
+  AuthStrings._();
+
+  // 공통
+  static const next = '다음으로';
+  static const duplicateCheck = '중복 확인';
+  static String stepCounter(int step) => '$step/${AuthMetrics.totalSteps}';
+
+  // 1/5 본인인증 (전화번호 → 인증번호, 화면 두 개가 같은 제목을 쓴다)
+  static const verifyTitle = '안전한 거래를 위해\n본인인증을 진행할게요';
+  static const verifySubtitle = '티켓은 본인만 사용할 수 있어요';
+  static const phoneLabel = '전화번호';
+  static const phoneHint = '전화번호 입력';
+  static const requestCode = '인증번호 받기';
+  static const codeLabel = '인증번호';
+  static const codeHint = '인증번호 입력';
+  static const verify = '인증하기';
+  static const codeMismatch = '인증번호가 올바르지 않아요';
+
+  // 2/5 이름
+  static const nameTitle = '이름을 알려주세요';
+  static const nameSubtitle = '본인의 실명을 입력하여 주세요';
+  static const nameLabel = '이름';
+  static const nameHint = '이름 입력';
+
+  // 3/5 아이디
+  static const usernameTitle = '아이디를 설정해주세요';
+  static const usernameSubtitle = '비밀번호를 변경할 때 사용합니다';
+  static const usernameLabel = '아이디';
+  static const usernameHint = '아이디 입력';
+  static const usernameRule =
+      '영문 소문자·숫자·밑줄(_) '
+      '${AuthMetrics.usernameMinLength}~${AuthMetrics.usernameMaxLength}자, '
+      '첫 글자는 영문';
+  static const usernameAvailable = '사용할 수 있는 아이디예요';
+  static const usernameTaken = '이미 사용 중인 아이디예요';
+
+  // 아이디 확정 팝업. 3/5 에서 '다음으로' 를 누르면 뜬다.
+  static const confirmTitle = '이 이후로는 아이디를 바꿀 수 없어요';
+  static const confirmBody = '수정해야 할 사항이 있다면 밖을 클릭해주세요';
+  static const confirmAgree = '동의하고 진행하기';
+
+  // 4/5 비밀번호
+  static const passwordTitle = '비밀번호를 설정해주세요';
+  static const passwordSubtitle = '다른 곳과 겹치지 않게 유의해주세요';
+  static const passwordLabel = '비밀번호';
+  static const passwordHint = '${AuthMetrics.passwordMinLength}자 이상 입력';
+  static const passwordConfirmLabel = '비밀번호 확인';
+  static const passwordConfirmHint = '비밀번호 재입력';
+  static const passwordRule =
+      '영문·숫자·특수문자를 모두 넣어 '
+      '${AuthMetrics.passwordMinLength}~${AuthMetrics.passwordMaxLength}자';
+  static const passwordMismatch = '비밀번호가 일치하지 않아요';
+  static const showPassword = '비밀번호 보기';
+  static const hidePassword = '비밀번호 숨기기';
+
+  // 5/5 닉네임
+  static const nicknameTitle = '사용하실 닉네임을\n설정해주세요';
+  static const nicknameSubtitle = '다른 사람들이 모두 확인할 수 있는 닉네임이에요';
+  static const nicknameLabel = '닉네임 설정';
+  static const nicknameHint = '닉네임 입력 (${AuthMetrics.nicknameMaxLength}글자까지)';
+  static const nicknameRule =
+      '한글·영문·숫자 '
+      '${AuthMetrics.nicknameMinLength}~${AuthMetrics.nicknameMaxLength}자, '
+      '공백 없이';
+  static const nicknameAvailable = '사용할 수 있는 닉네임이에요';
+  static const nicknameTaken = '이미 사용 중인 닉네임이에요';
+  static const startSignup = '인증하고 시작하기';
+
+  // 가입 완료
+  static const completeTitle = '가입이 완료됐어요';
+  static const completeSubtitle = '이제 티켓을 예매할 수 있어요';
+  static const goToTickets = '티켓 보러 가기';
+}
