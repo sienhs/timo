@@ -1,5 +1,6 @@
-package com.ssafy.timo.domain.member.entity;
+package com.ssafy.timo.domain.auth.entity;
 
+import com.ssafy.timo.domain.member.entity.Member;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -30,7 +31,7 @@ public class LoginInfo {
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false, length = 60)
+    @Column(nullable = false, length = 255)
     private String passwordHash;
 
     @Builder
