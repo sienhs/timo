@@ -1,6 +1,8 @@
-/// 금액·날짜·시간 표시 포맷. 화면·위젯이 문자열 조립을 직접 하지 않게 모아 둔다.
+/// 금액·날짜·시간·전화번호 표시 포맷. 화면·위젯이 문자열 조립을 직접 하지
+/// 않게 모아 둔다.
 ///
-/// intl 패키지는 붙이지 않았다. 필요한 형태가 넷뿐이라 의존성을 늘릴 이유가 없다.
+/// intl 패키지는 붙이지 않았다. 필요한 형태가 몇 개뿐이라 의존성을 늘릴 이유가
+/// 없다.
 ///
 /// 확장(`186000.won`)이 아니라 함수로 두는 이유: `extension on int` 을 선언하면
 /// 앱의 모든 정수에 금액 getter 가 붙어 `seat.number.won`, `seatsPerRow.won`
@@ -39,6 +41,21 @@ String formatPerformedAtWithWeekday(DateTime at) =>
 String formatCountdown(Duration remaining) {
   final clamped = remaining.isNegative ? Duration.zero : remaining;
   return '${_twoDigits(clamped.inMinutes)}:${_twoDigits(clamped.inSeconds % 60)}';
+}
+
+/// 전화번호 숫자열에 하이픈을 넣는다. (예: `01012345678` -> `010-1234-5678`)
+///
+/// 입력 도중에도 쓰므로 자릿수가 모자라면 있는 만큼만 끊는다
+/// (`010` -> `010`, `0101234` -> `010-1234`). 하이픈이 섞여 들어와도 걷어내고
+/// 다시 넣으므로 같은 값을 여러 번 통과시켜도 결과가 같다.
+String formatPhoneNumber(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) {
+    return '${digits.substring(0, 3)}-${digits.substring(3)}';
+  }
+  return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-'
+      '${digits.substring(7)}';
 }
 
 const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];

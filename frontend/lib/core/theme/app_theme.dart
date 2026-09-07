@@ -122,6 +122,32 @@ class AppTheme {
           thickness: 1,
           space: 0,
         ),
+        // 입력칸 공통 모양. 시안의 입력칸은 얇은 회색 테두리·모서리 6 이고,
+        // 포커스가 오면 브랜드색으로 바뀐다.
+        //
+        // Material 3 에서는 border 하나만 주면 포커스·오류 상태의 색이 따라오지
+        // 않고 ColorScheme 기본값(primary·error)이 쓰인다. 오류색을
+        // AppColors.accent 로 맞추려면 상태별 테두리를 전부 명시해야 한다.
+        inputDecorationTheme: InputDecorationThemeData(
+          isDense: true,
+          // 글자를 bodyMedium(14 × 1.5 = 21) 으로 두면 칸 높이가
+          // 13.5 × 2 + 21 = 48 이 되어 옆에 붙는 버튼 높이와 딱 맞는다.
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 13.5,
+          ),
+          hintStyle: _textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+          helperStyle: _textTheme.labelMedium,
+          errorStyle: _textTheme.labelMedium?.copyWith(color: AppColors.accent),
+          border: _inputBorder(AppColors.border),
+          enabledBorder: _inputBorder(AppColors.border),
+          focusedBorder: _inputBorder(AppColors.primary, width: 1.5),
+          errorBorder: _inputBorder(AppColors.accent),
+          focusedErrorBorder: _inputBorder(AppColors.accent, width: 1.5),
+          disabledBorder: _inputBorder(AppColors.textDisabled),
+        ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
@@ -169,6 +195,13 @@ class AppTheme {
             borderRadius: BorderRadius.all(Radius.circular(8)),
           ),
         ),
+      );
+
+  /// 입력칸 테두리. 색과 굵기만 다르고 모서리는 버튼과 같은 6 이다.
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+        borderSide: BorderSide(color: color, width: width),
       );
 
   /// 다크 테마 시안은 아직 없다. develop 에 있던 시드 기반 구현을 그대로

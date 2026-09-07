@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/models/signup_draft.dart';
+import '../features/auth/screens/signup_code_screen.dart';
+import '../features/auth/screens/signup_complete_screen.dart';
+import '../features/auth/screens/signup_name_screen.dart';
+import '../features/auth/screens/signup_nickname_screen.dart';
+import '../features/auth/screens/signup_password_screen.dart';
+import '../features/auth/screens/signup_phone_screen.dart';
+import '../features/auth/screens/signup_username_screen.dart';
 import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
@@ -24,6 +32,15 @@ class AppRoutes {
   static const payment = '/payment';
   static const paymentComplete = '/payment/complete';
 
+  /// 회원가입. 단계 화면은 앞 단계까지 채운 SignupDraft 를 arguments 로 받는다.
+  static const signupPhone = '/signup/phone';
+  static const signupCode = '/signup/code';
+  static const signupName = '/signup/name';
+  static const signupUsername = '/signup/username';
+  static const signupPassword = '/signup/password';
+  static const signupNickname = '/signup/nickname';
+  static const signupComplete = '/signup/complete';
+
   static final Map<String, WidgetBuilder> routes = {
     // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
     // 라우트로 노출하지 않는다.
@@ -40,5 +57,21 @@ class AppRoutes {
     payment: (context) => PaymentScreen(order: ticketOrderOrSample(context)),
     paymentComplete: (context) =>
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
+    signupPhone: (_) => const SignupPhoneScreen(),
+    signupCode: (context) => SignupCodeScreen(draft: _signupDraft(context)),
+    signupName: (context) => SignupNameScreen(draft: _signupDraft(context)),
+    signupUsername: (context) =>
+        SignupUsernameScreen(draft: _signupDraft(context)),
+    signupPassword: (context) =>
+        SignupPasswordScreen(draft: _signupDraft(context)),
+    signupNickname: (context) =>
+        SignupNicknameScreen(draft: _signupDraft(context)),
+    signupComplete: (_) => const SignupCompleteScreen(),
   };
+
+  /// 회원가입 단계 화면이 받는 초안. 초안 없이 열리면(화면 단위 테스트,
+  /// 딥링크) 빈 초안으로 시작해 화면이 죽지 않게 한다.
+  static SignupDraft _signupDraft(BuildContext context) =>
+      ModalRoute.of(context)!.settings.arguments as SignupDraft? ??
+      const SignupDraft();
 }
