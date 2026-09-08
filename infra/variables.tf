@@ -113,3 +113,9 @@ variable "solapi_environment" {
   })
   sensitive = true
 }
+
+variable "domain_name" {
+  description = "Domain managed by the independent DNS root"
+  type        = string
+  default     = "ticketmoa.site"
+}

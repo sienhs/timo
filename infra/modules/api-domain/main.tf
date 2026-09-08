@@ -1,10 +1,10 @@
 data "aws_route53_zone" "domain" {
-  name         = "ticketmoa.site"
+  name         = var.domain_name
   private_zone = false
 }
 
 locals {
-  api_domain_name = "api.ticketmoa.site"
+  api_domain_name = "${var.subdomain}.${var.domain_name}"
 }
 
 resource "aws_acm_certificate" "api" {
@@ -43,13 +43,8 @@ resource "aws_route53_record" "api" {
   type    = "A"
 
   alias {
-    name                   = module.alb.dns_name
-    zone_id                = module.alb.zone_id
+    name                   = var.alb_dns_name
+    zone_id                = var.alb_zone_id
     evaluate_target_health = true
   }
-}
-
-output "api_url" {
-  description = "Public HTTPS endpoint for the backend API"
-  value       = "https://${local.api_domain_name}"
 }

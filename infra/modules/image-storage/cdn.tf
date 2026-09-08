@@ -78,12 +78,3 @@ resource "aws_cloudfront_distribution" "images" {
     cloudfront_default_certificate = true
   }
 }
-
-output "image_cdn_url" {
-  description = "Append /<S3 object key> to serve a public image over HTTPS"
-  value       = "https://${aws_cloudfront_distribution.images.domain_name}"
-}
-
-output "image_cdn_distribution_id" {
-  value = aws_cloudfront_distribution.images.id
-}

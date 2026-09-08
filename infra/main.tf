@@ -14,7 +14,7 @@ module "backend_secret" {
     DB_USERNAME            = var.db_username
     DB_PASSWORD            = var.db_password
     JWT_SECRET             = var.jwt_secret
-  }, var.solapi_environment))
+  }, var.solapi_environment, module.image_storage.runtime_environment))
 }
 
 module "backend_cicd" {
@@ -100,5 +100,21 @@ module "alb" {
   target_instance_id = module.ec2.instance_id
   app_port           = var.app_port
   health_check_path  = var.health_check_path
-  certificate_arn    = aws_acm_certificate_validation.api.certificate_arn
+  certificate_arn    = module.api_domain.certificate_arn
+}
+
+module "image_storage" {
+  source = "./modules/image-storage"
+
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+}
+
+module "api_domain" {
+  source = "./modules/api-domain"
+
+  domain_name  = var.domain_name
+  alb_dns_name = module.alb.dns_name
+  alb_zone_id  = module.alb.zone_id
 }
