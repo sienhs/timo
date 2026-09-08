@@ -2,6 +2,11 @@ variable "name" {
   type = string
 }
 
+variable "certificate_arn" {
+  description = "Validated ACM certificate in the ALB region"
+  type        = string
+}
+
 variable "vpc_id" {
   type = string
 }
