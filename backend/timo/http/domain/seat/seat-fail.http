@@ -383,8 +383,68 @@ Content-Type: application/json
     });
 %}
 
-### POST 전용 경로에 GET 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
+### 좌석 조회 - sectionId 없이 부르면 400
+# 좌석은 언제나 구역 단위로 조회한다. 공연장 전체 좌석은 한 응답에 실을 크기가 아니다.
 GET {{baseUrl}}/api/v1/seats
+
+> {%
+    client.test("필수 파라미터가 빠지면 400", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "MissingServletRequestParameterException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 좌석 조회 - sectionId 가 숫자가 아니면 400
+GET {{baseUrl}}/api/v1/seats?sectionId=abc
+
+> {%
+    client.test("타입이 어긋나면 400", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.errorMessage !== undefined, "errorMessage 가 없다");
+    });
+%}
+
+### 좌석 조회 - 존재하지 않는 구역이면 404
+GET {{baseUrl}}/api/v1/seats?sectionId=999999999
+
+> {%
+    client.test("404 와 구역 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "SectionNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 구역입니다. (sectionId=999999999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 구역 조회 - venueId 없이 부르면 400
+GET {{baseUrl}}/api/v1/sections
+
+> {%
+    client.test("필수 파라미터가 빠지면 400", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "MissingServletRequestParameterException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 구역 조회 - 존재하지 않는 공연장이면 404
+GET {{baseUrl}}/api/v1/sections?venueId=999999999
+
+> {%
+    client.test("404 와 공연장 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "VenueNotFoundException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 좌석 경로에 PUT 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
+PUT {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{}
 
 > {%
     client.test("405 도 Problem Details 로 내려온다", function () {
