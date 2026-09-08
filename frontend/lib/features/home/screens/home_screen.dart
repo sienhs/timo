@@ -139,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         HomeBannerCarousel(
           banners: MockHomeData.banners,
-          onBannerPressed: (_) => _startBooking(context),
+          onBannerPressed: (banner) => _openShowDetail(context, banner.showId),
         ),
         const SizedBox(height: HomeMetrics.sectionGap),
         const HomeSectionHeader(title: HomeStrings.artistSection),
@@ -161,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: HomeMetrics.sectionTitleGap),
         ShowCardRow(
           shows: MockHomeData.ticketOpenSoon,
-          onShowPressed: (_) => _startBooking(context),
+          onShowPressed: (show) => _openShowDetail(context, show.id),
           badgeBuilder: (show, _) {
             final openAt = show.ticketOpenAt;
             return openAt == null ? null : TicketOpenBadge(openAt: openAt);
@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: HomeMetrics.sectionTitleGap),
         ShowCardRow(
           shows: MockHomeData.popular,
-          onShowPressed: (_) => _startBooking(context),
+          onShowPressed: (show) => _openShowDetail(context, show.id),
           // 목록 순서가 순위다. 1위부터 세므로 인덱스에 1을 더한다.
           badgeBuilder: (_, index) => RankBadge(rank: index + 1),
         ),
@@ -190,13 +190,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _notify(context, HomeStrings.searchNotReady);
   }
 
-  /// 공연 상세 화면이 아직 없어 예매 흐름의 첫 화면으로 바로 보낸다.
-  ///
-  /// 그래서 어떤 카드를 눌러도 목업 공연(2026 아이유 콘서트)의 좌석이 나온다.
-  /// 상세가 생기면 여기서 공연 id 를 넘겨 상세로 보내고, 예매 진입은 상세가
-  /// 맡는다. 지금 이 연결을 빼면 앱에서 예매 흐름에 들어갈 길이 없다.
-  void _startBooking(BuildContext context) {
-    Navigator.pushNamed(context, AppRoutes.zoneSelection);
+  /// 공연 상세로 보낸다. 예매 진입은 상세가 맡는다 — 홈에서 좌석 선택으로
+  /// 바로 가면 무엇을 예매하는지 모른 채 좌석을 고르게 된다.
+  void _openShowDetail(BuildContext context, String showId) {
+    Navigator.pushNamed(context, AppRoutes.showDetail, arguments: showId);
   }
 
   void _notifyMoreNotReady(BuildContext context, String sectionTitle) {

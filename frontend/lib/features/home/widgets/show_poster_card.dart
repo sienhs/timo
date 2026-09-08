@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/show_summary.dart';
-import 'poster_image.dart';
+import '../../../core/widgets/poster_image.dart';
 
 /// 포스터 + 제목 + 기간으로 된 공연 카드.
 ///

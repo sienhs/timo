@@ -65,9 +65,9 @@ class MockHomeData {
     ArtistSummary(name: '페기구'),
   ];
 
-  /// 티켓 오픈 임박. 오픈이 빠른 순으로 둔다.
+  /// 티켓 오픈 임박. 오픈이 빠른 순으로 둔다. 이미 오픈한 공연(아이유·김준수·
+  /// 페기구)은 여기 없다 — 뱃지에 찍을 오픈 시각이 없기 때문이다.
   static final ticketOpenSoon = <ShowSummary>[
-    _iu,
     _blackSkirt,
     _remind,
     _bigbang,
@@ -88,8 +88,8 @@ class MockHomeData {
     posterAsset: _poster,
     startAt: DateTime(2026, 11, 1),
     endAt: DateTime(2026, 12, 31),
-    // 오늘 오픈 — 시안의 `오늘 14:00 오픈` 뱃지가 여기서 나온다.
-    ticketOpenAt: _today.add(const Duration(hours: 14)),
+    // 이미 오픈했다. 배너에 걸린 대표 공연이고 예매 목업도 이 공연이라,
+    // 배너 -> 상세 -> 예매로 이어지는 길이 시각에 상관없이 늘 열려 있어야 한다.
   );
 
   static final _remind = ShowSummary(
@@ -115,7 +115,8 @@ class MockHomeData {
     title: '검정치마 단독공연 : 401',
     posterAsset: _poster,
     startAt: DateTime(2026, 9, 20),
-    ticketOpenAt: _today.add(const Duration(days: 2, hours: 11)),
+    // 오늘 밤 오픈 — 상세 화면의 남은 시간 카운트다운이 여기서 나온다.
+    ticketOpenAt: _today.add(const Duration(hours: 22)),
   );
 
   static final _xia = ShowSummary(

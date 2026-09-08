@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../theme/app_colors.dart';
 
 /// 공연 포스터 이미지. 부모가 준 크기를 꽉 채우고, 못 읽으면 회색 자리로
 /// 대체한다.
 ///
-/// 결제 도메인에도 `PosterThumbnail` 이 있지만 합치지 않았다. 저쪽은 크기가
+/// 홈에 있던 위젯을 여기로 올렸다. 홈 카드 · 아티스트 아바타 · 배너에 이어
+/// 공연 상세까지 같은 이유로 쓰게 되어, 원래 파일에 적어 둔 승격 조건('세
+/// 번째 화면이 같은 이유로 포스터를 그리면')을 채웠다.
+///
+/// 결제 도메인의 `PosterThumbnail` 은 아직 합치지 않는다. 저쪽은 크기가
 /// 고정된 썸네일이고 이쪽은 부모 박스를 채우는 형태여서, 하나로 묶으면
-/// 크기 관련 파라미터가 양쪽 사정을 모두 받아야 한다. 세 번째 화면이 같은
-/// 이유로 포스터를 그리게 되면 그때 `common/widgets` 로 올린다.
+/// 크기 관련 파라미터가 양쪽 사정을 모두 받아야 한다.
 class PosterImage extends StatelessWidget {
   const PosterImage({
     super.key,
