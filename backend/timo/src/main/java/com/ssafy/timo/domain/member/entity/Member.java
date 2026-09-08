@@ -1,33 +1,51 @@
 package com.ssafy.timo.domain.member.entity;
 
+import com.ssafy.timo.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Entity
-@Table(name = "member")
+/**
+ * 서비스 이용자. 로그인 수단은 {@link com.ssafy.timo.domain.auth.entity.LoginInfo} 가 따로 들고 있다.
+ *
+ * <p>{@link com.ssafy.timo.global.entity.SoftDeletableEntity} 가 아니라 {@link BaseEntity} 를 상속한다.
+ * 탈퇴는 {@link MemberStatus#WITHDRAWN} 으로 표현하므로, 소프트 삭제 플래그까지 두면 "지워졌다" 를
+ * 나타내는 장치가 둘이 되어 조회 조건이 갈린다.
+ *
+ * <p>유니크 제약에 이름을 붙인 이유가 있다. 중복 확인 API 를 통과한 뒤 가입 요청이 도착하기까지
+ * 사이에 남이 같은 값을 채갈 수 있어, 최종 판정은 DB 제약 위반으로 이뤄진다. 그때 어느 값이
+ * 부딪혔는지(전화번호인지 닉네임인지) 구분해 409 로 내보내려면 예외에 실려 오는 제약 이름이 필요하다.
+ */
 @Getter
+@Entity
+@Table(name = "member",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_member_phone_number", columnNames = "phone_number"),
+                @UniqueConstraint(name = "uk_member_nickname", columnNames = "nickname")})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Member {
+public class Member extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "member_id")
     private Long id;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
 
-    @Column(nullable = false, unique = true, length = 20)
+    /** 하이픈 없는 숫자만 저장한다. {@code PhoneNumbers.normalize()} 를 거친 값이어야 한다. */
+    @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;
 
     @Enumerated(EnumType.STRING)
@@ -37,7 +55,7 @@ public class Member {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(nullable = false, length = 30)
     private String nickname;
 
     @Builder

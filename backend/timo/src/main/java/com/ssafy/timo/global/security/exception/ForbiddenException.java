@@ -1,8 +1,6 @@
 package com.ssafy.timo.global.security.exception;
 
-import com.ssafy.timo.global.exception.BusinessException;
-
-public class ForbiddenException extends BusinessException {
+public class ForbiddenException extends AuthException {
 
     public ForbiddenException() {
         super(AuthErrorCode.FORBIDDEN);

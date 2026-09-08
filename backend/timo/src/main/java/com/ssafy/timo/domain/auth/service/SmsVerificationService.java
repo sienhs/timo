@@ -27,7 +27,12 @@ import org.springframework.stereotype.Service;
 public class SmsVerificationService {
 
     private static final Duration CODE_TTL = Duration.ofMinutes(3);
-    private static final Duration TICKET_TTL = Duration.ofMinutes(10);
+    /*
+     * 인증을 통과한 뒤 이름·아이디·비밀번호·닉네임 네 단계를 더 지나야 가입 요청이 도착한다.
+     * 아이디 확정 팝업까지 있어 10분으로는 마지막 단계에서 티켓이 만료되는 사람이 나온다.
+     * 티켓은 32바이트 난수를 해시로 보관하는 1회용이라 이 정도 수명은 감당된다.
+     */
+    private static final Duration TICKET_TTL = Duration.ofMinutes(30);
     private static final Duration SEND_COOLDOWN = Duration.ofMinutes(1);
     private static final Duration DAILY_WINDOW = Duration.ofDays(1);
     private static final Duration IP_WINDOW = Duration.ofHours(1);
