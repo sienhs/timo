@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@Profile("!local")
+// @Profile("!local")
+@Profile("!local & !test")
 public class SolapiSmsSender implements SmsSender {
 
     private static final String MESSAGE_TEMPLATE = "[TIMO] 인증번호 %s 를 입력해 주세요.";

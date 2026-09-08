@@ -24,7 +24,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
-    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    // Redis 기능(캐시·분산 락 등)을 도입할 때 다시 활성화한다.
+    // implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'com.solapi:sdk:1.0.3'
     compileOnly 'org.projectlombok:lombok'

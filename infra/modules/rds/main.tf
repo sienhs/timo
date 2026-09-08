@@ -32,11 +32,11 @@ resource "aws_db_instance" "this" {
   publicly_accessible = false
 
   backup_retention_period = 0
-  deletion_protection      = false
-  skip_final_snapshot      = true
+  deletion_protection     = false
+  skip_final_snapshot     = true
 
   auto_minor_version_upgrade = true
-  apply_immediately           = true
+  apply_immediately          = true
 
   tags = {
     Name = "${var.name}-mysql"
