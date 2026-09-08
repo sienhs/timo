@@ -1,6 +1,6 @@
 import '../models/signup_draft.dart';
 
-/// 회원가입 화면이 서버에 요청하는 일 다섯 가지.
+/// 인증(회원가입·로그인) 화면이 서버에 요청하는 일 여섯 가지.
 ///
 /// 화면은 이 인터페이스만 알고, 지금은 [MockAuthApi] 가 꽂혀 있다. 백엔드
 /// API 가 나오면 같은 인터페이스를 구현한 클래스로 바꿔 끼우고 화면은 그대로
@@ -24,4 +24,8 @@ abstract class AuthApi {
   Future<bool> isNicknameAvailable(String nickname);
 
   Future<void> signUp(SignupDraft draft);
+
+  /// 아이디·비밀번호가 맞으면 true. 틀린 것은 예상되는 결과라 false 로
+  /// 돌려주고 예외로 던지지 않는다.
+  Future<bool> login({required String username, required String password});
 }

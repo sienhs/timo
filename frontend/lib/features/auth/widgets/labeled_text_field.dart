@@ -37,6 +37,7 @@ class LabeledTextField extends StatelessWidget {
     this.enableSuggestions = true,
     this.textInputAction,
     this.focusNode,
+    this.autofillHints,
     this.suffixIcon,
     this.trailing,
   });
@@ -61,6 +62,10 @@ class LabeledTextField extends StatelessWidget {
   final bool enableSuggestions;
   final TextInputAction? textInputAction;
   final FocusNode? focusNode;
+
+  /// 이 칸이 무엇인지(아이디·비밀번호 등) OS 에 알리는 자동완성 힌트.
+  /// 넘기면 저장된 로그인 정보를 제안해 준다. 안 넘기면 제안하지 않는다.
+  final Iterable<String>? autofillHints;
 
   /// 입력칸 안쪽 오른쪽 아이콘(비밀번호 보기 토글 등).
   final Widget? suffixIcon;
@@ -87,6 +92,7 @@ class LabeledTextField extends StatelessWidget {
       autocorrect: autocorrect,
       enableSuggestions: enableSuggestions,
       textInputAction: textInputAction,
+      autofillHints: autofillHints,
       // 힌트와 같은 크기여야 글자를 치기 시작할 때 칸 높이가 안 바뀐다.
       style: textTheme.bodyMedium,
       decoration: InputDecoration(

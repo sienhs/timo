@@ -8,6 +8,7 @@ import 'auth_api.dart';
 /// 그 외 입력은 모두 성공한다.
 /// - 인증번호 [invalidCode] 는 틀린 번호
 /// - 아이디 [takenUsernames], 닉네임 [takenNicknames] 는 이미 사용 중
+/// - 로그인 비밀번호 [wrongPassword] 는 틀린 비밀번호(아이디는 무엇이든)
 ///
 /// 응답마다 [latency] 만큼 기다려 실제 서버처럼 로딩 상태가 보이게 한다.
 /// 테스트에서는 `Duration.zero` 를 넣어 바로 응답받는다.
@@ -19,6 +20,7 @@ class MockAuthApi implements AuthApi {
   static const invalidCode = '000000';
   static const takenUsernames = {'timo', 'admin'};
   static const takenNicknames = {'티모'};
+  static const wrongPassword = 'wrong1234';
 
   Future<void> _respond() => Future<void>.delayed(latency);
 
@@ -48,4 +50,13 @@ class MockAuthApi implements AuthApi {
 
   @override
   Future<void> signUp(SignupDraft draft) => _respond();
+
+  @override
+  Future<bool> login({
+    required String username,
+    required String password,
+  }) async {
+    await _respond();
+    return password != wrongPassword;
+  }
 }
