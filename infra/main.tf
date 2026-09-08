@@ -100,4 +100,5 @@ module "alb" {
   target_instance_id = module.ec2.instance_id
   app_port           = var.app_port
   health_check_path  = var.health_check_path
+  certificate_arn    = aws_acm_certificate_validation.api.certificate_arn
 }
