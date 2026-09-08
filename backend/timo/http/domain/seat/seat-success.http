@@ -209,3 +209,77 @@ Content-Type: application/json
         client.assert(second.startsWith("3층 B블록"), "두 번째 구역: " + second);
     });
 %}
+
+### 공연장의 구역 목록을 조회한다 - 좌석 고르기 전 구역 선택 화면이 쓴다
+GET {{baseUrl}}/api/v1/sections?venueId={{seatVenueId}}
+
+> {%
+    const sections = response.body.sections || [];
+
+    client.test("200 과 함께 이 공연장의 구역이 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.venueId === client.global.get("seatVenueId"),
+            "venueId: " + response.body.venueId);
+        client.assert(sections.length >= 1, "sections: " + sections.length);
+    });
+
+    client.test("앞서 등록한 5석 구역이 잔여석과 함께 담긴다", function () {
+        const target = sections.filter(x => x.id === client.global.get("sectionId"))[0] || {};
+        client.assert(target.seatCount === 5, "seatCount: " + target.seatCount);
+        client.assert(target.availableCount === 5, "availableCount: " + target.availableCount);
+        client.assert(target.grade === "COMMON", "grade: " + target.grade);
+        client.assert(target.price === 150000, "price: " + target.price);
+    });
+
+    client.test("구역 목록에는 개별 좌석을 담지 않는다", function () {
+        client.assert(sections[0].seats === undefined, "seats 가 구역 목록에 들어 있다");
+    });
+
+    client.test("전체 좌석 수와 잔여석 합계가 함께 내려온다", function () {
+        const sum = sections.reduce((acc, x) => acc + x.seatCount, 0);
+        client.assert(response.body.totalSeatCount === sum,
+            "totalSeatCount: " + response.body.totalSeatCount + " vs " + sum);
+        client.assert(response.body.totalAvailableCount === sum,
+            "아직 판매 전이라 잔여석은 전체와 같아야 한다: " + response.body.totalAvailableCount);
+    });
+%}
+
+### 구역 하나의 좌석을 조회한다 - 배치도를 그리는 화면이 쓴다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const seats = response.body.seats || [];
+
+    client.test("200 과 함께 그 구역의 좌석만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.sectionId === client.global.get("sectionId"),
+            "sectionId: " + response.body.sectionId);
+        client.assert(seats.length === 5, "seats: " + seats.length);
+    });
+
+    client.test("등급·가격·격자는 좌석마다가 아니라 응답 머리에 한 번만 담긴다", function () {
+        client.assert(response.body.grade === "COMMON", "grade: " + response.body.grade);
+        client.assert(response.body.price === 150000, "price: " + response.body.price);
+        client.assert(response.body.rowCount === 2, "rowCount: " + response.body.rowCount);
+        client.assert(response.body.seatPerRow === 3, "seatPerRow: " + response.body.seatPerRow);
+        client.assert(seats[0].grade === undefined, "좌석에 grade 가 중복해서 들어 있다");
+        client.assert(seats[0].price === undefined, "좌석에 price 가 중복해서 들어 있다");
+    });
+
+    client.test("좌석은 배치도 순서(행 -> 자리)로 내려온다", function () {
+        const order = seats.map(x => x.seatNo + "-" + x.seatCol).join(",");
+        client.assert(order === "1-1,1-2,1-3,2-1,2-3", "순서: " + order);
+    });
+
+    client.test("통로로 비운 2행 2번 자리는 목록에 없다", function () {
+        const gap = seats.filter(x => x.seatNo === 2 && x.seatCol === 2);
+        client.assert(gap.length === 0, "빈 자리가 좌석으로 내려왔다");
+    });
+
+    client.test("좌석마다 상태가 담기고 잔여석이 함께 계산된다", function () {
+        client.assert(seats[0].status === "AVAILABLE", "status: " + seats[0].status);
+        client.assert(response.body.seatCount === 5, "seatCount: " + response.body.seatCount);
+        client.assert(response.body.availableCount === 5,
+            "availableCount: " + response.body.availableCount);
+    });
+%}

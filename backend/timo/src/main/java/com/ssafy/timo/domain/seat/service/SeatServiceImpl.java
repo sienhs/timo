@@ -2,11 +2,16 @@ package com.ssafy.timo.domain.seat.service;
 
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
+import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
+import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
+import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
 import com.ssafy.timo.domain.seat.exception.SeatPositionOutOfBoundsException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
+import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
+import com.ssafy.timo.domain.seat.repository.SectionAvailableCount;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
@@ -19,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +56,55 @@ public class SeatServiceImpl implements SeatService {
         }
 
         return CommandSeatResponseDto.from(venue, sections);
+    }
+
+    /**
+     * 공연장의 구역 목록을 잔여석과 함께 돌려준다.
+     *
+     * <p>개별 좌석은 읽지 않는다. 구역 선택 화면에 필요한 것은 구역당 남은 자리 수뿐이고,
+     * 공연장 전체 좌석을 읽으면 수만 건이 된다.
+     *
+     * <p>잔여석은 구역마다 세지 않고 group by 한 번으로 모아 온다. 구역 수만큼 count 쿼리를
+     * 날리면 그게 N+1 이다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public SectionListResponseDto findSections(Long venueId) {
+        Venue venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new VenueNotFoundException(venueId));
+
+        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId);
+        if (sections.isEmpty()) {
+            // 좌석을 아직 등록하지 않은 공연장이다. 오류가 아니므로 빈 목록으로 답한다.
+            return SectionListResponseDto.from(venue, sections, Map.of());
+        }
+
+        return SectionListResponseDto.from(venue, sections, availableCountsOf(sections));
+    }
+
+    /**
+     * 구역 하나의 좌석을 배치도 순서로 돌려준다.
+     *
+     * <p>페이지로 나누지 않는다. 배치도는 좌석이 전부 있어야 그려진다. 대신 범위가 구역 하나라
+     * 응답 크기가 공연장 전체가 아니라 구역 크기로 묶인다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public SectionSeatListResponseDto findSeats(Long sectionId) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new SectionNotFoundException(sectionId));
+
+        return SectionSeatListResponseDto.from(
+                section, seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId));
+    }
+
+    /** 구역 id -> 예매 가능 좌석 수. 남은 자리가 없는 구역은 키가 없으므로 읽는 쪽에서 0 으로 채운다. */
+    private Map<Long, Long> availableCountsOf(List<Section> sections) {
+        List<Long> sectionIds = sections.stream().map(Section::getId).toList();
+
+        return seatRepository.countByStatusGroupedBySection(sectionIds, SeatStatus.AVAILABLE).stream()
+                .collect(Collectors.toMap(
+                        SectionAvailableCount::sectionId, SectionAvailableCount::availableCount));
     }
 
     /**
