@@ -92,3 +92,22 @@ String formatMonthDayWithWeekday(DateTime at) =>
 
 /// 시:분만. (예: `14:00`) 날짜가 문맥으로 이미 정해진 자리에 쓴다.
 String formatClock(DateTime at) => _formatTime(at);
+
+/// 남은 시간을 `hh:mm:ss` 로 바꾼다. 음수는 0으로 본다. (예: `00:23:14`)
+///
+/// [formatCountdown] 과 나눠 둔다. 저쪽은 좌석 선점처럼 늘 10분 안쪽이라
+/// `mm:ss` 가 맞고, 이쪽은 티켓 오픈까지라 시간 자리가 필요하다. 하나로
+/// 합쳐 `시간이 0이면 생략` 규칙을 두면 결제 버튼의 남은 시간이 `09:59` 에서
+/// `00:09:59` 로 자리수가 오락가락한다.
+///
+/// 하루가 넘으면 시간 자리가 24를 넘어간다(`36:00:00`). 그렇게 긴 시간은
+/// 카운트다운으로 읽히지 않으므로, 화면이 오픈 일시를 그대로 보여 주는
+/// 쪽으로 갈라야 한다.
+String formatCountdownWithHours(Duration remaining) {
+  final clamped = remaining.isNegative ? Duration.zero : remaining;
+  return [
+    _twoDigits(clamped.inHours),
+    _twoDigits(clamped.inMinutes % 60),
+    _twoDigits(clamped.inSeconds % 60),
+  ].join(':');
+}

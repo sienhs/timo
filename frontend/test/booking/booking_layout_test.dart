@@ -18,11 +18,13 @@ void main() {
 
   /// 홈에서 예매 흐름으로 들어간다.
   ///
-  /// 공연 상세 화면이 아직 없어 홈의 배너·카드 탭이 곧 좌석 선택 진입이다
-  /// (`HomeScreen._startBooking` 주석 참고). 상세가 생기면 이 함수만 고치면
-  /// 예매 흐름 테스트는 그대로 돈다.
+  /// 홈 -> 공연 상세 -> 좌석 선택 순이다. 예매 진입은 상세가 맡으므로 홈에서
+  /// 좌석 선택으로 바로 갈 수는 없다. 배너에 걸린 대표 공연(아이유)은 이미
+  /// 오픈한 공연이라 언제 돌려도 예매 버튼이 나온다.
   Future<void> enterBookingFromHome(WidgetTester tester) async {
     await tester.tap(find.byType(HomeBannerCarousel));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('예매하러 가기'));
     await tester.pumpAndSettle();
   }
 

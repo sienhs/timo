@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/artist_summary.dart';
-import 'poster_image.dart';
+import '../../../core/widgets/poster_image.dart';
 
 /// 인기 아티스트 4×2 격자. 마지막 칸은 '더보기' 다.
 ///

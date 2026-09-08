@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/home_banner.dart';
-import 'poster_image.dart';
+import '../../../core/widgets/poster_image.dart';
 
 /// 상단 배너 캐러셀. 옆으로 넘길 수 있다는 걸 알리려고 다음 배너가 오른쪽에
 /// 살짝 걸쳐 보이게 한다([HomeMetrics.bannerViewportFraction]).

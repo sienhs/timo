@@ -12,6 +12,8 @@ import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/shell/screens/main_shell_screen.dart';
+import '../features/show/data/mock_show_detail_data.dart';
+import '../features/show/screens/show_detail_screen.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
 
@@ -22,6 +24,9 @@ class AppRoutes {
   AppRoutes._();
 
   static const home = '/';
+
+  /// 공연 상세. 공연 id 를 arguments 로 받는다.
+  static const showDetail = '/show';
 
   /// 구역 배치도(좌석 선택 시작)
   static const zoneSelection = '/booking/zones';
@@ -45,6 +50,14 @@ class AppRoutes {
     // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
     // 라우트로 노출하지 않는다.
     home: (_) => const MainShellScreen(),
+    // 목록에서는 공연 id 만 넘어온다. 상세 조회를 여기서 해 두면 화면은
+    // 모델만 받아 그리므로 상태별로 단독 실행할 수 있다. 모르는 id 로
+    // 열리면(딥링크) 표본 공연으로 대체한다.
+    showDetail: (context) => ShowDetailScreen(
+          detail: MockShowDetailData.byId(
+            ModalRoute.of(context)!.settings.arguments as String?,
+          ),
+        ),
     zoneSelection: (_) => const ZoneSelectionScreen(),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.
