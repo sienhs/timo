@@ -36,9 +36,12 @@ import java.lang.annotation.Target;
  * <p>{@code @Transactional} 이 붙어 있어 각 테스트가 끝나면 롤백된다. 컨텍스트를 공유해도
  * 테스트 간 데이터가 섞이지 않으므로 별도의 정리 코드가 필요 없다.
  *
- * <p>시큐리티 필터를 끄지 않는다. test 프로필에서는 {@code SecurityConfig} 가 활성이고
- * 현재 정책이 {@code permitAll} 이라 요청이 그대로 통과한다. 인증이 붙으면 실제 필터 체인을
- * 태운 채로 검증할 수 있다.
+ * <p>{@code addFilters = false} 로 시큐리티 필터 체인을 태우지 않는다. test 프로필에서도
+ * 운영 {@code SecurityConfig} 가 활성이라 {@code anyRequest().authenticated()} 정책이 걸리는데,
+ * 도메인 API 통합 테스트의 관심사는 인가가 아니라 상태 코드와 응답 스키마이기 때문이다.
+ *
+ * <p>따라서 <b>인가 정책은 이 애노테이션으로 검증되지 않는다.</b> 엔드포인트별 권한 규칙과
+ * 401/403 응답 스키마는 필터 체인을 실제로 태우는 별도 테스트에서 다뤄야 한다.
  *
  * <p>{@link ExceptionProbeConfig} 를 함께 올린다. 예외 처리 규약은 도메인 컨트롤러가 아니라
  * 전용 프로브 컨트롤러로 검증해야 하는데, 그것만 따로 등록하면 컨텍스트가 하나 더 뜨기 때문이다.
@@ -49,7 +52,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @Import(ExceptionProbeConfig.class)
 @Transactional
