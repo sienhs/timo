@@ -28,3 +28,10 @@ jwt:
 app:
   image:
     base-url: https://cdn.test.timo.io
+
+# SolapiSmsSender 가 @Profile("!local") 이라 test 프로필에서도 생성된다.
+# 실제 발송은 하지 않지만 생성자 주입 값이 없으면 컨텍스트가 뜨지 않는다.
+solapi:
+  api-key: test-api-key
+  api-secret: test-api-secret
+  sender-phone-number: "01000000000"
