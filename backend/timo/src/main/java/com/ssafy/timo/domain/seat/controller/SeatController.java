@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.seat.controller;
 
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,6 +50,22 @@ public class SeatController {
     @GetMapping
     public ResponseEntity<SectionSeatListResponseDto> findSeats(@RequestParam Long sectionId) {
         return ResponseEntity.ok(seatService.findSeats(sectionId));
+    }
+
+    /**
+     * 좌석을 선점한다. 5 분 동안 다른 회원이 잡을 수 없다.
+     *
+     * <p>요청자는 요청 본문이 아니라 {@link com.ssafy.timo.global.security.CurrentMemberProvider}
+     * 가 알려 준다. 인증이 붙어도 이 API 규약은 그대로다.
+     *
+     * <p>한 계정은 좌석 하나만 잡을 수 있어, 새로 잡으면 이전 선점이 함께 풀린다. 풀린 좌석은
+     * 응답의 {@code releasedSeatId} 로 알려 준다.
+     *
+     * <p>이미 내가 잡고 있는 좌석을 다시 부르면 만료 시각이 5 분 뒤로 갱신된다.
+     */
+    @PostMapping("/{seatId}/hold")
+    public ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId) {
+        return ResponseEntity.ok(seatService.hold(seatId));
     }
 
     @PostMapping

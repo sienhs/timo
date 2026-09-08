@@ -2,14 +2,17 @@ package com.ssafy.timo.domain.seat.service;
 
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
+import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
 import com.ssafy.timo.domain.seat.exception.SeatPositionOutOfBoundsException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
+import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
+import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
 import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
 import com.ssafy.timo.domain.seat.repository.SectionAvailableCount;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
@@ -17,10 +20,14 @@ import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
+import com.ssafy.timo.global.security.CurrentMemberProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,9 +40,14 @@ import java.util.stream.Collectors;
 @Transactional
 public class SeatServiceImpl implements SeatService {
 
+    /** 선점이 유지되는 시간. 결제까지 마칠 만하면서, 놓친 자리가 오래 묶이지 않을 만큼으로 잡았다. */
+    private static final Duration HOLD_DURATION = Duration.ofMinutes(5);
+
     private final SectionRepository sectionRepository;
     private final SeatRepository seatRepository;
     private final VenueRepository venueRepository;
+    private final CurrentMemberProvider currentMemberProvider;
+    private final Clock clock;
 
     /**
      * 공연장의 구역과 좌석을 등록한다.
@@ -79,7 +91,8 @@ public class SeatServiceImpl implements SeatService {
             return SectionListResponseDto.from(venue, sections, Map.of());
         }
 
-        return SectionListResponseDto.from(venue, sections, availableCountsOf(sections));
+        return SectionListResponseDto.from(
+                venue, sections, availableCountsOf(sections, LocalDateTime.now(clock)));
     }
 
     /**
@@ -95,14 +108,65 @@ public class SeatServiceImpl implements SeatService {
                 .orElseThrow(() -> new SectionNotFoundException(sectionId));
 
         return SectionSeatListResponseDto.from(
-                section, seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId));
+                section,
+                seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId),
+                LocalDateTime.now(clock));
+    }
+
+    /**
+     * 좌석을 선점한다.
+     *
+     * <p>대상 좌석을 <b>행 잠금과 함께</b> 읽고, 그 잠금 안에서 선점 가능 여부를 확인하고 상태를
+     * 바꾼다. 확인과 변경이 한 잠금 안에 있어야 같은 좌석에 대한 동시 선점이 성립하지 않는다.
+     *
+     * <p>만료된 선점은 그 자리에서 인수한다. 정리 작업을 따로 두지 않았으므로 만료 여부는 기준
+     * 시각으로 판단한다.
+     *
+     * <p>잠그는 순서는 <b>대상 좌석 -> 내가 잡고 있던 좌석</b>이다. 대상이 남의 선점이면 그 지점에서
+     * 바로 끝내므로 두 번째 잠금까지 가지 않고, 내가 잡고 있던 좌석은 나만 건드리는 행이라
+     * 두 요청이 서로를 기다리는 상황이 생기지 않는다.
+     */
+    @Override
+    public SeatHoldResponseDto hold(Long seatId) {
+        Long memberId = currentMemberProvider.currentMemberId();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        Seat seat = seatRepository.findByIdForUpdate(seatId)
+                .orElseThrow(() -> new SeatNotFoundException(seatId));
+
+        // 이미 내가 잡고 있는 좌석을 다시 누른 경우다. 만료 시각을 새로 미뤄 준다.
+        if (!seat.isHeldBy(memberId, now) && !seat.isHoldableAt(now)) {
+            throw new SeatNotHoldableException(seatId);
+        }
+
+        Long releasedSeatId = releasePreviousHold(memberId, now, seatId);
+        seat.hold(memberId, now.plus(HOLD_DURATION));
+
+        return SeatHoldResponseDto.from(seat, releasedSeatId);
+    }
+
+    /**
+     * 한 계정은 좌석 하나만 잡을 수 있으므로, 새로 잡기 전에 이전 선점을 푼다.
+     *
+     * @return 풀린 좌석 id. 이전 선점이 없었으면 {@code null}.
+     */
+    private Long releasePreviousHold(Long memberId, LocalDateTime now, Long targetSeatId) {
+        List<Seat> previous = seatRepository.findActiveHoldsOfMember(memberId, now, targetSeatId);
+        if (previous.isEmpty()) {
+            return null;
+        }
+
+        previous.forEach(Seat::releaseHold);
+
+        // 규칙상 한 건이다. 어긋난 데이터가 있어도 전부 풀고, 응답에는 가장 최근 것을 알려 준다.
+        return previous.get(previous.size() - 1).getId();
     }
 
     /** 구역 id -> 예매 가능 좌석 수. 남은 자리가 없는 구역은 키가 없으므로 읽는 쪽에서 0 으로 채운다. */
-    private Map<Long, Long> availableCountsOf(List<Section> sections) {
+    private Map<Long, Long> availableCountsOf(List<Section> sections, LocalDateTime now) {
         List<Long> sectionIds = sections.stream().map(Section::getId).toList();
 
-        return seatRepository.countByStatusGroupedBySection(sectionIds, SeatStatus.AVAILABLE).stream()
+        return seatRepository.countAvailableGroupedBySection(sectionIds, now).stream()
                 .collect(Collectors.toMap(
                         SectionAvailableCount::sectionId, SectionAvailableCount::availableCount));
     }

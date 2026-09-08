@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum SeatErrorCode implements BaseErrorCode {
 
+    SEAT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 좌석입니다."),
+    SEAT_NOT_HOLDABLE(HttpStatus.CONFLICT, "이미 선택된 좌석입니다."),
     SECTION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 구역입니다."),
     SECTION_NAME_DUPLICATED(HttpStatus.CONFLICT, "이미 등록된 구역명입니다."),
     DUPLICATED_SEAT_POSITION(HttpStatus.BAD_REQUEST, "같은 좌석 자리가 두 번 들어왔습니다."),

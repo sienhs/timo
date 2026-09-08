@@ -218,13 +218,13 @@ GET {{baseUrl}}/api/v1/sections?venueId={{seatVenueId}}
 
     client.test("200 과 함께 이 공연장의 구역이 내려온다", function () {
         client.assert(response.status === 200, "status: " + response.status);
-        client.assert(response.body.venueId === client.global.get("seatVenueId"),
+        client.assert(response.body.venueId === Number(client.global.get("seatVenueId")),
             "venueId: " + response.body.venueId);
         client.assert(sections.length >= 1, "sections: " + sections.length);
     });
 
     client.test("앞서 등록한 5석 구역이 잔여석과 함께 담긴다", function () {
-        const target = sections.filter(x => x.id === client.global.get("sectionId"))[0] || {};
+        const target = sections.filter(x => x.id === Number(client.global.get("sectionId")))[0] || {};
         client.assert(target.seatCount === 5, "seatCount: " + target.seatCount);
         client.assert(target.availableCount === 5, "availableCount: " + target.availableCount);
         client.assert(target.grade === "COMMON", "grade: " + target.grade);
@@ -252,7 +252,7 @@ GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
 
     client.test("200 과 함께 그 구역의 좌석만 내려온다", function () {
         client.assert(response.status === 200, "status: " + response.status);
-        client.assert(response.body.sectionId === client.global.get("sectionId"),
+        client.assert(response.body.sectionId === Number(client.global.get("sectionId")),
             "sectionId: " + response.body.sectionId);
         client.assert(seats.length === 5, "seats: " + seats.length);
     });
@@ -281,5 +281,92 @@ GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
         client.assert(response.body.seatCount === 5, "seatCount: " + response.body.seatCount);
         client.assert(response.body.availableCount === 5,
             "availableCount: " + response.body.availableCount);
+    });
+
+    // 선점 요청에서 쓴다.
+    client.global.set("seatId", seats[0].id);
+    client.global.set("otherSeatId", seats[1].id);
+%}
+
+### 좌석을 선점한다 - 인증 전이라 X-Member-Id 헤더로 요청자를 흉내 낸다
+POST {{baseUrl}}/api/v1/seats/{{seatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("200 과 함께 만료 시각을 알려준다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seatId === Number(client.global.get("seatId")),
+            "seatId: " + response.body.seatId);
+        client.assert(response.body.status === "RESERVED", "status: " + response.body.status);
+        client.assert(response.body.heldUntil !== null, "heldUntil 이 비어 있다");
+    });
+
+    client.test("만료는 지금부터 5분 뒤다", function () {
+        const remainMs = new Date(response.body.heldUntil).getTime() - Date.now();
+        client.assert(remainMs > 4 * 60 * 1000 && remainMs <= 5 * 60 * 1000 + 30 * 1000,
+            "남은 시간(ms): " + remainMs);
+    });
+
+    client.test("첫 선점이라 풀린 좌석은 없다", function () {
+        client.assert(response.body.releasedSeatId === null,
+            "releasedSeatId: " + response.body.releasedSeatId);
+    });
+
+    client.test("선점한 회원 id 는 응답에 담지 않는다", function () {
+        client.assert(response.body.heldByMemberId === undefined, "선점자가 노출됐다");
+    });
+%}
+
+### 선점한 좌석은 목록에서 RESERVED 로 보이고 잔여석에서 빠진다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const held = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("seatId")))[0] || {};
+
+    client.test("선점이 좌석 목록에 반영된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(held.status === "RESERVED", "status: " + held.status);
+        client.assert(response.body.availableCount === 4,
+            "availableCount: " + response.body.availableCount);
+    });
+%}
+
+### 같은 회원이 다른 좌석을 선점하면 이전 선점이 풀린다 (한 계정 동시 하나)
+POST {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("새 좌석이 잡히고 이전 좌석이 풀렸다고 알려준다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seatId === Number(client.global.get("otherSeatId")),
+            "seatId: " + response.body.seatId);
+        client.assert(response.body.releasedSeatId === Number(client.global.get("seatId")),
+            "releasedSeatId: " + response.body.releasedSeatId);
+    });
+%}
+
+### 이미 내가 잡은 좌석을 다시 누르면 만료만 미뤄진다
+POST {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("409 가 아니라 200 으로 갱신된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.releasedSeatId === null,
+            "내 좌석을 내가 다시 잡는 것이라 풀릴 자리가 없다: " + response.body.releasedSeatId);
+    });
+%}
+
+### 풀린 좌석은 다시 예매 가능이다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const released = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("seatId")))[0] || {};
+
+    client.test("이전에 잡았던 좌석이 AVAILABLE 로 돌아왔다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(released.status === "AVAILABLE", "status: " + released.status);
     });
 %}
