@@ -440,6 +440,114 @@ GET {{baseUrl}}/api/v1/sections?venueId=999999999
     });
 %}
 
+### 선점 실패 케이스용 구역을 직접 등록한다 - 이 파일만 돌려도 되도록
+# seat-success.http 의 전역에 기대지 않는다. 앱을 재기동하면 스키마가 새로 만들어져
+# 이전 실행의 좌석 id 가 사라지므로, 쓸 좌석은 이 파일이 그때그때 만든다.
+POST {{baseUrl}}/api/v1/seats
+Content-Type: application/json
+
+{
+  "venueId": {{seatVenueId}},
+  "sections": [
+    {
+      "name": "선점실패-{{failSuffix}}",
+      "price": 70000,
+      "seats": [
+        { "seatNo": 1, "seatCol": 1 },
+        { "seatNo": 1, "seatCol": 2 }
+      ]
+    }
+  ]
+}
+
+> {%
+    client.test("201 로 구역이 만들어진다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+    });
+
+    client.global.set("failSectionId", (response.body.sections || [])[0].id);
+%}
+
+### 방금 만든 구역의 좌석 id 를 받아 둔다
+GET {{baseUrl}}/api/v1/seats?sectionId={{failSectionId}}
+
+> {%
+    const seats = response.body.seats || [];
+
+    client.test("좌석 2석이 조회된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(seats.length === 2, "seats: " + seats.length);
+    });
+
+    client.global.set("failFreeSeatId", seats[0].id);
+    client.global.set("failHeldSeatId", seats[1].id);
+%}
+
+### 409 케이스 준비 - 1번 회원이 좌석 하나를 선점해 둔다
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("준비용 선점이 성공한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "RESERVED", "status: " + response.body.status);
+    });
+%}
+
+### 선점 - 남이 잡고 있는 좌석이면 409
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/hold
+X-Member-Id: 2
+
+> {%
+    client.test("409 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotHoldableException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("왜 안 되는지(남의 선점인지 판매 완료인지)는 알려주지 않는다", function () {
+        client.assert(response.body.heldByMemberId === undefined, "선점자가 노출됐다");
+        client.assert(response.body.heldUntil === undefined, "선점 만료 시각이 노출됐다");
+    });
+%}
+
+### 선점 - 요청자를 특정할 수 없으면 401
+POST {{baseUrl}}/api/v1/seats/{{failFreeSeatId}}/hold
+
+> {%
+    client.test("헤더가 없으면 401", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 선점 - 요청자 헤더가 숫자가 아니면 401
+POST {{baseUrl}}/api/v1/seats/{{failFreeSeatId}}/hold
+X-Member-Id: not-a-number
+
+> {%
+    client.test("깨진 헤더도 인증 실패로 다룬다", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 선점 - 존재하지 않는 좌석이면 404
+POST {{baseUrl}}/api/v1/seats/999999999/hold
+X-Member-Id: 1
+
+> {%
+    client.test("404 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 좌석입니다. (seatId=999999999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
 ### 좌석 경로에 PUT 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
 PUT {{baseUrl}}/api/v1/seats
 Content-Type: application/json
