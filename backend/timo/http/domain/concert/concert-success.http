@@ -130,3 +130,127 @@ GET {{baseUrl}}/api/v1/concerts/{{concertId}}
         client.assert(response.body.viewCount === 2, "viewCount: " + response.body.viewCount);
     });
 %}
+
+### 공연 목록을 조회한다 - 조건을 주지 않으면 최근 등록순 첫 페이지
+GET {{baseUrl}}/api/v1/concerts
+
+> {%
+    client.test("200 과 페이지 정보가 함께 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.number === 0, "number: " + response.body.page.number);
+        client.assert(response.body.page.size === 20, "size: " + response.body.page.size);
+        client.assert(response.body.page.totalElements >= 3,
+            "totalElements: " + response.body.page.totalElements);
+    });
+
+    client.test("Page 를 그대로 직렬화할 때 새어 나오는 내부 필드가 없다", function () {
+        client.assert(response.body.pageable === undefined, "pageable 이 노출됐다");
+        client.assert(response.body.sort === undefined, "sort 가 노출됐다");
+        client.assert(response.body.first === undefined, "first 는 PagedModel 에 없다");
+        client.assert(response.body.last === undefined, "last 는 PagedModel 에 없다");
+    });
+
+    client.test("가장 마지막에 만든 공연이 맨 앞에 온다", function () {
+        client.assert(response.body.content[0].title === "중복 아티스트 확인용 공연",
+            "첫 번째: " + response.body.content[0].title);
+    });
+
+    client.test("카드에 필요한 필드가 채워져 있다", function () {
+        const item = response.body.content[0];
+        client.assert(item.id !== undefined, "id 가 없다");
+        client.assert(item.venueName === "고척돔", "venueName: " + item.venueName);
+        client.assert(item.status !== undefined, "status 가 없다");
+    });
+
+    client.test("목록에는 아티스트와 상세 이미지를 담지 않는다", function () {
+        const item = response.body.content[0];
+        client.assert(item.artists === undefined, "artists 가 목록에 들어 있다");
+        client.assert(item.imageUrls === undefined, "imageUrls 가 목록에 들어 있다");
+    });
+%}
+
+### 페이지 크기를 지정한다
+GET {{baseUrl}}/api/v1/concerts?page=0&size=2
+
+> {%
+    client.test("요청한 크기만큼만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length === 2,
+            "content: " + response.body.content.length);
+        client.assert(response.body.page.size === 2, "size: " + response.body.page.size);
+        client.assert(response.body.page.totalPages >= 2,
+            "totalPages: " + response.body.page.totalPages);
+    });
+%}
+
+### 조회수 많은 순으로 정렬한다 - 앞에서 두 번 조회한 공연이 맨 앞에 온다
+GET {{baseUrl}}/api/v1/concerts?sort=POPULAR
+
+> {%
+    client.test("조회수가 가장 높은 공연이 먼저 나온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content[0].title === "아이유 HEREH WORLD TOUR",
+            "첫 번째: " + response.body.content[0].title);
+        client.assert(response.body.content[0].viewCount >= 2,
+            "viewCount: " + response.body.content[0].viewCount);
+    });
+%}
+
+### 예매 오픈이 이른 순으로 정렬한다 - 오픈 미정인 공연은 뒤로 간다
+GET {{baseUrl}}/api/v1/concerts?sort=OPEN_SOON
+
+> {%
+    client.test("오픈 일시가 있는 공연이 미정인 공연보다 앞에 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+
+        const openAts = response.body.content.map(c => c.openAt);
+        const lastWithValue = openAts.reduce(function (acc, v, i) {
+            return v !== null ? i : acc;
+        }, -1);
+        const firstWithoutValue = openAts.indexOf(null);
+
+        client.assert(firstWithoutValue === -1 || firstWithoutValue > lastWithValue,
+            "오픈 미정이 앞에 있다: " + JSON.stringify(openAts));
+    });
+%}
+
+### 장르로 필터한다
+GET {{baseUrl}}/api/v1/concerts?genre=PLAY
+
+> {%
+    client.test("해당 장르만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length >= 1,
+            "content: " + response.body.content.length);
+        response.body.content.forEach(function (c) {
+            client.assert(c.genre === "PLAY", "genre: " + c.genre);
+        });
+    });
+%}
+
+### 공연명으로 검색한다 - 부분 일치
+GET {{baseUrl}}/api/v1/concerts?keyword=아이유
+
+> {%
+    client.test("공연명에 검색어가 들어간 공연만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length >= 1,
+            "content: " + response.body.content.length);
+        response.body.content.forEach(function (c) {
+            client.assert(c.title.indexOf("아이유") >= 0, "title: " + c.title);
+        });
+    });
+%}
+
+### 조건에 맞는 공연이 없어도 200 과 빈 목록을 준다
+GET {{baseUrl}}/api/v1/concerts?keyword=존재하지않는공연명
+
+> {%
+    client.test("빈 목록은 오류가 아니다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length === 0,
+            "content: " + response.body.content.length);
+        client.assert(response.body.page.totalElements === 0,
+            "totalElements: " + response.body.page.totalElements);
+    });
+%}

@@ -3,11 +3,15 @@ package com.ssafy.timo.domain.concert.controller;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
+import com.ssafy.timo.domain.concert.dto.ConcertListRequestDto;
+import com.ssafy.timo.domain.concert.dto.ConcertSummaryResponseDto;
 import com.ssafy.timo.domain.concert.service.ConcertService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +44,17 @@ public class ConcertController {
         return ResponseEntity
                 .created(URI.create(BASE_PATH + "/" + response.id()))
                 .body(response);
+    }
+
+    /**
+     * 조건에 맞는 공연 목록을 페이지 단위로 조회한다.
+     *
+     * <p>조건은 모두 선택값이라 {@code GET /api/v1/concerts} 만 호출해도 된다. 상세 조회와 달리
+     * 조회수는 올라가지 않는다.
+     */
+    @GetMapping
+    public ResponseEntity<PagedModel<ConcertSummaryResponseDto>> findAll(@Valid @ModelAttribute ConcertListRequestDto request) {
+        return ResponseEntity.ok(concertService.findAll(request));
     }
 
     /** 공연 상세를 조회한다. 조회할 때마다 조회수가 1 증가한다. */
