@@ -79,4 +79,37 @@ variable "db_username" {
 variable "db_password" {
   description = "RDS password"
   type        = string
+  sensitive   = true
+}
+
+variable "jwt_secret" {
+  description = "JWT HS256 signing key. Use at least 32 random bytes."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.jwt_secret) >= 32 && !startswith(var.jwt_secret, "REPLACE_WITH_")
+    error_message = "Set jwt_secret to a random value of at least 32 characters; do not leave the example value."
+  }
+}
+
+variable "gitlab_project_path" {
+  description = "Exact GitLab project path, for example group/project"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^:/\\s]+(/[^:/\\s]+)+$", var.gitlab_project_path))
+    error_message = "Use group/project only, without https:// or a hostname."
+  }
+}
+
+variable "solapi_environment" {
+  description = "SolAPI credentials, registered sender and opt-in live-test recipient"
+  type = object({
+    SOLAPI_API_KEY      = string
+    SOLAPI_API_SECRET   = string
+    SOLAPI_SENDER_PHONE = string
+    SMS_LIVE_TEST_TO    = string
+  })
+  sensitive = true
 }

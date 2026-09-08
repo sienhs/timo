@@ -3,6 +3,7 @@
 # worktree 병렬 작업 주의:
 #   ddl-auto: create-drop 이라 여러 워크트리가 같은 스키마에 테스트를 돌리면
 #   서로의 테이블을 drop 한다. 워크트리마다 TEST_DB / TEST_REDIS_DB 를 다르게 준다.
+#   현재 Redis는 비활성화되어 TEST_DB만 구분하면 된다.
 #   사용 가능한 값: timo_test(기본) / timo_test_a / timo_test_b / timo_test_c / timo_test_d
 #   예) TEST_DB=timo_test_a TEST_REDIS_DB=11 ./gradlew test
 spring:
@@ -14,16 +15,16 @@ spring:
     hibernate:
       ddl-auto: create-drop
 
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: ${TEST_REDIS_DB:1}
+  # Redis 기능을 도입할 때 다시 활성화한다.
+  # data:
+  #   redis:
+  #     host: localhost
+  #     port: 6379
+  #     database: ${TEST_REDIS_DB:1}
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789
 
-# 이미지 key -> URL 변환을 검증할 수 있도록 base URL 을 준다.
-# 비워 두면 PlaceholderImageStorage 가 key 를 그대로 돌려주어 변환됐는지 구분할 수 없다.
+# 최신 develop의 이미지 URL 변환 테스트 설정을 보존한다.
 app:
   image:
     base-url: https://cdn.test.timo.io

@@ -17,3 +17,12 @@ variable "instance_type" {
 variable "app_port" {
   type = number
 }
+
+variable "aws_region" {
+  type = string
+}
+
+variable "backend_secret_arn" {
+  description = "Secrets Manager secret containing backend Docker environment variables"
+  type        = string
+}
