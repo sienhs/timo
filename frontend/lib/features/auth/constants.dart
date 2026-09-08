@@ -1,4 +1,4 @@
-/// 회원가입 도메인의 문구·크기 상수.
+/// 인증(회원가입·로그인) 도메인의 문구·크기 상수.
 ///
 /// 글자수 한계 같은 숫자와 그 숫자를 설명하는 문구를 같은 곳에 두어
 /// 한쪽만 바뀌는 일을 막는다(결제 도메인의 PaymentConstants 와 같은 방식).
@@ -121,4 +121,18 @@ class AuthStrings {
   static const completeTitle = '가입이 완료됐어요';
   static const completeSubtitle = '이제 티켓을 예매할 수 있어요';
   static const goToTickets = '티켓 보러 가기';
+
+  // 로그인. 라벨은 회원가입의 usernameLabel·passwordLabel 을 그대로 쓴다.
+  static const login = '로그인';
+
+  /// 시안의 힌트는 라벨과 같은 글자다('아이디 입력' 이 아니라 '아이디').
+  static const loginUsernameHint = '아이디';
+  static const loginPasswordHint = '비밀번호';
+
+  /// 아이디가 없는 건지 비밀번호가 틀린 건지 구분해 주지 않는다. 구분해
+  /// 주면 어떤 아이디가 가입돼 있는지를 밖에서 알아낼 수 있기 때문이다.
+  static const loginFailed = '아이디 또는 비밀번호가 올바르지 않아요';
+
+  /// 로그인 화면의 회원가입 링크.
+  static const signup = '회원가입';
 }

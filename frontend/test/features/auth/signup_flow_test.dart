@@ -8,6 +8,7 @@ import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/models/signup_draft.dart';
+import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/screens/signup_code_screen.dart';
 import 'package:timo/features/auth/screens/signup_complete_screen.dart';
 import 'package:timo/features/auth/screens/signup_name_screen.dart';
@@ -406,7 +407,7 @@ void main() {
         ),
       );
 
-      // 마이페이지 탭의 임시 버튼으로 진입
+      // 마이페이지 탭의 임시 '로그인' 버튼 → 로그인 화면의 '회원가입' 링크로 진입
       await tester.tap(
         find.descendant(
           of: find.byType(AppBottomNavBar),
@@ -414,7 +415,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('회원가입'));
+      await tester.tap(find.text(AuthStrings.login));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      await tester.tap(find.text(AuthStrings.signup));
       await tester.pumpAndSettle();
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
 
@@ -468,6 +472,8 @@ void main() {
         findsNothing,
       );
       expect(find.byType(SignupPhoneScreen, skipOffstage: false), findsNothing);
+      // 가입을 거쳐 왔으니 로그인 화면으로 되돌아갈 이유도 없다.
+      expect(find.byType(LoginScreen, skipOffstage: false), findsNothing);
 
       // 티켓 보러 가기 → 홈 셸
       await tapNext(tester, AuthStrings.goToTickets);

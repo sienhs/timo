@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/auth/models/signup_draft.dart';
+import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/signup_code_screen.dart';
 import '../features/auth/screens/signup_complete_screen.dart';
 import '../features/auth/screens/signup_name_screen.dart';
@@ -37,6 +38,9 @@ class AppRoutes {
   static const payment = '/payment';
   static const paymentComplete = '/payment/complete';
 
+  /// 로그인. 성공하면 결과로 true 를 넘기며 이전 화면으로 돌아간다.
+  static const login = '/login';
+
   /// 회원가입. 단계 화면은 앞 단계까지 채운 SignupDraft 를 arguments 로 받는다.
   static const signupPhone = '/signup/phone';
   static const signupCode = '/signup/code';
@@ -70,6 +74,7 @@ class AppRoutes {
     payment: (context) => PaymentScreen(order: ticketOrderOrSample(context)),
     paymentComplete: (context) =>
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
+    login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
     signupCode: (context) => SignupCodeScreen(draft: _signupDraft(context)),
     signupName: (context) => SignupNameScreen(draft: _signupDraft(context)),

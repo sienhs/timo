@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../models/signup_draft.dart';
 import '../utils/signup_validators.dart';
 import '../widgets/labeled_text_field.dart';
+import '../widgets/obscure_toggle.dart';
 import '../widgets/signup_step_page.dart';
 
 /// 4/5 비밀번호 설정. 비밀번호와 확인 두 칸.
@@ -88,7 +88,7 @@ class _SignupPasswordScreenState extends State<SignupPasswordScreen> {
                 : null,
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _confirmFocus.requestFocus(),
-            suffixIcon: _ObscureToggle(
+            suffixIcon: ObscureToggle(
               obscured: _obscurePassword,
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
@@ -111,33 +111,13 @@ class _SignupPasswordScreenState extends State<SignupPasswordScreen> {
             onSubmitted: (_) {
               if (_canSubmit) _goNext();
             },
-            suffixIcon: _ObscureToggle(
+            suffixIcon: ObscureToggle(
               obscured: _obscureConfirm,
               onPressed: () =>
                   setState(() => _obscureConfirm = !_obscureConfirm),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 입력칸 오른쪽의 비밀번호 보기/숨기기 눈 아이콘.
-class _ObscureToggle extends StatelessWidget {
-  const _ObscureToggle({required this.obscured, required this.onPressed});
-
-  final bool obscured;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onPressed,
-      color: AppColors.textSecondary,
-      tooltip: obscured ? AuthStrings.showPassword : AuthStrings.hidePassword,
-      icon: Icon(
-        obscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
       ),
     );
   }
