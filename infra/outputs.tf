@@ -66,3 +66,29 @@ output "backend_runtime_secret_arn" {
   description = "Secrets Manager secret automatically loaded by the EC2 deployment script"
   value       = module.backend_secret.arn
 }
+
+output "image_bucket_name" {
+  value = module.image_storage.image_bucket_name
+}
+
+output "private_image_bucket_name" {
+  value = module.image_storage.private_image_bucket_name
+}
+
+output "image_cdn_url" {
+  value = module.image_storage.image_cdn_url
+}
+
+output "image_cdn_distribution_id" {
+  value = module.image_storage.image_cdn_distribution_id
+}
+
+output "image_storage_credentials" {
+  description = "Sensitive backend credentials for local handoff only"
+  sensitive   = true
+  value       = module.image_storage.image_storage_credentials
+}
+
+output "api_url" {
+  value = module.api_domain.api_url
+}

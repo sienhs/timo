@@ -21,7 +21,7 @@ For a domain already in use, copy its existing DNS records into Route 53 before
 changing name servers. Creating this zone alone does not configure ALB routing
 or HTTPS. The zone has `prevent_destroy` enabled to protect DNS delegation.
 
-The application root (`../https.tf`) manages the `api.ticketmoa.site` alias,
+The application root's `api_domain` module (`../modules/api-domain`) manages the `api.ticketmoa.site` alias,
 ACM certificate, and DNS validation records. The ALB module manages its HTTPS
 listener and HTTP-to-HTTPS redirect. Apply that root only after Gabia's domain
 name-server **change** points to this hosted zone's four AWS name servers;

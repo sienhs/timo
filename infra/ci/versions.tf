@@ -23,7 +23,7 @@ terraform {
 
 # Independent root: terraform -chdir=infra/ci init/plan/apply.
 # This does not create or change the application VPC, EC2, or RDS.
-# Keep the local state until a shared backend is configured and migrated.
+# State is stored in the dedicated S3 backend above.
 provider "aws" {
   region = var.aws_region
   default_tags {
