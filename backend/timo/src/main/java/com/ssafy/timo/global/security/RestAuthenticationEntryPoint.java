@@ -47,12 +47,31 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         }
     }
 
+    /**
+     * 만료 때문에 실패한 것인지 판별한다.
+     *
+     * <p>{@code JwtValidationException} 이라는 사실만으로는 부족하다. 만료뿐 아니라 nbf 위반,
+     * 나중에 추가될 발급자·대상 검증 실패도 전부 같은 타입이기 때문이다. 그것들까지 만료로
+     * 취급하면 앱이 재발급을 시도하고 새 토큰도 같은 이유로 막혀 무한 루프가 된다.
+     *
+     * <p>그래서 {@link ExpiryAwareJwtValidator} 가 만료일 때만 남겨 둔 에러 코드를 확인한다.
+     * 사람이 읽으라고 만든 메시지를 문자열 비교하지 않는다.
+     */
     private boolean isExpired(AuthenticationException authenticationException) {
-        for (Throwable cause = authenticationException.getCause(); cause != null; cause = cause.getCause()) {
-            if (cause instanceof JwtValidationException) {
-                return true;
+        for (Throwable cause = authenticationException.getCause();
+                cause != null && cause != cause.getCause();
+                cause = cause.getCause()) {
+
+            if (cause instanceof JwtValidationException validationException) {
+                return hasExpiredError(validationException);
             }
         }
         return false;
+    }
+
+    private boolean hasExpiredError(JwtValidationException validationException) {
+        return validationException.getErrors().stream()
+                .anyMatch(error ->
+                        ExpiryAwareJwtValidator.TOKEN_EXPIRED_ERROR_CODE.equals(error.getErrorCode()));
     }
 }

@@ -79,6 +79,17 @@ public class SmsVerificationStore {
         entries.put("ticket:" + ticketHash, entry(phoneNumber, ttl));
     }
 
+    /** 티켓이 어느 번호의 인증을 통과한 것인지 돌려준다. 없거나 만료됐으면 비어 있다. */
+    public synchronized Optional<String> findPhoneNumberByTicket(String ticketHash) {
+        Entry value = live("ticket:" + ticketHash);
+        return value == null ? Optional.empty() : Optional.of(value.value);
+    }
+
+    /** 티켓은 1회용이다. 가입이 끝나면 지워, 같은 티켓으로 계정을 더 만들지 못하게 한다. */
+    public synchronized void deleteTicket(String ticketHash) {
+        entries.remove("ticket:" + ticketHash);
+    }
+
     private long increaseWithin(String key, Duration window) {
         Entry value = live(key);
         if (value == null) {

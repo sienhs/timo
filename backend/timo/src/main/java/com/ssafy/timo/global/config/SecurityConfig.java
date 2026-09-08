@@ -32,7 +32,9 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/sms/send",
-                                "/api/v1/auth/sms/verify").permitAll()
+                                "/api/v1/auth/sms/verify",
+                                "/api/v1/auth/signup").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/availability").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(e -> e
