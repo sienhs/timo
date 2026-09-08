@@ -6,6 +6,8 @@ import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
+import com.ssafy.timo.domain.concert.dto.ConcertListRequestDto;
+import com.ssafy.timo.domain.concert.dto.ConcertSummaryResponseDto;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
@@ -16,6 +18,7 @@ import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +81,27 @@ public class ConcertServiceImpl implements ConcertService {
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
 
         return ConcertDetailResponseDto.from(concert, imageStorage);
+    }
+
+    /**
+     * 조건에 맞는 공연 목록을 페이지 단위로 조회한다.
+     *
+     * <p>상세 조회와 달리 조회수를 올리지 않는다. 목록에 스쳐 지나간 것까지 조회로 세면
+     * "인기 공연" 정렬이 목록에 오래 노출된 순서를 따라가 버린다. 그래서 읽기 전용이다.
+     *
+     * <p>{@link PagedModel} 로 감싸 내보낸다. {@code Page} 를 그대로 직렬화하면 {@code pageable.offset}
+     * 처럼 클라이언트가 쓸 일 없는 내부 필드가 노출되고 구현에 따라 모양이 바뀌는데, 이 타입은
+     * 그 문제를 피하려고 Spring Data 가 제공하는 응답 전용 타입이다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PagedModel<ConcertSummaryResponseDto> findAll(ConcertListRequestDto request) {
+        return new PagedModel<>(concertRepository.findPage(
+                        request.genre(),
+                        request.status(),
+                        request.keywordOrNull(),
+                        request.toPageable())
+                .map(concert -> ConcertSummaryResponseDto.from(concert, imageStorage)));
     }
 
     /**
