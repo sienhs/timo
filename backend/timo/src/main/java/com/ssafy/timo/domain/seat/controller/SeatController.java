@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.seat.controller;
 
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,6 +68,19 @@ public class SeatController {
     @PostMapping("/{seatId}/hold")
     public ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId) {
         return ResponseEntity.ok(seatService.hold(seatId));
+    }
+
+    /**
+     * 좌석 선점을 취소한다. 자리는 즉시 예매 가능으로 돌아간다.
+     *
+     * <p>본문을 내려준다. 화면이 좌석 목록을 다시 받지 않고도 풀린 자리를 바로 다시 그리기 위해서다.
+     *
+     * <p>이미 빈 자리(아무도 잡지 않았거나 선점이 만료된 좌석)를 취소해도 200 이다. 취소는 멱등하다.
+     * 남이 잡고 있거나 결제까지 끝난 좌석은 403 으로 거절한다.
+     */
+    @DeleteMapping("/{seatId}/hold")
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(@PathVariable Long seatId) {
+        return ResponseEntity.ok(seatService.cancelHold(seatId));
     }
 
     @PostMapping

@@ -370,3 +370,71 @@ GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
         client.assert(released.status === "AVAILABLE", "status: " + released.status);
     });
 %}
+
+### 내가 잡고 있는 좌석의 선점을 취소한다
+DELETE {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("200 과 함께 풀린 좌석 정보를 알려준다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seatId === Number(client.global.get("otherSeatId")),
+            "seatId: " + response.body.seatId);
+        client.assert(response.body.sectionId === Number(client.global.get("sectionId")),
+            "sectionId: " + response.body.sectionId);
+        client.assert(response.body.status === "AVAILABLE", "status: " + response.body.status);
+    });
+
+    client.test("만료 시각과 풀린 좌석 id 는 취소 응답에 없다", function () {
+        client.assert(response.body.heldUntil === undefined, "heldUntil 이 내려왔다");
+        client.assert(response.body.releasedSeatId === undefined, "releasedSeatId 가 내려왔다");
+        client.assert(response.body.heldByMemberId === undefined, "선점자가 노출됐다");
+    });
+%}
+
+### 취소한 좌석은 목록에서 AVAILABLE 로 보이고 잔여석에 다시 포함된다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const cancelled = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("otherSeatId")))[0] || {};
+
+    client.test("취소가 좌석 목록에 반영된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(cancelled.status === "AVAILABLE", "status: " + cancelled.status);
+        client.assert(response.body.availableCount === 5,
+            "availableCount: " + response.body.availableCount);
+    });
+%}
+
+### 이미 빈 좌석을 다시 취소해도 200 - 취소는 멱등하다
+DELETE {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("오류 없이 같은 본문으로 답한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "AVAILABLE", "status: " + response.body.status);
+    });
+%}
+
+### 취소한 좌석은 다른 회원이 바로 선점할 수 있다
+POST {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 2
+
+> {%
+    client.test("풀린 자리를 2번 회원이 잡는다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "RESERVED", "status: " + response.body.status);
+    });
+%}
+
+### 뒷정리 - 2번 회원이 잡은 선점을 풀어 다음 실행에 영향을 주지 않는다
+DELETE {{baseUrl}}/api/v1/seats/{{otherSeatId}}/hold
+X-Member-Id: 2
+
+> {%
+    client.test("뒷정리 취소가 성공한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}

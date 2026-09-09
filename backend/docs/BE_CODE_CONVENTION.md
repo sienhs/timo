@@ -244,9 +244,30 @@ com.timo
 - 목록 조회는 **부수 효과가 없어야 한다.** `@Transactional(readOnly = true)` 를 붙인다.
   조회수 증가 같은 것을 목록에서 하면 인기순 정렬이 "목록에 오래 노출된 순서"가 되어 버린다.
 
-### 4.5 새 목록 API 체크리스트
+### 4.5 페이징하지 않는 목록
+
+전체 집합이 있어야 화면이 성립하는 목록은 페이지로 나누지 않는다. 좌석 배치도가 그렇다 —
+100 개씩 끊어 받으면 화면이 여러 번 호출을 기다려야 해서 오히려 느리다.
+
+예외로 두는 대신 **응답 크기를 다른 방법으로 묶는다.**
+
+- 조회 범위를 상위 묶음 하나로 제한한다. 좌석은 공연장이 아니라 **구역 단위**로만 조회하게 해
+  (`GET /api/v1/seats?sectionId=`) 응답이 공연장 전체(수만 석)가 아니라 구역 크기로 묶인다.
+- 그 상위 묶음의 목록은 개별 항목 없이 **개수만** 준다
+  (`GET /api/v1/sections?venueId=` 는 구역별 `seatCount` · `availableCount` 만).
+- 집계는 항목마다 세지 말고 `group by` 한 번으로 모은다. 묶음 수만큼 count 쿼리를 날리면 N+1 이다.
+  집계 결과에 없는 묶음(예: 매진 구역)은 읽는 쪽에서 0 으로 채운다 — 빠뜨리면 화면에서 사라진다.
+
+페이징을 생략할 때는 **무엇이 응답 크기를 묶어 주는지**를 DTO 주석에 남긴다.
+근거 없이 생략하면 데이터가 늘었을 때 그대로 터진다.
+
+> 기준 구현: `SeatController#findSeats` · `SectionController#findSections` ·
+> `SectionSeatListResponseDto` · `SectionListResponseDto`.
+
+### 4.6 새 목록 API 체크리스트
 
 - [ ] 응답이 `PagedModel<{도메인}SummaryResponseDto>` 인가
+      (페이징을 생략한다면 4.5 의 조건을 만족하고, 그 근거를 주석에 남겼는가)
 - [ ] `page` / `size` 기본값과 `size` 상한을 두었는가
 - [ ] 정렬을 enum 으로 제한하고, 마지막에 유일 키를 덧붙였는가
 - [ ] 컬렉션을 `fetch join` 하지 않고, `countQuery` 를 직접 주었는가
