@@ -48,6 +48,14 @@ resource "aws_route53_zone" "domain" {
   }
 }
 
+resource "aws_route53_record" "network" {
+  zone_id = aws_route53_zone.domain.zone_id
+  name    = "network.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = ["43.202.55.114"]
+}
+
 output "zone_id" {
   description = "Hosted zone ID for subsequent DNS records"
   value       = aws_route53_zone.domain.zone_id
