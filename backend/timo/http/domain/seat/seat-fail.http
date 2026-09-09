@@ -548,6 +548,77 @@ X-Member-Id: 1
     });
 %}
 
+### 선점 취소 - 남이 잡고 있는 좌석이면 403
+# 위에서 1번 회원이 선점해 둔 좌석을 2번 회원이 풀려고 한다.
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/hold
+X-Member-Id: 2
+
+> {%
+    client.test("403 과 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 403, "status: " + response.status);
+        client.assert(response.body.exception === "SeatHoldNotOwnedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "본인이 선점한 좌석이 아닙니다. (seatId=" + client.global.get("failHeldSeatId") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+
+    client.test("누가 잡고 있는지는 알려주지 않는다", function () {
+        client.assert(response.body.heldByMemberId === undefined, "선점자가 노출됐다");
+        client.assert(response.body.heldUntil === undefined, "선점 만료 시각이 노출됐다");
+    });
+%}
+
+### 선점 취소 - 거절당한 뒤에도 원래 선점은 그대로다
+GET {{baseUrl}}/api/v1/seats?sectionId={{failSectionId}}
+
+> {%
+    const held = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("failHeldSeatId")))[0] || {};
+
+    client.test("1번 회원의 선점이 유지된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(held.status === "RESERVED", "status: " + held.status);
+    });
+%}
+
+### 선점 취소 - 요청자를 특정할 수 없으면 401
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/hold
+
+> {%
+    client.test("헤더가 없으면 401", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 선점 취소 - 요청자 헤더가 숫자가 아니면 401
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/hold
+X-Member-Id: not-a-number
+
+> {%
+    client.test("깨진 헤더도 인증 실패로 다룬다", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 선점 취소 - 존재하지 않는 좌석이면 404
+DELETE {{baseUrl}}/api/v1/seats/999999999/hold
+X-Member-Id: 1
+
+> {%
+    client.test("404 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotFoundException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage === "존재하지 않는 좌석입니다. (seatId=999999999)",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
 ### 좌석 경로에 PUT 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
 PUT {{baseUrl}}/api/v1/seats
 Content-Type: application/json

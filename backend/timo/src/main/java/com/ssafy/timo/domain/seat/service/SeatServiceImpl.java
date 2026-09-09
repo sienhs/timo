@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.seat.service;
 
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
@@ -11,6 +12,7 @@ import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
 import com.ssafy.timo.domain.seat.exception.SeatPositionOutOfBoundsException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
+import com.ssafy.timo.domain.seat.exception.SeatHoldNotOwnedException;
 import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
 import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
 import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
@@ -143,6 +145,37 @@ public class SeatServiceImpl implements SeatService {
         seat.hold(memberId, now.plus(HOLD_DURATION));
 
         return SeatHoldResponseDto.from(seat, releasedSeatId);
+    }
+
+    /**
+     * 좌석 선점을 취소한다.
+     *
+     * <p>선점과 같은 행 잠금 안에서 처리한다. 잠그지 않으면 내가 취소하는 사이 다른 회원의 선점이
+     * 끼어들어, 그 사람의 선점을 내가 풀어 버리는 경우가 생긴다.
+     *
+     * <p>내가 잡고 있는 좌석이면 푼다. 아무도 잡지 않았거나 선점이 만료된 좌석이면 이미 빈 자리이므로
+     * 할 일 없이 성공으로 답한다 — 만료 직후에 취소를 눌러도 화면에 오류가 뜨지 않아야 한다.
+     * 남이 잡고 있거나 결제까지 끝난 좌석만 거절한다.
+     *
+     * <p>결제 완료({@link com.ssafy.timo.domain.seat.entity.SeatStatus#OCCUPIED})는 여기서 풀지
+     * 않는다. 그것은 선점 해제가 아니라 점유 해제이고, 예매 취소 규칙과 함께 예매 도메인에서 정한다.
+     */
+    @Override
+    public SeatHoldCancelResponseDto cancelHold(Long seatId) {
+        Long memberId = currentMemberProvider.currentMemberId();
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        Seat seat = seatRepository.findByIdForUpdate(seatId)
+                .orElseThrow(() -> new SeatNotFoundException(seatId));
+
+        if (seat.isHeldBy(memberId, now)) {
+            seat.releaseHold();
+        } else if (!seat.isHoldableAt(now)) {
+            // 남의 유효한 선점이거나 결제 완료다. 둘을 구분해 알려주지 않는다.
+            throw new SeatHoldNotOwnedException(seatId);
+        }
+
+        return SeatHoldCancelResponseDto.from(seat, now);
     }
 
     /**
