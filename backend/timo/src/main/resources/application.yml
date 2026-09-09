@@ -20,7 +20,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, env, configprops
+        # health is public for the ALB. prometheus remains protected by the
+        # security filter chain and is intended for the monitoring collector.
+        include: health, prometheus
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

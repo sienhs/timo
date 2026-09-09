@@ -13,6 +13,20 @@ output "ec2_private_ip" {
   value       = module.ec2.private_ip
 }
 
+output "monitoring_ec2_instance_id" {
+  description = "SSM-managed Prometheus and Grafana instance"
+  value       = module.monitoring.instance_id
+}
+
+output "monitoring_ec2_private_ip" {
+  value = module.monitoring.private_ip
+}
+
+output "grafana_admin_secret_arn" {
+  description = "Secrets Manager secret containing the Grafana admin password"
+  value       = module.monitoring.grafana_secret_arn
+}
+
 output "nat_instance_id" {
   description = "NAT EC2 instance ID"
   value       = module.nat_instance.instance_id
@@ -91,4 +105,9 @@ output "image_storage_credentials" {
 
 output "api_url" {
   value = module.api_domain.api_url
+}
+
+output "grafana_url" {
+  description = "Public HTTPS Grafana address"
+  value       = module.grafana_domain.api_url
 }

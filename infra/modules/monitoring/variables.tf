@@ -1,0 +1,54 @@
+variable "name" {
+  type = string
+}
+
+variable "subnet_id" {
+  type = string
+}
+
+variable "security_group_id" {
+  type = string
+}
+
+variable "instance_type" {
+  type = string
+}
+
+variable "root_volume_size" {
+  type = number
+}
+
+variable "aws_region" {
+  type = string
+}
+
+variable "application_private_ip" {
+  description = "Private IP address of the Spring Boot scrape target"
+  type        = string
+}
+
+variable "grafana_admin_password" {
+  description = "Initial Grafana admin password; provide this through an ignored terraform.tfvars file"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.grafana_admin_password) >= 16
+    error_message = "grafana_admin_password must be at least 16 characters."
+  }
+}
+
+variable "prometheus_image" {
+  type    = string
+  default = "prom/prometheus:v3.14.0"
+}
+
+variable "grafana_image" {
+  type    = string
+  default = "grafana/grafana:13.2.1"
+}
+
+variable "grafana_domain" {
+  description = "Public HTTPS hostname served through the ALB"
+  type        = string
+}

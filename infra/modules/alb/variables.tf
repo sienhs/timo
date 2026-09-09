@@ -30,3 +30,18 @@ variable "app_port" {
 variable "health_check_path" {
   type = string
 }
+
+variable "monitoring_instance_id" {
+  description = "Private instance hosting Grafana"
+  type        = string
+}
+
+variable "grafana_certificate_arn" {
+  description = "Validated ACM certificate for the Grafana hostname"
+  type        = string
+}
+
+variable "grafana_host_name" {
+  description = "Public Grafana hostname matched by the HTTPS listener"
+  type        = string
+}

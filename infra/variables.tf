@@ -46,6 +46,35 @@ variable "ec2_instance_type" {
   default     = "t3.micro"
 }
 
+variable "ec2_detailed_monitoring" {
+  description = "Enable one-minute EC2 built-in CloudWatch metrics; this incurs AWS detailed-monitoring charges."
+  type        = bool
+  default     = true
+}
+
+variable "monitoring_instance_type" {
+  description = "Private EC2 instance type for the Prometheus and Grafana containers"
+  type        = string
+  default     = "t3.small"
+}
+
+variable "monitoring_root_volume_size" {
+  description = "Encrypted gp3 root volume size in GiB; holds retained Prometheus and Grafana data"
+  type        = number
+  default     = 30
+}
+
+variable "grafana_admin_password" {
+  description = "Initial Grafana administrator password; set only in ignored terraform.tfvars"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.grafana_admin_password) >= 16
+    error_message = "grafana_admin_password must be at least 16 characters."
+  }
+}
+
 variable "app_port" {
   description = "Spring Boot application port"
   type        = number
@@ -118,4 +147,15 @@ variable "domain_name" {
   description = "Domain managed by the independent DNS root"
   type        = string
   default     = "ticketmoa.site"
+}
+
+variable "grafana_subdomain" {
+  description = "Subdomain used for the public Grafana HTTPS endpoint"
+  type        = string
+  default     = "grafana"
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", var.grafana_subdomain))
+    error_message = "grafana_subdomain must be a lowercase DNS label."
+  }
 }

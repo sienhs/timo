@@ -26,3 +26,9 @@ variable "backend_secret_arn" {
   description = "Secrets Manager secret containing backend Docker environment variables"
   type        = string
 }
+
+variable "detailed_monitoring" {
+  description = "Publish EC2 instance metrics to CloudWatch at one-minute resolution"
+  type        = bool
+  default     = true
+}
