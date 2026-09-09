@@ -4,17 +4,22 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
+import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
 import com.ssafy.timo.domain.seat.exception.SeatPositionOutOfBoundsException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
 import com.ssafy.timo.domain.seat.exception.SeatHoldNotOwnedException;
+import com.ssafy.timo.domain.seat.exception.SeatNotHeldException;
 import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
 import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
+import com.ssafy.timo.domain.seat.exception.SeatNotOccupiedException;
+import com.ssafy.timo.domain.seat.exception.SeatOccupancyNotOwnedException;
 import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
 import com.ssafy.timo.domain.seat.repository.SectionAvailableCount;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
@@ -176,6 +181,75 @@ public class SeatServiceImpl implements SeatService {
         }
 
         return SeatHoldCancelResponseDto.from(seat, now);
+    }
+
+    @Override
+    public SeatOccupancyResponseDto occupy(Long seatId) {
+        return occupy(seatId, currentMemberProvider.currentMemberId());
+    }
+
+    /**
+     * 선점을 점유(결제 확정)로 바꾼다.
+     *
+     * <p>유효한 <b>내</b> 선점 위에서만 성립한다. 만료된 선점 위에 결제를 얹어 주면 5 분 규칙이
+     * 무의미해지므로 아무도 잡지 않은 좌석과 같이 거절한다(409). 남이 잡고 있거나 남이 결제한
+     * 좌석은 자격 문제라 403 이다. 이미 내가 점유한 좌석은 다시 불러도 그대로 성공이다.
+     *
+     * <p>선점과 같은 행 잠금 안에서 처리한다. 만료 판정과 상태 변경 사이에 다른 회원이 만료된
+     * 내 선점을 인수하는 일이 없어야 한다.
+     */
+    @Override
+    public SeatOccupancyResponseDto occupy(Long seatId, Long memberId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        Seat seat = seatRepository.findByIdForUpdate(seatId)
+                .orElseThrow(() -> new SeatNotFoundException(seatId));
+
+        if (seat.isHeldBy(memberId, now)) {
+            seat.occupy();
+        } else if (seat.isHoldableAt(now)) {
+            // 아무도 없거나 만료된 선점이다. 다시 선점하고 와야 한다.
+            throw new SeatNotHeldException(seatId);
+        } else if (!seat.isOccupiedBy(memberId)) {
+            // 남의 유효한 선점이거나 남의 점유다. 둘을 구분해 알려주지 않는다.
+            throw new SeatHoldNotOwnedException(seatId);
+        }
+
+        return SeatOccupancyResponseDto.from(seat, now);
+    }
+
+    @Override
+    public SeatOccupancyResponseDto releaseOccupancy(Long seatId) {
+        return releaseOccupancy(seatId, currentMemberProvider.currentMemberId());
+    }
+
+    /**
+     * 점유를 풀어 예매 가능으로 되돌린다.
+     *
+     * <p>내 점유면 푼다. 아무도 잡지 않았거나 만료된 선점만 남은 좌석은 이미 빈 자리이므로 할 일 없이
+     * 성공으로 답한다. 유효한 선점 상태(결제 전)라면 예매 취소가 들어올 수 없는 좌석이므로 데이터가
+     * 어긋난 것으로 보고 409 로 알린다. 남의 점유는 403 이다.
+     *
+     * <p>선점 취소({@link #cancelHold(Long)})와는 별개의 전이다. 그쪽은 결제 전 선점을 풀고,
+     * 여기는 결제까지 끝난 좌석을 푼다. 환불·취소 수수료 같은 예매 규칙은 여기서 보지 않는다.
+     */
+    @Override
+    public SeatOccupancyResponseDto releaseOccupancy(Long seatId, Long memberId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        Seat seat = seatRepository.findByIdForUpdate(seatId)
+                .orElseThrow(() -> new SeatNotFoundException(seatId));
+
+        if (seat.isOccupiedBy(memberId)) {
+            seat.releaseOccupancy();
+        } else if (seat.getStatus() == SeatStatus.OCCUPIED) {
+            throw new SeatOccupancyNotOwnedException(seatId);
+        } else if (!seat.isHoldableAt(now)) {
+            // 누군가의 유효한 선점이다. 결제 전 좌석에 예매 취소가 들어온 것이므로 그냥 넘기지 않는다.
+            throw new SeatNotOccupiedException(seatId);
+        }
+
+        return SeatOccupancyResponseDto.from(seat, now);
     }
 
     /**

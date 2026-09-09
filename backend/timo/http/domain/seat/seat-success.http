@@ -438,3 +438,114 @@ X-Member-Id: 2
         client.assert(response.status === 200, "status: " + response.status);
     });
 %}
+
+### 점유 준비 - 1번 회원이 좌석을 다시 선점한다
+# 점유(결제 확정)는 유효한 내 선점 위에서만 성립한다.
+POST {{baseUrl}}/api/v1/seats/{{seatId}}/hold
+X-Member-Id: 1
+
+> {%
+    client.test("점유용 선점이 성공한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "RESERVED", "status: " + response.body.status);
+    });
+%}
+
+### 선점한 좌석을 점유한다 - 결제 확정을 흉내 내는 임시 API
+POST {{baseUrl}}/api/v1/seats/{{seatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("200 과 함께 OCCUPIED 좌석 정보를 알려준다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seatId === Number(client.global.get("seatId")),
+            "seatId: " + response.body.seatId);
+        client.assert(response.body.sectionId === Number(client.global.get("sectionId")),
+            "sectionId: " + response.body.sectionId);
+        client.assert(response.body.status === "OCCUPIED", "status: " + response.body.status);
+    });
+
+    client.test("점유에는 만료가 없어 만료 시각을 싣지 않는다", function () {
+        client.assert(response.body.heldUntil === undefined, "heldUntil 이 내려왔다");
+        client.assert(response.body.releasedSeatId === undefined, "releasedSeatId 가 내려왔다");
+        client.assert(response.body.heldByMemberId === undefined, "소유자가 노출됐다");
+    });
+%}
+
+### 점유한 좌석은 목록에서 OCCUPIED 로 보이고 잔여석에서 빠진다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const occupied = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("seatId")))[0] || {};
+
+    client.test("점유가 좌석 목록에 반영된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(occupied.status === "OCCUPIED", "status: " + occupied.status);
+        client.assert(response.body.availableCount === 4,
+            "availableCount: " + response.body.availableCount);
+    });
+%}
+
+### 점유한 좌석은 다른 회원이 선점할 수 없다 - 만료 개념이 없다
+POST {{baseUrl}}/api/v1/seats/{{seatId}}/hold
+X-Member-Id: 2
+
+> {%
+    client.test("409 로 거절된다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotHoldableException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 이미 내가 점유한 좌석을 다시 점유해도 200 - 점유는 멱등하다
+POST {{baseUrl}}/api/v1/seats/{{seatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("오류 없이 같은 본문으로 답한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "OCCUPIED", "status: " + response.body.status);
+    });
+%}
+
+### 점유를 해제한다 - 예매 취소를 흉내 내는 임시 API
+DELETE {{baseUrl}}/api/v1/seats/{{seatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("200 과 함께 AVAILABLE 좌석 정보를 알려준다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seatId === Number(client.global.get("seatId")),
+            "seatId: " + response.body.seatId);
+        client.assert(response.body.status === "AVAILABLE", "status: " + response.body.status);
+        client.assert(response.body.heldByMemberId === undefined, "소유자가 노출됐다");
+    });
+%}
+
+### 해제한 좌석은 목록에서 AVAILABLE 로 보이고 잔여석에 다시 포함된다
+GET {{baseUrl}}/api/v1/seats?sectionId={{sectionId}}
+
+> {%
+    const released = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("seatId")))[0] || {};
+
+    client.test("해제가 좌석 목록에 반영된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(released.status === "AVAILABLE", "status: " + released.status);
+        client.assert(response.body.availableCount === 5,
+            "availableCount: " + response.body.availableCount);
+    });
+%}
+
+### 이미 빈 좌석을 다시 해제해도 200 - 해제는 멱등하다
+DELETE {{baseUrl}}/api/v1/seats/{{seatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("오류 없이 같은 본문으로 답한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "AVAILABLE", "status: " + response.body.status);
+    });
+%}
