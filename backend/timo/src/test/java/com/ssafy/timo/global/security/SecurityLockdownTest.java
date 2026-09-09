@@ -77,11 +77,27 @@ class SecurityLockdownTest {
     }
 
     @Test
+    @DisplayName("로그인은 토큰 없이 열려 있고, 실패해도 401 이 아니다")
+    void loginIsPublic() throws Exception {
+        // 401 로 나가면 앱의 "401 이면 재발급" 처리가 로그인 실패에 끼어든다.
+        mvc.perform(post("/api/v1/auth/login")
+                        .header("X-Device-Id", "device")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"nosuchuser","password":"timo1234!"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("LOGIN_FAILED"));
+    }
+
+    @Test
     @DisplayName("헬스체크와 내부 수집용 Prometheus 메트릭 endpoint는 필터를 통과한다")
     void actuatorAllowsHealthAndPrometheusForInternalCollector() throws Exception {
         // Prometheus의 외부 접근은 ALB 경로 차단 및 EC2 보안 그룹이 담당한다.
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
         mvc.perform(get("/actuator/prometheus")).andExpect(status().isOk());
+
+        // develop 의 재작성에서 빠졌던 확인이다. env 는 설정값을 그대로 뱉으므로 잠겨 있어야 한다.
+        mvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
     }
 
     @Test

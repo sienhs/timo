@@ -36,7 +36,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/sms/send",
                                 "/api/v1/auth/sms/verify",
-                                "/api/v1/auth/signup").permitAll()
+                                "/api/v1/auth/signup",
+                                "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/availability").permitAll()
                         .anyRequest().authenticated()
                 )

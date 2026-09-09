@@ -6,10 +6,13 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import tools.jackson.core.JacksonException;
@@ -20,6 +23,7 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -88,6 +92,50 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         body.setProperty("errors", errors);
 
         return handleExceptionInternal(e, body, headers, status, request);
+    }
+
+    /**
+     * 메서드 파라미터 검증 실패. {@code @RequestHeader} 같은 파라미터에 제약이 붙은 메서드에서
+     * {@code @Valid @RequestBody} 검증이 실패하면 {@link MethodArgumentNotValidException} 이 아니라
+     * 이쪽으로 온다. 스프링 6.1 부터 그런 메서드는 파라미터 검증 경로를 타기 때문이다.
+     *
+     * <p>재정의하지 않으면 어느 필드가 왜 틀렸는지가 빠진 응답이 나가 <b>같은 검증 실패인데
+     * 메서드 시그니처에 따라 응답 모양이 갈린다.</b> {@code @Valid} 실패와 같은 {@code errors} 배열로 맞춘다.
+     */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException e,
+                                                                           HttpHeaders headers,
+                                                                           HttpStatusCode status,
+                                                                           WebRequest request) {
+        log.warn("Validation failed: {}", e.getMessage());
+
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+        ProblemDetail body = problemDetail(errorCode.getStatus(), errorCode.getMessage(), e);
+        body.setProperty("errors", toFieldErrors(e));
+
+        return handleExceptionInternal(e, body, headers, status, request);
+    }
+
+    /**
+     * 본문 안쪽 필드 오류({@code ParameterErrors})는 필드명이 있고, 파라미터 자체의 오류
+     * ({@code X-Device-Id} 같은)는 파라미터명을 대신 쓴다.
+     */
+    private List<FieldError> toFieldErrors(HandlerMethodValidationException e) {
+        List<FieldError> errors = new ArrayList<>();
+
+        for (ParameterValidationResult result : e.getParameterValidationResults()) {
+            if (result instanceof ParameterErrors parameterErrors) {
+                parameterErrors.getFieldErrors().forEach(fieldError ->
+                        errors.add(new FieldError(fieldError.getField(), fieldError.getDefaultMessage())));
+                continue;
+            }
+
+            String name = result.getMethodParameter().getParameterName();
+            result.getResolvableErrors().forEach(resolvable ->
+                    errors.add(new FieldError(name, resolvable.getDefaultMessage())));
+        }
+
+        return errors;
     }
 
     /**
