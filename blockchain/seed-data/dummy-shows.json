@@ -1,0 +1,25 @@
+{
+  "organizers": [
+    {
+      "label": "arena-concert-productions",
+      "shows": [
+        { "facePriceEth": "0.0744", "totalSeats": 662, "metadataURI": "dummy://2026 아이유 콘서트 - 고척스카이돔" },
+        { "facePriceEth": "0.0616", "totalSeats": 40000, "metadataURI": "dummy://2026 BIGBANG - 고양종합운동장" },
+        { "facePriceEth": "0.0572", "totalSeats": 11000, "metadataURI": "dummy://2026 김준수 콘서트 : XIGNATURE - 잠실실내체육관" }
+      ]
+    },
+    {
+      "label": "seoul-live-company",
+      "shows": [
+        { "facePriceEth": "0.0528", "totalSeats": 10000, "metadataURI": "dummy://REMIND : 리센느 - 올림픽공원 체조경기장" },
+        { "facePriceEth": "0.0484", "totalSeats": 3000, "metadataURI": "dummy://페기구 THE LOUD SHOW - 인천 파라다이스시티" }
+      ]
+    },
+    {
+      "label": "indie-stage-collective",
+      "shows": [
+        { "facePriceEth": "0.0396", "totalSeats": 500, "metadataURI": "dummy://검정치마 단독공연 : 401 - 무신사 개러지" }
+      ]
+    }
+  ]
+}

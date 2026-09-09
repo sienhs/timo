@@ -1,0 +1,30 @@
+{
+  "name": "timo-blockchain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TIMO custodial wallet + ticket NFT smart contracts (Hardhat/Solidity)",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "wallet:create": "hardhat run scripts/demo/createUserWallet.ts",
+    "mint:demo": "hardhat run scripts/demo/mintSampleTicket.ts",
+    "flow:demo": "hardhat run scripts/demo/fullUserFlow.ts",
+    "qr:live": "hardhat run scripts/demo/liveEntryQr.ts",
+    "tickets:list": "hardhat run scripts/demo/listTickets.ts",
+    "deploy": "hardhat run scripts/deploy/deploy.ts",
+    "seed": "hardhat run scripts/seed/seedDummyShows.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@types/qrcode": "^1.5.6",
+    "hardhat": "^2.29.1",
+    "typescript": "^5.7.0",
+    "ts-node": "^10.9.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1",
+    "dotenv": "^16.4.7",
+    "qrcode": "^1.5.4"
+  }
+}
