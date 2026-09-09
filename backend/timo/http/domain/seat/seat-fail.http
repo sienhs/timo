@@ -619,6 +619,157 @@ X-Member-Id: 1
     });
 %}
 
+### 점유 - 선점하지 않은 좌석이면 409
+# 결제 확정은 유효한 내 선점 위에서만 성립한다. 만료된 선점도 여기에 해당한다.
+POST {{baseUrl}}/api/v1/seats/{{failFreeSeatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("409 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotHeldException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "선점 상태가 아닌 좌석입니다. (seatId=" + client.global.get("failFreeSeatId") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 점유 - 남이 선점 중인 좌석이면 403
+# 위에서 1번 회원이 선점해 둔 좌석을 2번 회원이 결제하려 한다.
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+X-Member-Id: 2
+
+> {%
+    client.test("403 과 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 403, "status: " + response.status);
+        client.assert(response.body.exception === "SeatHoldNotOwnedException",
+            "exception: " + response.body.exception);
+    });
+
+    client.test("누가 잡고 있는지는 알려주지 않는다", function () {
+        client.assert(response.body.heldByMemberId === undefined, "선점자가 노출됐다");
+        client.assert(response.body.heldUntil === undefined, "선점 만료 시각이 노출됐다");
+    });
+%}
+
+### 점유 해제 - 결제 전 선점 상태인 좌석이면 409
+# 결제도 안 된 좌석에 예매 취소가 들어온 것이다. 데이터가 어긋난 것이므로 멱등 성공으로 넘기지 않는다.
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("409 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotOccupiedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "점유된 좌석이 아닙니다. (seatId=" + client.global.get("failHeldSeatId") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+%}
+
+### 점유 실패 케이스 준비 - 1번 회원이 선점해 둔 좌석을 점유한다
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("준비용 점유가 성공한다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "OCCUPIED", "status: " + response.body.status);
+    });
+%}
+
+### 점유 - 남이 점유한 좌석이면 403
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+X-Member-Id: 2
+
+> {%
+    client.test("남의 점유도 남의 선점과 같은 예외로 거절한다", function () {
+        client.assert(response.status === 403, "status: " + response.status);
+        client.assert(response.body.exception === "SeatHoldNotOwnedException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 점유 해제 - 남이 점유한 좌석이면 403
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+X-Member-Id: 2
+
+> {%
+    client.test("403 과 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 403, "status: " + response.status);
+        client.assert(response.body.exception === "SeatOccupancyNotOwnedException",
+            "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage ===
+            "본인이 점유한 좌석이 아닙니다. (seatId=" + client.global.get("failHeldSeatId") + ")",
+            "errorMessage: " + response.body.errorMessage);
+    });
+
+    client.test("누가 점유하고 있는지는 알려주지 않는다", function () {
+        client.assert(response.body.heldByMemberId === undefined, "소유자가 노출됐다");
+    });
+%}
+
+### 점유 해제 - 거절당한 뒤에도 원래 점유는 그대로다
+GET {{baseUrl}}/api/v1/seats?sectionId={{failSectionId}}
+
+> {%
+    const occupied = (response.body.seats || [])
+        .filter(x => x.id === Number(client.global.get("failHeldSeatId")))[0] || {};
+
+    client.test("1번 회원의 점유가 유지된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(occupied.status === "OCCUPIED", "status: " + occupied.status);
+    });
+%}
+
+### 점유 - 요청자를 특정할 수 없으면 401
+POST {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+
+> {%
+    client.test("헤더가 없으면 401", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 점유 해제 - 요청자를 특정할 수 없으면 401
+DELETE {{baseUrl}}/api/v1/seats/{{failHeldSeatId}}/occupancy
+
+> {%
+    client.test("헤더가 없으면 401", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.exception === "TokenInvalidException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 점유 - 존재하지 않는 좌석이면 404
+POST {{baseUrl}}/api/v1/seats/999999999/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("404 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotFoundException",
+            "exception: " + response.body.exception);
+    });
+%}
+
+### 점유 해제 - 존재하지 않는 좌석이면 404
+DELETE {{baseUrl}}/api/v1/seats/999999999/occupancy
+X-Member-Id: 1
+
+> {%
+    client.test("404 와 좌석 도메인 예외를 반환한다", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotFoundException",
+            "exception: " + response.body.exception);
+    });
+%}
+
 ### 좌석 경로에 PUT 을 보내면 405 - 내장 예외도 같은 스키마로 나간다
 PUT {{baseUrl}}/api/v1/seats
 Content-Type: application/json

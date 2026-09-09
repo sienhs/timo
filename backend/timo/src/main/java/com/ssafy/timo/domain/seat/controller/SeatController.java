@@ -4,6 +4,7 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
+import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import jakarta.validation.Valid;
@@ -81,6 +82,38 @@ public class SeatController {
     @DeleteMapping("/{seatId}/hold")
     public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(@PathVariable Long seatId) {
         return ResponseEntity.ok(seatService.cancelHold(seatId));
+    }
+
+    /**
+     * 선점한 좌석을 점유(결제 확정)한다. 점유된 좌석은 만료되지 않고 예매 취소로만 풀린다.
+     *
+     * <p><b>임시 API 다.</b> 결제 확정은 원래 예매·결제 도메인이 결제 성공 시점에
+     * {@code SeatService.occupy(seatId, memberId)} 를 불러 처리할 일이다. 그 도메인이 생기기 전까지
+     * 화면이 결제 이후 흐름을 붙여 볼 수 있도록 열어 둔다.
+     *
+     * <p>유효한 내 선점 위에서만 200 이다. 선점이 없거나 만료됐으면 409, 남의 선점·점유면 403 이다.
+     *
+     * <p><b>TODO</b>: 예매 도메인이 결제 확정을 처리하게 되면 이 엔드포인트를 삭제한다.
+     */
+    @PostMapping("/{seatId}/occupancy")
+    public ResponseEntity<SeatOccupancyResponseDto> occupy(@PathVariable Long seatId) {
+        return ResponseEntity.ok(seatService.occupy(seatId));
+    }
+
+    /**
+     * 점유(결제 확정)를 풀어 좌석을 예매 가능으로 되돌린다.
+     *
+     * <p><b>임시 API 다.</b> 점유 해제는 원래 예매 도메인이 예매 취소를 확정한 뒤
+     * {@code SeatService.releaseOccupancy(seatId, memberId)} 를 불러 처리할 일이다. 환불이나 취소
+     * 수수료 같은 예매 규칙은 여기서 보지 않는다.
+     *
+     * <p>이미 빈 자리를 풀어도 200 이다. 결제 전 선점 상태면 409, 남의 점유면 403 이다.
+     *
+     * <p><b>TODO</b>: 예매 도메인이 예매 취소를 처리하게 되면 이 엔드포인트를 삭제한다.
+     */
+    @DeleteMapping("/{seatId}/occupancy")
+    public ResponseEntity<SeatOccupancyResponseDto> releaseOccupancy(@PathVariable Long seatId) {
+        return ResponseEntity.ok(seatService.releaseOccupancy(seatId));
     }
 
     @PostMapping
