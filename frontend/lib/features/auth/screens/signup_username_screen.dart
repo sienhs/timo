@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../data/auth_api.dart';
-import '../data/mock_auth_api.dart';
 import '../models/availability_status.dart';
 import '../models/signup_draft.dart';
+import '../state/auth_api_scope.dart';
 import '../utils/signup_validators.dart';
 import '../widgets/duplicate_check_button.dart';
 import '../widgets/labeled_text_field.dart';
@@ -20,14 +22,12 @@ import '../widgets/signup_step_page.dart';
 /// 한다. '다음으로' 를 누르면 아이디 확정 팝업이 뜨고, 동의하면 비밀번호
 /// 화면으로 간다. 가입 뒤에는 아이디를 바꿀 수 없기 때문이다.
 class SignupUsernameScreen extends StatefulWidget {
-  const SignupUsernameScreen({
-    super.key,
-    required this.draft,
-    this.api = const MockAuthApi(),
-  });
+  const SignupUsernameScreen({super.key, required this.draft, this.api});
 
   final SignupDraft draft;
-  final AuthApi api;
+
+  /// 직접 넘기면 그걸 쓰고(테스트), 안 넘기면 [AuthApiScope] 에서 받는다(앱).
+  final AuthApi? api;
 
   @override
   State<SignupUsernameScreen> createState() => _SignupUsernameScreenState();
@@ -36,6 +36,8 @@ class SignupUsernameScreen extends StatefulWidget {
 class _SignupUsernameScreenState extends State<SignupUsernameScreen> {
   final _controller = TextEditingController();
   var _status = AvailabilityStatus.unchecked;
+
+  AuthApi get _api => widget.api ?? AuthApiScope.of(context);
 
   String get _username => _controller.text;
 
@@ -74,7 +76,19 @@ class _SignupUsernameScreenState extends State<SignupUsernameScreen> {
   Future<void> _check() async {
     final candidate = _username;
     setState(() => _status = AvailabilityStatus.checking);
-    final available = await widget.api.isUsernameAvailable(candidate);
+
+    final bool available;
+    try {
+      available = await _api.isUsernameAvailable(candidate);
+    } on ApiException catch (e) {
+      // 확인이 안 된 것이지 결과가 난 게 아니므로 '확인 안 함' 으로 돌려
+      // 다시 누를 수 있게 하고, 이유는 스낵바로 알린다.
+      if (!mounted || _controller.text != candidate) return;
+      setState(() => _status = AvailabilityStatus.unchecked);
+      showErrorSnackBar(context, e.message);
+      return;
+    }
+
     // 응답이 오기 전에 글자를 고쳤으면 옛 값에 대한 결과이므로 버린다.
     if (!mounted || _controller.text != candidate) return;
     setState(() {

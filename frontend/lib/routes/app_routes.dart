@@ -58,16 +58,16 @@ class AppRoutes {
     // 모델만 받아 그리므로 상태별로 단독 실행할 수 있다. 모르는 id 로
     // 열리면(딥링크) 표본 공연으로 대체한다.
     showDetail: (context) => ShowDetailScreen(
-          detail: MockShowDetailData.byId(
-            ModalRoute.of(context)!.settings.arguments as String?,
-          ),
-        ),
+      detail: MockShowDetailData.byId(
+        ModalRoute.of(context)!.settings.arguments as String?,
+      ),
+    ),
     zoneSelection: (_) => const ZoneSelectionScreen(),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.
     seatSelection: (context) => SeatSelectionScreen(
-          zoneId: ModalRoute.of(context)!.settings.arguments as String,
-        ),
+      zoneId: ModalRoute.of(context)!.settings.arguments as String,
+    ),
     // 고른 좌석으로 주문을 만들어 넘긴다. 이 연결이 없으면 어떤 좌석을 골라도
     // 결제 화면에 더미 좌석(A구역 9열 6번)이 찍힌다. 예매 흐름을 거치지 않고
     // 열린 경우는 ticketOrderOrSample 이 더미로 대체한다.
@@ -76,7 +76,18 @@ class AppRoutes {
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
     login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
-    signupCode: (context) => SignupCodeScreen(draft: _signupDraft(context)),
+    // 전화번호 화면은 초안에 인증번호 유효 시간을 더한 인자를 넘긴다. 초안만
+    // 오거나 없으면(테스트, 딥링크) 화면의 기본 유효 시간으로 시작한다.
+    signupCode: (context) {
+      final arguments = ModalRoute.of(context)!.settings.arguments;
+      if (arguments is SignupCodeArguments) {
+        return SignupCodeScreen(
+          draft: arguments.draft,
+          validFor: arguments.validFor,
+        );
+      }
+      return SignupCodeScreen(draft: _signupDraft(context));
+    },
     signupName: (context) => SignupNameScreen(draft: _signupDraft(context)),
     signupUsername: (context) =>
         SignupUsernameScreen(draft: _signupDraft(context)),
