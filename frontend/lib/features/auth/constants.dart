@@ -22,6 +22,11 @@ class AuthMetrics {
   static const phoneDigits = 11;
   static const codeLength = 6;
 
+  /// 인증번호 유효 시간. 실제 값은 서버가 발송 응답으로 주고 화면은 그걸 쓴다.
+  /// 이 상수는 서버 값 없이 화면이 열렸을 때(화면 단위 테스트, 딥링크)와 목의
+  /// 응답에 쓰는 기본값이며 백엔드 SmsVerificationService 의 CODE_TTL 과 같다.
+  static const codeValidity = Duration(minutes: 3);
+
   /// DB `member.name` 컬럼 길이.
   static const nameMinLength = 2;
   static const nameMaxLength = 50;
@@ -39,6 +44,28 @@ class AuthMetrics {
 
   /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태를 눈으로 볼 수 있다.
   static const mockLatency = Duration(milliseconds: 400);
+}
+
+/// 서버가 실패 응답(ProblemDetail)의 `exception` 에 싣는 오류 이름.
+///
+/// 백엔드 `domain/auth/exception` 패키지의 클래스 이름과 같아야 한다. 같은
+/// 상태 코드(400·409) 안에서 원인을 가를 때 문구 대신 이 이름으로 비교한다.
+/// 문구는 다듬느라 바뀌어도 클래스 이름은 잘 안 바뀌기 때문이다.
+class AuthServerErrors {
+  AuthServerErrors._();
+
+  /// 인증번호가 틀림(400). 만료·횟수 초과와는 다르게 안내한다.
+  static const smsCodeMismatch = 'SmsCodeMismatchException';
+
+  /// 인증번호가 만료됐거나 없음(400). 화면의 남은 시간이 아직 남았어도 서버가
+  /// 이걸 주면 만료로 본다.
+  static const smsCodeNotFound = 'SmsCodeNotFoundException';
+
+  /// 가입 시 인증 티켓이 만료됐거나 전화번호와 맞지 않음(400).
+  static const verificationTicketInvalid = 'VerificationTicketInvalidException';
+
+  /// 가입 시 닉네임 중복(409). 중복 확인과 가입 사이에 남이 채간 경우.
+  static const nicknameDuplicated = 'NicknameDuplicatedException';
 }
 
 class AuthAssets {
@@ -66,6 +93,11 @@ class AuthStrings {
   static const codeHint = '인증번호 입력';
   static const verify = '인증하기';
   static const codeMismatch = '인증번호가 올바르지 않아요';
+  static const codeExpired = '인증번호가 만료됐어요. 다시 받아주세요';
+  static const resendCode = '인증번호 다시 받기';
+
+  /// 입력칸 안 남은 시간 표시를 스크린리더가 읽는 문구. 눈으로는 '02:59' 만 본다.
+  static String remainingTime(String clock) => '남은 시간 $clock';
 
   // 2/5 이름
   static const nameTitle = '이름을 알려주세요';

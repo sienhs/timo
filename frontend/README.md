@@ -39,3 +39,21 @@ lib/
   - 파일·폴더 이름: snake_case (`seat_selection_screen.dart`)
 - 색상·테마 값은 위젯에 하드코딩하지 말고 `AppTheme`/`Theme.of(context)`에서 가져온다.
 - 두 개 이상의 기능에서 쓰는 위젯만 `common/widgets/`로 올린다.
+
+## 서버 주소
+
+앱은 기본으로 **내 컴퓨터에서 띄운 백엔드**에 붙는다. 안드로이드 에뮬레이터에서 호스트 컴퓨터는 `10.0.2.2` 로 보이므로 기본 주소가 `http://10.0.2.2:8080` 이다 (`lib/core/network/api_client.dart`).
+
+다른 서버에 붙일 때는 실행 인자로 바꾼다.
+
+```bash
+# 배포 서버
+flutter run --dart-define=API_BASE_URL=https://api.ticketmoa.site
+
+# 실제 폰으로 내 컴퓨터의 백엔드에 붙을 때 (같은 와이파이, 컴퓨터 IP 로)
+flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
+```
+
+- 기본 주소가 암호화 없는 http 라서 디버그 빌드의 안드로이드 설정(`android/app/src/debug/AndroidManifest.xml`)에서만 http 를 허용해 두었다. 배포 빌드는 https 만 된다.
+- 백엔드를 내 컴퓨터에서 띄우려면 Docker Desktop 을 켜고 `backend/timo` 에서 `./gradlew bootRun`. 자바 21 이 필요하다. 로컬 프로필에서는 인증 문자가 실제로 가지 않고 백엔드 콘솔에 `[SMS NOT SENT] … code=…` 로 인증번호가 찍힌다.
+- 배포 서버는 인증 문자가 실제로 가고, 한 번 가입한 전화번호로는 다시 가입할 수 없다.

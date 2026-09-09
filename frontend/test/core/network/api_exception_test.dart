@@ -43,6 +43,7 @@ void main() {
 
       expect(result.message, '이미 사용 중인 아이디예요.');
       expect(result.status, 400);
+      expect(result.exceptionName, 'DuplicateUsernameException');
       expect(result.fieldErrors, isNull);
     });
 
@@ -72,6 +73,7 @@ void main() {
 
       expect(result.message, contains('502'));
       expect(result.status, 502);
+      expect(result.exceptionName, isNull);
     });
   });
 
