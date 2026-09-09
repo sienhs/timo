@@ -30,6 +30,9 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
+                        // External ALB traffic is blocked in Terraform. The future Prometheus
+                        // instance reaches this endpoint directly through its security group.
+                        .requestMatchers("/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/sms/send",
                                 "/api/v1/auth/sms/verify",

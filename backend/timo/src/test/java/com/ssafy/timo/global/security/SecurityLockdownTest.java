@@ -77,11 +77,11 @@ class SecurityLockdownTest {
     }
 
     @Test
-    @DisplayName("헬스체크는 열려 있고, 나머지 actuator 는 잠겨 있다")
-    void actuatorExposesOnlyHealth() throws Exception {
-        // health 가 막히면 ALB 가 인스턴스를 unhealthy 로 본다. env 는 설정값이라 열면 안 된다.
+    @DisplayName("헬스체크와 내부 수집용 Prometheus 메트릭 endpoint는 필터를 통과한다")
+    void actuatorAllowsHealthAndPrometheusForInternalCollector() throws Exception {
+        // Prometheus의 외부 접근은 ALB 경로 차단 및 EC2 보안 그룹이 담당한다.
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
-        mvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/actuator/prometheus")).andExpect(status().isOk());
     }
 
     @Test

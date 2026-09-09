@@ -24,6 +24,13 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# The agent publishes host-level metrics that EC2's built-in metrics do not
+# include, notably memory, disk utilisation, and swap usage.
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 resource "aws_iam_role_policy" "ecr_pull" {
   name = "${var.name}-ecr-pull"
   role = aws_iam_role.ssm.id
@@ -67,6 +74,7 @@ resource "aws_instance" "this" {
   vpc_security_group_ids      = [var.security_group_id]
   associate_public_ip_address = false
   iam_instance_profile        = aws_iam_instance_profile.this.name
+  monitoring                  = var.detailed_monitoring
 
   metadata_options {
     http_endpoint = "enabled"
@@ -85,8 +93,33 @@ resource "aws_instance" "this" {
               set -eux
               # AL2023 already supplies curl-minimal; installing curl conflicts with it.
               dnf install -y docker python3
+              dnf install -y amazon-cloudwatch-agent
               systemctl enable --now docker
               install -d -m 0755 /opt/timo /var/lib/timo
+              cat >/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWAGENT'
+              {
+                "agent": { "metrics_collection_interval": 60, "run_as_user": "root" },
+                "metrics": {
+                  "namespace": "Timo/EC2",
+                  "aggregation_dimensions": [["InstanceId"]],
+                  "append_dimensions": {
+                    "InstanceId": "$${aws:InstanceId}",
+                    "ImageId": "$${aws:ImageId}",
+                    "InstanceType": "$${aws:InstanceType}"
+                  },
+                  "metrics_collected": {
+                    "cpu": { "measurement": ["cpu_usage_idle", "cpu_usage_iowait", "cpu_usage_system", "cpu_usage_user"], "totalcpu": true },
+                    "mem": { "measurement": ["mem_used_percent"] },
+                    "disk": { "measurement": ["used_percent"], "resources": ["/"] },
+                    "swap": { "measurement": ["swap_used_percent"] },
+                    "net": { "measurement": ["bytes_sent", "bytes_recv"] }
+                  }
+                }
+              }
+              CWAGENT
+              /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+                -a fetch-config -m ec2 \
+                -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
               cat >/opt/timo/deploy.sh <<'SCRIPT'
               #!/usr/bin/env bash
               set -euo pipefail

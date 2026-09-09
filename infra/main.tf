@@ -64,13 +64,14 @@ module "security" {
 module "ec2" {
   source = "./modules/ec2"
 
-  name               = "${var.project_name}-${var.environment}"
-  subnet_id          = module.network.private_app_subnet_id
-  security_group_id  = module.security.ec2_security_group_id
-  instance_type      = var.ec2_instance_type
-  app_port           = var.app_port
-  aws_region         = var.aws_region
-  backend_secret_arn = module.backend_secret.arn
+  name                = "${var.project_name}-${var.environment}"
+  subnet_id           = module.network.private_app_subnet_id
+  security_group_id   = module.security.ec2_security_group_id
+  instance_type       = var.ec2_instance_type
+  app_port            = var.app_port
+  aws_region          = var.aws_region
+  backend_secret_arn  = module.backend_secret.arn
+  detailed_monitoring = var.ec2_detailed_monitoring
 
   # Ensure the private subnet has an Internet route through the NAT instance
   # before application EC2 user_data attempts dnf update/install.
@@ -90,17 +91,29 @@ module "rds" {
   db_password       = var.db_password
 }
 
+module "grafana_domain" {
+  source = "./modules/api-domain"
+
+  domain_name  = var.domain_name
+  subdomain    = var.grafana_subdomain
+  alb_dns_name = module.alb.dns_name
+  alb_zone_id  = module.alb.zone_id
+}
+
 module "alb" {
   source = "./modules/alb"
 
-  name               = "${var.project_name}-${var.environment}"
-  vpc_id             = module.network.vpc_id
-  public_subnet_ids  = module.network.public_subnet_ids
-  security_group_id  = module.security.alb_security_group_id
-  target_instance_id = module.ec2.instance_id
-  app_port           = var.app_port
-  health_check_path  = var.health_check_path
-  certificate_arn    = module.api_domain.certificate_arn
+  name                    = "${var.project_name}-${var.environment}"
+  vpc_id                  = module.network.vpc_id
+  public_subnet_ids       = module.network.public_subnet_ids
+  security_group_id       = module.security.alb_security_group_id
+  target_instance_id      = module.ec2.instance_id
+  app_port                = var.app_port
+  health_check_path       = var.health_check_path
+  certificate_arn         = module.api_domain.certificate_arn
+  monitoring_instance_id  = module.monitoring.instance_id
+  grafana_certificate_arn = module.grafana_domain.certificate_arn
+  grafana_host_name       = "${var.grafana_subdomain}.${var.domain_name}"
 }
 
 module "image_storage" {
@@ -117,4 +130,105 @@ module "api_domain" {
   domain_name  = var.domain_name
   alb_dns_name = module.alb.dns_name
   alb_zone_id  = module.alb.zone_id
+}
+
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  name                   = "${var.project_name}-${var.environment}"
+  subnet_id              = module.network.private_app_subnet_id
+  security_group_id      = module.security.prometheus_security_group_id
+  instance_type          = var.monitoring_instance_type
+  root_volume_size       = var.monitoring_root_volume_size
+  aws_region             = var.aws_region
+  application_private_ip = module.ec2.private_ip
+  grafana_admin_password = var.grafana_admin_password
+  grafana_domain         = "${var.grafana_subdomain}.${var.domain_name}"
+
+  depends_on = [module.nat_instance]
+}
+
+resource "aws_cloudwatch_dashboard" "operations" {
+  dashboard_name = "${var.project_name}-${var.environment}-operations"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          title  = "EC2 - CPU and host memory"
+          region = var.aws_region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "InstanceId", module.ec2.instance_id, { label = "CPU (%)" }],
+            ["Timo/EC2", "mem_used_percent", "InstanceId", module.ec2.instance_id, { label = "Memory (%)" }]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          title  = "EC2 - disk and network"
+          region = var.aws_region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          metrics = [
+            ["Timo/EC2", "disk_used_percent", "InstanceId", module.ec2.instance_id, { label = "Disk used (%)" }],
+            ["AWS/EC2", "NetworkIn", "InstanceId", module.ec2.instance_id, { label = "Network received" }],
+            ["AWS/EC2", "NetworkOut", "InstanceId", module.ec2.instance_id, { label = "Network sent" }]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 12
+        height = 6
+        properties = {
+          title  = "RDS - CPU, connections, and free storage"
+          region = var.aws_region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          metrics = [
+            ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", module.rds.identifier, { label = "CPU (%)" }],
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", module.rds.identifier, { label = "Connections" }],
+            ["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", module.rds.identifier, { label = "Free storage (bytes)" }]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 6
+        width  = 12
+        height = 6
+        properties = {
+          title  = "RDS - read/write latency and IOPS"
+          region = var.aws_region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          metrics = [
+            ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", module.rds.identifier, { label = "Read latency" }],
+            ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", module.rds.identifier, { label = "Write latency" }],
+            ["AWS/RDS", "ReadIOPS", "DBInstanceIdentifier", module.rds.identifier, { label = "Read IOPS" }],
+            ["AWS/RDS", "WriteIOPS", "DBInstanceIdentifier", module.rds.identifier, { label = "Write IOPS" }]
+          ]
+        }
+      }
+    ]
+  })
 }
