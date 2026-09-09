@@ -1,0 +1,4 @@
+# mysql CLI 클라이언트 기본 문자셋.
+# 옵션 없이 접속하면 한글이 ??? 로 깨져서 표시되는 문제 방지용.
+[client]
+default-character-set=utf8mb4

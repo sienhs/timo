@@ -1,5 +1,8 @@
 services:
   mysql:
+    # Spring Boot Docker Compose 지원이 image 이름으로 MySQL 서비스임을 인식해
+    # datasource 를 자동 구성하므로, 커스텀 빌드를 하더라도 태그는 mysql:8.0 유지
+    build: ./docker/mysql
     image: mysql:8.0
     container_name: timo-mysql
     environment:
