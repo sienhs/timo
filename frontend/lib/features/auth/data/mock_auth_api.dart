@@ -1,6 +1,6 @@
 import '../constants.dart';
 import '../models/signup_draft.dart';
-import '../models/signup_result.dart';
+import '../models/auth_tokens.dart';
 import 'auth_api.dart';
 
 /// 서버 없이 쓰는 가짜 [AuthApi]. 화면 테스트와, 백엔드 API 가 아직 없는
@@ -28,8 +28,8 @@ class MockAuthApi implements AuthApi {
   static const takenNicknames = {'티모'};
   static const wrongPassword = 'wrong1234';
 
-  /// 가입 응답 흉내. 토큰은 저장하지 않으므로 값은 아무것이어도 된다.
-  static const signupResult = SignupResult(
+  /// 가입·로그인 응답 흉내. 서버에 보내지 않으므로 값은 아무것이어도 된다.
+  static const tokens = AuthTokens(
     memberId: 1,
     accessToken: 'mock-access-token',
     refreshToken: 'mock-refresh-token',
@@ -66,17 +66,17 @@ class MockAuthApi implements AuthApi {
   }
 
   @override
-  Future<SignupResult> signUp(SignupDraft draft) async {
+  Future<AuthTokens> signUp(SignupDraft draft) async {
     await _respond();
-    return signupResult;
+    return tokens;
   }
 
   @override
-  Future<bool> login({
+  Future<AuthTokens?> login({
     required String username,
     required String password,
   }) async {
     await _respond();
-    return password != wrongPassword;
+    return password == wrongPassword ? null : tokens;
   }
 }

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../data/auth_api.dart';
-import '../data/mock_auth_api.dart';
+import '../models/auth_tokens.dart';
+import '../state/auth_api_scope.dart';
+import '../state/auth_session.dart';
+import '../state/auth_session_scope.dart';
 import '../widgets/auth_page.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/obscure_toggle.dart';
@@ -17,12 +22,17 @@ import '../widgets/timo_logo.dart';
 /// 바뀌어도 기존 계정이 로그인 못 하는 일이 없어야 하고, 맞는지 판정은 서버
 /// 몫이기 때문이다.
 ///
-/// 성공하면 이전 화면으로 돌아가며 결과로 true 를 넘긴다. 로그인 상태를
-/// 저장하는 일은 다음 작업에서 이 값을 받아 처리한다.
+/// 성공하면 받은 토큰을 [AuthSession] 에 담아(기기에도 저장됨) 이전 화면으로
+/// 돌아가며 결과로 true 를 넘긴다. 아이디·비밀번호가 틀리면 칸 아래 문구,
+/// 정지·탈퇴 계정이나 네트워크 실패는 스낵바로 알린다.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.api = const MockAuthApi()});
+  const LoginScreen({super.key, this.api, this.session});
 
-  final AuthApi api;
+  /// 직접 넘기면 그걸 쓰고(테스트), 안 넘기면 [AuthApiScope] 에서 받는다(앱).
+  final AuthApi? api;
+
+  /// 마찬가지. 안 넘기면 [AuthSessionScope] 에서 받는다.
+  final AuthSession? session;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -35,6 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
   var _obscurePassword = true;
   var _busy = false;
   String? _errorText;
+
+  AuthApi get _api => widget.api ?? AuthApiScope.of(context);
+
+  AuthSession get _session => widget.session ?? AuthSessionScope.read(context);
 
   /// 앞뒤 공백은 오타로 보고 잘라낸다. 비밀번호는 공백도 글자라 그대로 둔다.
   String get _username => _usernameController.text.trim();
@@ -60,13 +74,32 @@ class _LoginScreenState extends State<LoginScreen> {
       _busy = true;
       _errorText = null;
     });
-    final ok = await widget.api.login(username: _username, password: _password);
+
+    final AuthTokens? tokens;
+    try {
+      tokens = await _api.login(username: _username, password: _password);
+    } on ApiException catch (e) {
+      // 정지·탈퇴 계정(403), 네트워크 끊김. 입력이 틀린 게 아니라 칸 아래가
+      // 아닌 스낵바로 알리고 다시 시도할 수 있게 버튼을 푼다.
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showErrorSnackBar(context, e.message);
+      return;
+    }
+
     if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (!ok) _errorText = AuthStrings.loginFailed;
-    });
-    if (!ok) return;
+    if (tokens == null) {
+      setState(() {
+        _busy = false;
+        _errorText = AuthStrings.loginFailed;
+      });
+      return;
+    }
+
+    // 토큰을 세션에 담으면 앱 전체가 로그인 상태가 되고 기기에도 저장된다.
+    // 저장까지 끝난 뒤 닫아야, 닫힌 직후 앱을 죽여도 로그인 상태가 남는다.
+    await _session.signIn(tokens);
+    if (!mounted) return;
     // 성공했을 때만 OS 에 "이 아이디·비밀번호를 저장할래?" 를 묻게 한다.
     // 틀린 비밀번호를 저장하라고 묻는 일이 없도록, 화면이 닫힐 때 무조건
     // 묻는 자동완성 그룹의 기본 동작은 아래 build 에서 꺼 두었다.

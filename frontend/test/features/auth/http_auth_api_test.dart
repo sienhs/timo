@@ -257,13 +257,89 @@ void main() {
     });
   });
 
-  test('로그인은 백엔드 API 가 없어 지원하지 않는다고 알린다', () async {
-    final api = build((_) => jsonResponse({}));
+  group('로그인', () {
+    test('아이디·비밀번호와 기기 식별자 헤더를 POST /login 으로 보내고 토큰을 읽는다', () async {
+      final api = build(
+        (_) => jsonResponse({
+          'memberId': 7,
+          'accessToken': 'access-jwt',
+          'refreshToken': 'refresh-random',
+          'accessTokenExpiresIn': 1800,
+        }),
+      );
 
-    await expectLater(
-      api.login(username: 'timo', password: 'abcd1234!'),
-      throwsUnsupportedError,
-    );
-    expect(adapter.requests, isEmpty);
+      final tokens = await api.login(
+        username: 'timo_test1',
+        password: 'abcd1234!',
+      );
+
+      expect(tokens, isNotNull);
+      expect(tokens!.memberId, 7);
+      expect(tokens.accessToken, 'access-jwt');
+      expect(tokens.refreshToken, 'refresh-random');
+      expect(tokens.accessTokenExpiresIn, const Duration(seconds: 1800));
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '$basePath/login');
+      expect(request.headers[HttpAuthApi.deviceIdHeader], deviceId);
+      expect(request.jsonBody, {
+        'username': 'timo_test1',
+        'password': 'abcd1234!',
+      });
+    });
+
+    test('아이디·비밀번호가 틀리면(400 LoginFailed) 예외가 아니라 null 이다', () async {
+      final api = build(
+        (_) => problemResponse(
+          status: 400,
+          errorMessage: '아이디 또는 비밀번호가 올바르지 않습니다.',
+          exception: AuthServerErrors.loginFailed,
+        ),
+      );
+
+      final tokens = await api.login(username: 'timo_test1', password: 'wrong');
+
+      expect(tokens, isNull);
+    });
+
+    test('정지된 계정(403)은 서버 문구를 담은 예외로 던진다', () async {
+      final api = build(
+        (_) => problemResponse(
+          status: 403,
+          errorMessage: '정지된 계정입니다. 고객센터로 문의해 주세요.',
+          exception: 'MemberSuspendedException',
+        ),
+      );
+
+      await expectLater(
+        api.login(username: 'timo_test1', password: 'abcd1234!'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 403)
+              .having((e) => e.message, 'message', contains('정지된 계정'))
+              .having(
+                (e) => e.exceptionName,
+                'exceptionName',
+                'MemberSuspendedException',
+              ),
+        ),
+      );
+    });
+
+    test('서버에 닿지 못하면 안내 문구를 담은 예외가 나간다', () async {
+      final api = build(connectionLost);
+
+      await expectLater(
+        api.login(username: 'timo_test1', password: 'abcd1234!'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            '인터넷 연결을 확인해주세요.',
+          ),
+        ),
+      );
+    });
   });
 }
