@@ -25,5 +25,10 @@ logging:
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789
 
+# 로컬은 프론트가 붙어 보는 환경이라 스텁(/api/v0/**) 을 켠다. 실제 API(/api/v1/**) 도 같이 뜬다.
+api:
+  stub:
+    enabled: true
+
 wallet:
   master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99

@@ -22,6 +22,12 @@ logging:
 jwt:
   secret: ${JWT_SECRET}
 
+# 배포 환경은 실제 API(/api/v1/**) 만 연다. 기본값도 false 지만, 운영에 스텁이 올라가면
+# 인증 없이 가짜 토큰을 내주는 셈이라 의도를 명시해 둔다.
+api:
+  stub:
+    enabled: false
+
 wallet:
   master-key: ${WALLET_MASTER_KEY}
 

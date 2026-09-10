@@ -4,16 +4,14 @@ import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 구역 API.
+ * 구역 API (v1, 실제 구현).
  *
- * <p>좌석과 같은 도메인이지만 경로를 나눈다. 한 URL 이 파라미터에 따라 구역을 주기도 하고 좌석을
- * 주기도 하면 응답 스키마가 둘이 되어 클라이언트가 무엇이 올지 미리 알 수 없다.
+ * <p>엔드포인트 매핑과 검증 규약은 {@link SectionApi} 에 있다. 이 클래스는 버전 경로를 정하고
+ * 서비스에 위임만 한다. 프론트 연동용 스텁은 {@code /api/v0/sections} 에 같은 규약으로 떠 있다.
  *
  * <p>요청 검증 실패는 {@link com.ssafy.timo.global.exception.GlobalExceptionHandler} 가
  * Problem Details 로 변환하므로 여기서 따로 처리하지 않는다.
@@ -21,19 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(SectionController.BASE_PATH)
 @RequiredArgsConstructor
-public class SectionController {
+public class SectionController implements SectionApi {
 
     static final String BASE_PATH = "/api/v1/sections";
 
     private final SeatService seatService;
 
-    /**
-     * 공연장의 구역을 잔여석과 함께 조회한다. 구역 선택 화면이 쓴다.
-     *
-     * <p>개별 좌석은 담기지 않는다. 구역을 고른 뒤 {@code GET /api/v1/seats?sectionId=} 로 받는다.
-     */
-    @GetMapping
-    public ResponseEntity<SectionListResponseDto> findSections(@RequestParam Long venueId) {
+    @Override
+    public ResponseEntity<SectionListResponseDto> findSections(Long venueId) {
         return ResponseEntity.ok(seatService.findSections(venueId));
     }
 }
