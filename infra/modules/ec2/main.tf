@@ -88,6 +88,13 @@ resource "aws_instance" "this" {
     delete_on_termination = true
   }
 
+  # The public SSM parameter always advances to the newest AL2023 AMI. Do not
+  # replace a running application instance during an unrelated Terraform apply.
+  # AMI upgrades are performed explicitly in a planned maintenance change.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   user_data = replace(<<-EOF
               #!/bin/bash
               set -eux

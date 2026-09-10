@@ -40,6 +40,10 @@ terraform '-chdir=infra' apply 'changes.tfplan'
 `moved.tf`는 기존 리소스 주소를 새 모듈 주소로 이전합니다. 기존 환경의 업그레이드를
 위해 유지하며, 모듈 정리만으로 버킷·키·인증서가 재생성되어서는 안 됩니다.
 
+EC2·NAT·모니터링 인스턴스는 최신 AL2023 AMI SSM 파라미터를 최초 생성 시에만 사용합니다.
+이후 AMI 갱신은 Terraform apply만으로 인스턴스를 교체하지 않습니다. AMI 업그레이드는 별도
+점검·교체 계획으로 수행합니다.
+
 ## CloudWatch 운영 지표
 
 `terraform apply` 후 CloudWatch의 `${project_name}-${environment}-operations` 대시보드에서
@@ -75,6 +79,8 @@ Prometheus 데이터는 30GiB 암호화 gp3 루트 볼륨에 15일간 보존됩�
 Grafana는 `https://grafana.<domain>`으로 공개됩니다. ALB만 Grafana 컨테이너의 3000 포트에
 접근할 수 있고, Prometheus의 9090 포트 및 모니터링 EC2의 직접 접근은 계속 비공개입니다.
 Grafana에서는 `admin`과 `grafana_admin_password`로 로그인하며, 익명 접근과 회원가입은 꺼져 있습니다.
+`Timo` 폴더의 `Timo Backend Overview` 대시보드는 backend 상태, 요청량, p95 응답시간, 5xx 비율,
+JVM heap, DB 커넥션 풀만 자동 등록합니다.
 
 `.terraform.lock.hcl`은 버전 재현성을 위해 커밋합니다. `*.tfvars`, 상태 파일,
 계획 파일, `.terraform/`, `private/`의 비밀 전달 파일은 커밋하지 않습니다.

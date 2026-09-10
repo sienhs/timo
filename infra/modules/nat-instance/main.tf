@@ -82,6 +82,12 @@ resource "aws_instance" "this" {
     delete_on_termination = true
   }
 
+  # Keep the NAT instance on its current AMI until an explicit maintenance
+  # replacement. The latest-AMI SSM parameter must not cause surprise outages.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   user_data = templatefile("${path.module}/user_data.sh", {
     private_app_subnet_cidr = var.private_app_subnet_cidr
   })

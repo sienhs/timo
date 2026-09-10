@@ -72,14 +72,22 @@ resource "aws_instance" "this" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("${path.module}/user_data.sh", {
+  # Bootstrap changes are delivered through the SSM association below. Avoid
+  # recreating the monitoring host merely because the public latest AMI moves.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
+  # Windows checkouts may contain CRLF; Linux shebangs and shell commands
+  # require LF. Normalize the complete rendered script before EC2/SSM use.
+  user_data = replace(templatefile("${path.module}/user_data.sh", {
     application_private_ip = var.application_private_ip
     aws_region             = var.aws_region
     grafana_secret_arn     = aws_secretsmanager_secret.grafana.arn
     prometheus_image       = var.prometheus_image
     grafana_image          = var.grafana_image
     grafana_domain         = var.grafana_domain
-  })
+  }), "\r\n", "\n")
 
   tags = {
     Name = "${var.name}-monitoring"
@@ -88,9 +96,14 @@ resource "aws_instance" "this" {
 
 # Applying an updated Terraform configuration to an existing monitoring EC2
 # reruns the bootstrap safely without replacing its Prometheus data volume.
+resource "terraform_data" "bootstrap_version" {
+  input = sha256(aws_instance.this.user_data)
+}
+
 resource "aws_ssm_association" "bootstrap" {
-  name             = "AWS-RunShellScript"
-  association_name = "${var.name}-monitoring-bootstrap"
+  name                             = "AWS-RunShellScript"
+  association_name                 = "${var.name}-monitoring-bootstrap"
+  wait_for_success_timeout_seconds = 300
 
   targets {
     key    = "InstanceIds"
@@ -105,4 +118,10 @@ resource "aws_ssm_association" "bootstrap" {
     aws_iam_role_policy_attachment.ssm,
     aws_iam_role_policy.grafana_secret_read
   ]
+
+  # The provider waits for execution success on creation, not on updates.
+  # Replace on script changes so bootstrap failures are reported by apply.
+  lifecycle {
+    replace_triggered_by = [terraform_data.bootstrap_version]
+  }
 }
