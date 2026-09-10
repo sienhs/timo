@@ -4,7 +4,7 @@ set -euo pipefail
 dnf install -y docker python3
 systemctl enable --now docker
 
-install -d -m 0755 /opt/timo-monitoring/prometheus /opt/timo-monitoring/grafana/provisioning/datasources
+install -d -m 0755 /opt/timo-monitoring/prometheus /opt/timo-monitoring/grafana/provisioning/datasources /opt/timo-monitoring/grafana/provisioning/dashboards /opt/timo-monitoring/grafana/dashboards
 install -d -m 0755 /var/lib/timo-monitoring/prometheus /var/lib/timo-monitoring/grafana
 chown 65534:65534 /var/lib/timo-monitoring/prometheus
 chown 472:472 /var/lib/timo-monitoring/grafana
@@ -23,14 +23,110 @@ PROMETHEUS
 
 cat >/opt/timo-monitoring/grafana/provisioning/datasources/prometheus.yml <<'GRAFANA'
 apiVersion: 1
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
 datasources:
   - name: Prometheus
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
     editable: false
 GRAFANA
+
+cat >/opt/timo-monitoring/grafana/provisioning/dashboards/default.yml <<'DASHBOARD_PROVIDER'
+apiVersion: 1
+providers:
+  - name: timo
+    orgId: 1
+    folder: Timo
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /etc/grafana/dashboards
+DASHBOARD_PROVIDER
+
+cat >/opt/timo-monitoring/grafana/dashboards/timo-overview.json <<'DASHBOARD'
+{
+  "uid": "timo-overview",
+  "title": "Timo Backend Overview",
+  "tags": ["timo", "backend"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Backend target",
+      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 5},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "max(up{job=\"timo-backend\"})", "instant": true, "range": false}],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Request rate",
+      "gridPos": {"x": 4, "y": 0, "w": 10, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{application=\"timo\"}[1m]))", "legendFormat": "requests/s"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 2}, "overrides": []}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "p95 response time",
+      "gridPos": {"x": 14, "y": 0, "w": 10, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"timo\"}[5m])))", "legendFormat": "p95"}],
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 3}, "overrides": []}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "5xx error rate",
+      "gridPos": {"x": 0, "y": 8, "w": 8, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "100 * sum(rate(http_server_requests_seconds_count{application=\"timo\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"timo\"}[5m])), 0.001)", "legendFormat": "5xx"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2, "min": 0}, "overrides": []}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM heap used",
+      "gridPos": {"x": 8, "y": 8, "w": 8, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "100 * sum(jvm_memory_used_bytes{application=\"timo\",area=\"heap\"}) / sum(jvm_memory_max_bytes{application=\"timo\",area=\"heap\"})", "legendFormat": "heap used"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "min": 0, "max": 100}, "overrides": []}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "DB connection pool",
+      "gridPos": {"x": 16, "y": 8, "w": 8, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "hikaricp_connections_active{application=\"timo\"}", "legendFormat": "active"},
+        {"refId": "B", "expr": "hikaricp_connections_pending{application=\"timo\"}", "legendFormat": "pending"},
+        {"refId": "C", "expr": "hikaricp_connections_max{application=\"timo\"}", "legendFormat": "max"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0}, "overrides": []}
+    }
+  ]
+}
+DASHBOARD
 
 grafana_password=$(aws secretsmanager get-secret-value \
   --region '${aws_region}' \
@@ -63,4 +159,5 @@ docker run -d --name timo-grafana --restart unless-stopped \
   --env GF_SERVER_ROOT_URL='https://${grafana_domain}' \
   --volume /var/lib/timo-monitoring/grafana:/var/lib/grafana \
   --volume /opt/timo-monitoring/grafana/provisioning:/etc/grafana/provisioning:ro \
+  --volume /opt/timo-monitoring/grafana/dashboards:/etc/grafana/dashboards:ro \
   '${grafana_image}'
