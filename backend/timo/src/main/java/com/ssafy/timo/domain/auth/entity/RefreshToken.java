@@ -40,9 +40,15 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "refresh_token",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_refresh_token_member_device",
-                columnNames = {"member_id", "device_id"}))
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_refresh_token_member_device",
+                        columnNames = {"member_id", "device_id"}),
+                // 재발급은 토큰 해시만 들고 들어온다. 인덱스가 없으면 세션이 늘어날수록
+                // 매 재발급이 풀스캔이 된다. 유일하기도 해야 조회 결과가 하나로 확정된다.
+                @UniqueConstraint(
+                        name = "uk_refresh_token_hash",
+                        columnNames = "token_hash")})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken extends BaseEntity {
 
@@ -82,6 +88,17 @@ public class RefreshToken extends BaseEntity {
      */
     public void rotate(String tokenHash, LocalDateTime expiresAt) {
         this.tokenHash = tokenHash;
+        this.expiresAt = expiresAt;
+    }
+
+    /**
+     * 만료 시각을 다시 민다.
+     *
+     * <p>access 만 재발급하는 구조라 이게 없으면 <b>앱을 매일 쓰는 사용자도 최초 로그인
+     * 이후 수명이 다하면 그냥 튕긴다.</b> 재발급 때마다 밀어 줘야 활성 사용자는 안 풀리고
+     * 방치된 세션만 만료된다. 기기를 잃어버렸을 때 언젠가는 끊기게 하려면 무한이면 안 된다.
+     */
+    public void extend(LocalDateTime expiresAt) {
         this.expiresAt = expiresAt;
     }
 
