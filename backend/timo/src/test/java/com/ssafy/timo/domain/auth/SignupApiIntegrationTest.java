@@ -12,6 +12,8 @@ import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.entity.MemberStatus;
 import com.ssafy.timo.domain.member.entity.Role;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.wallet.entity.Wallet;
+import com.ssafy.timo.domain.wallet.repository.WalletRepository;
 import com.ssafy.timo.global.util.Sha256;
 import com.ssafy.timo.support.IntegrationTest;
 import java.time.Duration;
@@ -65,6 +67,9 @@ class SignupApiIntegrationTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
+    private WalletRepository walletRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -104,6 +109,21 @@ class SignupApiIntegrationTest {
 
         assertThat(loginInfoRepository.existsByUsername(USERNAME)).isTrue();
         assertThat(refreshTokenRepository.findByMemberIdAndDeviceId(member.getId(), DEVICE_ID)).isPresent();
+    }
+
+    @Test
+    @DisplayName("가입하면 지갑도 함께 생성된다")
+    void signUp_createsWallet() throws Exception {
+        String ticket = issueTicket(PHONE);
+
+        mvc.perform(signupRequest(ticket, PHONE, USERNAME, NICKNAME)).andExpect(status().isCreated());
+
+        Member member = memberRepository.findAll().getFirst();
+        Wallet wallet = walletRepository.findById(member.getId()).orElseThrow();
+        // 대소문자를 섞지 않고 항상 소문자로 고정한다 - CustodialWalletCrypto 주석 참고.
+        assertThat(wallet.getAddress()).matches("^0x[0-9a-f]{40}$");
+        assertThat(wallet.getEncryptedKeystoreJson()).isNotBlank();
+        assertThat(wallet.getWrappedDek()).isNotBlank();
     }
 
     @Test

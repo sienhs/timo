@@ -24,11 +24,17 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+
     // Redis 기능(캐시·분산 락 등)을 도입할 때 다시 활성화한다.
     // implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'com.solapi:sdk:1.0.3'
+
+    // 커스터디얼 지갑 키페어 생성 및 V3 keystore 암복호화 / 서명에 사용한다.
+    implementation 'org.web3j:core:4.14.0'
+
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'com.mysql:mysql-connector-j'

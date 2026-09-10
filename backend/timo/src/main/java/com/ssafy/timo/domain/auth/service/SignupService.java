@@ -13,10 +13,13 @@ import com.ssafy.timo.domain.auth.service.AccessTokenProvider.AccessToken;
 import com.ssafy.timo.domain.auth.service.RefreshTokenProvider.IssuedRefreshToken;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.global.util.PhoneNumbers;
 import com.ssafy.timo.global.util.Sha256;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class SignupService {
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenProvider accessTokenProvider;
     private final RefreshTokenProvider refreshTokenProvider;
+    private final WalletService walletService;
 
     @Transactional
     public SignupResponseDto signUp(SignupRequestDto request, String deviceId) {
@@ -54,8 +58,10 @@ public class SignupService {
         checkDuplicates(phoneNumber, request);
 
         Member member = save(request, phoneNumber);
+        walletService.createWallet(member);
 
-        // 가입이 확정된 뒤에 소비한다. 앞에서 지우면 저장이 실패했을 때 다시 인증받아야 한다.
+        // 가입이 확정된 뒤에 소비한다. 앞에서 지우면 저장이나 지갑 생성이 실패했을 때
+        // 다시 인증받아야 한다.
         smsVerificationStore.deleteTicket(ticketHash);
 
         AccessToken accessToken = accessTokenProvider.issue(member.getId(), member.getRole());

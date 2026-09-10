@@ -17,6 +17,9 @@ spring:
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789
 
+wallet:
+  master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
+
 # 이 프로파일에서는 SolapiSmsSender 가 뜬다. 실제 발송은 하지 않지만 값이 없으면 기동에 실패한다.
 solapi:
   api-key: test-api-key
