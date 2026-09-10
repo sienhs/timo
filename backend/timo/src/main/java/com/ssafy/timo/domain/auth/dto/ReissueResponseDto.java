@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 /**
  * access 토큰 재발급 결과.
  *
@@ -15,4 +16,10 @@ public record ReissueResponseDto(
         String accessToken,
         long accessTokenExpiresIn
 ) {
+
+    @Override
+    public String toString() {
+        return "ReissueResponseDto[accessToken=%s, accessTokenExpiresIn=%d]"
+                .formatted(Masked.of(accessToken), accessTokenExpiresIn);
+    }
 }

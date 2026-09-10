@@ -4,8 +4,6 @@ import com.ssafy.timo.domain.auth.dto.LoginRequestDto;
 import com.ssafy.timo.domain.auth.dto.LoginResponseDto;
 import com.ssafy.timo.domain.auth.entity.LoginInfo;
 import com.ssafy.timo.domain.auth.exception.LoginFailedException;
-import com.ssafy.timo.domain.auth.exception.MemberSuspendedException;
-import com.ssafy.timo.domain.auth.exception.MemberWithdrawnException;
 import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.auth.service.AccessTokenProvider.AccessToken;
 import com.ssafy.timo.domain.auth.service.RefreshTokenProvider.IssuedRefreshToken;
@@ -79,7 +77,7 @@ public class LoginService {
         }
 
         Member member = found.get().getMember();
-        checkLoginable(member);
+        member.verifyActive();
 
         AccessToken accessToken = accessTokenProvider.issue(member.getId(), member.getRole());
         IssuedRefreshToken refreshToken = refreshTokenProvider.issue(member, deviceId);
@@ -90,18 +88,4 @@ public class LoginService {
                 member.getId(), accessToken.value(), refreshToken.value(), accessToken.expiresInSeconds());
     }
 
-    /**
-     * 계정 상태를 본다. 비밀번호를 <b>맞힌 뒤</b>에 검사하므로 이미 본인이 확인된 상태고,
-     * 열거 걱정 없이 사유를 그대로 알려줘도 된다. 그래서 {@code LOGIN_FAILED} 와 코드를 나눈다.
-     *
-     * <p>{@code MemberStatus} 에 상태를 추가하면 여기도 같이 봐야 한다. 빠뜨리면 그 상태의
-     * 계정이 <b>그냥 로그인된다.</b>
-     */
-    private void checkLoginable(Member member) {
-        switch (member.getStatus()) {
-            case ACTIVE -> { }
-            case SUSPENDED -> throw new MemberSuspendedException();
-            case WITHDRAWN -> throw new MemberWithdrawnException();
-        }
-    }
 }

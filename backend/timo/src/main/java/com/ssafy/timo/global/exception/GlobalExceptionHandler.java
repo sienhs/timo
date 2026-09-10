@@ -82,14 +82,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers,
                                                                   HttpStatusCode status,
                                                                   WebRequest request) {
-        log.warn("Validation failed: {}", e.getMessage());
-
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         ProblemDetail body = problemDetail(errorCode.getStatus(), errorCode.getMessage(), e);
         List<FieldError> errors = e.getBindingResult().getFieldErrors().stream()
                 .map(error -> new FieldError(error.getField(), error.getDefaultMessage()))
                 .toList();
         body.setProperty("errors", errors);
+
+        // e.getMessage() 를 찍으면 안 된다. 거절된 값(rejected value)이 그대로 들어 있어
+        // SMS 인증번호나 비밀번호 같은 사용자 입력 원문이 로그에 남는다. 필드와 사유만 남긴다.
+        log.warn("Validation failed: {}", errors);
 
         return handleExceptionInternal(e, body, headers, status, request);
     }
@@ -107,11 +109,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                            HttpHeaders headers,
                                                                            HttpStatusCode status,
                                                                            WebRequest request) {
-        log.warn("Validation failed: {}", e.getMessage());
-
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         ProblemDetail body = problemDetail(errorCode.getStatus(), errorCode.getMessage(), e);
-        body.setProperty("errors", toFieldErrors(e));
+        List<FieldError> errors = toFieldErrors(e);
+        body.setProperty("errors", errors);
+
+        // 위와 같은 이유로 원본 메시지를 찍지 않는다.
+        log.warn("Validation failed: {}", errors);
 
         return handleExceptionInternal(e, body, headers, status, request);
     }
@@ -149,11 +153,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers,
                                                                   HttpStatusCode status,
                                                                   WebRequest request) {
-        log.warn("Request body not readable: {}", e.getMessage());
-
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         ProblemDetail body = problemDetail(errorCode.getStatus(), errorCode.getMessage(), e);
-        toFieldError(e.getCause()).ifPresent(fieldError -> body.setProperty("errors", List.of(fieldError)));
+        Optional<FieldError> fieldError = toFieldError(e.getCause());
+        fieldError.ifPresent(error -> body.setProperty("errors", List.of(error)));
+
+        // 원본 메시지에는 파싱하지 못한 요청 본문 조각이 들어 있다. 어느 필드에서 실패했는지만 남긴다.
+        log.warn("Request body not readable: field={}", fieldError.map(FieldError::field).orElse("unknown"));
 
         return handleExceptionInternal(e, body, headers, status, request);
     }

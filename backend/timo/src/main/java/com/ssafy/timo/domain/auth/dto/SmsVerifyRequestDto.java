@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
@@ -13,4 +14,9 @@ public record SmsVerifyRequestDto(
         @Pattern(regexp = AuthPatterns.VERIFICATION_CODE, message = "인증 코드는 6자리 숫자입니다.")
         String code
 ) {
+
+    @Override
+    public String toString() {
+        return "SmsVerifyRequestDto[phoneNumber=%s, code=%s]".formatted(Masked.of(phoneNumber), Masked.of(code));
+    }
 }

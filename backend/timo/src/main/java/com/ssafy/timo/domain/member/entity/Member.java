@@ -1,5 +1,7 @@
 package com.ssafy.timo.domain.member.entity;
 
+import com.ssafy.timo.domain.auth.exception.MemberSuspendedException;
+import com.ssafy.timo.domain.auth.exception.MemberWithdrawnException;
 import com.ssafy.timo.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -65,6 +67,21 @@ public class Member extends BaseEntity {
         this.nickname = nickname;
         this.role = Role.USER;
         this.status = MemberStatus.ACTIVE;
+    }
+
+    /**
+     * 서비스를 이용할 수 있는 상태인지 확인한다. 아니면 그 사유대로 예외를 던진다.
+     *
+     * <p>로그인과 본인 정보 조회가 같은 판정을 써야 해서 엔티티에 둔다. 호출하는 쪽에
+     * 각자 {@code switch} 를 두면 {@link MemberStatus} 에 값을 추가할 때 한 곳을 빠뜨리고,
+     * 그 상태의 계정이 <b>그냥 통과한다.</b>
+     */
+    public void verifyActive() {
+        switch (status) {
+            case ACTIVE -> { }
+            case SUSPENDED -> throw new MemberSuspendedException();
+            case WITHDRAWN -> throw new MemberWithdrawnException();
+        }
     }
 
     public void changeNickname(String nickname) {

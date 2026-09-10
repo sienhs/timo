@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
@@ -9,4 +10,9 @@ public record SmsSendRequestDto(
         @Pattern(regexp = AuthPatterns.PHONE_NUMBER, message = "휴대폰 번호 형식이 올바르지 않습니다.")
         String phoneNumber
 ) {
+
+    @Override
+    public String toString() {
+        return "SmsSendRequestDto[phoneNumber=%s]".formatted(Masked.of(phoneNumber));
+    }
 }

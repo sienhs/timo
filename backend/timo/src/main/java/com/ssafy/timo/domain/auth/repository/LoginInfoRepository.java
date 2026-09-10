@@ -22,4 +22,16 @@ public interface LoginInfoRepository extends JpaRepository<LoginInfo, Long> {
      */
     @Query("select l from LoginInfo l join fetch l.member where l.username = :username")
     Optional<LoginInfo> findByUsernameWithMember(@Param("username") String username);
+
+    /**
+     * 본인 정보 조회용. 회원과 로그인 수단을 한 번에 가져온다.
+     *
+     * <p>{@code LoginInfo} 를 기준으로 찾는 이유는 아이디가 이쪽에 있어서다. 회원부터 찾으면
+     * 아이디를 얻으려고 쿼리가 한 번 더 나간다.
+     *
+     * <p>소셜 로그인이 붙어 아이디·비밀번호 수단이 없는 회원이 생기면 그 회원은 이 조회로
+     * 찾히지 않는다. 그때는 {@code Member} 기준으로 바꾸고 아이디를 nullable 로 다뤄야 한다.
+     */
+    @Query("select l from LoginInfo l join fetch l.member where l.memberId = :memberId")
+    Optional<LoginInfo> findByMemberIdWithMember(@Param("memberId") Long memberId);
 }

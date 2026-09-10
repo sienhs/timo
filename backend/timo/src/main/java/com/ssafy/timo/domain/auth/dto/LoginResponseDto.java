@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 /**
  * 로그인 결과.
  *
@@ -17,4 +18,10 @@ public record LoginResponseDto(
         String refreshToken,
         long accessTokenExpiresIn
 ) {
+
+    @Override
+    public String toString() {
+        return "LoginResponseDto[memberId=%s, accessToken=%s, refreshToken=%s, accessTokenExpiresIn=%d]"
+                .formatted(memberId, Masked.of(accessToken), Masked.of(refreshToken), accessTokenExpiresIn);
+    }
 }

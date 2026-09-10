@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -63,5 +64,12 @@ public record SignupRequestDto(
     private boolean find(java.util.regex.Pattern pattern) {
         Matcher matcher = pattern.matcher(password);
         return matcher.find();
+    }
+
+    @Override
+    public String toString() {
+        return "SignupRequestDto[verificationTicket=%s, phoneNumber=%s, name=%s, username=%s, password=%s, nickname=%s]"
+                .formatted(Masked.of(verificationTicket), Masked.of(phoneNumber), Masked.of(name),
+                        username, Masked.of(password), nickname);
     }
 }

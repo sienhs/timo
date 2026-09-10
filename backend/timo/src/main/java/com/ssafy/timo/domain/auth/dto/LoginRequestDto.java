@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -36,5 +37,10 @@ public record LoginRequestDto(
     public LoginRequestDto {
         // 검증보다 먼저 돈다. 공백만 넣은 아이디는 여기서 빈 문자열이 되어 @NotBlank 에 걸린다.
         username = username == null ? null : username.strip();
+    }
+
+    @Override
+    public String toString() {
+        return "LoginRequestDto[username=%s, password=%s]".formatted(Masked.of(username), Masked.of(password));
     }
 }

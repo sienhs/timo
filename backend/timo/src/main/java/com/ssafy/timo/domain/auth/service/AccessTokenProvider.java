@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.auth.service;
 
 import com.ssafy.timo.domain.member.entity.Role;
 import com.ssafy.timo.global.config.JwtProperties;
+import com.ssafy.timo.global.util.Masked;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -62,5 +63,10 @@ public class AccessTokenProvider {
      * @param expiresInSeconds 남은 수명(초). 앱이 만료 직전에 미리 재발급할 수 있도록 함께 내려준다
      */
     public record AccessToken(String value, long expiresInSeconds) {
+
+        @Override
+        public String toString() {
+            return "AccessToken[value=%s, expiresInSeconds=%d]".formatted(Masked.of(value), expiresInSeconds);
+        }
     }
 }
