@@ -7,21 +7,20 @@ import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 좌석 API.
+ * 좌석 API (v1, 실제 구현).
+ *
+ * <p>엔드포인트 매핑과 검증 규약은 {@link SeatApi} 에 있다. 이 클래스는 버전 경로를 정하고
+ * 서비스에 위임만 한다. 프론트 연동용 스텁은 {@code /api/v0/seats} 에 같은 규약으로 떠 있다.
+ *
+ * <p>요청자는 요청 본문이 아니라 {@link com.ssafy.timo.global.security.CurrentMemberProvider}
+ * 가 알려 준다. 인증이 붙어도 이 API 규약은 그대로다.
  *
  * <p>요청 검증 실패는 {@link com.ssafy.timo.global.exception.GlobalExceptionHandler} 가
  * Problem Details 로 변환하므로 여기서 따로 처리하지 않는다.
@@ -29,95 +28,38 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(SeatController.BASE_PATH)
 @RequiredArgsConstructor
-public class SeatController {
+public class SeatController implements SeatApi {
 
     static final String BASE_PATH = "/api/v1/seats";
 
     private final SeatService seatService;
 
-    /**
-     * 공연장의 구역과 좌석을 등록한다.
-     *
-     * <p>공연장·공연 등록과 달리 Location 헤더를 싣지 않는다. 한 번의 호출로 구역 여러 개와 좌석 수천 건이
-     * 만들어지므로 가리킬 단일 리소스가 없다. 만들어진 구역은 응답 본문의 {@code sections} 에서 확인한다.
-     */
-    /**
-     * 구역 하나의 좌석을 배치도 순서(행 -> 자리)로 조회한다.
-     *
-     * <p>{@code sectionId} 는 필수다. 좌석은 언제나 구역 단위로 조회한다 — 공연장 전체 좌석은
-     * 수만 건이 될 수 있어 한 응답에 실을 크기가 아니다. 구역 목록은
-     * {@code GET /api/v1/sections?venueId=} 에서 받는다.
-     *
-     * <p>페이지로 나누지 않는다. 배치도는 좌석이 전부 있어야 그려진다.
-     */
-    @GetMapping
-    public ResponseEntity<SectionSeatListResponseDto> findSeats(@RequestParam Long sectionId) {
+    @Override
+    public ResponseEntity<SectionSeatListResponseDto> findSeats(Long sectionId) {
         return ResponseEntity.ok(seatService.findSeats(sectionId));
     }
 
-    /**
-     * 좌석을 선점한다. 5 분 동안 다른 회원이 잡을 수 없다.
-     *
-     * <p>요청자는 요청 본문이 아니라 {@link com.ssafy.timo.global.security.CurrentMemberProvider}
-     * 가 알려 준다. 인증이 붙어도 이 API 규약은 그대로다.
-     *
-     * <p>한 계정은 좌석 하나만 잡을 수 있어, 새로 잡으면 이전 선점이 함께 풀린다. 풀린 좌석은
-     * 응답의 {@code releasedSeatId} 로 알려 준다.
-     *
-     * <p>이미 내가 잡고 있는 좌석을 다시 부르면 만료 시각이 5 분 뒤로 갱신된다.
-     */
-    @PostMapping("/{seatId}/hold")
-    public ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId) {
+    @Override
+    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId) {
         return ResponseEntity.ok(seatService.hold(seatId));
     }
-
-    /**
-     * 좌석 선점을 취소한다. 자리는 즉시 예매 가능으로 돌아간다.
-     *
-     * <p>본문을 내려준다. 화면이 좌석 목록을 다시 받지 않고도 풀린 자리를 바로 다시 그리기 위해서다.
-     *
-     * <p>이미 빈 자리(아무도 잡지 않았거나 선점이 만료된 좌석)를 취소해도 200 이다. 취소는 멱등하다.
-     * 남이 잡고 있거나 결제까지 끝난 좌석은 403 으로 거절한다.
-     */
-    @DeleteMapping("/{seatId}/hold")
-    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(@PathVariable Long seatId) {
+    @Override
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId) {
         return ResponseEntity.ok(seatService.cancelHold(seatId));
     }
 
-    /**
-     * 선점한 좌석을 점유(결제 확정)한다. 점유된 좌석은 만료되지 않고 예매 취소로만 풀린다.
-     *
-     * <p><b>임시 API 다.</b> 결제 확정은 원래 예매·결제 도메인이 결제 성공 시점에
-     * {@code SeatService.occupy(seatId, memberId)} 를 불러 처리할 일이다. 그 도메인이 생기기 전까지
-     * 화면이 결제 이후 흐름을 붙여 볼 수 있도록 열어 둔다.
-     *
-     * <p>유효한 내 선점 위에서만 200 이다. 선점이 없거나 만료됐으면 409, 남의 선점·점유면 403 이다.
-     *
-     * <p><b>TODO</b>: 예매 도메인이 결제 확정을 처리하게 되면 이 엔드포인트를 삭제한다.
-     */
-    @PostMapping("/{seatId}/occupancy")
-    public ResponseEntity<SeatOccupancyResponseDto> occupy(@PathVariable Long seatId) {
+    @Override
+    public ResponseEntity<SeatOccupancyResponseDto> occupy(Long seatId) {
         return ResponseEntity.ok(seatService.occupy(seatId));
     }
 
-    /**
-     * 점유(결제 확정)를 풀어 좌석을 예매 가능으로 되돌린다.
-     *
-     * <p><b>임시 API 다.</b> 점유 해제는 원래 예매 도메인이 예매 취소를 확정한 뒤
-     * {@code SeatService.releaseOccupancy(seatId, memberId)} 를 불러 처리할 일이다. 환불이나 취소
-     * 수수료 같은 예매 규칙은 여기서 보지 않는다.
-     *
-     * <p>이미 빈 자리를 풀어도 200 이다. 결제 전 선점 상태면 409, 남의 점유면 403 이다.
-     *
-     * <p><b>TODO</b>: 예매 도메인이 예매 취소를 처리하게 되면 이 엔드포인트를 삭제한다.
-     */
-    @DeleteMapping("/{seatId}/occupancy")
-    public ResponseEntity<SeatOccupancyResponseDto> releaseOccupancy(@PathVariable Long seatId) {
+    @Override
+    public ResponseEntity<SeatOccupancyResponseDto> releaseOccupancy(Long seatId) {
         return ResponseEntity.ok(seatService.releaseOccupancy(seatId));
     }
 
-    @PostMapping
-    public ResponseEntity<CommandSeatResponseDto> register(@Valid @RequestBody CommandSeatRequestDto request) {
+    @Override
+    public ResponseEntity<CommandSeatResponseDto> register(CommandSeatRequestDto request) {
         CommandSeatResponseDto response = seatService.register(request);
 
         return ResponseEntity

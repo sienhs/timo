@@ -1,0 +1,242 @@
+###############################################################################
+# v0 스텁 스모크 테스트
+#
+# local 프로필(api.stub.enabled=true)에서만 동작한다. DB 상태와 무관하게 언제나 같은 응답이 나온다.
+# 실패 분기는 예약값으로 재현한다. (id 404, 주문 좌석 1006 = 발행 실패) 인증은 스텁 대상이 아니라 v1 을 그대로 쓴다.
+# 자세한 규약은 com.ssafy.timo.stub 패키지 설명 참고.
+###############################################################################
+
+### 공연 목록 (인기순)
+GET {{baseUrl}}/api/v0/concerts?sort=POPULAR&genre=CONCERT
+
+> {%
+    client.test("고정 공연 목록이 PagedModel 모양으로 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page !== undefined, "page 가 없다");
+        client.assert(response.body.content.length === 4, "content: " + response.body.content.length);
+    });
+%}
+
+### 공연 상세
+GET {{baseUrl}}/api/v0/concerts/1
+
+> {%
+    client.test("상세에는 아티스트가 실린다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.artists.length === 1, "artists: " + JSON.stringify(response.body.artists));
+    });
+%}
+
+### 없는 공연 (예약 id)
+GET {{baseUrl}}/api/v0/concerts/404
+
+> {%
+    client.test("예약 id 는 404", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "ConcertNotFoundException", response.body.exception);
+    });
+%}
+
+### 구역 목록
+GET {{baseUrl}}/api/v0/sections?venueId=1
+
+> {%
+    client.test("구역 3개", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.sections.length === 3, "sections: " + response.body.sections.length);
+    });
+    client.global.set("stubSeatId", 1001);
+%}
+
+### A블록 좌석 (명세 예시와 같은 5석)
+GET {{baseUrl}}/api/v0/seats?sectionId=1
+
+> {%
+    client.test("5석", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.seats.length === 5, "seats: " + response.body.seats.length);
+    });
+%}
+
+### 좌석 선점
+POST {{baseUrl}}/api/v0/seats/{{stubSeatId}}/hold
+
+> {%
+    client.test("RESERVED 로 바뀐다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "RESERVED", response.body.status);
+    });
+%}
+
+### 좌석 점유 (결제 확정)
+POST {{baseUrl}}/api/v0/seats/{{stubSeatId}}/occupancy
+
+> {%
+    client.test("OCCUPIED 로 바뀐다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "OCCUPIED", response.body.status);
+    });
+%}
+
+### 점유 해제 (원상 복구)
+DELETE {{baseUrl}}/api/v0/seats/{{stubSeatId}}/occupancy
+
+> {%
+    client.test("AVAILABLE 로 돌아온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "AVAILABLE", response.body.status);
+    });
+%}
+
+### 예매: 좌석 선점
+POST {{baseUrl}}/api/v0/seats/1002/hold
+
+> {%
+    client.test("선점", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}
+
+### 예매: 주문 확정 (좌석은 곧바로 OCCUPIED, 발행은 3초 뒤 완료로 보임)
+POST {{baseUrl}}/api/v0/reservations
+Content-Type: application/json
+
+{ "concertId": 1, "seatId": 1002 }
+
+> {%
+    client.test("201 PENDING_MINT", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.status === "PENDING_MINT", response.body.status);
+    });
+    client.global.set("stubReservationId", response.body.id);
+%}
+
+### 예매: 발행 진행 상태 (3초 뒤 다시 실행하면 MINTED)
+GET {{baseUrl}}/api/v0/reservations/{{stubReservationId}}
+
+> {%
+    client.test("주문 조회", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.log("status = " + response.body.status + ", tokenId = " + response.body.tokenId);
+    });
+%}
+
+### 예매: 내 주문 목록
+GET {{baseUrl}}/api/v0/reservations
+
+> {%
+    client.test("PagedModel", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page !== undefined, "page 가 없다");
+    });
+%}
+
+### 예매: 같은 공연 두 번째 주문은 409 (1인 1매)
+POST {{baseUrl}}/api/v0/seats/1003/hold
+
+###
+POST {{baseUrl}}/api/v0/reservations
+Content-Type: application/json
+
+{ "concertId": 1, "seatId": 1003 }
+
+> {%
+    client.test("409 AlreadyReservedException", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "AlreadyReservedException", response.body.exception);
+    });
+%}
+
+### 예매: 취소 (MINTED 뒤에만 200. 발행 전이면 409)
+DELETE {{baseUrl}}/api/v0/reservations/{{stubReservationId}}
+
+> {%
+    client.test("취소 결과", function () {
+        client.log("status = " + response.status + (response.body.status ? ", order = " + response.body.status : ", " + response.body.exception));
+    });
+%}
+
+### 양도 마켓: 매물 목록 (낮은 가격순, 5개)
+GET {{baseUrl}}/api/v0/market/listings
+
+> {%
+    client.test("매물 5개", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.log("listings = " + JSON.stringify(response.body.content.map(l => l.tokenId + ":" + l.listPrice)));
+    });
+%}
+
+### 양도 마켓: 1번 공연 매물 구매 (120,000)
+POST {{baseUrl}}/api/v0/market/listings/3/purchase
+
+> {%
+    client.test("체결", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.log("price = " + response.body.price + ", tradeId = " + response.body.tradeId);
+    });
+%}
+
+### 양도 마켓: 같은 공연 다른 매물은 409 (1인 1매)
+POST {{baseUrl}}/api/v0/market/listings/2/purchase
+
+> {%
+    client.test("409 AlreadyReservedException", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "AlreadyReservedException", response.body.exception);
+    });
+%}
+
+### 양도 마켓: 3번 공연 매물은 처음부터 409 (내 티켓 101 이 같은 공연)
+POST {{baseUrl}}/api/v0/market/listings/5/purchase
+
+> {%
+    client.test("409 AlreadyReservedException", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+    });
+%}
+
+### 양도 마켓: 정가 초과 등록은 400 (티켓 101 정가 99,000)
+POST {{baseUrl}}/api/v0/market/listings
+Content-Type: application/json
+
+{ "tokenId": "101", "askPrice": 99001 }
+
+> {%
+    client.test("400 ListPriceExceedsFacePriceException", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+        client.assert(response.body.exception === "ListPriceExceedsFacePriceException", response.body.exception);
+    });
+%}
+
+### 양도 마켓: 내 티켓 등록 (10초 뒤 팔린 것으로 보임)
+POST {{baseUrl}}/api/v0/market/listings
+Content-Type: application/json
+
+{ "tokenId": "101", "askPrice": 90000 }
+
+> {%
+    client.test("201 LISTED", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.mine === true, "mine: " + response.body.mine);
+        client.log("discountRate = " + response.body.discountRate + "%");
+    });
+%}
+
+### 양도 마켓: 3번 공연 매물 (내 매물 101 이 mine=true 로 함께 나온다. 10초 뒤 실행하면 사라짐)
+GET {{baseUrl}}/api/v0/market/listings?concertId=3
+
+> {%
+    client.test("내 매물 표시", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.log("listings = " + JSON.stringify(response.body.content.map(l => l.tokenId + (l.mine ? "(mine)" : ""))));
+    });
+%}
+
+### 양도 마켓: 등록 취소 (204. 이미 팔렸으면 403)
+DELETE {{baseUrl}}/api/v0/market/listings/101
+
+> {%
+    client.test("등록 취소", function () {
+        client.log("status = " + response.status + (response.body.exception ? ", " + response.body.exception : ""));
+    });
+%}
