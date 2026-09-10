@@ -122,6 +122,17 @@ variable "jwt_secret" {
   }
 }
 
+variable "wallet_master_key" {
+  description = "Backend wallet encryption master key (32 bytes encoded as 64 hexadecimal characters)."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{64}$", var.wallet_master_key))
+    error_message = "wallet_master_key must be exactly 64 hexadecimal characters."
+  }
+}
+
 variable "gitlab_project_path" {
   description = "Exact GitLab project path, for example group/project"
   type        = string
