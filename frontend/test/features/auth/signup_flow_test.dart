@@ -8,8 +8,9 @@ import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/models/signup_draft.dart';
-import 'package:timo/features/auth/models/signup_result.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/screens/signup_code_screen.dart';
 import 'package:timo/features/auth/screens/signup_complete_screen.dart';
@@ -19,6 +20,8 @@ import 'package:timo/features/auth/screens/signup_password_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
 import 'package:timo/features/auth/screens/signup_username_screen.dart';
 import 'package:timo/features/auth/state/auth_api_scope.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/auth/widgets/duplicate_check_button.dart';
 import 'package:timo/features/auth/widgets/timo_logo.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
@@ -700,15 +703,19 @@ void main() {
 
     testWidgets('홈에서 시작해 가입을 마치면 완료 화면만 남고, 티켓 보러 가기는 홈으로 간다', (tester) async {
       usePhoneSize(tester);
-      // 실제 라우트 표로 띄우면 화면들이 api 를 직접 받지 않으므로, 앱(App)이
-      // 하는 것처럼 스코프로 감싸 목을 내려준다.
+      // 실제 라우트 표로 띄우면 화면들이 api·세션을 직접 받지 않으므로, 앱(App)이
+      // 하는 것처럼 스코프로 감싸 목과 빈 세션을 내려준다.
+      final session = AuthSession(storage: InMemoryTokenStorage());
       await tester.pumpWidget(
-        AuthApiScope(
-          api: api,
-          child: MaterialApp(
-            theme: AppTheme.light,
-            initialRoute: AppRoutes.home,
-            routes: AppRoutes.routes,
+        AuthSessionScope(
+          session: session,
+          child: AuthApiScope(
+            api: api,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              initialRoute: AppRoutes.home,
+              routes: AppRoutes.routes,
+            ),
           ),
         ),
       );
@@ -781,12 +788,25 @@ void main() {
       expect(find.byType(SignupPhoneScreen, skipOffstage: false), findsNothing);
       // 가입을 거쳐 왔으니 로그인 화면으로 되돌아갈 이유도 없다.
       expect(find.byType(LoginScreen, skipOffstage: false), findsNothing);
+      // 가입 응답의 토큰이 세션에 담겨 바로 로그인 상태다.
+      expect(session.isLoggedIn, isTrue);
+      expect(session.memberId, MockAuthApi.tokens.memberId);
 
       // 티켓 보러 가기 → 홈 셸
       await tapNext(tester, AuthStrings.goToTickets);
       await tester.pumpAndSettle();
       expect(find.byType(MainShellScreen), findsOneWidget);
       expect(find.byType(SignupCompleteScreen), findsNothing);
+
+      // 마이페이지 탭의 임시 버튼도 로그인 상태를 따라 '로그아웃' 으로 바뀌어 있다.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppBottomNavBar),
+          matching: find.text('마이페이지'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(AuthStrings.logout), findsOneWidget);
     });
   });
 }
@@ -838,7 +858,7 @@ class _FailingAuthApi extends MockAuthApi {
   }
 
   @override
-  Future<SignupResult> signUp(SignupDraft draft) async {
+  Future<AuthTokens> signUp(SignupDraft draft) async {
     if (onSignUp != null) throw onSignUp!;
     return super.signUp(draft);
   }

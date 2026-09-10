@@ -1,17 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/widgets/timo_logo.dart';
 import 'package:timo/routes/app_routes.dart';
 
 void main() {
   /// 지연 0 인 목 API. 응답을 바로 받아야 하는 화면 단위 테스트에 꽂는다.
   const api = MockAuthApi(latency: Duration.zero);
+
+  /// 로그인 성공이 담길 세션. 메모리 저장소라 테스트마다 새로 만든다.
+  late InMemoryTokenStorage storage;
+  late AuthSession session;
+
+  setUp(() {
+    storage = InMemoryTokenStorage();
+    session = AuthSession(storage: storage);
+  });
 
   /// 375×812 폰 크기. 좁은 폰에서 넘침(overflow)이 나면 테스트가 바로
   /// 실패하므로 레이아웃 검사도 겸한다.
@@ -26,12 +39,12 @@ void main() {
   /// 진짜 라우트로 검사한다.
   final routes = Map.of(AppRoutes.routes)..remove(AppRoutes.home);
 
-  Future<void> pumpLogin(WidgetTester tester) async {
+  Future<void> pumpLogin(WidgetTester tester, {MockAuthApi? withApi}) async {
     usePhoneSize(tester);
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: const LoginScreen(api: api),
+        home: LoginScreen(api: withApi ?? api, session: session),
         routes: routes,
       ),
     );
@@ -136,10 +149,7 @@ void main() {
     testWidgets('요청 중에는 스피너가 보이고 버튼이 눌리지 않는다', (tester) async {
       // 지연 0 목은 첫 프레임에 바로 응답해 요청 중 상태를 볼 수 없다.
       // 기본 지연(400ms) 목을 쓰고 시계를 그만큼 돌린다.
-      usePhoneSize(tester);
-      await tester.pumpWidget(
-        MaterialApp(theme: AppTheme.light, home: const LoginScreen()),
-      );
+      await pumpLogin(tester, withApi: const MockAuthApi());
       await fill(tester, username: 'timo', password: MockAuthApi.wrongPassword);
       await tester.tap(loginButton());
       await tester.pump();
@@ -170,6 +180,7 @@ void main() {
       expect(find.text(AuthStrings.loginFailed), findsOneWidget);
       // 다시 시도할 수 있어야 하니 버튼은 도로 켜진다.
       expect(loginEnabled(tester), isTrue);
+      expect(session.isLoggedIn, isFalse);
     });
 
     testWidgets('실패 문구는 어느 칸이든 다시 치면 사라진다', (tester) async {
@@ -190,7 +201,31 @@ void main() {
       expect(find.text(AuthStrings.loginFailed), findsNothing);
     });
 
-    testWidgets('맞는 정보면 true 를 돌려주며 닫힌다', (tester) async {
+    testWidgets('정지된 계정처럼 입력 탓이 아닌 실패는 스낵바로 알리고 버튼을 다시 켠다', (tester) async {
+      const suspended = ApiException(
+        '정지된 계정입니다. 고객센터로 문의해 주세요.',
+        status: 403,
+        exceptionName: 'MemberSuspendedException',
+      );
+      await pumpLogin(tester, withApi: const _FailingLoginApi(suspended));
+      await fill(tester, username: 'timo', password: 'abcd1234!');
+      await tester.tap(loginButton());
+      await settle(tester);
+
+      expect(
+        find.descendant(
+          of: find.byType(SnackBar),
+          matching: find.text(suspended.message),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(AuthStrings.loginFailed), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(loginEnabled(tester), isTrue);
+      expect(session.isLoggedIn, isFalse);
+    });
+
+    testWidgets('맞는 정보면 세션에 로그인 상태를 담고, true 를 돌려주며 닫힌다', (tester) async {
       usePhoneSize(tester);
       bool? result;
       await tester.pumpWidget(
@@ -202,7 +237,7 @@ void main() {
                 result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const LoginScreen(api: api),
+                    builder: (_) => LoginScreen(api: api, session: session),
                   ),
                 );
               },
@@ -221,6 +256,13 @@ void main() {
 
       expect(find.byType(LoginScreen), findsNothing);
       expect(result, isTrue);
+      // 앱 전체가 로그인 상태가 되고, 기기에도 저장돼 다시 켜도 유지된다.
+      expect(session.isLoggedIn, isTrue);
+      expect(session.memberId, MockAuthApi.tokens.memberId);
+      expect(
+        storage.values[TokenStorageKeys.accessToken],
+        MockAuthApi.tokens.accessToken,
+      );
     });
 
     testWidgets('아이디 칸에서 다음을 누르면 비밀번호 칸으로 포커스가 간다', (tester) async {
@@ -272,4 +314,20 @@ void main() {
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
     });
   });
+}
+
+/// 로그인만 정해 둔 예외로 실패하는 가짜 API. 정지·탈퇴 계정, 네트워크 끊김
+/// 같은 "입력 탓이 아닌 실패" 를 화면이 어떻게 보여주는지 검사할 때 쓴다.
+class _FailingLoginApi extends MockAuthApi {
+  const _FailingLoginApi(this.error) : super(latency: Duration.zero);
+
+  final ApiException error;
+
+  @override
+  Future<AuthTokens?> login({
+    required String username,
+    required String password,
+  }) async {
+    throw error;
+  }
 }

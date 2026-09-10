@@ -1,5 +1,5 @@
 import '../models/signup_draft.dart';
-import '../models/signup_result.dart';
+import '../models/auth_tokens.dart';
 
 /// 인증(회원가입·로그인) 화면이 서버에 요청하는 일 여섯 가지.
 ///
@@ -38,9 +38,15 @@ abstract class AuthApi {
   ///
   /// 중복(409: 아이디·닉네임·전화번호)과 티켓 만료(400)는 예외로 던진다.
   /// 중복 확인을 통과했어도 그 사이 남이 채가면 409 가 날 수 있다.
-  Future<SignupResult> signUp(SignupDraft draft);
+  Future<AuthTokens> signUp(SignupDraft draft);
 
-  /// 아이디·비밀번호가 맞으면 true. 틀린 것은 예상되는 결과라 false 로
-  /// 돌려주고 예외로 던지지 않는다.
-  Future<bool> login({required String username, required String password});
+  /// 아이디·비밀번호가 맞으면 토큰을, 틀리면 null 을 돌려준다.
+  ///
+  /// 서버는 "아이디 없음" 과 "비밀번호 틀림" 을 구분해 주지 않는다. 구분하면
+  /// 어떤 아이디가 가입돼 있는지 밖에서 알아낼 수 있어서다. 정지·탈퇴 계정(403)
+  /// 은 입력이 틀린 게 아니라 예외로 던진다.
+  Future<AuthTokens?> login({
+    required String username,
+    required String password,
+  });
 }

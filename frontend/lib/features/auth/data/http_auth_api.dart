@@ -4,7 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/signup_draft.dart';
-import '../models/signup_result.dart';
+import '../models/auth_tokens.dart';
 import 'auth_api.dart';
 import 'device_id.dart';
 
@@ -83,7 +83,7 @@ class HttpAuthApi implements AuthApi {
   }
 
   @override
-  Future<SignupResult> signUp(SignupDraft draft) async {
+  Future<AuthTokens> signUp(SignupDraft draft) async {
     final response = await _guard(
       () => _dio.post<dynamic>(
         '$basePath/signup',
@@ -98,16 +98,31 @@ class HttpAuthApi implements AuthApi {
         options: Options(headers: {deviceIdHeader: _deviceId}),
       ),
     );
-    return SignupResult.fromJson(_body(response));
+    return AuthTokens.fromJson(_body(response));
   }
 
-  /// 로그인 API 는 백엔드에 아직 없다. 로그인 화면은 [MockAuthApi] 를 쓴다.
   @override
-  Future<bool> login({
+  Future<AuthTokens?> login({
     required String username,
     required String password,
   }) async {
-    throw UnsupportedError('로그인 API 는 아직 없다. 로그인 화면은 목을 쓴다.');
+    try {
+      final response = await _guard(
+        () => _dio.post<dynamic>(
+          '$basePath/login',
+          data: {'username': username, 'password': password},
+          // 가입 때와 같은 기기 식별자를 보내야 서버가 같은 기기의 세션을 갱신한다.
+          options: Options(headers: {deviceIdHeader: _deviceId}),
+        ),
+      );
+      return AuthTokens.fromJson(_body(response));
+    } on ApiException catch (e) {
+      // 아이디 없음·비밀번호 틀림은 정상 흐름에서 예상되는 결과라 null. 서버는
+      // 둘을 하나로 묶어 400 으로 준다. 정지·탈퇴 계정(403)과 네트워크 실패는
+      // 화면이 다르게 안내해야 하므로 예외로 둔다.
+      if (e.exceptionName == AuthServerErrors.loginFailed) return null;
+      rethrow;
+    }
   }
 
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.

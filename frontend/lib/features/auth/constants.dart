@@ -66,6 +66,9 @@ class AuthServerErrors {
 
   /// 가입 시 닉네임 중복(409). 중복 확인과 가입 사이에 남이 채간 경우.
   static const nicknameDuplicated = 'NicknameDuplicatedException';
+
+  /// 로그인 실패(400). 아이디 없음과 비밀번호 틀림을 서버가 하나로 묶어 준다.
+  static const loginFailed = 'LoginFailedException';
 }
 
 class AuthAssets {
@@ -156,6 +159,9 @@ class AuthStrings {
 
   // 로그인. 라벨은 회원가입의 usernameLabel·passwordLabel 을 그대로 쓴다.
   static const login = '로그인';
+
+  /// 마이페이지 임시 버튼. 로그인 상태면 이 글자로 바뀐다.
+  static const logout = '로그아웃';
 
   /// 시안의 힌트는 라벨과 같은 글자다('아이디 입력' 이 아니라 '아이디').
   static const loginUsernameHint = '아이디';

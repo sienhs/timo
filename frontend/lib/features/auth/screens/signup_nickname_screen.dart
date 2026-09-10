@@ -10,6 +10,8 @@ import '../data/auth_api.dart';
 import '../models/availability_status.dart';
 import '../models/signup_draft.dart';
 import '../state/auth_api_scope.dart';
+import '../state/auth_session.dart';
+import '../state/auth_session_scope.dart';
 import '../utils/signup_validators.dart';
 import '../widgets/duplicate_check_button.dart';
 import '../widgets/labeled_text_field.dart';
@@ -24,12 +26,20 @@ import '../widgets/signup_step_page.dart';
 ///
 /// 가입이 거절되면 원인에 따라 다르게 안내한다. [_handleSignUpFailure] 참고.
 class SignupNicknameScreen extends StatefulWidget {
-  const SignupNicknameScreen({super.key, required this.draft, this.api});
+  const SignupNicknameScreen({
+    super.key,
+    required this.draft,
+    this.api,
+    this.session,
+  });
 
   final SignupDraft draft;
 
   /// 직접 넘기면 그걸 쓰고(테스트), 안 넘기면 [AuthApiScope] 에서 받는다(앱).
   final AuthApi? api;
+
+  /// 가입 성공 토큰을 담을 곳. 안 넘기면 [AuthSessionScope] 에서 받는다.
+  final AuthSession? session;
 
   @override
   State<SignupNicknameScreen> createState() => _SignupNicknameScreenState();
@@ -41,6 +51,8 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
   var _busy = false;
 
   AuthApi get _api => widget.api ?? AuthApiScope.of(context);
+
+  AuthSession get _session => widget.session ?? AuthSessionScope.read(context);
 
   String get _nickname => _controller.text.trim();
 
@@ -101,8 +113,12 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
   Future<void> _signUp() async {
     setState(() => _busy = true);
     try {
-      // 응답의 토큰은 이번엔 쓰지 않는다. 저장·자동 로그인은 로그인 작업에서.
-      await _api.signUp(widget.draft.copyWith(nickname: _nickname));
+      // 가입 응답에도 로그인 토큰이 온다. 세션에 담아 가입 즉시 로그인 상태로
+      // 만든다(기기에도 저장됨). 가입한 사람에게 다시 로그인하라고 할 이유가 없다.
+      final tokens = await _api.signUp(
+        widget.draft.copyWith(nickname: _nickname),
+      );
+      await _session.signIn(tokens);
     } on ApiException catch (e) {
       if (!mounted) return;
       _handleSignUpFailure(e);
