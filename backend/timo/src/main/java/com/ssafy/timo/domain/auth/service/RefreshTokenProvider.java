@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.auth.service;
 import com.ssafy.timo.domain.auth.entity.RefreshToken;
 import com.ssafy.timo.domain.auth.repository.RefreshTokenRepository;
 import com.ssafy.timo.domain.member.entity.Member;
+import com.ssafy.timo.global.util.Masked;
 import com.ssafy.timo.global.util.Sha256;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -98,5 +99,10 @@ public class RefreshTokenProvider {
      * @param expiresInSeconds 남은 수명(초)
      */
     public record IssuedRefreshToken(String value, long expiresInSeconds) {
+
+        @Override
+        public String toString() {
+            return "IssuedRefreshToken[value=%s, expiresInSeconds=%d]".formatted(Masked.of(value), expiresInSeconds);
+        }
     }
 }

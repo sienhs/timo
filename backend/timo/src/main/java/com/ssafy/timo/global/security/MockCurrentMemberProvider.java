@@ -11,17 +11,21 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@code X-Member-Id} 요청 헤더를 그대로 요청자로 받아들인다. <b>클라이언트가 보낸 값을 검증
  * 없이 믿는다</b>는 뜻이라, 이 구현이 운영에 올라가면 아무나 남의 계정으로 행세할 수 있다.
- * 그래서 {@code prod} 프로필에서는 등록되지 않고, 대신 {@link DeniedCurrentMemberProvider} 가
- * 올라가 401 로 막는다.
+ * 그래서 {@code prod} 와 {@code securitytest} 에서는 등록되지 않고, 대신
+ * {@link JwtCurrentMemberProvider} 가 올라가 토큰의 {@code sub} 만 신원으로 쓴다.
+ *
+ * <p>이 구현이 남아 있는 이유는 좌석 도메인이 아직 이 헤더로 요청자를 흉내 내기 때문이다.
+ * 그쪽이 토큰 기반으로 옮겨오면 이 클래스는 삭제한다. <b>프로파일 조건을 넓히지 말 것.</b>
+ * {@code !prod} 처럼 두면 새 배포 프로파일이 하나 생기는 순간 헤더 한 줄로 남의 정보가 조회된다.
  *
  * <p>회원이 실제로 존재하는지 확인하지 않는다. 회원 조회는 인증 구현체의 책임이고, 여기서
  * 흉내 내면 갈아 끼울 때 지워야 할 코드만 늘어난다.
  *
- * <p><b>TODO</b>: JWT 인증이 붙으면 인증 주체에서 회원 id 를 꺼내는 구현체로 교체하고
- * 이 클래스와 {@link DeniedCurrentMemberProvider} 를 삭제한다.
+ * <p><b>TODO</b>: 좌석 도메인이 토큰 기반으로 옮겨오면 이 클래스를 삭제하고
+ * {@link JwtCurrentMemberProvider} 의 프로파일 제한을 없앤다.
  */
 @Component
-@Profile("!prod")
+@Profile("!prod & !securitytest")
 @RequiredArgsConstructor
 public class MockCurrentMemberProvider implements CurrentMemberProvider {
 

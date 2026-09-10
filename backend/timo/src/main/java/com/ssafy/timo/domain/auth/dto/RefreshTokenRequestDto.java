@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -18,4 +19,9 @@ public record RefreshTokenRequestDto(
         @NotBlank(message = "인증 정보가 필요합니다.")
         String refreshToken
 ) {
+
+    @Override
+    public String toString() {
+        return "RefreshTokenRequestDto[refreshToken=%s]".formatted(Masked.of(refreshToken));
+    }
 }

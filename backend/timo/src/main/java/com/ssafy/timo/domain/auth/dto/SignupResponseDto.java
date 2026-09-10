@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.auth.dto;
 
+import com.ssafy.timo.global.util.Masked;
 /**
  * 회원가입 결과. 가입과 동시에 로그인 상태가 되도록 토큰을 함께 내려준다.
  *
@@ -14,4 +15,10 @@ public record SignupResponseDto(
         String refreshToken,
         long accessTokenExpiresIn
 ) {
+
+    @Override
+    public String toString() {
+        return "SignupResponseDto[memberId=%s, accessToken=%s, refreshToken=%s, accessTokenExpiresIn=%d]"
+                .formatted(memberId, Masked.of(accessToken), Masked.of(refreshToken), accessTokenExpiresIn);
+    }
 }

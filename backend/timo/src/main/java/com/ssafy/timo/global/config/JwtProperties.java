@@ -31,4 +31,11 @@ public record JwtProperties(String secret, Duration accessTokenTtl) {
             accessTokenTtl = DEFAULT_ACCESS_TOKEN_TTL;
         }
     }
+
+    /** 기본 toString 은 비밀키를 그대로 노출한다. 바인딩 실패 로그나 configprops 에 새지 않게 가린다. */
+    @Override
+    public String toString() {
+        return "JwtProperties[secret=<%d bytes>, accessTokenTtl=%s]"
+                .formatted(secret.getBytes(StandardCharsets.UTF_8).length, accessTokenTtl);
+    }
 }
