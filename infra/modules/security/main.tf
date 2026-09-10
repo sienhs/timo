@@ -100,6 +100,8 @@ resource "aws_security_group" "prometheus" {
 
 resource "aws_security_group" "rds" {
   name        = "${var.name}-rds-sg"
+  # Keep this immutable value unchanged so Terraform updates the rules in
+  # place instead of attempting to replace a security group attached to RDS.
   description = "Allow MySQL only from the application EC2 security group"
   vpc_id      = var.vpc_id
 
@@ -109,6 +111,16 @@ resource "aws_security_group" "rds" {
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
+  }
+
+  # The supplied EC2 cannot be modified to join this VPC, so permit only its
+  # public address rather than opening MySQL to the Internet.
+  ingress {
+    description = "MySQL from designated external EC2"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["43.202.55.114/32"]
   }
 
   egress {
