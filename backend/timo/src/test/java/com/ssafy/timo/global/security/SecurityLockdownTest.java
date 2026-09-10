@@ -90,6 +90,31 @@ class SecurityLockdownTest {
     }
 
     @Test
+    @DisplayName("재발급은 토큰 없이 열려 있다")
+    void reissueIsPublic() throws Exception {
+        // 부르는 시점에 access 가 이미 만료돼 있다. 잠기면 재발급받으려면 재발급이 필요해진다.
+        mvc.perform(post("/api/v1/auth/reissue")
+                        .header("X-Device-Id", "device")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"never-issued-token"}"""))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("TOKEN_INVALID"));
+    }
+
+    @Test
+    @DisplayName("로그아웃은 토큰 없이 열려 있다")
+    void logoutIsPublic() throws Exception {
+        // 재발급과 같은 이유다. access 가 만료된 뒤에도 로그아웃은 되어야 한다.
+        mvc.perform(post("/api/v1/auth/logout")
+                        .header("X-Device-Id", "device")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"never-issued-token"}"""))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("헬스체크와 내부 수집용 Prometheus 메트릭 endpoint는 필터를 통과한다")
     void actuatorAllowsHealthAndPrometheusForInternalCollector() throws Exception {
         // Prometheus의 외부 접근은 ALB 경로 차단 및 EC2 보안 그룹이 담당한다.

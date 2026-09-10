@@ -29,9 +29,13 @@ public class RefreshTokenProvider {
 
     /**
      * 이 기간 동안 앱을 한 번도 안 열면 다시 로그인해야 한다.
-     * 재발급이 일어나면 그 시점부터 다시 센다.
+     * 재발급이 일어나면 그 시점부터 다시 센다({@link #renew}).
+     *
+     * <p>짧게 잡으면 안 된다. 예매 앱은 공연이 있을 때만 열리는 앱이라 2주 미사용이 흔하고,
+     * 하필 티켓팅 순간에 로그인 화면을 보게 되면 좌석을 놓친다. 유출 대비는 수명이 아니라
+     * 세션 폐기(로그아웃·비밀번호 변경)와 지갑 서명 step-up 으로 잡는다.
      */
-    private static final Duration TTL = Duration.ofDays(14);
+    private static final Duration TTL = Duration.ofDays(30);
 
     /** 128비트면 충분하지만 저장 비용이 없으므로 넉넉히 잡는다. */
     private static final int TOKEN_BYTES = 32;
@@ -66,6 +70,17 @@ public class RefreshTokenProvider {
                                 .build()));
 
         return new IssuedRefreshToken(value, TTL.toSeconds());
+    }
+
+    /**
+     * 살아 있는 세션의 만료를 지금부터 다시 센다.
+     *
+     * <p>수명을 여기 한 곳에만 두려고 메서드로 뺐다. 재발급 쪽에서 {@code TTL} 을 다시 계산하면
+     * 발급과 갱신의 기준이 갈라져 "로그인은 30일인데 재발급은 14일" 같은 상태가 조용히 생긴다.
+     */
+    @Transactional
+    public void renew(RefreshToken session) {
+        session.extend(LocalDateTime.now().plus(TTL));
     }
 
     private String generate() {
