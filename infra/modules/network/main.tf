@@ -113,21 +113,15 @@ resource "aws_route_table_association" "private_app" {
   route_table_id = aws_route_table.private_app.id
 }
 
-# No Internet route here: RDS remains isolated.
-resource "aws_route_table" "db" {
-  vpc_id = aws_vpc.this.id
-
-  tags = {
-    Name = "${var.name}-db-rt"
-  }
-}
-
+# The RDS instance is intentionally public so a separately managed EC2 can
+# connect to it. Its security group still permits MySQL only from that EC2
+# and from the application security group.
 resource "aws_route_table_association" "db_primary" {
   subnet_id      = aws_subnet.db_primary.id
-  route_table_id = aws_route_table.db.id
+  route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table_association" "db_secondary" {
   subnet_id      = aws_subnet.db_secondary.id
-  route_table_id = aws_route_table.db.id
+  route_table_id = aws_route_table.public.id
 }

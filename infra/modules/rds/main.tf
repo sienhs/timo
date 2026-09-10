@@ -29,7 +29,8 @@ resource "aws_db_instance" "this" {
   availability_zone      = var.availability_zone
 
   multi_az            = false
-  publicly_accessible = false
+  # The DB security group limits public MySQL access to the designated EC2.
+  publicly_accessible = true
 
   backup_retention_period = 0
   deletion_protection     = false
