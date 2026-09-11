@@ -16,7 +16,7 @@ import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_confirm_dialog.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 3/5 아이디 설정.
+/// 2/4 아이디 설정.
 ///
 /// '중복 확인' 을 통과해야 '다음으로' 가 켜지고, 글자를 고치면 다시 확인해야
 /// 한다. '다음으로' 를 누르면 아이디 확정 팝업이 뜨고, 동의하면 비밀번호
@@ -111,7 +111,7 @@ class _SignupUsernameScreenState extends State<SignupUsernameScreen> {
   @override
   Widget build(BuildContext context) {
     return SignupStepPage(
-      step: 3,
+      step: 2,
       title: AuthStrings.usernameTitle,
       subtitle: AuthStrings.usernameSubtitle,
       buttonLabel: AuthStrings.next,

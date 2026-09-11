@@ -19,6 +19,19 @@ import '../theme/app_colors.dart';
 /// 두 번 나면 스낵바가 줄지어 기다리는데, 두 번째는 이미 본 문구라 기다릴 이유가
 /// 없다. (좌석·구역 선택 화면이 안내 스낵바를 띄우는 방식과 같다.)
 void showErrorSnackBar(BuildContext context, String message) {
+  _showOutlinedSnackBar(context, message, borderColor: AppColors.accent);
+}
+
+/// 성공 안내도 오류 안내와 같은 위치와 모양으로 보여주되 브랜드색 테두리를 쓴다.
+void showSuccessSnackBar(BuildContext context, String message) {
+  _showOutlinedSnackBar(context, message, borderColor: AppColors.primary);
+}
+
+void _showOutlinedSnackBar(
+  BuildContext context,
+  String message, {
+  required Color borderColor,
+}) {
   final textTheme = Theme.of(context).textTheme;
 
   ScaffoldMessenger.of(context)
@@ -33,11 +46,12 @@ void showErrorSnackBar(BuildContext context, String message) {
         padding: EdgeInsets.zero,
         margin: const EdgeInsets.fromLTRB(20, 0, 20, _aboveBottomButton),
         content: Container(
+          width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.accent),
+            border: Border.all(color: borderColor),
             // 흰 배경 위의 흰 상자라 테두리만으로는 떠 있는 느낌이 없어 옅은
             // 그림자를 깐다.
             boxShadow: const [
@@ -51,6 +65,7 @@ void showErrorSnackBar(BuildContext context, String message) {
           child: Text(
             message,
             textAlign: TextAlign.center,
+            softWrap: true,
             style: textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
           ),
         ),

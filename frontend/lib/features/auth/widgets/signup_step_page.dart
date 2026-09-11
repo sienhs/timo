@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import 'auth_page.dart';
 import 'timo_logo.dart';
 
 /// 회원가입 단계 화면의 공통 틀.
 ///
-/// [AuthPage] 에 단계 헤더(로고와 'n/5' → 제목 → 설명)를 끼운 것이다. 배치와
+/// [AuthPage] 에 단계 헤더(로고와 'n/4' → 제목 → 설명)를 끼운 것이다. 배치와
 /// 키보드 처리, 하단 버튼의 비활성·요청 중 표시는 AuthPage 가 맡고, 각 단계
 /// 화면은 문구·입력칸·버튼 동작만 채운다.
 class SignupStepPage extends StatelessWidget {
@@ -42,7 +43,7 @@ class SignupStepPage extends StatelessWidget {
   }
 }
 
-/// 로고 + 'n/5' 한 줄, 제목, 설명.
+/// 로고 + 단계 숫자와 진행선, 제목, 설명.
 class _StepHeader extends StatelessWidget {
   const _StepHeader({
     required this.step,
@@ -65,18 +66,74 @@ class _StepHeader extends StatelessWidget {
           children: [
             const TimoLogo(),
             const Spacer(),
-            Text(
-              AuthStrings.stepCounter(step),
-              style: textTheme.labelMedium,
-              semanticsLabel: '${AuthMetrics.totalSteps}단계 중 $step단계',
-            ),
+            _StepIndicator(step: step),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        _StepProgressBar(step: step),
+        const SizedBox(height: 32),
         Text(title, style: textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(subtitle, style: textTheme.bodySmall),
       ],
+    );
+  }
+}
+
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({required this.step});
+
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '${AuthMetrics.totalSteps}단계 중 $step단계',
+      child: ExcludeSemantics(
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '$step',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              TextSpan(
+                text: ' / ${AuthMetrics.totalSteps}',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          style: Theme.of(context).textTheme.labelMedium,
+        ),
+      ),
+    );
+  }
+}
+
+class _StepProgressBar extends StatelessWidget {
+  const _StepProgressBar({required this.step});
+
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '회원가입 진행률',
+      value: '${AuthMetrics.totalSteps}단계 중 $step단계',
+      child: ExcludeSemantics(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: step / AuthMetrics.totalSteps,
+            minHeight: 4,
+            color: AppColors.primary,
+            backgroundColor: AppColors.surfaceMuted,
+          ),
+        ),
+      ),
     );
   }
 }

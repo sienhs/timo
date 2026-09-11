@@ -9,7 +9,7 @@ import '../widgets/labeled_text_field.dart';
 import '../widgets/obscure_toggle.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 4/5 비밀번호 설정. 비밀번호와 확인 두 칸.
+/// 3/4 비밀번호 설정. 비밀번호와 확인 두 칸.
 ///
 /// 규칙(8~20자, 영문·숫자·특수문자)을 만족하고 두 칸이 같아야 '다음으로' 가
 /// 켜진다. 확인 칸이 비어 있지 않은데 다르면 바로 오류 문구를 띄운다.
@@ -63,7 +63,7 @@ class _SignupPasswordScreenState extends State<SignupPasswordScreen> {
     );
 
     return SignupStepPage(
-      step: 4,
+      step: 3,
       title: AuthStrings.passwordTitle,
       subtitle: AuthStrings.passwordSubtitle,
       buttonLabel: AuthStrings.next,
@@ -82,10 +82,6 @@ class _SignupPasswordScreenState extends State<SignupPasswordScreen> {
             enableSuggestions: false,
             textInputAction: TextInputAction.next,
             inputFormatters: [lengthLimit],
-            // 규칙은 치기 시작했는데 아직 안 맞는 동안만 보여준다.
-            helperText: _password.isNotEmpty && !_passwordValid
-                ? AuthStrings.passwordRule
-                : null,
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _confirmFocus.requestFocus(),
             suffixIcon: ObscureToggle(

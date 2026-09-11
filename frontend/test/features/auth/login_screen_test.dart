@@ -94,7 +94,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(AuthStrings.signup), findsOneWidget);
-      // 회원가입과 같은 틀을 쓰지만 단계 표시(n/5)는 없어야 한다.
+      // 회원가입과 같은 틀을 쓰지만 단계 표시(n/4)는 없어야 한다.
       expect(find.textContaining('/${AuthMetrics.totalSteps}'), findsNothing);
     });
 
