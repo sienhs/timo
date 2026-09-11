@@ -55,7 +55,8 @@ Content-Type: application/json
     });
 
     client.test("공연장 정보가 함께 내려온다", function () {
-        client.assert(response.body.venueName === "고척돔", "venueName: " + response.body.venueName);
+        client.assert(response.body.venueName === client.global.get("venueName"),
+            "venueName: " + response.body.venueName);
     });
 
     client.global.set("concertId", response.body.id);
@@ -111,7 +112,8 @@ GET {{baseUrl}}/api/v1/concerts/{{concertId}}
         client.assert(response.status === 200, "status: " + response.status);
         client.assert(response.body.id === Number(client.global.get("concertId")), "id: " + response.body.id);
         client.assert(response.body.title === "아이유 HEREH WORLD TOUR", "title: " + response.body.title);
-        client.assert(response.body.venueName === "고척돔", "venueName: " + response.body.venueName);
+        client.assert(response.body.venueName === client.global.get("venueName"),
+            "venueName: " + response.body.venueName);
         client.assert(response.body.artists.length === 2, "artists: " + response.body.artists.length);
         client.assert(response.body.imageUrls.length === 2, "imageUrls: " + response.body.imageUrls.length);
     });
@@ -158,7 +160,7 @@ GET {{baseUrl}}/api/v1/concerts
     client.test("카드에 필요한 필드가 채워져 있다", function () {
         const item = response.body.content[0];
         client.assert(item.id !== undefined, "id 가 없다");
-        client.assert(item.venueName === "고척돔", "venueName: " + item.venueName);
+        client.assert(item.venueName === client.global.get("venueName"), "venueName: " + item.venueName);
         client.assert(item.status !== undefined, "status 가 없다");
     });
 
@@ -183,16 +185,22 @@ GET {{baseUrl}}/api/v1/concerts?page=0&size=2
     });
 %}
 
-### 조회수 많은 순으로 정렬한다 - 앞에서 두 번 조회한 공연이 맨 앞에 온다
+### 조회수 많은 순으로 정렬한다
+#
+# 특정 공연을 1위로 지목하지 않는다. 기동 시 LocalDataSeeder 가 넣는 공연들이 이미
+# 조회수를 갖고 있어, 이 파일이 만들고 두 번 조회한 공연은 맨 앞에 오지 않는다.
+# 확인해야 할 규약은 "누가 1위냐" 가 아니라 "조회수 내림차순이냐" 다.
 GET {{baseUrl}}/api/v1/concerts?sort=POPULAR
 
 > {%
-    client.test("조회수가 가장 높은 공연이 먼저 나온다", function () {
+    client.test("조회수 내림차순으로 내려온다", function () {
         client.assert(response.status === 200, "status: " + response.status);
-        client.assert(response.body.content[0].title === "아이유 HEREH WORLD TOUR",
-            "첫 번째: " + response.body.content[0].title);
-        client.assert(response.body.content[0].viewCount >= 2,
-            "viewCount: " + response.body.content[0].viewCount);
+
+        const viewCounts = response.body.content.map(c => c.viewCount);
+        for (let i = 1; i < viewCounts.length; i++) {
+            client.assert(viewCounts[i - 1] >= viewCounts[i],
+                "조회수 순서가 뒤집혔다: " + JSON.stringify(viewCounts));
+        }
     });
 %}
 
