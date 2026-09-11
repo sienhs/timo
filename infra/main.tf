@@ -136,17 +136,24 @@ module "api_domain" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  name                   = "${var.project_name}-${var.environment}"
-  subnet_id              = module.network.private_app_subnet_id
-  security_group_id      = module.security.prometheus_security_group_id
-  instance_type          = var.monitoring_instance_type
-  root_volume_size       = var.monitoring_root_volume_size
-  aws_region             = var.aws_region
-  application_private_ip = module.ec2.private_ip
-  grafana_admin_password = var.grafana_admin_password
-  grafana_domain         = "${var.grafana_subdomain}.${var.domain_name}"
+  name                     = "${var.project_name}-${var.environment}"
+  subnet_id                = module.network.private_app_subnet_id
+  security_group_id        = module.security.prometheus_security_group_id
+  jaeger_security_group_id = module.security.jaeger_security_group_id
+  instance_type            = var.monitoring_instance_type
+  root_volume_size         = var.monitoring_root_volume_size
+  aws_region               = var.aws_region
+  application_private_ip   = module.ec2.private_ip
+  grafana_admin_password   = var.grafana_admin_password
+  grafana_domain           = "${var.grafana_subdomain}.${var.domain_name}"
 
   depends_on = [module.nat_instance]
+}
+
+resource "aws_ssm_parameter" "tracing_endpoint" {
+  name  = "/${var.project_name}-${var.environment}/tracing/endpoint"
+  type  = "String"
+  value = "http://${module.monitoring.private_ip}:4318/v1/traces"
 }
 
 resource "aws_cloudwatch_dashboard" "operations" {

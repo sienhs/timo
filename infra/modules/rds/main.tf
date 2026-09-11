@@ -28,7 +28,7 @@ resource "aws_db_instance" "this" {
   vpc_security_group_ids = [var.security_group_id]
   availability_zone      = var.availability_zone
 
-  multi_az            = false
+  multi_az = false
   # The DB security group limits public MySQL access to the designated EC2.
   publicly_accessible = true
 

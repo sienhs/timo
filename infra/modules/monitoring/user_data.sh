@@ -9,6 +9,48 @@ install -d -m 0755 /var/lib/timo-monitoring/prometheus /var/lib/timo-monitoring/
 chown 65534:65534 /var/lib/timo-monitoring/prometheus
 chown 472:472 /var/lib/timo-monitoring/grafana
 
+install -d -m 0755 /opt/timo-monitoring/jaeger /var/lib/timo-monitoring/jaeger
+chown 10001:10001 /var/lib/timo-monitoring/jaeger
+cat >/opt/timo-monitoring/jaeger/config.yml <<'JAEGER'
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [jaeger_storage_exporter]
+extensions:
+  jaeger_query:
+    http:
+      endpoint: 0.0.0.0:16686
+    storage:
+      traces: local
+  jaeger_storage:
+    backends:
+      local:
+        badger:
+          directories:
+            keys: /data/keys
+            values: /data/values
+          ephemeral: false
+          ttl:
+            spans: 48h
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 64
+  batch:
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: local
+JAEGER
+
 cat >/opt/timo-monitoring/prometheus/prometheus.yml <<'PROMETHEUS'
 global:
   scrape_interval: 15s
@@ -135,6 +177,25 @@ grafana_password=$(aws secretsmanager get-secret-value \
   --output text | python3 -c 'import json, sys; print(json.load(sys.stdin)["GRAFANA_ADMIN_PASSWORD"])')
 
 docker network inspect timo-monitoring >/dev/null 2>&1 || docker network create timo-monitoring
+docker pull '${jaeger_image}'
+docker rm -f timo-jaeger >/dev/null 2>&1 || true
+docker run -d --name timo-jaeger --restart unless-stopped \
+  --network timo-monitoring \
+  --user 10001:10001 \
+  --memory 768m \
+  --publish 127.0.0.1:16686:16686 \
+  --publish 4318:4318 \
+  --volume /opt/timo-monitoring/jaeger/config.yml:/etc/jaeger/config.yml:ro \
+  --volume /var/lib/timo-monitoring/jaeger:/data \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
+  '${jaeger_image}' --config /etc/jaeger/config.yml
+for attempt in {1..30}; do
+  if curl --fail --silent http://127.0.0.1:16686/api/services >/dev/null; then
+    break
+  fi
+  sleep 2
+done
+curl --fail --silent http://127.0.0.1:16686/api/services >/dev/null
 docker rm -f timo-prometheus timo-grafana >/dev/null 2>&1 || true
 
 docker run -d --name timo-prometheus --restart unless-stopped \

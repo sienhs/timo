@@ -55,7 +55,7 @@ EC2 기본 지표도 60초 단위로 받도록 상세 모니터링을 기본 활
 하면 `terraform.tfvars`에 `ec2_detailed_monitoring = false`를 설정하세요. CloudWatch Agent의
 사용자 정의 메트릭 및 상세 모니터링에는 AWS 과금이 적용될 수 있습니다.
 
-Prometheus는 향후 별도 프라이빗 인스턴스에 `prometheus_security_group_id` 보안 그룹을 붙여
+Prometheus는 별도 프라이빗 인스턴스에 `prometheus_security_group_id` 보안 그룹을 붙여
 애플리케이션 EC2의 `:8080/actuator/prometheus`를 직접 수집합니다. 이 endpoint는 Spring에서
 수집기 인증 없이 열지만, EC2 보안 그룹은 Prometheus 보안 그룹만 허용하고 ALB는 같은 경로를
 404로 차단하므로 인터넷에서는 접근할 수 없습니다.
@@ -64,8 +64,8 @@ Prometheus는 향후 별도 프라이빗 인스턴스에 `prometheus_security_gr
 
 Terraform은 프라이빗 앱 서브넷에 모니터링 EC2 한 대를 만들고, 부팅 및 SSM 재적용 시
 Prometheus와 Grafana 컨테이너를 자동으로 실행합니다. Prometheus는 백엔드 EC2의 사설 IP를
-15초마다 수집하고, Grafana에는 Prometheus 데이터 소스가 미리 등록됩니다. 두 웹 UI는
-`127.0.0.1`에만 바인딩되므로 SSM 포트 포워딩으로 접근합니다.
+15초마다 수집하고, Grafana에는 Prometheus 데이터 소스가 미리 등록됩니다. Prometheus는
+`127.0.0.1`에만 바인딩되므로 SSM 포트 포워딩으로 접근하고, Grafana는 아래 HTTPS 주소로 접근합니다.
 
 적용 전, Git에서 제외된 `terraform.tfvars`에 16자 이상 Grafana 관리자 비밀번호를 추가해야 합니다.
 
@@ -81,6 +81,36 @@ Grafana는 `https://grafana.<domain>`으로 공개됩니다. ALB만 Grafana 컨�
 Grafana에서는 `admin`과 `grafana_admin_password`로 로그인하며, 익명 접근과 회원가입은 꺼져 있습니다.
 `Timo` 폴더의 `Timo Backend Overview` 대시보드는 backend 상태, 요청량, p95 응답시간, 5xx 비율,
 JVM heap, DB 커넥션 풀만 자동 등록합니다.
+
+## Jaeger 요청 추적 (SSM 전용)
+
+같은 모니터링 EC2에서 Jaeger 2.20.0을 실행합니다. 웹 UI와 조회 API는 호스트의
+`127.0.0.1:16686`에만 바인딩하며, ALB 규칙이나 공개 도메인은 만들지 않습니다.
+OTLP HTTP 수집 포트 `4318`은 애플리케이션 보안 그룹에서만 접근 가능합니다.
+Grafana의 공개 HTTPS 및 로그인 설정은 유지합니다.
+
+백엔드는 Spring Boot OpenTelemetry starter로 HTTP 요청을 추적합니다. 운영 프로필은
+기본 10%를 수집하며 `TRACING_SAMPLING_PROBABILITY`로 조절합니다. 모든 서비스 메서드나
+SQL이 자동으로 개별 span이 되는 것은 아니며, 필요한 업무 구간은 별도 계측이 필요합니다.
+배포 스크립트는 SSM Parameter Store의 `/<project>-<environment>/tracing/endpoint`를 읽어
+`TRACING_OTLP_ENDPOINT`를 주입합니다. 백엔드 코드 변경은 이미지 빌드·배포가 필요합니다.
+
+추적 데이터는 `/var/lib/timo-monitoring/jaeger`의 Badger에 48시간 보관합니다.
+컨테이너 재시작 후에도 남지만 EC2 루트 볼륨 삭제 시 사라집니다. Jaeger 컨테이너 메모리는
+768MiB로 제한되며 저장공간은 Prometheus·Grafana와 공유하므로 디스크 사용량을 확인합니다.
+
+로컬 PC에 AWS CLI, Session Manager 플러그인, 해당 인스턴스에 대한 SSM 접속 권한이 필요합니다.
+저장소 루트의 PowerShell에서 실행합니다.
+
+```powershell
+./infra/open-jaeger.ps1
+# 다른 AWS 프로필 또는 로컬 포트 사용:
+./infra/open-jaeger.ps1 -Profile my-profile -LocalPort 16687
+```
+
+터널 연결 후 브라우저에서 `http://localhost:16686`을 엽니다. 터미널은 유지하고,
+종료할 때 Ctrl+C를 누릅니다. 별도 웹 비밀번호는 없으며 AWS SSM 권한으로 접근을 통제합니다.
+Jaeger에서 서비스 `timo`를 선택하고 Find Traces를 눌러 조회합니다.
 
 `.terraform.lock.hcl`은 버전 재현성을 위해 커밋합니다. `*.tfvars`, 상태 파일,
 계획 파일, `.terraform/`, `private/`의 비밀 전달 파일은 커밋하지 않습니다.

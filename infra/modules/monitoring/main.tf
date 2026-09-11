@@ -56,7 +56,7 @@ resource "aws_instance" "this" {
   ami                         = data.aws_ssm_parameter.al2023_ami.value
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
-  vpc_security_group_ids      = [var.security_group_id]
+  vpc_security_group_ids      = [var.security_group_id, var.jaeger_security_group_id]
   associate_public_ip_address = false
   iam_instance_profile        = aws_iam_instance_profile.this.name
 
@@ -87,6 +87,7 @@ resource "aws_instance" "this" {
     prometheus_image       = var.prometheus_image
     grafana_image          = var.grafana_image
     grafana_domain         = var.grafana_domain
+    jaeger_image           = var.jaeger_image
   }), "\r\n", "\n")
 
   tags = {

@@ -14,3 +14,6 @@ output "prometheus_security_group_id" {
   description = "Attach to the private Prometheus/Grafana instance"
   value       = aws_security_group.prometheus.id
 }
+output "jaeger_security_group_id" {
+  value = aws_security_group.jaeger.id
+}

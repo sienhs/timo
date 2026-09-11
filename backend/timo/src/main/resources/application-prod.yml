@@ -19,6 +19,16 @@ logging:
   level:
     root: info
 
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${TRACING_OTLP_ENDPOINT}
+
 jwt:
   secret: ${JWT_SECRET}
 
