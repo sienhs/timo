@@ -67,6 +67,21 @@ resource "aws_iam_instance_profile" "this" {
   role = aws_iam_role.ssm.name
 }
 
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role_policy" "tracing_endpoint_read" {
+  name = "${var.name}-tracing-endpoint-read"
+  role = aws_iam_role.ssm.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.name}/tracing/endpoint"
+    }]
+  })
+}
+
 resource "aws_instance" "this" {
   ami                         = data.aws_ssm_parameter.al2023_ami.value
   instance_type               = var.instance_type
@@ -164,6 +179,9 @@ resource "aws_instance" "this" {
                   print(f"{key}={value}")
               PY
               chmod 0600 /etc/timo/backend.env
+              tracing_endpoint=$(aws ssm get-parameter --region ${var.aws_region} \
+                --name '/${var.name}/tracing/endpoint' --query Parameter.Value --output text)
+              printf 'TRACING_OTLP_ENDPOINT=%s\n' "$tracing_endpoint" >>/etc/timo/backend.env
 
               registry=$${image%%/*}
               aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin "$registry"

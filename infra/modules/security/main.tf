@@ -98,8 +98,22 @@ resource "aws_security_group" "prometheus" {
   }
 }
 
+resource "aws_security_group" "jaeger" {
+  name        = "${var.name}-jaeger-sg"
+  description = "OTLP HTTP from the application only; no UI ingress"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "Backend traces"
+    from_port       = 4318
+    to_port         = 4318
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ec2.id]
+  }
+}
+
 resource "aws_security_group" "rds" {
-  name        = "${var.name}-rds-sg"
+  name = "${var.name}-rds-sg"
   # Keep this immutable value unchanged so Terraform updates the rules in
   # place instead of attempting to replace a security group attached to RDS.
   description = "Allow MySQL only from the application EC2 security group"

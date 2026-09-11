@@ -2,6 +2,15 @@ variable "name" {
   type = string
 }
 
+variable "jaeger_security_group_id" {
+  type = string
+}
+
+variable "jaeger_image" {
+  type    = string
+  default = "cr.jaegertracing.io/jaegertracing/jaeger:2.20.0"
+}
+
 variable "subnet_id" {
   type = string
 }
