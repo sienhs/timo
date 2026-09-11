@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/models/signup_draft.dart';
 import '../features/auth/screens/login_screen.dart';
-import '../features/auth/screens/signup_code_screen.dart';
 import '../features/auth/screens/signup_complete_screen.dart';
-import '../features/auth/screens/signup_name_screen.dart';
 import '../features/auth/screens/signup_nickname_screen.dart';
 import '../features/auth/screens/signup_password_screen.dart';
 import '../features/auth/screens/signup_phone_screen.dart';
@@ -43,8 +41,6 @@ class AppRoutes {
 
   /// 회원가입. 단계 화면은 앞 단계까지 채운 SignupDraft 를 arguments 로 받는다.
   static const signupPhone = '/signup/phone';
-  static const signupCode = '/signup/code';
-  static const signupName = '/signup/name';
   static const signupUsername = '/signup/username';
   static const signupPassword = '/signup/password';
   static const signupNickname = '/signup/nickname';
@@ -76,19 +72,6 @@ class AppRoutes {
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
     login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
-    // 전화번호 화면은 초안에 인증번호 유효 시간을 더한 인자를 넘긴다. 초안만
-    // 오거나 없으면(테스트, 딥링크) 화면의 기본 유효 시간으로 시작한다.
-    signupCode: (context) {
-      final arguments = ModalRoute.of(context)!.settings.arguments;
-      if (arguments is SignupCodeArguments) {
-        return SignupCodeScreen(
-          draft: arguments.draft,
-          validFor: arguments.validFor,
-        );
-      }
-      return SignupCodeScreen(draft: _signupDraft(context));
-    },
-    signupName: (context) => SignupNameScreen(draft: _signupDraft(context)),
     signupUsername: (context) =>
         SignupUsernameScreen(draft: _signupDraft(context)),
     signupPassword: (context) =>

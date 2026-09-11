@@ -12,9 +12,7 @@ import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/models/signup_draft.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
-import 'package:timo/features/auth/screens/signup_code_screen.dart';
 import 'package:timo/features/auth/screens/signup_complete_screen.dart';
-import 'package:timo/features/auth/screens/signup_name_screen.dart';
 import 'package:timo/features/auth/screens/signup_nickname_screen.dart';
 import 'package:timo/features/auth/screens/signup_password_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
@@ -86,184 +84,41 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
   }
 
-  group('전화번호 화면', () {
-    testWidgets('11자리 전엔 버튼이 꺼져 있고, 채우면 하이픈이 붙고 켜진다', (tester) async {
+  group('기본 정보와 휴대폰 인증 화면', () {
+    testWidgets('이름과 전화번호를 모두 채워야 인증번호 받기가 켜진다', (tester) async {
       await pumpScreen(tester, const SignupPhoneScreen(api: api));
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(2));
       expect(nextEnabled(tester), isFalse);
 
-      await tester.enterText(find.byType(TextField), '0101234567');
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '0101234567');
       await tester.pump();
       expect(find.text('010-1234-567'), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
 
-      await tester.enterText(find.byType(TextField), '01012345678');
+      await tester.enterText(fields.at(1), '01012345678');
       await tester.pump();
       expect(find.text('010-1234-5678'), findsOneWidget);
       expect(nextEnabled(tester), isTrue);
     });
 
-    testWidgets('인증 번호 받기를 누르면 숫자만 담아 인증번호 화면으로 간다', (tester) async {
+    testWidgets('인증번호를 같은 화면에서 입력하고 성공하면 아이디 화면으로 간다', (tester) async {
       await pumpScreen(tester, const SignupPhoneScreen(api: api));
-      await tester.enterText(find.byType(TextField), '01012345678');
+      var fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
       await tester.pump();
 
       await tester.tap(nextButton());
       await settleFrames(tester);
-
-      final next = tester.widget<SignupCodeScreen>(
-        find.byType(SignupCodeScreen),
-      );
-      expect(next.draft.phoneNumber, '01012345678');
-      // 서버가 준 유효 시간이 함께 넘어가 남은 시간의 출발점이 된다.
-      expect(next.validFor, MockAuthApi.codeValidity);
-    });
-  });
-
-  group('인증번호 화면', () {
-    const draft = SignupDraft(phoneNumber: '01012345678');
-
-    testWidgets('틀린 번호는 오류 문구가 뜨고, 다시 치면 사라진다', (tester) async {
-      await pumpScreen(tester, const SignupCodeScreen(draft: draft, api: api));
-
-      await tester.enterText(find.byType(TextField), MockAuthApi.invalidCode);
-      await tester.pump();
-      expect(nextEnabled(tester), isTrue);
-
-      await tester.tap(nextButton());
-      await settleFrames(tester);
-      expect(find.text(AuthStrings.codeMismatch), findsOneWidget);
-      expect(find.byType(SignupCodeScreen), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField), '00000');
-      await tester.pump();
-      expect(find.text(AuthStrings.codeMismatch), findsNothing);
-    });
-
-    testWidgets('남은 시간이 칸 안에서 줄고 만료되면 인증 버튼이 잠긴다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupCodeScreen(
-          draft: draft,
-          api: api,
-          validFor: Duration(seconds: 3),
-        ),
-      );
-      expect(find.text('00:03'), findsOneWidget);
-      expect(find.text(AuthStrings.verify), findsOneWidget);
-      expect(find.text(AuthStrings.resendCodeAfter('01:00')), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('00:02'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField), '123456');
-      await tester.pump();
-      expect(nextEnabled(tester), isTrue);
-
-      await tester.pump(const Duration(seconds: 2));
-      expect(find.text('00:00'), findsOneWidget);
-      expect(find.text(AuthStrings.codeExpired), findsOneWidget);
-      // 하단 버튼은 인증하기로 유지되지만 만료된 번호는 보낼 수 없다.
-      expect(find.text(AuthStrings.verify), findsOneWidget);
-      expect(nextEnabled(tester), isFalse);
-
-      // 만료 문구는 글자를 고쳐도 남는다. 다시 받아야 풀린다.
-      await tester.enterText(find.byType(TextField), '1234');
-      await tester.pump();
-      expect(find.text(AuthStrings.codeExpired), findsOneWidget);
-    });
-
-    testWidgets('1분 뒤 다시 받으면 입력이 비워지고 두 타이머가 다시 시작한다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupCodeScreen(
-          draft: draft,
-          api: api,
-          validFor: Duration(seconds: 1),
-        ),
-      );
-      await tester.enterText(find.byType(TextField), '123456');
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text(AuthStrings.codeExpired), findsOneWidget);
-
-      // 첫 발송 후 1분이 지나야 별도 재전송 버튼이 켜진다.
-      await tester.pump(const Duration(seconds: 59));
-      expect(find.text(AuthStrings.resendCode), findsOneWidget);
-      final resend = tester.widget<TextButton>(find.byType(TextButton));
-      expect(resend.onPressed, isNotNull);
-
-      await tester.tap(find.text(AuthStrings.resendCode));
-      await settleFrames(tester);
-
-      // 목의 유효 시간(3분)과 재전송 대기 시간(1분)에서 다시 시작한다.
+      expect(find.byType(SignupPhoneScreen), findsOneWidget);
+      fields = find.byType(TextField);
+      expect(fields, findsNWidgets(3));
+      expect(find.text(AuthStrings.codeSent), findsOneWidget);
       expect(find.text('03:00'), findsOneWidget);
-      expect(find.text(AuthStrings.resendCodeAfter('01:00')), findsOneWidget);
-      expect(find.text(AuthStrings.codeExpired), findsNothing);
-      expect(find.text('123456'), findsNothing);
-      expect(find.text(AuthStrings.codeResent), findsOneWidget);
-      expect(find.text(AuthStrings.verify), findsOneWidget);
-      expect(nextEnabled(tester), isFalse);
-    });
 
-    testWidgets('맞는 번호면 티켓을 초안에 담아 이름 화면으로 간다', (tester) async {
-      await pumpScreen(tester, const SignupCodeScreen(draft: draft, api: api));
-
-      await tester.enterText(find.byType(TextField), '123456');
-      await tester.pump();
-      await tester.tap(nextButton());
-      await settle(tester);
-
-      final next = tester.widget<SignupNameScreen>(
-        find.byType(SignupNameScreen),
-      );
-      expect(next.draft.phoneNumber, '01012345678');
-      // 가입 요청에 실어 보낼 인증 티켓이 여기서부터 초안에 실린다.
-      expect(next.draft.verificationTicket, MockAuthApi.mockTicket);
-    });
-  });
-
-  group('이름 화면', () {
-    testWidgets('한글 이름을 넣으면 다음 버튼이 켜진다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupNameScreen(draft: SignupDraft(phoneNumber: '01012345678')),
-      );
-      expect(nextEnabled(tester), isFalse);
-
-      await tester.enterText(find.byType(TextField), '홍길동');
-      await tester.pump();
-
-      expect(find.text('홍길동'), findsOneWidget);
-      expect(nextEnabled(tester), isTrue);
-    });
-
-    testWidgets('한 글자나 숫자가 섞이면 다음 버튼이 꺼져 있다', (tester) async {
-      await pumpScreen(tester, const SignupNameScreen(draft: SignupDraft()));
-
-      await tester.enterText(find.byType(TextField), '홍');
-      await tester.pump();
-      expect(find.text(AuthStrings.nameRule), findsOneWidget);
-      expect(nextEnabled(tester), isFalse);
-
-      await tester.enterText(find.byType(TextField), '홍길동1');
-      await tester.pump();
-      expect(find.text(AuthStrings.nameRule), findsOneWidget);
-      expect(nextEnabled(tester), isFalse);
-    });
-
-    testWidgets('2/5 단계 표시와 시안 문구가 보인다', (tester) async {
-      await pumpScreen(tester, const SignupNameScreen(draft: SignupDraft()));
-
-      expect(find.text(AuthStrings.stepCounter(2)), findsOneWidget);
-      expect(find.text(AuthStrings.nameTitle), findsOneWidget);
-      // 라벨과 입력 힌트가 모두 '이름'이라 두 곳에 표시된다.
-      expect(find.text(AuthStrings.nameLabel), findsNWidgets(2));
-      expect(find.text(AuthStrings.next), findsOneWidget);
-    });
-
-    testWidgets('다음으로를 누르면 앞뒤 공백을 뗀 이름이 초안에 담긴다', (tester) async {
-      await pumpScreen(tester, const SignupNameScreen(draft: SignupDraft()));
-
-      await tester.enterText(find.byType(TextField), ' 홍길동 ');
+      await tester.enterText(fields.at(2), '123456');
       await tester.pump();
       await tester.tap(nextButton());
       await settle(tester);
@@ -271,7 +126,74 @@ void main() {
       final next = tester.widget<SignupUsernameScreen>(
         find.byType(SignupUsernameScreen),
       );
+      expect(next.draft.phoneNumber, '01012345678');
       expect(next.draft.name, '홍길동');
+      expect(next.draft.verificationTicket, MockAuthApi.mockTicket);
+
+      Navigator.of(tester.element(find.byType(SignupUsernameScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(SignupPhoneScreen), findsOneWidget);
+      expect(find.text(AuthStrings.verificationComplete), findsOneWidget);
+      expect(find.text(AuthStrings.next), findsOneWidget);
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(nextEnabled(tester), isTrue);
+
+      await tester.enterText(find.byType(TextField).at(1), '01099999999');
+      await tester.pump();
+      expect(find.text(AuthStrings.verificationComplete), findsNothing);
+      expect(find.text(AuthStrings.requestCode), findsOneWidget);
+      expect(nextEnabled(tester), isTrue);
+    });
+
+    testWidgets('입력 시간이 끝나면 다시 받기가 켜지고, 입력하면 만료 문구가 사라진다', (tester) async {
+      await pumpScreen(
+        tester,
+        const SignupPhoneScreen(
+          api: _ShortCodeAuthApi(validFor: Duration(seconds: 1)),
+        ),
+      );
+      var fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+      await tester.tap(nextButton());
+      await settleFrames(tester);
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text(AuthStrings.codeExpired), findsOneWidget);
+      expect(find.text('00:00'), findsOneWidget);
+      expect(
+        tester.widget<TextButton>(find.byType(TextButton)).onPressed,
+        isNotNull,
+      );
+      expect(nextEnabled(tester), isFalse);
+
+      fields = find.byType(TextField);
+      await tester.enterText(fields.at(2), '1');
+      await tester.pump();
+      expect(find.text(AuthStrings.codeExpired), findsNothing);
+      expect(nextEnabled(tester), isFalse);
+    });
+
+    testWidgets('틀린 인증번호 안내는 번호를 수정하면 사라진다', (tester) async {
+      await pumpScreen(tester, const SignupPhoneScreen(api: api));
+      var fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+      await tester.tap(nextButton());
+      await settleFrames(tester);
+
+      fields = find.byType(TextField);
+      await tester.enterText(fields.at(2), MockAuthApi.invalidCode);
+      await tester.pump();
+      await tester.tap(nextButton());
+      await settleFrames(tester);
+      expect(find.text(AuthStrings.codeMismatch), findsOneWidget);
+
+      await tester.enterText(fields.at(2), '00000');
+      await tester.pump();
+      expect(find.text(AuthStrings.codeMismatch), findsNothing);
     });
   });
 
@@ -365,7 +287,7 @@ void main() {
   });
 
   group('비밀번호 화면', () {
-    testWidgets('규칙 미달이면 안내, 두 칸이 다르면 오류, 같으면 켜진다', (tester) async {
+    testWidgets('규칙 미달이면 잠기고, 두 칸이 다르면 오류, 같으면 켜진다', (tester) async {
       await pumpScreen(
         tester,
         const SignupPasswordScreen(draft: SignupDraft()),
@@ -375,12 +297,10 @@ void main() {
 
       await tester.enterText(fields.at(0), 'abcd1234'); // 특수문자 없음
       await tester.pump();
-      expect(find.text(AuthStrings.passwordRule), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
 
       await tester.enterText(fields.at(0), 'abcd1234!');
       await tester.pump();
-      expect(find.text(AuthStrings.passwordRule), findsNothing);
 
       await tester.enterText(fields.at(1), 'abcd1234');
       await tester.pump();
@@ -471,96 +391,57 @@ void main() {
         tester,
         const SignupPhoneScreen(api: _FailingAuthApi(onSend: error)),
       );
-      await tester.enterText(find.byType(TextField), '01012345678');
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
       await tester.pump();
 
       await tester.tap(nextButton());
       await settle(tester);
 
-      expect(snackBarText(error.message), findsOneWidget);
+      expect(snackBarText(AuthStrings.sendLimitExceeded), findsOneWidget);
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
-      expect(find.byType(SignupCodeScreen), findsNothing);
       expect(nextEnabled(tester), isTrue);
     });
 
-    testWidgets('인증번호: 서버가 만료라고 하면 시간이 남았어도 만료 상태로 바뀐다', (tester) async {
+    testWidgets('인증 시도 초과 안내는 재전송 전까지 유지되고 인증을 잠근다', (tester) async {
       const error = ApiException(
-        '인증 코드가 만료되었습니다. 다시 요청해 주세요.',
-        status: 400,
-        exceptionName: AuthServerErrors.smsCodeNotFound,
-      );
-      await pumpScreen(
-        tester,
-        const SignupCodeScreen(
-          draft: SignupDraft(phoneNumber: '01012345678'),
-          api: _FailingAuthApi(onVerify: error),
-        ),
-      );
-      await tester.enterText(find.byType(TextField), '123456');
-      await tester.pump();
-
-      await tester.tap(nextButton());
-      await settleFrames(tester);
-
-      // 서버 문구 대신 우리 만료 문구를 쓰고 남은 시간을 0으로 맞춘다.
-      expect(find.text(AuthStrings.codeExpired), findsOneWidget);
-      expect(find.text('00:00'), findsOneWidget);
-      expect(find.text(AuthStrings.verify), findsOneWidget);
-      expect(nextEnabled(tester), isFalse);
-      expect(find.byType(TextButton), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(find.byType(SignupCodeScreen), findsOneWidget);
-    });
-
-    testWidgets('인증번호: 시도 횟수 초과(429)처럼 다른 4xx 는 칸 아래에 서버 문구를 띄운다', (
-      tester,
-    ) async {
-      const error = ApiException(
-        '인증 시도 횟수를 초과했습니다. 다시 요청해 주세요.',
+        '인증 시도 횟수를 초과했습니다.',
         status: 429,
-        exceptionName: 'SmsAttemptExceededException',
+        exceptionName: AuthServerErrors.smsAttemptExceeded,
       );
       await pumpScreen(
         tester,
-        const SignupCodeScreen(
-          draft: SignupDraft(phoneNumber: '01012345678'),
-          api: _FailingAuthApi(onVerify: error),
-        ),
+        const SignupPhoneScreen(api: _FailingAuthApi(onVerify: error)),
       );
-      await tester.enterText(find.byType(TextField), '123456');
+      var fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
       await tester.pump();
-
       await tester.tap(nextButton());
       await settleFrames(tester);
 
-      expect(find.text(error.message), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      expect(nextEnabled(tester), isTrue);
-
-      // 다시 치면 문구가 사라진다.
-      await tester.enterText(find.byType(TextField), '12345');
+      fields = find.byType(TextField);
+      await tester.enterText(fields.at(2), '123456');
       await tester.pump();
-      expect(find.text(error.message), findsNothing);
-    });
-
-    testWidgets('인증번호: 서버에 닿지 못하면 칸이 아니라 스낵바로 알린다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupCodeScreen(
-          draft: SignupDraft(phoneNumber: '01012345678'),
-          api: _FailingAuthApi(onVerify: networkError),
-        ),
-      );
-      await tester.enterText(find.byType(TextField), '123456');
-      await tester.pump();
-
       await tester.tap(nextButton());
       await settleFrames(tester);
+      expect(find.text(AuthStrings.attemptExceeded), findsOneWidget);
+      expect(
+        tester.widget<TextButton>(find.byType(TextButton)).onPressed,
+        isNotNull,
+      );
+      expect(nextEnabled(tester), isFalse);
 
-      // 문구가 스낵바에만 있고 칸 아래에는 없다.
-      expect(snackBarText(networkError.message), findsOneWidget);
-      expect(find.text(networkError.message), findsOneWidget);
-      expect(nextEnabled(tester), isTrue);
+      await tester.enterText(fields.at(2), '123455');
+      await tester.pump();
+      expect(find.text(AuthStrings.attemptExceeded), findsOneWidget);
+      expect(nextEnabled(tester), isFalse);
+
+      await tester.tap(find.text(AuthStrings.resendCode));
+      await settleFrames(tester);
+      expect(find.text(AuthStrings.attemptExceeded), findsNothing);
+      expect(find.text('123455'), findsNothing);
     });
 
     testWidgets('아이디: 중복 확인이 실패하면 스낵바를 띄우고 다시 누를 수 있다', (tester) async {
@@ -738,25 +619,24 @@ void main() {
       await tester.tap(find.text(AuthStrings.signup));
       await tester.pumpAndSettle();
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
+      expect(find.text(AuthStrings.stepCounter(1)), findsOneWidget);
 
-      // 1/5 전화번호 → 인증번호
-      await tester.enterText(find.byType(TextField), '01012345678');
+      // 1/4 이름 + 전화번호 → 같은 화면의 인증번호
+      var fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
       await tester.pump();
       await tapNext(tester, AuthStrings.requestCode);
-      // 인증번호 화면은 매초 다시 그려서 pumpAndSettle 이 끝나지 않는다.
+      // 인증번호 남은 시간이 매초 바뀌므로 정해진 프레임만 흘린다.
       await settleFrames(tester);
-      await tester.enterText(find.byType(TextField), '123456');
+      fields = find.byType(TextField);
+      await tester.enterText(fields.at(2), '123456');
       await tester.pump();
       await tapNext(tester, AuthStrings.verify);
       await settle(tester);
 
-      // 2/5 이름
-      await tester.enterText(find.byType(TextField), '홍길동');
-      await tester.pump();
-      await tapNext(tester, AuthStrings.next);
-      await tester.pumpAndSettle();
-
-      // 3/5 아이디 + 확정 팝업
+      // 2/4 아이디 + 확정 팝업
+      expect(find.text(AuthStrings.stepCounter(2)), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'minsuk_01');
       await tester.pump();
       await tester.tap(find.byType(DuplicateCheckButton));
@@ -766,15 +646,17 @@ void main() {
       await tester.tap(find.text(AuthStrings.confirmAgree));
       await tester.pumpAndSettle();
 
-      // 4/5 비밀번호
-      final fields = find.byType(TextField);
+      // 3/4 비밀번호
+      expect(find.text(AuthStrings.stepCounter(3)), findsOneWidget);
+      fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'abcd1234!');
       await tester.enterText(fields.at(1), 'abcd1234!');
       await tester.pump();
       await tapNext(tester, AuthStrings.next);
       await tester.pumpAndSettle();
 
-      // 5/5 닉네임 → 가입
+      // 4/4 닉네임 → 가입
+      expect(find.text(AuthStrings.stepCounter(4)), findsOneWidget);
       await tester.enterText(find.byType(TextField), '티모2');
       await tester.pump();
       await tester.tap(find.byType(DuplicateCheckButton));
@@ -866,6 +748,17 @@ class _FailingAuthApi extends MockAuthApi {
     if (onSignUp != null) throw onSignUp!;
     return super.signUp(draft);
   }
+}
+
+class _ShortCodeAuthApi extends MockAuthApi {
+  const _ShortCodeAuthApi({required this.validFor})
+    : super(latency: Duration.zero);
+
+  final Duration validFor;
+
+  @override
+  Future<Duration> requestVerificationCode(String phoneNumber) async =>
+      validFor;
 }
 
 /// 이미지 파일이 하나도 없는 에셋 번들. 로고 파일이 없을 때의 폴백을 검사한다.

@@ -17,7 +17,7 @@ import '../widgets/duplicate_check_button.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 5/5 닉네임 설정. 회원가입의 마지막 입력 화면.
+/// 4/4 닉네임 설정. 회원가입의 마지막 입력 화면.
 ///
 /// 중복 확인 흐름은 아이디 화면과 같다. '인증하고 시작하기' 를 누르면 지금까지
 /// 모은 초안으로 가입을 요청하고 완료 화면으로 간다. 이때 입력 화면들은
@@ -165,7 +165,7 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
   @override
   Widget build(BuildContext context) {
     return SignupStepPage(
-      step: 5,
+      step: 4,
       title: AuthStrings.nicknameTitle,
       subtitle: AuthStrings.nicknameSubtitle,
       buttonLabel: AuthStrings.startSignup,

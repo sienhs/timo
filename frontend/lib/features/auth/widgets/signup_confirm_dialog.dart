@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 아이디 확정 팝업. 3/5 아이디 화면에서 '다음으로' 를 누르면 뜬다.
+/// 아이디 확정 팝업. 2/4 아이디 화면에서 '다음' 을 누르면 뜬다.
 ///
 /// 가입 뒤에는 아이디를 바꿀 수 없으므로 넘어가기 전에 한 번 묻는다.
 /// 사용자는 아이디를 그대로 쓰거나 수정하러 돌아가는 동작을 직접 고른다.
