@@ -125,6 +125,21 @@ class HttpAuthApi implements AuthApi {
     }
   }
 
+  @override
+  Future<void> logout(String refreshToken) async {
+    // 응답은 204 로 본문이 없다. _body 를 타면 JSON 객체가 아니라서 예외가 나므로
+    // 응답을 읽지 않는다. 서버가 실패를 돌려주지 않는 API 라(토큰이 틀려도 204)
+    // 여기서 나는 예외는 네트워크가 끊긴 경우뿐이다.
+    await _guard(
+      () => _dio.post<dynamic>(
+        '$basePath/logout',
+        data: {'refreshToken': refreshToken},
+        // 서버가 (회원, 기기) 한 쌍으로 세션을 두므로 어느 기기인지 같이 보낸다.
+        options: Options(headers: {deviceIdHeader: _deviceId}),
+      ),
+    );
+  }
+
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
   Future<T> _guard<T>(Future<T> Function() request) async {
     try {

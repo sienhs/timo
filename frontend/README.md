@@ -61,6 +61,7 @@ flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 ## 로그인 상태
 
 - 로그인·가입에 성공하면 받은 토큰을 `AuthSession`(`features/auth/state/`)에 담고 기기 보안 저장소(flutter_secure_storage)에 저장한다. 앱을 켤 때 `main.dart` 가 되살리므로 다시 켜도 로그인 상태가 유지된다.
-- 화면에서 로그인 여부가 필요하면 `AuthSessionScope.of(context).isLoggedIn` 을 읽는다. 로그아웃은 `signOut()`.
+- 화면에서 로그인 여부가 필요하면 `AuthSessionScope.of(context).isLoggedIn` 을 읽는다.
+- 로그아웃은 두 단계다. `signOut()` 으로 기기 토큰을 지우고(화면이 바로 바뀐다), 이어서 `AuthApi.logout(refreshToken)` 으로 서버 세션을 끊는다. 리프레시 토큰은 `signOut()` 전에 꺼내 둬야 한다. 서버에 못 알려도(네트워크 끊김) 로그아웃은 된 것으로 친다. 마이페이지 버튼(`features/mypage/`)이 예시다.
 - 로그인 상태면 모든 서버 요청에 `Authorization: Bearer …` 가 자동으로 붙는다(`core/network/auth_interceptor.dart`). 인증 주소(`/api/v1/auth/…`)는 예외. 서버가 401 을 주면 자동으로 로그아웃 상태가 된다.
-- 토큰 재발급과 서버 로그아웃은 백엔드 API 가 나오면 붙인다.
+- 토큰 재발급은 백엔드 API(`/api/v1/auth/reissue`)는 있지만 아직 붙이지 않았다. 붙일 때 401 처리를 "재발급 시도 → 실패하면 로그아웃" 으로 바꾼다.
