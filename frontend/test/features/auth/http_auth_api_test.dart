@@ -342,4 +342,35 @@ void main() {
       );
     });
   });
+
+  group('로그아웃', () {
+    test(
+      '리프레시 토큰과 기기 식별자 헤더를 POST /logout 으로 보내고, 본문 없는 204 를 그대로 받는다',
+      () async {
+        // 서버는 본문 없이 204 만 준다. 다른 응답처럼 JSON 으로 읽으려 들면 깨진다.
+        final api = build((_) => ResponseBody.fromString('', 204));
+
+        await expectLater(api.logout('refresh-random'), completes);
+
+        final request = adapter.requests.single;
+        expect(request.method, 'POST');
+        expect(request.path, '$basePath/logout');
+        expect(request.headers[HttpAuthApi.deviceIdHeader], deviceId);
+        expect(request.jsonBody, {'refreshToken': 'refresh-random'});
+      },
+    );
+
+    test('서버에 닿지 못하면 예외로 알린다. 무시할지는 부르는 쪽이 정한다', () async {
+      final api = build(connectionLost);
+
+      await expectLater(
+        api.logout('refresh-random'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', isNull)
+              .having((e) => e.message, 'message', '인터넷 연결을 확인해주세요.'),
+        ),
+      );
+    });
+  });
 }

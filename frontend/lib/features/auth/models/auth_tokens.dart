@@ -31,7 +31,8 @@ class AuthTokens {
   final String accessToken;
 
   /// 액세스 토큰이 만료됐을 때 재발급에 쓰는 값. JWT 가 아닌 난수다.
-  /// 재발급 API 는 아직 없어 지금은 저장만 한다.
+  /// 로그아웃할 때 서버에 보내 이 기기의 세션을 끊는 데도 쓴다. 재발급은 아직
+  /// 붙이지 않았다.
   final String refreshToken;
 
   /// 액세스 토큰의 남은 수명. 서버는 초 단위 숫자로 준다.

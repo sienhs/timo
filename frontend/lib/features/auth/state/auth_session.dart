@@ -9,9 +9,9 @@ import '../models/auth_tokens.dart';
 /// [restore] 로 저장된 것을 되살리고, [signOut] 이면 비우고 지운다. 값이 바뀌면
 /// 알려서(ChangeNotifier) [AuthSessionScope] 아래 화면들이 다시 그려진다.
 ///
-/// 토큰 재발급은 백엔드 API 가 아직 없어 하지 않는다. 로그인이 필요한 API 가
-/// 401 을 주면 인터셉터가 [signOut] 을 불러 로그아웃 상태로 돌린다. 재발급 API 가
-/// 생기면 그 자리를 "재발급 시도 → 실패하면 로그아웃" 으로 바꾼다.
+/// 토큰 재발급은 아직 붙이지 않았다(백엔드 API 는 있고, 별도 작업). 로그인이
+/// 필요한 API 가 401 을 주면 인터셉터가 [signOut] 을 불러 로그아웃 상태로 돌린다.
+/// 재발급을 붙일 때 그 자리를 "재발급 시도 → 실패하면 로그아웃" 으로 바꾼다.
 ///
 /// [now] 는 테스트에서 시계를 고정하기 위해 받는다. 앱에서는 넘기지 않는다.
 class AuthSession extends ChangeNotifier {
@@ -94,8 +94,11 @@ class AuthSession extends ChangeNotifier {
 
   /// 로그아웃. 상태를 비우고 기기에서도 지운다.
   ///
-  /// 서버 쪽 세션(리프레시 토큰)은 그대로 남는다. 서버에 알리는 로그아웃 API 가
-  /// 아직 없기 때문이다. 기기 식별자는 지우지 않는다([TokenStorageKeys.deviceId]).
+  /// 서버 쪽 세션(리프레시 토큰)은 여기서 끊지 않는다. 이 메서드는 마이페이지의
+  /// 로그아웃 버튼과 401 을 받은 인터셉터 둘이 부르는데, 401 은 토큰이 이미 안
+  /// 통한다는 뜻이라 서버에 알릴 게 없다. 서버에 알리는 일은 버튼 쪽이 이 메서드
+  /// 앞뒤로 따로 한다(AuthApi.logout). 세션은 네트워크를 모르는 채로 둔다.
+  /// 기기 식별자는 지우지 않는다([TokenStorageKeys.deviceId]).
   Future<void> signOut() async {
     _memberId = null;
     _accessToken = null;
