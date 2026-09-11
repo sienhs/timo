@@ -1,4 +1,5 @@
 import { ethers, network } from "hardhat";
+import { Signer } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { ShowRegistry, TicketNFT, TicketVault, Marketplace } from "../../typechain-types";
@@ -21,27 +22,43 @@ export interface DeployedContracts {
  * network) still deploys everything correctly, but that admin has to run
  * the grantRole calls itself afterwards - this function logs a reminder
  * instead of silently failing.
+ *
+ * `deployerSigner` defaults to Hardhat's first configured account (its
+ * behavior before this parameter existed). Pass a dedicated wallet here to
+ * deploy from - and become admin of - a key that isn't one of Hardhat's 20
+ * well-known accounts. That matters the moment this chain is reachable over
+ * a network (e.g. hosted on an EC2 instance): Hardhat's default accounts are
+ * unlocked *on the node itself*, so anyone who can reach the RPC endpoint
+ * can send transactions "as" account #0 without ever knowing its private
+ * key. A dedicated wallet's key never touches the node - it signs locally
+ * and only the already-signed transaction is submitted - so RPC access
+ * alone can't impersonate it.
  */
-export async function deployContracts(admin: string, custodyVaultAddress: string): Promise<DeployedContracts> {
-  const [deployer] = await ethers.getSigners();
+export async function deployContracts(
+  admin: string,
+  custodyVaultAddress: string,
+  deployerSigner?: Signer
+): Promise<DeployedContracts> {
+  const deployer = deployerSigner ?? (await ethers.getSigners())[0];
+  const deployerAddress = await deployer.getAddress();
 
-  const ShowRegistryFactory = await ethers.getContractFactory("ShowRegistry");
+  const ShowRegistryFactory = await ethers.getContractFactory("ShowRegistry", deployer);
   const showRegistry = await ShowRegistryFactory.deploy(admin);
   await showRegistry.waitForDeployment();
 
-  const TicketNFTFactory = await ethers.getContractFactory("TicketNFT");
+  const TicketNFTFactory = await ethers.getContractFactory("TicketNFT", deployer);
   const ticketNFT = await TicketNFTFactory.deploy(admin, custodyVaultAddress, await showRegistry.getAddress());
   await ticketNFT.waitForDeployment();
 
-  const TicketVaultFactory = await ethers.getContractFactory("TicketVault");
+  const TicketVaultFactory = await ethers.getContractFactory("TicketVault", deployer);
   const ticketVault = await TicketVaultFactory.deploy(admin);
   await ticketVault.waitForDeployment();
 
-  const MarketplaceFactory = await ethers.getContractFactory("Marketplace");
+  const MarketplaceFactory = await ethers.getContractFactory("Marketplace", deployer);
   const marketplace = await MarketplaceFactory.deploy(admin, await ticketNFT.getAddress(), await ticketVault.getAddress());
   await marketplace.waitForDeployment();
 
-  if (admin.toLowerCase() === deployer.address.toLowerCase()) {
+  if (admin.toLowerCase() === deployerAddress.toLowerCase()) {
     const marketplaceAddress = await marketplace.getAddress();
     await (await ticketNFT.grantRole(await ticketNFT.MARKETPLACE_ROLE(), marketplaceAddress)).wait();
     await (await ticketVault.grantRole(await ticketVault.MARKETPLACE_ROLE(), marketplaceAddress)).wait();
@@ -81,16 +98,41 @@ async function writeDeploymentInfo(contracts: DeployedContracts): Promise<void> 
   fs.writeFileSync(path.join(outDir, "deployment.json"), JSON.stringify(info, null, 2));
 }
 
-async function main() {
-  const [deployer] = await ethers.getSigners();
-  const admin = process.env.ADMIN_ADDRESS ?? deployer.address;
-  const custodyVaultAddress = process.env.CUSTODY_VAULT_ADDRESS ?? deployer.address;
+/**
+ * ADMIN_PRIVATE_KEY, when set, deploys from - and makes admin - a wallet
+ * that isn't one of Hardhat's 20 well-known accounts (see the warning on
+ * deployContracts). On hardhat/localhost this wallet also gets its balance
+ * set directly via hardhat_setBalance, since there's no faucet for a chain
+ * we control ourselves. Falls back to Hardhat's first default account when
+ * unset, so quick local experiments still work with zero setup.
+ */
+async function resolveDeployer(): Promise<Signer> {
+  const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
+  if (!adminPrivateKey) {
+    return (await ethers.getSigners())[0];
+  }
 
-  console.log("Deployer:", deployer.address);
+  const wallet = new ethers.Wallet(adminPrivateKey, ethers.provider);
+
+  if (network.name === "hardhat" || network.name === "localhost") {
+    const oneMillionEthInWei = ethers.parseEther("1000000");
+    await network.provider.send("hardhat_setBalance", [wallet.address, ethers.toBeHex(oneMillionEthInWei)]);
+  }
+
+  return wallet;
+}
+
+async function main() {
+  const deployer = await resolveDeployer();
+  const deployerAddress = await deployer.getAddress();
+  const admin = process.env.ADMIN_ADDRESS ?? deployerAddress;
+  const custodyVaultAddress = process.env.CUSTODY_VAULT_ADDRESS ?? admin;
+
+  console.log("Deployer:", deployerAddress);
   console.log("Admin:", admin);
   console.log("Custody vault (holds revoked tickets):", custodyVaultAddress);
 
-  const { showRegistry, ticketNFT, ticketVault, marketplace } = await deployContracts(admin, custodyVaultAddress);
+  const { showRegistry, ticketNFT, ticketVault, marketplace } = await deployContracts(admin, custodyVaultAddress, deployer);
 
   console.log("\nDeployed:");
   console.log("  ShowRegistry:", await showRegistry.getAddress());
