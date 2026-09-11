@@ -24,7 +24,14 @@ class SignupNameScreen extends StatefulWidget {
 class _SignupNameScreenState extends State<SignupNameScreen> {
   final _controller = TextEditingController();
 
-  bool get _canSubmit => SignupValidators.isValidName(_controller.text);
+  String get _name => _controller.text.trim();
+
+  bool get _canSubmit => SignupValidators.isValidName(_name);
+
+  String? get _helperText {
+    if (_name.isEmpty || _canSubmit) return null;
+    return AuthStrings.nameRule;
+  }
 
   @override
   void dispose() {
@@ -36,7 +43,7 @@ class _SignupNameScreenState extends State<SignupNameScreen> {
     Navigator.pushNamed(
       context,
       AppRoutes.signupUsername,
-      arguments: widget.draft.copyWith(name: _controller.text.trim()),
+      arguments: widget.draft.copyWith(name: _name),
     );
   }
 
@@ -52,6 +59,7 @@ class _SignupNameScreenState extends State<SignupNameScreen> {
         label: AuthStrings.nameLabel,
         hint: AuthStrings.nameHint,
         controller: _controller,
+        helperText: _helperText,
         autofocus: true,
         keyboardType: TextInputType.name,
         textInputAction: TextInputAction.done,

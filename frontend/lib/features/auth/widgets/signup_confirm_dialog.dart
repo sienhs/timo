@@ -6,14 +6,15 @@ import '../constants.dart';
 /// 아이디 확정 팝업. 3/5 아이디 화면에서 '다음으로' 를 누르면 뜬다.
 ///
 /// 가입 뒤에는 아이디를 바꿀 수 없으므로 넘어가기 전에 한 번 묻는다.
-/// 시안대로 닫기 버튼은 없고, 고치고 싶으면 팝업 바깥을 눌러 닫는다.
+/// 사용자는 아이디를 그대로 쓰거나 수정하러 돌아가는 동작을 직접 고른다.
 /// 시안의 빨간 느낌표는 빼고, 좌석 확인 팝업과 같은 얇은 브랜드색 테두리로
 /// 앱 안 팝업 모양을 통일했다(사용자 결정).
 ///
-/// '동의하고 진행하기' 를 눌렀으면 true, 바깥을 눌러 닫았으면 false.
+/// '이 아이디 사용하기' 를 눌렀으면 true, '수정하기' 를 눌렀으면 false.
 Future<bool> showSignupConfirmDialog(BuildContext context) async {
   final agreed = await showDialog<bool>(
     context: context,
+    barrierDismissible: false,
     builder: (context) => const _SignupConfirmDialog(),
   );
   return agreed ?? false;
@@ -63,6 +64,11 @@ class _SignupConfirmDialog extends StatelessWidget {
               ),
               onPressed: () => Navigator.pop(context, true),
               child: const Text(AuthStrings.confirmAgree),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text(AuthStrings.confirmEdit),
             ),
           ],
         ),

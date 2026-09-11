@@ -13,7 +13,7 @@ import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_step_page.dart';
 import 'signup_code_screen.dart';
 
-/// 1/5 본인인증 — 전화번호 입력. 회원가입 흐름의 첫 화면이다.
+/// 1/5 휴대폰 번호 인증 — 전화번호 입력. 회원가입 흐름의 첫 화면이다.
 ///
 /// 인증번호를 보낸 뒤 [SignupCodeScreen] 으로 넘어가며, 전화번호는 하이픈을
 /// 뺀 숫자만 초안에 담는다. 발송 실패(횟수 초과, 네트워크)는 스낵바로 알리고
@@ -83,8 +83,8 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
   Widget build(BuildContext context) {
     return SignupStepPage(
       step: 1,
-      title: AuthStrings.verifyTitle,
-      subtitle: AuthStrings.verifySubtitle,
+      title: AuthStrings.phoneTitle,
+      subtitle: AuthStrings.phoneSubtitle,
       buttonLabel: AuthStrings.requestCode,
       isBusy: _busy,
       onPressed: _canSubmit ? _requestCode : null,
