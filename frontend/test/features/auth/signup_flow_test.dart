@@ -139,7 +139,7 @@ void main() {
       expect(find.text(AuthStrings.codeMismatch), findsNothing);
     });
 
-    testWidgets('남은 시간이 칸 안에서 줄어들고, 0 이 되면 만료 문구와 다시 받기로 바뀐다', (tester) async {
+    testWidgets('남은 시간이 칸 안에서 줄고 만료되면 인증 버튼이 잠긴다', (tester) async {
       await pumpScreen(
         tester,
         const SignupCodeScreen(
@@ -150,6 +150,7 @@ void main() {
       );
       expect(find.text('00:03'), findsOneWidget);
       expect(find.text(AuthStrings.verify), findsOneWidget);
+      expect(find.text(AuthStrings.resendCodeAfter('01:00')), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('00:02'), findsOneWidget);
@@ -161,13 +162,9 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(find.text('00:00'), findsOneWidget);
       expect(find.text(AuthStrings.codeExpired), findsOneWidget);
-      // 만료된 번호는 보낼 수 없고, 버튼이 다시 받기로 바뀐다.
-      expect(find.text(AuthStrings.verify), findsNothing);
-      expect(
-        find.widgetWithText(FilledButton, AuthStrings.resendCode),
-        findsOneWidget,
-      );
-      expect(nextEnabled(tester), isTrue);
+      // 하단 버튼은 인증하기로 유지되지만 만료된 번호는 보낼 수 없다.
+      expect(find.text(AuthStrings.verify), findsOneWidget);
+      expect(nextEnabled(tester), isFalse);
 
       // 만료 문구는 글자를 고쳐도 남는다. 다시 받아야 풀린다.
       await tester.enterText(find.byType(TextField), '1234');
@@ -175,7 +172,7 @@ void main() {
       expect(find.text(AuthStrings.codeExpired), findsOneWidget);
     });
 
-    testWidgets('다시 받기를 누르면 입력이 비워지고 새 유효 시간으로 다시 센다', (tester) async {
+    testWidgets('1분 뒤 다시 받으면 입력이 비워지고 두 타이머가 다시 시작한다', (tester) async {
       await pumpScreen(
         tester,
         const SignupCodeScreen(
@@ -188,13 +185,21 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text(AuthStrings.codeExpired), findsOneWidget);
 
-      await tester.tap(nextButton());
+      // 첫 발송 후 1분이 지나야 별도 재전송 버튼이 켜진다.
+      await tester.pump(const Duration(seconds: 59));
+      expect(find.text(AuthStrings.resendCode), findsOneWidget);
+      final resend = tester.widget<TextButton>(find.byType(TextButton));
+      expect(resend.onPressed, isNotNull);
+
+      await tester.tap(find.text(AuthStrings.resendCode));
       await settleFrames(tester);
 
-      // 목의 유효 시간(3분)에서 다시 시작하고 옛 입력은 사라진다.
+      // 목의 유효 시간(3분)과 재전송 대기 시간(1분)에서 다시 시작한다.
       expect(find.text('03:00'), findsOneWidget);
+      expect(find.text(AuthStrings.resendCodeAfter('01:00')), findsOneWidget);
       expect(find.text(AuthStrings.codeExpired), findsNothing);
       expect(find.text('123456'), findsNothing);
+      expect(find.text(AuthStrings.codeResent), findsOneWidget);
       expect(find.text(AuthStrings.verify), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
     });
@@ -236,10 +241,12 @@ void main() {
 
       await tester.enterText(find.byType(TextField), '홍');
       await tester.pump();
+      expect(find.text(AuthStrings.nameRule), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
 
       await tester.enterText(find.byType(TextField), '홍길동1');
       await tester.pump();
+      expect(find.text(AuthStrings.nameRule), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
     });
 
@@ -248,7 +255,8 @@ void main() {
 
       expect(find.text(AuthStrings.stepCounter(2)), findsOneWidget);
       expect(find.text(AuthStrings.nameTitle), findsOneWidget);
-      expect(find.text(AuthStrings.nameLabel), findsOneWidget);
+      // 라벨과 입력 힌트가 모두 '이름'이라 두 곳에 표시된다.
+      expect(find.text(AuthStrings.nameLabel), findsNWidgets(2));
       expect(find.text(AuthStrings.next), findsOneWidget);
     });
 
@@ -324,9 +332,7 @@ void main() {
       expect(nextEnabled(tester), isFalse);
     });
 
-    testWidgets('다음으로를 누르면 팝업이 뜨고, 바깥을 누르면 닫히고, 동의하면 비밀번호 화면으로', (
-      tester,
-    ) async {
+    testWidgets('다음을 누르면 팝업이 뜨고, 수정하거나 아이디를 확정할 수 있다', (tester) async {
       await pumpScreen(
         tester,
         const SignupUsernameScreen(draft: SignupDraft(), api: api),
@@ -340,8 +346,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(AuthStrings.confirmTitle), findsOneWidget);
 
-      // 팝업 바깥(화면 왼쪽 위)을 누르면 닫히고 확인 결과는 그대로다.
-      await tester.tapAt(const Offset(10, 10));
+      await tester.tap(find.text(AuthStrings.confirmEdit));
       await tester.pumpAndSettle();
       expect(find.text(AuthStrings.confirmTitle), findsNothing);
       expect(find.byType(SignupUsernameScreen), findsOneWidget);
@@ -497,13 +502,12 @@ void main() {
       await tester.tap(nextButton());
       await settleFrames(tester);
 
-      // 서버 문구 대신 우리 만료 문구와 다시 받기 버튼. 남은 시간도 0 으로.
+      // 서버 문구 대신 우리 만료 문구를 쓰고 남은 시간을 0으로 맞춘다.
       expect(find.text(AuthStrings.codeExpired), findsOneWidget);
       expect(find.text('00:00'), findsOneWidget);
-      expect(
-        find.widgetWithText(FilledButton, AuthStrings.resendCode),
-        findsOneWidget,
-      );
+      expect(find.text(AuthStrings.verify), findsOneWidget);
+      expect(nextEnabled(tester), isFalse);
+      expect(find.byType(TextButton), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
       expect(find.byType(SignupCodeScreen), findsOneWidget);
     });

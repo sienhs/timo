@@ -27,6 +27,10 @@ class AuthMetrics {
   /// 응답에 쓰는 기본값이며 백엔드 SmsVerificationService 의 CODE_TTL 과 같다.
   static const codeValidity = Duration(minutes: 3);
 
+  /// 인증 문자를 보낸 뒤 다시 요청할 수 있을 때까지의 대기 시간.
+  /// 백엔드 SmsVerificationService 의 SEND_COOLDOWN 과 같다.
+  static const resendCooldown = Duration(minutes: 1);
+
   /// DB `member.name` 컬럼 길이.
   static const nameMinLength = 2;
   static const nameMaxLength = 50;
@@ -82,75 +86,81 @@ class AuthStrings {
   AuthStrings._();
 
   // 공통
-  static const next = '다음으로';
+  static const next = '다음';
   static const duplicateCheck = '중복 확인';
   static String stepCounter(int step) => '$step/${AuthMetrics.totalSteps}';
 
-  // 1/5 본인인증 (전화번호 → 인증번호, 화면 두 개가 같은 제목을 쓴다)
-  static const verifyTitle = '안전한 거래를 위해\n본인인증을 진행할게요';
-  static const verifySubtitle = '티켓은 본인만 사용할 수 있어요';
-  static const phoneLabel = '전화번호';
-  static const phoneHint = '전화번호 입력';
+  // 1/5 휴대폰 번호
+  static const phoneTitle = '휴대폰 번호를 입력해주세요';
+  static const phoneSubtitle = '인증번호를 보내드릴게요';
+  static const phoneLabel = '휴대폰 번호';
+  static const phoneHint = '010-0000-0000';
   static const requestCode = '인증번호 받기';
+
+  // 1/5 인증번호
+  static const codeTitle = '인증번호를 입력해주세요';
+  static const codeSubtitle = '문자로 받은 6자리 번호를 입력해주세요';
   static const codeLabel = '인증번호';
-  static const codeHint = '인증번호 입력';
+  static const codeHint = '인증번호 6자리';
   static const verify = '인증하기';
-  static const codeMismatch = '인증번호가 올바르지 않아요';
-  static const codeExpired = '인증번호가 만료됐어요. 다시 받아주세요';
+  static const codeMismatch = '인증번호를 다시 확인해주세요';
+  static const codeExpired = '입력 시간이 지났어요. 인증번호를 다시 받아주세요';
   static const resendCode = '인증번호 다시 받기';
+  static const codeResent = '인증번호를 다시 보냈어요';
+  static String resendCodeAfter(String clock) => '인증번호 다시 받기 ($clock)';
 
   /// 입력칸 안 남은 시간 표시를 스크린리더가 읽는 문구. 눈으로는 '02:59' 만 본다.
   static String remainingTime(String clock) => '남은 시간 $clock';
 
   // 2/5 이름
-  static const nameTitle = '이름을 알려주세요';
-  static const nameSubtitle = '본인의 실명을 입력하여 주세요';
+  static const nameTitle = '이름을 입력해주세요';
+  static const nameSubtitle = '예매자 확인에 사용할 이름이에요';
   static const nameLabel = '이름';
-  static const nameHint = '이름 입력';
+  static const nameHint = '이름';
+  static const nameRule = '한글 또는 영문으로 입력해주세요';
 
   // 3/5 아이디
-  static const usernameTitle = '아이디를 설정해주세요';
-  static const usernameSubtitle = '비밀번호를 변경할 때 사용합니다';
+  static const usernameTitle = '사용할 아이디를 정해주세요';
+  static const usernameSubtitle = '로그인할 때 사용할 아이디예요';
   static const usernameLabel = '아이디';
-  static const usernameHint = '아이디 입력';
+  static const usernameHint = '아이디';
   static const usernameRule =
-      '영문 소문자·숫자·밑줄(_) '
-      '${AuthMetrics.usernameMinLength}~${AuthMetrics.usernameMaxLength}자, '
-      '첫 글자는 영문';
+      '영문 소문자로 시작 · '
+      '${AuthMetrics.usernameMinLength}~${AuthMetrics.usernameMaxLength}자';
   static const usernameAvailable = '사용할 수 있는 아이디예요';
-  static const usernameTaken = '이미 사용 중인 아이디예요';
+  static const usernameTaken = '이미 사용 중이에요';
 
   // 아이디 확정 팝업. 3/5 에서 '다음으로' 를 누르면 뜬다.
-  static const confirmTitle = '이 이후로는 아이디를 바꿀 수 없어요';
-  static const confirmBody = '수정해야 할 사항이 있다면 밖을 클릭해주세요';
-  static const confirmAgree = '동의하고 진행하기';
+  static const confirmTitle = '이 아이디를 사용할까요?';
+  static const confirmBody = '가입한 뒤에는 아이디를 바꿀 수 없어요';
+  static const confirmAgree = '이 아이디 사용하기';
+  static const confirmEdit = '수정하기';
 
   // 4/5 비밀번호
-  static const passwordTitle = '비밀번호를 설정해주세요';
-  static const passwordSubtitle = '다른 곳과 겹치지 않게 유의해주세요';
+  static const passwordTitle = '비밀번호를 만들어주세요';
+  static const passwordSubtitle = '다른 서비스와 다른 비밀번호를 사용해주세요';
   static const passwordLabel = '비밀번호';
-  static const passwordHint = '${AuthMetrics.passwordMinLength}자 이상 입력';
+  static const passwordHint = '비밀번호 입력';
   static const passwordConfirmLabel = '비밀번호 확인';
-  static const passwordConfirmHint = '비밀번호 재입력';
+  static const passwordConfirmHint = '비밀번호 한 번 더 입력';
   static const passwordRule =
-      '영문·숫자·특수문자를 모두 넣어 '
+      '영문·숫자·특수문자 포함 · '
       '${AuthMetrics.passwordMinLength}~${AuthMetrics.passwordMaxLength}자';
-  static const passwordMismatch = '비밀번호가 일치하지 않아요';
+  static const passwordMismatch = '입력한 비밀번호가 서로 달라요';
   static const showPassword = '비밀번호 보기';
   static const hidePassword = '비밀번호 숨기기';
 
   // 5/5 닉네임
-  static const nicknameTitle = '사용하실 닉네임을\n설정해주세요';
-  static const nicknameSubtitle = '다른 사람들이 모두 확인할 수 있는 닉네임이에요';
-  static const nicknameLabel = '닉네임 설정';
-  static const nicknameHint = '닉네임 입력 (${AuthMetrics.nicknameMaxLength}글자까지)';
+  static const nicknameTitle = '사용할 닉네임을 정해주세요';
+  static const nicknameSubtitle = '다른 사람에게 보여지는 이름이에요';
+  static const nicknameLabel = '닉네임';
+  static const nicknameHint = '닉네임 입력';
   static const nicknameRule =
-      '한글·영문·숫자 '
-      '${AuthMetrics.nicknameMinLength}~${AuthMetrics.nicknameMaxLength}자, '
-      '공백 없이';
+      '한글·영문·숫자 · '
+      '${AuthMetrics.nicknameMinLength}~${AuthMetrics.nicknameMaxLength}자';
   static const nicknameAvailable = '사용할 수 있는 닉네임이에요';
-  static const nicknameTaken = '이미 사용 중인 닉네임이에요';
-  static const startSignup = '인증하고 시작하기';
+  static const nicknameTaken = '이미 사용 중이에요';
+  static const startSignup = '가입하기';
 
   // 가입 완료
   static const completeTitle = '가입이 완료됐어요';

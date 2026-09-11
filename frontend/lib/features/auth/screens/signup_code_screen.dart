@@ -27,11 +27,11 @@ class SignupCodeArguments {
   final Duration validFor;
 }
 
-/// 1/5 본인인증 — 인증번호 입력. 전화번호 화면과 같은 제목·단계를 쓴다.
+/// 1/5 휴대폰 번호 인증 — 인증번호 입력.
 ///
-/// 입력칸 오른쪽에 남은 시간이 흐른다. 0 이 되면(또는 서버가 만료라고 하면) 칸
-/// 아래 만료 문구가 뜨고 하단 버튼이 '인증번호 다시 받기' 로 바뀐다. 다시 받으면
-/// 입력이 비워지고 새 유효 시간으로 다시 센다.
+/// 입력칸 오른쪽에 남은 시간이 흐른다. 인증 문자를 보낸 뒤 1분이 지나면 입력칸
+/// 아래에서 인증번호를 다시 받을 수 있다. 다시 받으면 입력이 비워지고 인증번호
+/// 유효 시간과 재전송 대기 시간을 처음부터 다시 센다.
 ///
 /// 번호가 틀리면 칸 아래 오류 문구를 띄우고, 다시 타이핑하면 지운다. 맞으면
 /// 서버가 준 인증 티켓을 초안에 담아 이름 화면으로 간다.
@@ -59,7 +59,9 @@ class SignupCodeScreen extends StatefulWidget {
 class _SignupCodeScreenState extends State<SignupCodeScreen> {
   final _controller = TextEditingController();
   Timer? _timer;
+  Timer? _resendTimer;
   late Duration _remaining;
+  late Duration _resendRemaining;
   var _expired = false;
   var _busy = false;
   String? _errorText;
@@ -76,11 +78,13 @@ class _SignupCodeScreenState extends State<SignupCodeScreen> {
   void initState() {
     super.initState();
     _startCountdown(widget.validFor);
+    _startResendCooldown();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _resendTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -107,6 +111,25 @@ class _SignupCodeScreenState extends State<SignupCodeScreen> {
     _timer?.cancel();
     _remaining = Duration.zero;
     _expired = true;
+  }
+
+  /// 서버의 재발송 제한과 같은 1분을 센다. 0이 되기 전에는 재전송을 막아
+  /// 불필요한 429 응답을 받지 않게 한다.
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    _resendRemaining = AuthMetrics.resendCooldown;
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        final next = _resendRemaining - const Duration(seconds: 1);
+        if (next <= Duration.zero) {
+          _resendRemaining = Duration.zero;
+          _resendTimer?.cancel();
+        } else {
+          _resendRemaining = next;
+        }
+      });
+    });
   }
 
   Future<void> _verify() async {
@@ -138,6 +161,7 @@ class _SignupCodeScreenState extends State<SignupCodeScreen> {
     // 돌리면 다음 화면들에서 매초 리빌드가 생긴다.
     _timer?.cancel();
     // 티켓은 가입 요청에 같이 보내야 하므로 초안에 담아 끝까지 들고 간다.
+    _resendTimer?.cancel();
     Navigator.pushNamed(
       context,
       AppRoutes.signupName,
@@ -163,8 +187,7 @@ class _SignupCodeScreenState extends State<SignupCodeScreen> {
     if (!aboutThisInput) showErrorSnackBar(context, e.message);
   }
 
-  /// 만료 뒤 '인증번호 다시 받기'. 새 유효 시간으로 다시 세고 입력을 비운다.
-  /// 발송 제한(1분 안에 재요청)은 유효 시간(3분)보다 짧아 보통 걸리지 않는다.
+  /// '인증번호 다시 받기'. 새 유효 시간으로 다시 세고 입력을 비운다.
   Future<void> _resend() async {
     setState(() => _busy = true);
 
@@ -184,37 +207,57 @@ class _SignupCodeScreenState extends State<SignupCodeScreen> {
       _errorText = null;
       _controller.clear();
       _startCountdown(validFor);
+      _startResendCooldown();
     });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text(AuthStrings.codeResent)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final canResend = !_busy && _resendRemaining == Duration.zero;
+    final resendLabel = canResend
+        ? AuthStrings.resendCode
+        : AuthStrings.resendCodeAfter(formatCountdown(_resendRemaining));
+
     return SignupStepPage(
       step: 1,
-      title: AuthStrings.verifyTitle,
-      subtitle: AuthStrings.verifySubtitle,
-      buttonLabel: _expired ? AuthStrings.resendCode : AuthStrings.verify,
+      title: AuthStrings.codeTitle,
+      subtitle: AuthStrings.codeSubtitle,
+      buttonLabel: AuthStrings.verify,
       isBusy: _busy,
-      onPressed: _expired
-          ? (_busy ? null : _resend)
-          : (_canSubmit ? _verify : null),
-      child: LabeledTextField(
-        label: AuthStrings.codeLabel,
-        hint: AuthStrings.codeHint,
-        controller: _controller,
-        autofocus: true,
-        keyboardType: TextInputType.number,
-        textInputAction: TextInputAction.done,
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(AuthMetrics.codeLength),
+      onPressed: _canSubmit ? _verify : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LabeledTextField(
+            label: AuthStrings.codeLabel,
+            hint: AuthStrings.codeHint,
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(AuthMetrics.codeLength),
+            ],
+            errorText: _fieldError,
+            onChanged: (_) => setState(() => _errorText = null),
+            onSubmitted: (_) {
+              if (_canSubmit) _verify();
+            },
+            suffixIcon: _CountdownLabel(remaining: _remaining),
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: canResend ? _resend : null,
+              child: Text(resendLabel),
+            ),
+          ),
         ],
-        errorText: _fieldError,
-        onChanged: (_) => setState(() => _errorText = null),
-        onSubmitted: (_) {
-          if (_canSubmit) _verify();
-        },
-        suffixIcon: _CountdownLabel(remaining: _remaining),
       ),
     );
   }
