@@ -72,11 +72,15 @@ module "ec2" {
   app_port            = var.app_port
   aws_region          = var.aws_region
   backend_secret_arn  = module.backend_secret.arn
+  db_endpoint         = module.rds.endpoint
+  db_port             = module.rds.port
+  db_name             = var.db_name
+  db_init_sql_base64  = base64encode(file("${path.module}/bootstrap/rds-load-test-init.sql"))
   detailed_monitoring = var.ec2_detailed_monitoring
 
   # Ensure the private subnet has an Internet route through the NAT instance
   # before application EC2 user_data attempts dnf update/install.
-  depends_on = [module.nat_instance]
+  depends_on = [module.nat_instance, module.rds]
 }
 
 module "rds" {

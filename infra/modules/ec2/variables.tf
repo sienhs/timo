@@ -27,6 +27,27 @@ variable "backend_secret_arn" {
   type        = string
 }
 
+variable "db_endpoint" {
+  description = "RDS endpoint used by the one-time schema bootstrap command"
+  type        = string
+}
+
+variable "db_port" {
+  description = "RDS MySQL port used by the one-time schema bootstrap command"
+  type        = number
+}
+
+variable "db_name" {
+  description = "Database to initialise"
+  type        = string
+}
+
+variable "db_init_sql_base64" {
+  description = "Base64-encoded SQL executed once through SSM after RDS provisioning"
+  type        = string
+  sensitive   = true
+}
+
 variable "detailed_monitoring" {
   description = "Publish EC2 instance metrics to CloudWatch at one-minute resolution"
   type        = bool
