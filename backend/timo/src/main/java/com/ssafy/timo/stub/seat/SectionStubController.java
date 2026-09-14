@@ -3,7 +3,7 @@ package com.ssafy.timo.stub.seat;
 import com.ssafy.timo.domain.seat.controller.SectionApi;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto.SectionSummary;
-import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
+import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.stub.StubController;
 import com.ssafy.timo.stub.StubFixtures;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +30,9 @@ public class SectionStubController implements SectionApi {
     }
 
     @Override
-    public ResponseEntity<SectionListResponseDto> findSections(Long venueId) {
-        if (venueId == StubFixtures.NOT_FOUND_ID) {
-            throw new VenueNotFoundException(venueId);
+    public ResponseEntity<SectionListResponseDto> findSections(Long concertId) {
+        if (concertId == StubFixtures.NOT_FOUND_ID) {
+            throw new ConcertNotFoundException(concertId);
         }
 
         List<SectionSummary> sections = StubFixtures.SECTIONS.stream()
@@ -48,7 +48,7 @@ public class SectionStubController implements SectionApi {
                 .toList();
 
         return ResponseEntity.ok(new SectionListResponseDto(
-                venueId,
+                StubFixtures.VENUE_ID,
                 StubFixtures.VENUE_NAME,
                 sections.stream().mapToInt(SectionSummary::seatCount).sum(),
                 sections.stream().mapToInt(SectionSummary::availableCount).sum(),

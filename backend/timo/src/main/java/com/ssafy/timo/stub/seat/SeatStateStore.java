@@ -55,7 +55,7 @@ public class SeatStateStore {
     public synchronized Long hold(SeatFixture seat) {
         Long previous = heldSeatId;
         heldSeatId = seat.id();
-        mine.put(seat.id(), SeatStatus.RESERVED);
+        mine.put(seat.id(), SeatStatus.HELD);
 
         if (previous == null || previous.equals(seat.id())) {
             return null;    // 처음 잡았거나 같은 자리를 다시 잡아 만료만 늘린 경우.
@@ -70,7 +70,7 @@ public class SeatStateStore {
     }
 
     public synchronized void occupy(SeatFixture seat) {
-        mine.put(seat.id(), SeatStatus.OCCUPIED);
+        mine.put(seat.id(), SeatStatus.SOLD);
         clearHeldIf(seat);
     }
 

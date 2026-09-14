@@ -6,16 +6,12 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SectionLayout;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
-import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto.SeatSummary;
 import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.exception.SeatHoldNotOwnedException;
 import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
-import com.ssafy.timo.domain.seat.exception.SeatNotHeldException;
 import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
-import com.ssafy.timo.domain.seat.exception.SeatNotOccupiedException;
-import com.ssafy.timo.domain.seat.exception.SeatOccupancyNotOwnedException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
 import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
@@ -61,7 +57,7 @@ public class SeatStubController implements SeatApi {
     }
 
     @Override
-    public ResponseEntity<SectionSeatListResponseDto> findSeats(Long sectionId) {
+    public ResponseEntity<SectionSeatListResponseDto> findSeats(Long concertId, Long sectionId) {
         SectionFixture section = StubFixtures.findSection(sectionId)
                 .orElseThrow(() -> new SectionNotFoundException(sectionId));
 
@@ -89,12 +85,12 @@ public class SeatStubController implements SeatApi {
     }
 
     @Override
-    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId) {
+    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId) {
         SeatFixture seat = findSeat(seatId);
         if (!seatStateStore.isMine(seat) && seatStateStore.statusOf(seat) != SeatStatus.AVAILABLE) {
             throw new SeatNotHoldableException(seatId);
         }
-        if (seatStateStore.isMine(seat) && seatStateStore.statusOf(seat) == SeatStatus.OCCUPIED) {
+        if (seatStateStore.isMine(seat) && seatStateStore.statusOf(seat) == SeatStatus.SOLD) {
             throw new SeatNotHoldableException(seatId);
         }
 
@@ -107,18 +103,18 @@ public class SeatStubController implements SeatApi {
                 seat.section().name(),
                 seat.seatNo(),
                 seat.seatCol(),
-                SeatStatus.RESERVED,
+                SeatStatus.HELD,
                 heldUntil,
                 releasedSeatId));
     }
 
     @Override
-    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId) {
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId) {
         SeatFixture seat = findSeat(seatId);
         SeatStatus status = seatStateStore.statusOf(seat);
 
         if (seatStateStore.isMine(seat)) {
-            if (status == SeatStatus.OCCUPIED) {
+            if (status == SeatStatus.SOLD) {
                 throw new SeatHoldNotOwnedException(seatId);   // 결제까지 끝난 자리는 선점 취소로 못 푼다.
             }
             seatStateStore.release(seat);
@@ -133,41 +129,6 @@ public class SeatStubController implements SeatApi {
                 seat.seatNo(),
                 seat.seatCol(),
                 SeatStatus.AVAILABLE));
-    }
-
-    @Override
-    public ResponseEntity<SeatOccupancyResponseDto> occupy(Long seatId) {
-        SeatFixture seat = findSeat(seatId);
-        SeatStatus status = seatStateStore.statusOf(seat);
-
-        if (!seatStateStore.isMine(seat)) {
-            if (status == SeatStatus.AVAILABLE) {
-                throw new SeatNotHeldException(seatId);        // 선점 없이 바로 점유할 수 없다.
-            }
-            throw new SeatHoldNotOwnedException(seatId);       // 남의 선점·점유.
-        }
-        seatStateStore.occupy(seat);
-
-        return ResponseEntity.ok(occupancyResponse(seat, SeatStatus.OCCUPIED));
-    }
-
-    @Override
-    public ResponseEntity<SeatOccupancyResponseDto> releaseOccupancy(Long seatId) {
-        SeatFixture seat = findSeat(seatId);
-        SeatStatus status = seatStateStore.statusOf(seat);
-
-        if (status == SeatStatus.RESERVED) {
-            throw new SeatNotOccupiedException(seatId);        // 결제 전 선점 상태.
-        }
-        if (status == SeatStatus.OCCUPIED) {
-            if (!seatStateStore.isMine(seat)) {
-                throw new SeatOccupancyNotOwnedException(seatId);
-            }
-            seatStateStore.release(seat);
-        }
-        // 이미 빈 자리는 그대로 200. 해제는 멱등하다.
-
-        return ResponseEntity.ok(occupancyResponse(seat, SeatStatus.AVAILABLE));
     }
 
     /**
@@ -219,13 +180,4 @@ public class SeatStubController implements SeatApi {
         return seatStateStore.find(seatId).orElseThrow(() -> new SeatNotFoundException(seatId));
     }
 
-    private static SeatOccupancyResponseDto occupancyResponse(SeatFixture seat, SeatStatus status) {
-        return new SeatOccupancyResponseDto(
-                seat.id(),
-                seat.section().id(),
-                seat.section().name(),
-                seat.seatNo(),
-                seat.seatCol(),
-                status);
-    }
 }

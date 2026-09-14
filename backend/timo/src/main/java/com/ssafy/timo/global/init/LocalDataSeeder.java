@@ -17,6 +17,7 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto.SectionSummary;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
+import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import com.ssafy.timo.domain.venue.dto.CommandVenueRequestDto;
 import com.ssafy.timo.domain.venue.entity.Venue;
@@ -201,6 +202,7 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final ConcertRepository concertRepository;
     private final VenueRepository venueRepository;
     private final SeatRepository seatRepository;
+    private final SectionRepository sectionRepository;
     private final ArtistRepository artistRepository;
     private final EntityManager entityManager;
     private final Clock clock;
@@ -248,7 +250,9 @@ public class LocalDataSeeder implements ApplicationRunner {
      * 기동이 409 로 실패한다.
      */
     private void seedSeats(Long venueId) {
-        if (!seatService.findSections(venueId).sections().isEmpty()) {
+        // 구역 조회 API 는 이제 공연 기준이라 여기 쓸 수 없다. "이 공연장에 구역이 있는가" 는
+        // 공연과 무관한 질문이므로 리포지토리에 직접 묻는다.
+        if (!sectionRepository.findAllByVenueIdOrderByIdAsc(venueId).isEmpty()) {
             log.info("공연장 {} 에 구역이 이미 있어 좌석 시드를 건너뛴다.", venueId);
             return;
         }
@@ -270,42 +274,18 @@ public class LocalDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * 시드 좌석 일부를 판매 완료·선점 중으로 바꾼다.
+     * 좌석 상태 시딩은 지금 하지 않는다.
      *
-     * <p>등록 API 는 좌석을 항상 예매 가능으로 만든다. 1,000 석이 전부 비어 있으면 배치도의 상태별 색
-     * 구분도, 잔여석이 총좌석보다 적은 화면도 확인할 수 없다. 그래서 구역 안 자리 번호로 정해지는
-     * 결정적 규칙으로 섞어 둔다 — 매 기동 같은 자리가 같은 상태가 된다.
+     * <p>예전에는 좌석 행의 {@code status} 를 직접 바꿔 일부를 판매 완료·선점 중으로 만들었다. 좌석에서
+     * 판매 상태가 사라지면서 그 방법이 없어졌다 — 선점은 {@code seat_hold}, 판매는 {@code reservation}
+     * 행이고 둘 다 <b>공연과 회원</b>을 FK 로 요구한다.
      *
-     * <p>서비스가 아니라 엔티티의 상태 변경 메서드를 직접 부른다. 선점에는 회원을 명시하는 진입점이 없고
-     * ({@link SeatService#hold} 는 요청자 기준이다) 러너에는 요청 컨텍스트가 없다. 서비스가 행 잠금으로
-     * 막는 동시 선점은 기동 시점의 단일 스레드 시딩에서는 애초에 성립하지 않는다.
+     * <p>되살리려면 시드 회원을 먼저 만들고, 시드 공연을 기준으로 {@code SeatHold} ·
+     * {@code Reservation} 행을 넣어야 한다. 지금 러너는 회원을 만들지 않으므로 그 작업을 함께 해야 한다.
+     * 그전까지 로컬 배치도는 전 좌석이 예매 가능으로 보인다.
      */
     private void markSomeSeatsTaken(List<SectionSummary> sections) {
-        LocalDateTime heldUntil = LocalDateTime.now(clock).plus(SEED_HOLD_DURATION);
-        long holderId = SEED_HOLDER_ID_BASE;
-        int occupied = 0;
-        int reserved = 0;
-
-        for (SectionSummary section : sections) {
-            List<Seat> seats = seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.id());
-
-            for (int i = 0; i < seats.size(); i++) {
-                int seatIndex = i + 1;
-                Seat seat = seats.get(i);
-
-                if (seatIndex % OCCUPIED_EVERY == 0) {
-                    // 점유는 유효한 선점 위에서만 성립한다. 잡은 뒤 결제까지 끝난 것으로 만든다.
-                    seat.hold(holderId++, heldUntil);
-                    seat.occupy();
-                    occupied++;
-                } else if (seatIndex % RESERVED_EVERY == 0) {
-                    seat.hold(holderId++, heldUntil);
-                    reserved++;
-                }
-            }
-        }
-
-        log.info("로컬 시드: {}석을 판매 완료로, {}석을 선점 중으로 바꿨다.", occupied, reserved);
+        log.info("로컬 시드: 좌석 상태는 넣지 않는다. 선점·판매가 공연별 행이 되어 시드 회원·공연이 먼저 필요하다.");
     }
 
     /**

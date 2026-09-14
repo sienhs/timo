@@ -101,7 +101,7 @@ public class ReservationStubController implements ReservationApi {
         boolean alreadyHolds = orders.values().stream()
                 .filter(order -> order.concert().id() == concert.id())
                 .map(this::statusOf)
-                .anyMatch(status -> status != ReservationStatus.REFUNDED && status != ReservationStatus.CANCELLED);
+                .anyMatch(status -> status == ReservationStatus.PAID);
         if (alreadyHolds) {
             throw new AlreadyReservedException(concert.id());
         }
@@ -142,7 +142,7 @@ public class ReservationStubController implements ReservationApi {
     public ResponseEntity<ReservationDetailResponseDto> cancel(Long reservationId) {
         Order order = requireOrder(reservationId);
         ReservationStatus status = statusOf(order);
-        if (status != ReservationStatus.MINTED) {
+        if (status != ReservationStatus.PAID) {
             throw new ReservationNotCancellableException(reservationId, "status=" + status);
         }
 
@@ -168,7 +168,7 @@ public class ReservationStubController implements ReservationApi {
 
     private void requireMyHold(SeatFixture seat) {
         SeatStatus status = seatStateStore.statusOf(seat);
-        if (seatStateStore.isMine(seat) && status == SeatStatus.RESERVED) {
+        if (seatStateStore.isMine(seat) && status == SeatStatus.HELD) {
             return;
         }
         if (status == SeatStatus.AVAILABLE) {
@@ -178,36 +178,21 @@ public class ReservationStubController implements ReservationApi {
     }
 
     /**
-     * 주문 시각으로부터 흐른 시간으로 발행 상태를 정한다. 실패 좌석은 좌석 회수까지 여기서 처리한다.
-     * 조회할 때마다 같은 답이 나오도록 시간만 보고 결정하며, 회수는 멱등이라 여러 번 불려도 같다.
+     * 주문 상태. 취소했으면 {@code CANCELLED}, 아니면 {@code PAID} 다.
+     *
+     * <p>예전에는 주문 시각으로부터 흐른 시간으로 발행 진행 상태를 흉내 냈다. 발행 진행은 이제 주문이
+     * 아니라 티켓 쪽 관심사가 되어 {@code ReservationStatus} 에서 빠졌으므로 그 시뮬레이션도 걷어냈다.
      */
     private ReservationStatus statusOf(Order order) {
-        if (cancelled.containsKey(order.id())) {
-            return ReservationStatus.CANCELLED;
-        }
-        long elapsed = Duration.between(order.createdAt(), LocalDateTime.now(clock)).getSeconds();
-        if (elapsed < StubFixtures.MINT_DELAY_SECONDS) {
-            return ReservationStatus.PENDING_MINT;
-        }
-        if (order.seat().id() != StubFixtures.MINT_FAIL_SEAT_ID) {
-            return ReservationStatus.MINTED;
-        }
-        if (elapsed < StubFixtures.MINT_DELAY_SECONDS + StubFixtures.REFUND_DELAY_SECONDS) {
-            return ReservationStatus.MINT_FAILED;
-        }
-        seatStateStore.release(order.seat());                 // 보상: 좌석 회수. 잔액 환원은 지갑 도메인 몫.
-        return ReservationStatus.REFUNDED;
+        return cancelled.containsKey(order.id())
+                ? ReservationStatus.CANCELLED
+                : ReservationStatus.PAID;
     }
 
     private ReservationDetailResponseDto toDetail(Order order) {
         ReservationStatus status = statusOf(order);
-        boolean minted = status == ReservationStatus.MINTED || status == ReservationStatus.CANCELLED;
-        boolean failed = status == ReservationStatus.MINT_FAILED || status == ReservationStatus.REFUNDED;
         LocalDateTime updatedAt = switch (status) {
-            case PENDING_MINT -> order.createdAt();
-            case MINTED, MINT_FAILED -> order.createdAt().plusSeconds(StubFixtures.MINT_DELAY_SECONDS);
-            case REFUNDED -> order.createdAt()
-                    .plusSeconds(StubFixtures.MINT_DELAY_SECONDS + StubFixtures.REFUND_DELAY_SECONDS);
+            case PAID -> order.createdAt();
             case CANCELLED -> cancelled.get(order.id());
         };
 
@@ -226,10 +211,12 @@ public class ReservationStubController implements ReservationApi {
                 order.seat().seatCol(),
                 order.seat().section().price(),
                 status,
-                minted ? String.valueOf(order.id()) : null,
-                minted ? StubHashes.of("mint:" + order.id()) : null,
-                status == ReservationStatus.PENDING_MINT ? 0 : failed ? 3 : 1,
-                failed ? StubFixtures.MINT_FAILURE_REASON : null,
+                // 발행 추적 값은 스텁이 흉내 내지 않는다. 주문 상태에서 발행 진행이 빠졌고,
+                // 티켓 발행은 티켓 도메인이 생길 때 그쪽에서 재현한다.
+                null,
+                null,
+                0,
+                null,
                 order.createdAt(),
                 updatedAt);
     }

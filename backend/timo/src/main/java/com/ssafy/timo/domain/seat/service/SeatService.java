@@ -4,40 +4,45 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
-import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 
+/**
+ * 좌석 조회와 선점.
+ *
+ * <p>등록({@link #register})을 뺀 모든 메서드가 <b>공연 id 를 받는다.</b> 좌석은 공연장 마스터
+ * 데이터라 공연을 빼고는 상태가 정해지지 않기 때문이다. 같은 좌석이라도 공연이 다르면 다른 자리다.
+ *
+ * <p>점유(결제 확정)·점유 해제는 없어졌다. 판매 상태는 이제 {@code seat} 행이 아니라
+ * {@code reservation} 행이 갖는다. 예전의 {@code occupy} / {@code releaseOccupancy} 가 하던 일은
+ * 주문을 만들고 취소하는 것으로 대체된다.
+ */
 public interface SeatService {
+
+    /** 공연장의 구역과 좌석을 등록한다. 마스터 데이터라 공연과 무관하다. */
     CommandSeatResponseDto register(CommandSeatRequestDto request);
 
-    SectionListResponseDto findSections(Long venueId);
+    /** 이 공연 기준의 구역 목록과 구역별 잔여석. */
+    SectionListResponseDto findSections(Long concertId);
 
-    SectionSeatListResponseDto findSeats(Long sectionId);
-
-    SeatHoldResponseDto hold(Long seatId);
-
-    SeatHoldCancelResponseDto cancelHold(Long seatId);
-
-    /** 요청자의 선점을 점유(결제 확정)로 바꾼다. 요청자는 {@code CurrentMemberProvider} 가 알려 준다. */
-    SeatOccupancyResponseDto occupy(Long seatId);
+    /** 이 공연 기준의 구역 좌석 배치도. */
+    SectionSeatListResponseDto findSeats(Long concertId, Long sectionId);
 
     /**
-     * 회원의 선점을 점유(결제 확정)로 바꾼다.
+     * 이 공연의 좌석을 선점한다.
      *
-     * <p>예매·결제 도메인이 결제 성공 시점에 부르는 진입점이다. 회원을 명시적으로 받으므로
-     * 요청 컨텍스트가 없는 곳(결제 콜백 등)에서도 쓸 수 있다.
+     * <p>같은 좌석에 대한 동시 요청은 {@code seat_hold} 의 유니크 제약이 가른다. 좌석 행을 잠그지
+     * 않으므로 <b>다른 공연의 선점 요청과 서로를 기다리지 않는다.</b>
      */
-    SeatOccupancyResponseDto occupy(Long seatId, Long memberId);
+    SeatHoldResponseDto hold(Long concertId, Long seatId);
 
-    /** 요청자의 점유를 풀어 예매 가능으로 되돌린다. 요청자는 {@code CurrentMemberProvider} 가 알려 준다. */
-    SeatOccupancyResponseDto releaseOccupancy(Long seatId);
+    /** 이 공연의 좌석 선점을 취소한다. */
+    SeatHoldCancelResponseDto cancelHold(Long concertId, Long seatId);
 
     /**
-     * 회원의 점유를 풀어 예매 가능으로 되돌린다.
+     * 이 공연의 남은 좌석 수.
      *
-     * <p>예매 도메인이 예매 취소를 확정한 뒤 부르는 진입점이다. 환불·취소 수수료 같은 예매 규칙은
-     * 여기서 보지 않는다. 좌석은 "누구의 점유를 풀 것인가"만 안다.
+     * <p>공연 상태 전이(잔여 0 이면 매진)가 쓰는 접점이라 시그니처를 바꾸지 않는다.
      */
-    SeatOccupancyResponseDto releaseOccupancy(Long seatId, Long memberId);
+    long countAvailable(Long concertId);
 }

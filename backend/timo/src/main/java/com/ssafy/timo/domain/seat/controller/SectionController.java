@@ -26,7 +26,7 @@ public class SectionController implements SectionApi {
     private final SeatService seatService;
 
     @Override
-    public ResponseEntity<SectionListResponseDto> findSections(Long venueId) {
-        return ResponseEntity.ok(seatService.findSections(venueId));
+    public ResponseEntity<SectionListResponseDto> findSections(Long concertId) {
+        return ResponseEntity.ok(seatService.findSections(concertId));
     }
 }

@@ -2,7 +2,6 @@ package com.ssafy.timo.domain.seat;
 
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatGrade;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
@@ -135,7 +134,6 @@ class SeatApiIntegrationTest {
         Long sectionId = onlySavedSection().getId();
 
         assertThat(savedSeats()).allSatisfy(seat -> {
-            assertThat(seat.getStatus()).isEqualTo(SeatStatus.AVAILABLE);
             assertThat(seat.getSection().getId()).isEqualTo(sectionId);
         });
     }

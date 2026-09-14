@@ -212,7 +212,7 @@ class StubApiTest {
 
         @Test
         void 구역_목록은_잔여석_합계를_준다() throws Exception {
-            mockMvc.perform(get("/api/v0/sections").param("venueId", "1"))
+            mockMvc.perform(get("/api/v0/sections").param("concertId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.venueId").value(1))
                     .andExpect(jsonPath("$.sections", hasSize(3)))
@@ -223,7 +223,7 @@ class StubApiTest {
         @Test
         void 구역_합계는_명세_문서의_값과_같다() throws Exception {
             // docs/stub/STUB_SEAT_API.md 의 고정 배치도 표와 맞아야 한다.
-            mockMvc.perform(get("/api/v0/sections").param("venueId", "1"))
+            mockMvc.perform(get("/api/v0/sections").param("concertId", "1"))
                     .andExpect(jsonPath("$.totalSeatCount").value(135))
                     .andExpect(jsonPath("$.totalAvailableCount").value(112))
                     .andExpect(jsonPath("$.sections[1].availableCount").value(33))
@@ -232,22 +232,22 @@ class StubApiTest {
         }
 
         @Test
-        void venueId_없이_부르면_400() throws Exception {
+        void concertId_없이_부르면_400() throws Exception {
             mockMvc.perform(get("/api/v0/sections"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.exception").value("MissingServletRequestParameterException"));
         }
 
         @Test
-        void venueId_가_숫자가_아니면_400() throws Exception {
-            mockMvc.perform(get("/api/v0/sections").param("venueId", "abc"))
+        void concertId_가_숫자가_아니면_400() throws Exception {
+            mockMvc.perform(get("/api/v0/sections").param("concertId", "abc"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.exception").value("MethodArgumentTypeMismatchException"));
         }
 
         @Test
         void A블록_좌석은_명세_예시와_같은_5석이다() throws Exception {
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
+            mockMvc.perform(get("/api/v0/seats").param("concertId", "1").param("sectionId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.rowCount").value(2))
                     .andExpect(jsonPath("$.seatPerRow").value(3))
@@ -257,20 +257,20 @@ class StubApiTest {
         }
 
         @Test
-        void 선점하면_조회에_RESERVED_로_보이고_잔여석이_준다() throws Exception {
+        void 선점하면_조회에_HELD_로_보이고_잔여석이_준다() throws Exception {
             long seatId = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 1);
 
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId))
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("RESERVED"))
-                    .andExpect(jsonPath("$.heldUntil").value("2026-09-10T12:05:00"))
+                    .andExpect(jsonPath("$.status").value("HELD"))
+                    .andExpect(jsonPath("$.expiresAt").value("2026-09-10T12:05:00"))
                     .andExpect(jsonPath("$.releasedSeatId").doesNotExist());
 
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
+            mockMvc.perform(get("/api/v0/seats").param("concertId", "1").param("sectionId", "1"))
                     .andExpect(jsonPath("$.availableCount").value(4))
-                    .andExpect(jsonPath("$.seats[0].status").value("RESERVED"));
+                    .andExpect(jsonPath("$.seats[0].status").value("HELD"));
 
-            mockMvc.perform(get("/api/v0/sections").param("venueId", "1"))
+            mockMvc.perform(get("/api/v0/sections").param("concertId", "1"))
                     .andExpect(jsonPath("$.sections[0].availableCount").value(4));
         }
 
@@ -279,53 +279,32 @@ class StubApiTest {
             long first = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 1);
             long second = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 2);
 
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", first)).andExpect(status().isOk());
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", second))
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", first).param("concertId", "1")).andExpect(status().isOk());
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", second).param("concertId", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.releasedSeatId").value((int) first));
 
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
+            mockMvc.perform(get("/api/v0/seats").param("concertId", "1").param("sectionId", "1"))
                     .andExpect(jsonPath("$.seats[0].status").value("AVAILABLE"))
-                    .andExpect(jsonPath("$.seats[1].status").value("RESERVED"));
-        }
-
-        @Test
-        void 선점_점유_해제_흐름이_이어진다() throws Exception {
-            long seatId = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 3);
-
-            mockMvc.perform(post("/api/v0/seats/{seatId}/occupancy", seatId))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.exception").value("SeatNotHeldException"));
-
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId)).andExpect(status().isOk());
-            mockMvc.perform(post("/api/v0/seats/{seatId}/occupancy", seatId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("OCCUPIED"));
-
-            mockMvc.perform(delete("/api/v0/seats/{seatId}/hold", seatId))
-                    .andExpect(status().isForbidden());
-
-            mockMvc.perform(delete("/api/v0/seats/{seatId}/occupancy", seatId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("AVAILABLE"));
+                    .andExpect(jsonPath("$.seats[1].status").value("HELD"));
         }
 
         @Test
         void 남이_잡은_고정_좌석은_선점_403_취소_403() throws Exception {
-            // C블록의 13 번째 자리는 초기 상태가 RESERVED 다. (StubFixtures.initialStatus)
+            // C블록의 13 번째 자리는 초기 상태가 HELD 다. (StubFixtures.initialStatus)
             long seatId = StubFixtures.SECTIONS.get(2).id() * 1_000 + 13;
 
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId))
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("SeatNotHoldableException"));
-            mockMvc.perform(delete("/api/v0/seats/{seatId}/hold", seatId))
+            mockMvc.perform(delete("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1"))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.exception").value("SeatHoldNotOwnedException"));
         }
 
         @Test
         void 없는_좌석은_404() throws Exception {
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", StubFixtures.NOT_FOUND_ID))
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", StubFixtures.NOT_FOUND_ID).param("concertId", "1"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("SeatNotFoundException"));
         }
@@ -372,19 +351,19 @@ class StubApiTest {
         }
 
         private void holdAndReserve(long concertId, long seatId) throws Exception {
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId)).andExpect(status().isOk());
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1")).andExpect(status().isOk());
             mockMvc.perform(post("/api/v0/reservations").contentType(MediaType.APPLICATION_JSON).content(body(concertId, seatId)))
                     .andExpect(status().isCreated());
         }
 
         @Test
-        void 선점한_좌석으로_주문하면_201_PENDING_MINT_이고_좌석은_OCCUPIED_가_된다() throws Exception {
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId)).andExpect(status().isOk());
+        void 선점한_좌석으로_주문하면_201_PAID_이고_좌석은_SOLD_가_된다() throws Exception {
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1")).andExpect(status().isOk());
 
             mockMvc.perform(post("/api/v0/reservations").contentType(MediaType.APPLICATION_JSON).content(body(1, seatId)))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", "/api/v0/reservations/" + StubFixtures.CREATED_ID_START))
-                    .andExpect(jsonPath("$.status").value("PENDING_MINT"))
+                    .andExpect(jsonPath("$.status").value("PAID"))
                     .andExpect(jsonPath("$.orderId", startsWith("0x")))
                     .andExpect(jsonPath("$.tokenId").doesNotExist())
                     .andExpect(jsonPath("$.facePrice").value(150000))
@@ -392,78 +371,8 @@ class StubApiTest {
                     .andExpect(jsonPath("$.sectionName").value("1층 A블록"))
                     .andExpect(jsonPath("$.mintAttemptCount").value(0));
 
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
-                    .andExpect(jsonPath("$.seats[0].status").value("OCCUPIED"));
-        }
-
-        @Test
-        void 시간이_지나면_MINTED_로_바뀌고_tokenId_가_생긴다() throws Exception {
-            holdAndReserve(1, seatId);
-
-            clock.advance(Duration.ofSeconds(StubFixtures.MINT_DELAY_SECONDS));
-
-            mockMvc.perform(get("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("MINTED"))
-                    .andExpect(jsonPath("$.tokenId").value(String.valueOf(StubFixtures.CREATED_ID_START)))
-                    .andExpect(jsonPath("$.mintTxHash", startsWith("0x")))
-                    .andExpect(jsonPath("$.mintAttemptCount").value(1))
-                    .andExpect(jsonPath("$.failureReason").doesNotExist());
-        }
-
-        @Test
-        void 실패_좌석은_MINT_FAILED_를_거쳐_REFUNDED_가_되고_좌석이_풀린다() throws Exception {
-            long failSeat = StubFixtures.MINT_FAIL_SEAT_ID;
-            holdAndReserve(1, failSeat);
-
-            clock.advance(Duration.ofSeconds(StubFixtures.MINT_DELAY_SECONDS));
-            mockMvc.perform(get("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(jsonPath("$.status").value("MINT_FAILED"))
-                    .andExpect(jsonPath("$.mintAttemptCount").value(3))
-                    .andExpect(jsonPath("$.failureReason").value(StubFixtures.MINT_FAILURE_REASON));
-
-            clock.advance(Duration.ofSeconds(StubFixtures.REFUND_DELAY_SECONDS));
-            mockMvc.perform(get("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(jsonPath("$.status").value("REFUNDED"));
-
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
-                    .andExpect(jsonPath("$.seats[?(@.id == " + failSeat + ")].status", everyItem(is("AVAILABLE"))));
-
-            // 환불된 주문은 보유가 아니라 같은 공연을 다시 예매할 수 있다.
-            holdAndReserve(1, seatId);
-        }
-
-        @Test
-        void 취소하면_CANCELLED_이고_좌석은_노출되지_않으며_다시_예매할_수_있다() throws Exception {
-            holdAndReserve(1, seatId);
-            clock.advance(Duration.ofSeconds(StubFixtures.MINT_DELAY_SECONDS));
-
-            mockMvc.perform(delete("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("CANCELLED"))
-                    .andExpect(jsonPath("$.tokenId").value(String.valueOf(StubFixtures.CREATED_ID_START)))
-                    .andExpect(jsonPath("$.updatedAt").value("2026-09-10T12:00:03"));
-
-            // 회수 좌석은 선택 화면에 다시 나오지 않는다.
-            mockMvc.perform(get("/api/v0/seats").param("sectionId", "1"))
-                    .andExpect(jsonPath("$.seats[0].status").value("OCCUPIED"));
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId)).andExpect(status().isConflict());
-
-            // 취소한 뒤에는 같은 공연을 다시 예매할 수 있다 (다른 좌석).
-            holdAndReserve(1, StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 2));
-
-            // 두 번 취소는 409.
-            mockMvc.perform(delete("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.exception").value("ReservationNotCancellableException"));
-        }
-
-        @Test
-        void 발행_전_주문은_취소_409() throws Exception {
-            holdAndReserve(1, seatId);
-            mockMvc.perform(delete("/api/v0/reservations/{id}", StubFixtures.CREATED_ID_START))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.exception").value("ReservationNotCancellableException"));
+            mockMvc.perform(get("/api/v0/seats").param("concertId", "1").param("sectionId", "1"))
+                    .andExpect(jsonPath("$.seats[0].status").value("SOLD"));
         }
 
         @Test
@@ -483,7 +392,7 @@ class StubApiTest {
 
         @Test
         void 예매_중이_아닌_공연은_409() throws Exception {
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId));
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1"));
             mockMvc.perform(post("/api/v0/reservations").contentType(MediaType.APPLICATION_JSON).content(body(2, seatId)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("ConcertNotOnSaleException"));
@@ -494,7 +403,7 @@ class StubApiTest {
             long second = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 2);
             holdAndReserve(1, seatId);
 
-            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", second));
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", second).param("concertId", "1"));
             mockMvc.perform(post("/api/v0/reservations").contentType(MediaType.APPLICATION_JSON).content(body(1, second)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("AlreadyReservedException"));
@@ -526,16 +435,15 @@ class StubApiTest {
         @Test
         void 목록은_PagedModel_이고_상태로_걸러지며_발행_정보는_없다() throws Exception {
             holdAndReserve(1, seatId);
-            clock.advance(Duration.ofSeconds(StubFixtures.MINT_DELAY_SECONDS));
 
             mockMvc.perform(get("/api/v0/reservations"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(1)))
-                    .andExpect(jsonPath("$.content[0].status").value("MINTED"))
+                    .andExpect(jsonPath("$.content[0].status").value("PAID"))
                     .andExpect(jsonPath("$.content[0].tokenId").doesNotExist())
                     .andExpect(jsonPath("$.page.totalElements").value(1));
 
-            mockMvc.perform(get("/api/v0/reservations").param("status", "PENDING_MINT"))
+            mockMvc.perform(get("/api/v0/reservations").param("status", "CANCELLED"))
                     .andExpect(jsonPath("$.content", hasSize(0)));
         }
     }
