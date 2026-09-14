@@ -27,10 +27,32 @@ void showSuccessSnackBar(BuildContext context, String message) {
   _showOutlinedSnackBar(context, message, borderColor: AppColors.primary);
 }
 
+/// 잘되지도 잘못되지도 않은 안내. "아직 준비 중인 화면" 같은 것.
+///
+/// 테두리를 회색으로 둔다. 초록을 쓰면 성공으로, 코랄을 쓰면 오류로 읽힌다.
+/// 검정 배경의 기본 스낵바를 쓰지 않는 이유는, 같은 화면에서 오류 스낵바와
+/// 번갈아 뜨면 두 안내의 생김새가 아예 달라 같은 앱으로 보이지 않아서다.
+///
+/// [bottomMargin] 은 스낵바 아래 여백이다. 하단 바가 있는 화면은 그 높이만큼
+/// 띄워야 안내가 바에 가리지 않는다.
+void showInfoSnackBar(
+  BuildContext context,
+  String message, {
+  double? bottomMargin,
+}) {
+  _showOutlinedSnackBar(
+    context,
+    message,
+    borderColor: AppColors.textDisabled,
+    bottomMargin: bottomMargin,
+  );
+}
+
 void _showOutlinedSnackBar(
   BuildContext context,
   String message, {
   required Color borderColor,
+  double? bottomMargin,
 }) {
   final textTheme = Theme.of(context).textTheme;
 
@@ -44,7 +66,12 @@ void _showOutlinedSnackBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         padding: EdgeInsets.zero,
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, _aboveBottomButton),
+        margin: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          bottomMargin ?? _aboveBottomButton,
+        ),
         content: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

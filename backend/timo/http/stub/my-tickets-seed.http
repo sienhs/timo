@@ -1,0 +1,84 @@
+###############################################################################
+# 내 티켓 화면(S15P21D206-165)용 v0 스텁 시드
+#
+# 앱의 좌석 선택·결제 흐름이 아직 서버로 가지 않아, 앱에서 예매해도 목록이 비어 있다.
+# 카드를 보려면 여기 요청을 직접 쏴야 한다. local 프로필(api.stub.enabled=true)에서만 동작한다.
+#
+# 스텁으로 만들 수 있는 것에는 한계가 뚜렷하다.
+#   - 주문하려면 공연이 ON_SALE 이어야 하는데 고정 공연 4개 중 1번뿐이다.
+#   - 공연을 새로 만들어도 상태가 SCHEDULED 로 고정되고, 상태를 바꿀 API 가 없다.
+#   - 1인 1매라 그 공연에 유효한 주문은 하나뿐이다.
+# 그래서 예정 1장 · 지난 0장이 최대다. **지난 공연 탭은 스텁으로 못 채운다.**
+# 화면을 시안과 대조할 때는 앱 쪽 목을 쓴다: flutter run --dart-define=TICKET_API=mock
+###############################################################################
+
+### 0. 지금 내 티켓 목록 (처음엔 비어 있다)
+GET {{baseUrl}}/api/v0/reservations
+
+> {%
+    client.test("PagedModel 로 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.log("티켓 " + response.body.page.totalElements + "장");
+    });
+%}
+
+### 1. 정상 티켓 만들기 — 좌석 선점 (1번 공연, ON_SALE)
+POST {{baseUrl}}/api/v0/seats/1002/hold
+
+> {%
+    client.test("RESERVED", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}
+
+### 2. 주문 확정. 3초 안에 목록을 새로고침하면 "발행 중" 카드가 보인다
+POST {{baseUrl}}/api/v0/reservations
+Content-Type: application/json
+
+{ "concertId": 1, "seatId": 1002 }
+
+> {%
+    client.test("201 PENDING_MINT", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.status === "PENDING_MINT", response.body.status);
+    });
+    client.global.set("seedReservationId", response.body.id);
+    client.log("3초 뒤 목록을 새로고침하면 MINTED 로 바뀐다");
+%}
+
+### 3. 발행 상태 확인 (3초 뒤 다시 실행하면 MINTED)
+GET {{baseUrl}}/api/v0/reservations/{{seedReservationId}}
+
+> {%
+    client.log("status = " + response.body.status);
+%}
+
+###############################################################################
+# 발행 실패 → 환불 흐름
+#
+# 좌석 1006 은 예약된 실패 좌석이다. 주문하면 3초 뒤 MINT_FAILED, 다시 3초 뒤 REFUNDED 가 된다.
+# REFUNDED 는 1인 1매에서 빠지므로, 이 흐름을 먼저 돌리고 나서 위 정상 주문을 넣을 수 있다.
+# 반대로 정상 주문이 이미 있으면 아래는 409 로 막힌다.
+###############################################################################
+
+### 4. 실패 좌석 선점
+POST {{baseUrl}}/api/v0/seats/1006/hold
+
+### 5. 실패 좌석 주문
+POST {{baseUrl}}/api/v0/reservations
+Content-Type: application/json
+
+{ "concertId": 1, "seatId": 1006 }
+
+> {%
+    client.test("주문 결과", function () {
+        client.log("status = " + response.status + (response.body.exception ? " " + response.body.exception : " " + response.body.status));
+    });
+%}
+
+### 6. 예매 취소 (MINTED 이고 공연 24시간 전일 때만 200)
+DELETE {{baseUrl}}/api/v0/reservations/{{seedReservationId}}
+
+> {%
+    client.log("status = " + response.status + (response.body.exception ? ", " + response.body.exception : ", " + response.body.status));
+%}

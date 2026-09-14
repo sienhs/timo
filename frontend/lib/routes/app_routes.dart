@@ -12,6 +12,9 @@ import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/home/screens/show_search_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
+import '../features/ticket/models/my_ticket.dart';
+import '../features/ticket/screens/entry_qr_screen.dart';
+import '../features/ticket/screens/my_tickets_screen.dart';
 import '../features/show/data/mock_show_detail_data.dart';
 import '../features/show/screens/show_detail_screen.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
@@ -30,6 +33,12 @@ class AppRoutes {
 
   /// 공연 검색. 홈 상단 검색 바에서 들어온다.
   static const showSearch = '/search';
+
+  /// 내 티켓. 빠른 메뉴에서 들어온다.
+  static const myTickets = '/tickets';
+
+  /// 입장 QR. 내 티켓의 예정 공연 카드에서 티켓([MyTicket])을 받아 연다.
+  static const entryQr = '/tickets/qr';
 
   /// 구역 배치도(좌석 선택 시작)
   static const zoneSelection = '/booking/zones';
@@ -52,8 +61,11 @@ class AppRoutes {
 
   static final Map<String, WidgetBuilder> routes = {
     // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
-    // 라우트로 노출하지 않는다.
-    home: (_) => const MainShellScreen(),
+    // 라우트로 노출하지 않는다. 빠른 메뉴에서 연 화면이 하단 바로 돌아올 때는
+    // 열 탭 번호를 arguments 로 넘긴다.
+    home: (context) => MainShellScreen(
+      initialTab: ModalRoute.of(context)!.settings.arguments as int? ?? 0,
+    ),
     // 목록에서는 공연 id 만 넘어온다. 상세 조회를 여기서 해 두면 화면은
     // 모델만 받아 그리므로 상태별로 단독 실행할 수 있다. 모르는 id 로
     // 열리면(딥링크) 표본 공연으로 대체한다.
@@ -63,6 +75,12 @@ class AppRoutes {
       ),
     ),
     showSearch: (_) => const ShowSearchScreen(),
+    myTickets: (_) => const MyTicketsScreen(),
+    // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
+    // 조회하면 입장 직전에 네트워크를 한 번 더 타게 된다.
+    entryQr: (context) => EntryQrScreen(
+      ticket: ModalRoute.of(context)!.settings.arguments! as MyTicket,
+    ),
     zoneSelection: (_) => const ZoneSelectionScreen(),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.

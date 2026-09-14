@@ -18,6 +18,10 @@ import 'features/home/state/home_api_scope.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
 import 'features/mypage/state/my_page_api_scope.dart';
+import 'features/ticket/data/http_ticket_api.dart';
+import 'features/ticket/data/mock_ticket_api.dart';
+import 'features/ticket/data/ticket_api.dart';
+import 'features/ticket/state/ticket_api_scope.dart';
 import 'routes/app_routes.dart';
 
 class App extends StatefulWidget {
@@ -27,6 +31,7 @@ class App extends StatefulWidget {
     this.authApi,
     this.homeApi,
     this.myPageApi,
+    this.ticketApi,
   });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
@@ -43,9 +48,35 @@ class App extends StatefulWidget {
   /// 마이페이지가 쓰는 회원·지갑 API. 안 넘기면 진짜 서버 구현을 쓴다.
   final MyPageApi? myPageApi;
 
+  /// 내 티켓 화면이 쓰는 API. 안 넘기면 [_ticketApiKind] 가 고른다.
+  final TicketApi? ticketApi;
+
   @override
   State<App> createState() => _AppState();
 }
+
+/// 내 티켓 화면이 어느 [TicketApi] 를 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run --dart-define=TICKET_API=mock    # 시안 데이터로. 백엔드 불필요
+/// flutter run                                   # 기본값. 실제 서버(v0 스텁)
+/// ```
+///
+/// 홈·인증에는 없는 장치다. 저쪽은 v0 스텁만으로도 화면이 채워져서 목을
+/// 테스트에서만 쓰면 됐다. 티켓은 사정이 다르다 — 스텁으로는 티켓을 한 장밖에
+/// 못 만들고 지난 공연 탭은 아예 못 채워서([HttpTicketApi] 주석), 이 인자가
+/// 없으면 화면이 시안대로 나오는지 눈으로 볼 방법이 코드를 고쳤다 되돌리는
+/// 것뿐이다. 티켓 도메인 v1 이 붙어 서버로 다 확인되면 지운다.
+const _ticketApiKind = String.fromEnvironment('TICKET_API');
+
+/// 실행 인자에 맞는 구현. 모르는 값이면 실제 서버로 간다.
+TicketApi _ticketApiFor(String kind) => switch (kind) {
+  'mock' => MockTicketApi(),
+  'mock-states' => MockTicketApi(scenario: TicketMockScenario.states),
+  'mock-empty' => MockTicketApi(scenario: TicketMockScenario.empty),
+  'mock-error' => MockTicketApi(scenario: TicketMockScenario.error),
+  _ => HttpTicketApi(),
+};
 
 class _AppState extends State<App> {
   late final AuthSession _session =
@@ -62,6 +93,11 @@ class _AppState extends State<App> {
 
   /// 마이페이지가 쓰는 회원·지갑 API. 위 둘과 같은 이유로 앱에 하나만 둔다.
   late final MyPageApi _myPageApi = widget.myPageApi ?? HttpMyPageApi();
+
+  /// 내 티켓 화면이 쓰는 API. 위 셋과 같은 이유로 앱에 하나만 두고
+  /// [TicketApiScope] 로 내려준다.
+  late final TicketApi _ticketApi =
+      widget.ticketApi ?? _ticketApiFor(_ticketApiKind);
 
   /// 로그인 상태면 서버 요청에 토큰을 붙이고, 401 이면 로그아웃시키는 인터셉터.
   /// 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다(테스트가 App 을 여러 번
@@ -115,15 +151,18 @@ class _AppState extends State<App> {
           api: _homeApi,
           child: MyPageApiScope(
             api: _myPageApi,
-            child: BookingScope(
-              controller: _bookingController,
-              child: MaterialApp(
-                title: 'TIMO',
-                theme: AppTheme.light,
-                // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                initialRoute: AppRoutes.home,
-                routes: AppRoutes.routes,
+            child: TicketApiScope(
+              api: _ticketApi,
+              child: BookingScope(
+                controller: _bookingController,
+                child: MaterialApp(
+                  title: 'TIMO',
+                  theme: AppTheme.light,
+                  // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                  // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                  initialRoute: AppRoutes.home,
+                  routes: AppRoutes.routes,
+                ),
               ),
             ),
           ),
