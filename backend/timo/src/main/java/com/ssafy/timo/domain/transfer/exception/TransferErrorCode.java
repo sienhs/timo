@@ -13,6 +13,11 @@ import org.springframework.http.HttpStatus;
  *
  * <p>"이미 이 공연의 티켓을 보유하고 있습니다"(1인 1매)는 예매와 같은 규칙이라 예매 도메인의
  * {@code AlreadyReservedException} 을 그대로 쓴다. 같은 규칙이 두 코드로 갈리면 앱이 분기를 두 번 짜야 한다.
+ *
+ * <p>정가 초과가 {@link #LIST_PRICE_EXCEEDS_FACE_PRICE}(400) 와
+ * {@link #TRADE_PRICE_EXCEEDS_FACE_VALUE}(422) 로 갈려 있다. enum 이 상태를 함께 들고 있어 같은 코드를
+ * 상황에 따라 다른 상태로 내보낼 수 없기 때문이다. 등록은 사용자가 방금 입력한 값이 잘못된 것이라 400,
+ * 체결은 저장된 데이터가 규칙을 어긴 것이라 422 다.
  */
 @Getter
 @RequiredArgsConstructor
@@ -26,7 +31,27 @@ public enum TransferErrorCode implements BaseErrorCode {
     /** 온체인 {@code ListPriceExceedsFacePrice}. "등록가가 정가 이하일 때에만 등록이 성립한다." */
     LIST_PRICE_EXCEEDS_FACE_PRICE(HttpStatus.BAD_REQUEST, "등록가는 정가를 초과할 수 없습니다."),
     LISTING_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 양도 매물이 아닙니다."),
-    CANNOT_BUY_OWN_LISTING(HttpStatus.CONFLICT, "본인이 등록한 매물은 구매할 수 없습니다.");
+    CANNOT_BUY_OWN_LISTING(HttpStatus.CONFLICT, "본인이 등록한 매물은 구매할 수 없습니다."),
+
+    /** 남의 매물을 취소하려 한 경우. 티켓 소유자가 아니라 <b>매물 판매자</b>가 아닌 것이다. */
+    NOT_LISTING_SELLER(HttpStatus.FORBIDDEN, "본인이 등록한 매물이 아닙니다."),
+    /**
+     * 이미 팔렸거나 취소된 매물. 조건부 UPDATE 의 영향 행이 0 일 때 던진다.
+     *
+     * <p>선착순 경쟁에서 진 쪽이 받는 응답이기도 하다. 404 가 아닌 이유는 매물이 없는 게 아니라
+     * 상태가 맞지 않는 것이고, 앱이 "없는 매물"과 "방금 팔린 매물"을 다르게 안내해야 하기 때문이다.
+     */
+    LISTING_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 매물입니다."),
+    /** 구매자가 화면에서 본 가격과 서버의 등록가가 다른 경우. 목록 캐시와 상세 진입 사이의 시차에서 생긴다. */
+    LISTING_PRICE_MISMATCH(HttpStatus.CONFLICT, "매물 가격이 변경되었습니다. 다시 확인해 주세요."),
+    /**
+     * 체결 시점 정가 재검증 실패.
+     *
+     * <p>{@code face_value} 는 예매 시점 스냅샷이라 불변이므로 정상 경로에서는 발생하지 않는다.
+     * 데이터가 손상됐을 때만 걸리는 방어선이다. 그래도 검증을 두는 것은 정가 초과 판매 차단이
+     * 이 서비스의 존재 이유이기 때문이다.
+     */
+    TRADE_PRICE_EXCEEDS_FACE_VALUE(HttpStatus.UNPROCESSABLE_CONTENT, "정가를 초과한 매물은 체결할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
