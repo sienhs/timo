@@ -11,7 +11,15 @@ void main() {
   late int unauthorizedCalls;
 
   /// [token] 을 돌려주는 세션이 꽂힌 dio. 응답은 [respond] 가 정한다.
-  Dio build(String? token, ResponseBody Function(RecordedRequest) respond) {
+  ///
+  /// 회원 번호 헤더는 기본으로 끈다. 기본값(`kDebugMode`)은 테스트에서도 참이라,
+  /// 켜고 끄는 동작을 따로 보려면 명시해야 한다.
+  Dio build(
+    String? token,
+    ResponseBody Function(RecordedRequest) respond, {
+    int? memberId,
+    bool sendMemberIdHeader = false,
+  }) {
     adapter = FakeHttpAdapter(respond);
     unauthorizedCalls = 0;
     return Dio(BaseOptions(baseUrl: 'http://fake.test'))
@@ -19,6 +27,8 @@ void main() {
       ..interceptors.add(
         AuthInterceptor(
           accessToken: () => token,
+          memberId: () => memberId,
+          sendMemberIdHeader: sendMemberIdHeader,
           onUnauthorized: () => unauthorizedCalls++,
         ),
       );
@@ -45,6 +55,55 @@ void main() {
     expect(
       adapter.requests.single.headers.containsKey(
         AuthInterceptor.authorizationHeader,
+      ),
+      isFalse,
+    );
+  });
+
+  test('회원 번호 헤더를 켜면 로그인 상태에서 토큰과 함께 X-Member-Id 가 붙는다', () async {
+    final dio = build('access-jwt', ok, memberId: 7, sendMemberIdHeader: true);
+
+    await dio.get<dynamic>('/api/v1/members/me');
+
+    expect(
+      adapter.requests.single.headers[AuthInterceptor.memberIdHeader],
+      '7',
+    );
+  });
+
+  test('회원 번호 헤더를 꺼 두면 로그인 상태라도 X-Member-Id 를 붙이지 않는다', () async {
+    final dio = build('access-jwt', ok, memberId: 7);
+
+    await dio.get<dynamic>('/api/v1/members/me');
+
+    expect(
+      adapter.requests.single.headers.containsKey(
+        AuthInterceptor.memberIdHeader,
+      ),
+      isFalse,
+    );
+  });
+
+  test('회원 번호 헤더를 켜도 로그아웃 상태·인증 주소에는 붙이지 않는다', () async {
+    final loggedOut = build(null, ok, sendMemberIdHeader: true);
+    await loggedOut.get<dynamic>('/api/v1/members/me');
+    expect(
+      adapter.requests.single.headers.containsKey(
+        AuthInterceptor.memberIdHeader,
+      ),
+      isFalse,
+    );
+
+    final public = build(
+      'access-jwt',
+      ok,
+      memberId: 7,
+      sendMemberIdHeader: true,
+    );
+    await public.post<dynamic>('/api/v1/auth/login', data: {'username': 'a'});
+    expect(
+      adapter.requests.single.headers.containsKey(
+        AuthInterceptor.memberIdHeader,
       ),
       isFalse,
     );

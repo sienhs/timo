@@ -30,7 +30,8 @@ String formatThousands(int value) {
 /// 구분자는 `.` 하나로 고정한다. 시안에는 결제 카드가 `2026/11/04`,
 /// 완료 카드가 `2026.11.04` 로 그려져 있었으나 같은 흐름의 연속된 두 화면에서
 /// 표기가 갈릴 이유가 없어 통일했다.
-String formatPerformedAt(DateTime at) => '${_formatDate(at)} ${_formatTime(at)}';
+String formatPerformedAt(DateTime at) =>
+    '${_formatDate(at)} ${_formatTime(at)}';
 
 /// 요일까지 붙인 형식. (예: `2026.11.04 (수) 18:00`)
 /// 좌석 선택 화면의 공연 정보 바처럼 날짜 감각이 필요한 곳에 쓴다.
@@ -61,10 +62,10 @@ String formatPhoneNumber(String value) {
 const _weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
 
 String _formatDate(DateTime at) => [
-      at.year.toString().padLeft(4, '0'),
-      _twoDigits(at.month),
-      _twoDigits(at.day),
-    ].join('.');
+  at.year.toString().padLeft(4, '0'),
+  _twoDigits(at.month),
+  _twoDigits(at.day),
+].join('.');
 
 String _formatTime(DateTime at) =>
     '${_twoDigits(at.hour)}:${_twoDigits(at.minute)}';
@@ -111,3 +112,16 @@ String formatCountdownWithHours(Duration remaining) {
     _twoDigits(clamped.inSeconds % 60),
   ].join(':');
 }
+
+/// 부호를 항상 붙인 천 단위 금액. (예: 150000 -> `+150,000`, -176000 -> `-176,000`)
+///
+/// 거래 내역처럼 늘어난 것과 줄어든 것이 한 목록에 섞이는 자리에 쓴다. 양수에
+/// `+` 가 없으면 음수 줄과 나란히 놓였을 때 눈으로 가르기 어렵다. 0 은 부호
+/// 없이 `0` 이다.
+String formatSignedThousands(int value) =>
+    value > 0 ? '+${formatThousands(value)}' : formatThousands(value);
+
+/// 연도를 뺀 월·일과 시:분. (예: `09.12 19:42`)
+/// 거래 내역처럼 최근 것이 줄지어 있어 연도가 자명한 자리에 쓴다.
+String formatMonthDayClock(DateTime at) =>
+    '${_twoDigits(at.month)}.${_twoDigits(at.day)} ${_formatTime(at)}';
