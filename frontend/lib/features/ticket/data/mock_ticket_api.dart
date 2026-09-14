@@ -44,10 +44,20 @@ class MockTicketApi implements TicketApi {
   MockTicketApi({
     this.latency = TicketMetrics.mockLatency,
     this.scenario = TicketMockScenario.design,
+    this.clock = DateTime.now,
   });
 
   final Duration latency;
   final TicketMockScenario scenario;
+
+  /// 지금 시각을 읽는 함수. 티켓 날짜를 여기서 잰다.
+  ///
+  /// 테스트가 시각을 고정할 수 있게 받는다(공연 상세 화면이 `clock` 을 받는
+  /// 것과 같은 이유다). 진짜 시계를 그대로 쓰면 **언제 돌리느냐에 따라 결과가
+  /// 달라지는 테스트**가 된다 — 실제로 '1시간 뒤 공연' 이 자정을 넘기는
+  /// 밤 11시 이후에는 D-day 배지가 `D-DAY` 가 아니라 `D-1` 로 찍혀 테스트가
+  /// 깨졌다.
+  final DateTime Function() clock;
 
   List<MyTicket>? _tickets;
 
@@ -200,7 +210,7 @@ class MockTicketApi implements TicketApi {
     String? posterImageUrl,
     TicketStatus status = TicketStatus.minted,
   }) {
-    final now = DateTime.now();
+    final now = clock();
     return MyTicket(
       reservationId: reservationId,
       concertId: concertId,

@@ -9,7 +9,11 @@ import 'features/auth/data/token_storage.dart';
 import 'features/auth/state/auth_api_scope.dart';
 import 'features/auth/state/auth_session.dart';
 import 'features/auth/state/auth_session_scope.dart';
+import 'features/booking/data/booking_api.dart';
+import 'features/booking/data/http_booking_api.dart';
+import 'features/booking/data/mock_booking_api.dart';
 import 'features/booking/data/mock_booking_data.dart';
+import 'features/booking/state/booking_api_scope.dart';
 import 'features/booking/state/booking_controller.dart';
 import 'features/booking/state/booking_scope.dart';
 import 'features/home/data/home_api.dart';
@@ -32,6 +36,7 @@ class App extends StatefulWidget {
     this.homeApi,
     this.myPageApi,
     this.ticketApi,
+    this.bookingApi,
   });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
@@ -51,6 +56,9 @@ class App extends StatefulWidget {
   /// 내 티켓 화면이 쓰는 API. 안 넘기면 [_ticketApiKind] 가 고른다.
   final TicketApi? ticketApi;
 
+  /// 예매(구역·좌석·선점) API. 안 넘기면 [_bookingApiKind] 가 고른다.
+  final BookingApi? bookingApi;
+
   @override
   State<App> createState() => _AppState();
 }
@@ -68,6 +76,18 @@ class App extends StatefulWidget {
 /// 없으면 화면이 시안대로 나오는지 눈으로 볼 방법이 코드를 고쳤다 되돌리는
 /// 것뿐이다. 티켓 도메인 v1 이 붙어 서버로 다 확인되면 지운다.
 const _ticketApiKind = String.fromEnvironment('TICKET_API');
+
+/// 예매 화면이 어느 [BookingApi] 를 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run --dart-define=BOOKING_API=mock    # 고정 배치도로. 백엔드 불필요
+/// flutter run                                    # 기본값. 실제 서버(v1)
+/// ```
+///
+/// 티켓과 같은 이유로 둔다. 서버 로컬 시드가 좌석 상태를 넣지 않아 배치도가
+/// 전부 예매 가능으로 오기 때문에, 회색 자리와 선점중 자리가 어떻게 보이는지는
+/// 목으로만 확인할 수 있다. 시드가 좌석 상태를 채우게 되면 지운다.
+const _bookingApiKind = String.fromEnvironment('BOOKING_API');
 
 /// 실행 인자에 맞는 구현. 모르는 값이면 실제 서버로 간다.
 TicketApi _ticketApiFor(String kind) => switch (kind) {
@@ -120,9 +140,13 @@ class _AppState extends State<App> {
   /// 실제 앱이라면 '예매 시작' 시점에 만들고 완료·이탈 시 버리는 게 맞다.
   late final _bookingController = BookingController(
     performance: MockBookingData.performance,
-    zones: MockBookingData.zones,
-    seatRowsByZone: MockBookingData.seatRowsByZone,
   );
+
+  /// 예매 화면이 쓰는 구역·좌석 API. 위 넷과 같은 이유로 앱에 하나만 두고
+  /// [BookingApiScope] 로 내려준다.
+  late final BookingApi _bookingApi =
+      widget.bookingApi ??
+      (_bookingApiKind == 'mock' ? MockBookingApi() : HttpBookingApi());
 
   @override
   void initState() {
@@ -153,15 +177,18 @@ class _AppState extends State<App> {
             api: _myPageApi,
             child: TicketApiScope(
               api: _ticketApi,
-              child: BookingScope(
-                controller: _bookingController,
-                child: MaterialApp(
-                  title: 'TIMO',
-                  theme: AppTheme.light,
-                  // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                  // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                  initialRoute: AppRoutes.home,
-                  routes: AppRoutes.routes,
+              child: BookingApiScope(
+                api: _bookingApi,
+                child: BookingScope(
+                  controller: _bookingController,
+                  child: MaterialApp(
+                    title: 'TIMO',
+                    theme: AppTheme.light,
+                    // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                    // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                    initialRoute: AppRoutes.home,
+                    routes: AppRoutes.routes,
+                  ),
                 ),
               ),
             ),

@@ -7,8 +7,10 @@ import '../features/auth/screens/signup_nickname_screen.dart';
 import '../features/auth/screens/signup_password_screen.dart';
 import '../features/auth/screens/signup_phone_screen.dart';
 import '../features/auth/screens/signup_username_screen.dart';
+import '../features/booking/constants.dart';
 import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
+import '../features/booking/state/booking_scope.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/home/screens/show_search_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
@@ -69,10 +71,12 @@ class AppRoutes {
     // 목록에서는 공연 id 만 넘어온다. 상세 조회를 여기서 해 두면 화면은
     // 모델만 받아 그리므로 상태별로 단독 실행할 수 있다. 모르는 id 로
     // 열리면(딥링크) 표본 공연으로 대체한다.
+    //
+    // 같은 인자를 숫자로도 넘긴다. 상세 본문은 아직 목업이지만 예매 흐름은
+    // 서버에 붙어 있어, 좌석을 물을 때 쓸 진짜 공연 번호가 필요하다.
     showDetail: (context) => ShowDetailScreen(
-      detail: MockShowDetailData.byId(
-        ModalRoute.of(context)!.settings.arguments as String?,
-      ),
+      detail: MockShowDetailData.byId(_showIdArg(context)),
+      concertId: int.tryParse(_showIdArg(context) ?? ''),
     ),
     showSearch: (_) => const ShowSearchScreen(),
     myTickets: (_) => const MyTicketsScreen(),
@@ -81,16 +85,29 @@ class AppRoutes {
     entryQr: (context) => EntryQrScreen(
       ticket: ModalRoute.of(context)!.settings.arguments! as MyTicket,
     ),
-    zoneSelection: (_) => const ZoneSelectionScreen(),
+    // 예매 흐름 밖에서 열리면(딥링크·화면 단위 테스트) 공연 번호가 없다.
+    // 그때만 기본 공연으로 대신한다.
+    zoneSelection: (context) => ZoneSelectionScreen(
+      concertId:
+          ModalRoute.of(context)!.settings.arguments as int? ??
+          BookingConstants.fallbackConcertId,
+    ),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.
     seatSelection: (context) => SeatSelectionScreen(
-      zoneId: ModalRoute.of(context)!.settings.arguments as String,
+      zoneId: ModalRoute.of(context)!.settings.arguments! as int,
     ),
     // 고른 좌석으로 주문을 만들어 넘긴다. 이 연결이 없으면 어떤 좌석을 골라도
     // 결제 화면에 더미 좌석(A구역 9열 6번)이 찍힌다. 예매 흐름을 거치지 않고
     // 열린 경우는 ticketOrderOrSample 이 더미로 대체한다.
-    payment: (context) => PaymentScreen(order: ticketOrderOrSample(context)),
+    payment: (context) => PaymentScreen(
+      order: ticketOrderOrSample(context),
+      // 잡아 둔 자리가 풀리기까지 남은 시간. 예매 흐름 밖에서 열렸으면 잡아 둔
+      // 자리가 없어 null 이고, 화면이 규약값(5분)으로 센다.
+      holdRemaining: BookingScope.maybeRead(
+        context,
+      )?.hold?.remainingFrom(DateTime.now()),
+    ),
     paymentComplete: (context) =>
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
     login: (_) => const LoginScreen(),
@@ -103,6 +120,10 @@ class AppRoutes {
         SignupNicknameScreen(draft: _signupDraft(context)),
     signupComplete: (_) => const SignupCompleteScreen(),
   };
+
+  /// 공연 상세가 받는 라우트 인자. 서버가 준 공연 id 를 문자열로 넘긴다.
+  static String? _showIdArg(BuildContext context) =>
+      ModalRoute.of(context)!.settings.arguments as String?;
 
   /// 회원가입 단계 화면이 받는 초안. 초안 없이 열리면(화면 단위 테스트,
   /// 딥링크) 빈 초안으로 시작해 화면이 죽지 않게 한다.

@@ -28,7 +28,13 @@ import '../widgets/upcoming_ticket_card.dart';
 ///
 /// 시안에는 `양도 목록` 탭이 하나 더 있었다. 뺀 이유는 [TicketTabBar] 주석 참고.
 class MyTicketsScreen extends StatefulWidget {
-  const MyTicketsScreen({super.key});
+  const MyTicketsScreen({super.key, this.clock = DateTime.now});
+
+  /// 지금 시각을 읽는 함수. D-day 와 QR 창 판정이 이 값을 본다.
+  ///
+  /// 테스트에서 시각을 고정하려고 받는다(공연 상세 화면과 같은 방식이다).
+  /// 목 데이터도 같은 시각을 받아야 배지가 흔들리지 않는다.
+  final DateTime Function() clock;
 
   @override
   State<MyTicketsScreen> createState() => _MyTicketsScreenState();
@@ -54,7 +60,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   @override
   void initState() {
     super.initState();
-    _now = DateTime.now();
+    _now = widget.clock();
     _data = _load();
   }
 
@@ -75,7 +81,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
 
   void _reload() {
     setState(() {
-      _now = DateTime.now();
+      _now = widget.clock();
       _data = _load();
     });
   }

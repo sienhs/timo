@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/booking/data/mock_booking_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 
@@ -17,6 +21,35 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  /// 예매 흐름을 띄운다.
+  ///
+  /// 로그인 상태로 시작한다. 예매 진입(상세의 '예매하러 가기')이 로그인을
+  /// 요구해서, 로그아웃 상태로 두면 좌석 화면 대신 로그인 화면이 열린다.
+  Future<void> pumpApp(WidgetTester tester) async {
+    usePhoneSize(tester);
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    await session.signIn(
+      const AuthTokens(
+        memberId: 1,
+        accessToken: 'test-access-token',
+        refreshToken: 'test-refresh-token',
+        accessTokenExpiresIn: Duration(minutes: 30),
+      ),
+    );
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      App(
+        session: session,
+        homeApi: const MockHomeApi(latency: Duration.zero),
+        // 예매 화면은 서버에서 구역·좌석을 받아 온다. 테스트에서는 고정
+        // 배치도를 주는 목을 꽂아야 배치도가 그려진다.
+        bookingApi: MockBookingApi(latency: Duration.zero),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   /// 홈에서 예매 흐름으로 들어간다.
   ///
   /// 홈 -> 공연 상세 -> 좌석 선택 순이다. 예매 진입은 상세가 맡으므로 홈에서
@@ -30,11 +63,7 @@ void main() {
   }
 
   testWidgets('폰 크기에서 예매 흐름 화면이 오버플로 없이 그려진다', (tester) async {
-    usePhoneSize(tester);
-    await tester.pumpWidget(
-      const App(homeApi: MockHomeApi(latency: Duration.zero)),
-    );
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
     await enterBookingFromHome(tester);
@@ -50,7 +79,7 @@ void main() {
     // 좌석가격보기 패널: 요구사항상 모든 구역이 동일 금액
     await tester.tap(find.text('좌석가격보기'));
     await tester.pumpAndSettle();
-    expect(find.text('186,000원'), findsNWidgets(3));
+    expect(find.text('186,000원'), findsNWidgets(5));
 
     // 패널을 닫고 구역 상세로 진입
     await tester.tap(find.text('좌석가격보기'));
@@ -69,11 +98,7 @@ void main() {
   });
 
   testWidgets('매진 구역을 누르면 안내만 뜨고 진입하지 않는다', (tester) async {
-    usePhoneSize(tester);
-    await tester.pumpWidget(
-      const App(homeApi: MockHomeApi(latency: Duration.zero)),
-    );
-    await tester.pumpAndSettle();
+    await pumpApp(tester);
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
     await enterBookingFromHome(tester);

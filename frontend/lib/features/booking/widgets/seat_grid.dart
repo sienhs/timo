@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../models/seat.dart';
-import '../models/zone.dart';
 import 'seat_colors.dart';
 
 /// 좌석 한 칸의 한 변. 권장 터치 타겟(44pt) 기준이다.
@@ -38,18 +37,24 @@ const _canvasPadding = EdgeInsets.fromLTRB(12, 8, 12, 8);
 class SeatGrid extends StatefulWidget {
   const SeatGrid({
     super.key,
-    required this.zone,
+    required this.seatsPerRow,
     required this.seatRows,
     required this.selectedSeatId,
     required this.onSeatTap,
   });
 
-  final Zone zone;
-  final List<List<Seat>> seatRows;
+  /// 한 열에 들어가는 칸 수. 캔버스 폭을 정한다.
+  ///
+  /// 자리 목록에서 세지 않는 이유: 통로로 끝자리가 비면 줄마다 길이가 달라져
+  /// 캔버스가 들쭉날쭉해진다. 격자 크기는 서버가 알려 준 값을 쓴다.
+  final int seatsPerRow;
+
+  /// 열 → 자리. 자리가 없는 칸(통로)은 null 이다.
+  final List<List<Seat?>> seatRows;
 
   /// 선택된 좌석 id 만 내려받는다. 좌석 칸마다 컨트롤러를 구독하면
   /// InheritedWidget 의존 위젯이 수백 개가 되어 알림 비용이 커진다.
-  final String? selectedSeatId;
+  final int? selectedSeatId;
 
   final void Function(Seat seat) onSeatTap;
 
@@ -72,10 +77,10 @@ class _SeatGridState extends State<SeatGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final zone = widget.zone;
-    final canvasWidth = _canvasPadding.horizontal +
+    final canvasWidth =
+        _canvasPadding.horizontal +
         _labelWidth +
-        zone.seatsPerRow * (_cellSize + _cellGap);
+        widget.seatsPerRow * (_cellSize + _cellGap);
 
     // 프레임으로 감싸는 이유: 44px 셀이면 18석이 폰 폭에 절대 안 들어가고,
     // 화면 끝에서 셀이 반쯤 잘린다. 테두리 없이 두면 스크롤 가능한 영역이
@@ -134,7 +139,11 @@ class _SeatGridState extends State<SeatGrid> {
               left: 0,
               child: _PinnedRowLabels(
                 transform: _transform,
-                rowNumbers: [for (final row in widget.seatRows) row.first.row],
+                // 열 번호는 자리에서 읽지 않고 순서로 센다. 통로로 한 열이
+                // 통째로 비면 그 줄에는 읽을 좌석이 없다.
+                rowNumbers: [
+                  for (var i = 0; i < widget.seatRows.length; i++) i + 1,
+                ],
               ),
             ),
             // 오른쪽·아래에 옅은 페이드를 깔아 '더 있다'를 알린다.
@@ -222,8 +231,8 @@ class _SeatRow extends StatelessWidget {
     required this.onSeatTap,
   });
 
-  final List<Seat> row;
-  final String? selectedSeatId;
+  final List<Seat?> row;
+  final int? selectedSeatId;
   final void Function(Seat seat) onSeatTap;
 
   @override
@@ -237,13 +246,17 @@ class _SeatRow extends StatelessWidget {
           for (final seat in row)
             Padding(
               padding: const EdgeInsets.only(right: _cellGap),
-              child: _SeatCell(
-                // 'A-9-6'. 좌석을 지목해 탭하는 테스트에 쓴다.
-                key: ValueKey(seat.id),
-                seat: seat,
-                state: seatCellStateOf(seat, selectedSeatId),
-                onTap: onSeatTap,
-              ),
+              // 자리가 없는 칸(통로)은 같은 크기로 비워 둔다. 건너뛰고 붙이면
+              // 그 뒤의 자리가 한 칸씩 밀려 배치도가 실제와 달라진다.
+              child: seat == null
+                  ? const SizedBox.square(dimension: _cellSize)
+                  : _SeatCell(
+                      // 서버 좌석 번호. 좌석을 지목해 탭하는 테스트에 쓴다.
+                      key: ValueKey(seat.id),
+                      seat: seat,
+                      state: seatCellStateOf(seat, selectedSeatId),
+                      onTap: onSeatTap,
+                    ),
             ),
         ],
       ),
@@ -267,8 +280,8 @@ class _SeatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = seatCellColors(state);
 
-    // 예매 완료 좌석도 탭은 받는다. 아무 일도 일어나지 않으면 사용자는
-    // 왜 안 되는지 알 수 없다. 사유 안내는 화면(onTap)이 맡는다.
+    // 고를 수 없는 좌석도 탭은 받는다. 여기서 거르지 않고 화면(onTap)이
+    // 판단하게 두는 것은, 자리마다 무엇을 할지가 화면의 사정이기 때문이다.
     return GestureDetector(
       onTap: () => onTap(seat),
       behavior: HitTestBehavior.opaque,
@@ -306,10 +319,7 @@ class _EdgeFade extends StatelessWidget {
           gradient: LinearGradient(
             begin: horizontal ? Alignment.centerRight : Alignment.bottomCenter,
             end: horizontal ? Alignment.centerLeft : Alignment.topCenter,
-            colors: [
-              AppColors.surface,
-              AppColors.surface.withValues(alpha: 0),
-            ],
+            colors: [AppColors.surface, AppColors.surface.withValues(alpha: 0)],
           ),
         ),
       ),

@@ -26,8 +26,9 @@ TicketOrder ticketOrderOrSample(BuildContext context) {
 
 /// 고른 좌석이 없으면 null 을 돌려준다.
 TicketOrder? ticketOrderOf(BookingController controller) {
-  final seat = controller.selectedSeat;
-  if (seat == null) return null;
+  final seatLabel = controller.selectedSeatLabel;
+  final zone = controller.selectedZone;
+  if (seatLabel == null || zone == null) return null;
 
   final performance = controller.performance;
 
@@ -35,10 +36,10 @@ TicketOrder? ticketOrderOf(BookingController controller) {
     concertTitle: performance.title,
     performedAt: performance.startAt,
     venue: performance.venue,
-    seat: seat.label,
+    seat: seatLabel,
     bookerName: MockBookingData.bookerName,
     posterAsset: performance.posterAsset,
-    ticketPrice: controller.zoneById(seat.zoneId).price,
+    ticketPrice: zone.price,
     bookingFee: performance.bookingFee,
   );
 }
