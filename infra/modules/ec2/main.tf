@@ -248,3 +248,143 @@ resource "aws_ssm_association" "backend_bootstrap" {
     commands = aws_instance.this.user_data
   }
 }
+
+# RDS does not accept a schema file as part of aws_db_instance creation. Run
+# the versioned SQL from the private application instance instead, after the
+# instance can read the existing DB secret. This avoids exposing DB credentials
+# in Terraform state or opening MySQL to the CI runner.
+resource "aws_ssm_document" "rds_schema_bootstrap" {
+  name            = "${var.name}-rds-schema-bootstrap"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Initialise the Timo RDS schema and load test members"
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "initialiseRds"
+      inputs = {
+        timeoutSeconds = "1800"
+        runCommand = [<<-SCRIPT
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          dnf install -y mariadb105
+
+          secret_file=$(mktemp)
+          env_file=$(mktemp)
+          sql_file=$(mktemp)
+          drop_file=$(mktemp)
+          trap 'rm -f "$secret_file" "$env_file" "$sql_file" "$drop_file"' EXIT
+
+          aws secretsmanager get-secret-value \
+            --region ${var.aws_region} \
+            --secret-id '${var.backend_secret_arn}' \
+            --query SecretString \
+            --output text >"$secret_file"
+
+          SECRET_FILE="$secret_file" python3 - <<'PY' >"$env_file"
+          import json
+          import os
+          import shlex
+          import sys
+
+          values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
+          for key in ("DB_USERNAME", "DB_PASSWORD"):
+              value = values.get(key)
+              if not isinstance(value, str) or not value or "\n" in value or "\r" in value:
+                  sys.exit(f"Invalid or missing secret value: {key}")
+              print(f"{key}={shlex.quote(value)}")
+          PY
+
+          set -a
+          source "$env_file"
+          set +a
+          printf '%s' '${var.db_init_sql_base64}' | base64 --decode >"$sql_file"
+
+          mysql_cmd=(
+            mysql
+            --protocol=TCP
+            --connect-timeout=5
+            --host='${var.db_endpoint}'
+            --port='${var.db_port}'
+            --user="$DB_USERNAME"
+            --database='${var.db_name}'
+          )
+
+          for attempt in $(seq 1 60); do
+            if existing_tables=$(MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names \
+              --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"); then
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ -z "$${existing_tables:-}" ]]; then
+            echo 'RDS did not accept connections within 10 minutes.' >&2
+            exit 1
+          fi
+
+          if [[ "$existing_tables" != "0" ]]; then
+            echo "Resetting database: removing $existing_tables existing tables."
+            MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names --batch \
+              --execute="
+                SELECT CONCAT(
+                  'DROP TABLE IF EXISTS ',
+                  CHAR(96),
+                  REPLACE(table_name, CHAR(96), CONCAT(CHAR(96), CHAR(96))),
+                  CHAR(96),
+                  ';'
+                )
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+              " >"$drop_file"
+
+            {
+              echo 'SET FOREIGN_KEY_CHECKS = 0;'
+              cat "$drop_file"
+              echo 'SET FOREIGN_KEY_CHECKS = 1;'
+            } | MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}"
+          fi
+
+          MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" <"$sql_file"
+
+          member_count=$(MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names \
+            --execute="SELECT COUNT(*) FROM member")
+          [[ "$member_count" == "100000" ]] || {
+            echo "Expected 100000 load-test members, found $member_count." >&2
+            exit 1
+          }
+          exit 0
+
+          SCRIPT
+        ]
+      }
+    }]
+  })
+}
+
+# The association has no schedule and normally runs only when it is created.
+# Make the SQL content an explicit replacement trigger so a changed init file
+# always produces a fresh association execution and a reproducible test DB.
+resource "terraform_data" "rds_schema_revision" {
+  triggers_replace = [sha256(var.db_init_sql_base64)]
+}
+
+resource "aws_ssm_association" "rds_schema_bootstrap" {
+  name             = aws_ssm_document.rds_schema_bootstrap.name
+  association_name = "${var.name}-rds-schema-bootstrap"
+  document_version = "$LATEST"
+
+  targets {
+    key    = "InstanceIds"
+    values = [aws_instance.this.id]
+  }
+
+  wait_for_success_timeout_seconds = 1800
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.rds_schema_revision]
+  }
+}

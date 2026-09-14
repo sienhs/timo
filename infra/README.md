@@ -40,6 +40,19 @@ terraform '-chdir=infra' apply 'changes.tfplan'
 `moved.tf`는 기존 리소스 주소를 새 모듈 주소로 이전합니다. 기존 환경의 업그레이드를
 위해 유지하며, 모듈 정리만으로 버킷·키·인증서가 재생성되어서는 안 됩니다.
 
+## RDS 초기 스키마·부하 테스트 데이터
+
+`terraform apply`는 RDS와 애플리케이션 EC2가 준비된 뒤 SSM 명령으로
+`infra/bootstrap/rds-load-test-init.sql`을 실행합니다. 이 파일은 현재 JPA
+엔티티 스키마, 좌석 선점용 공연장·구역·좌석 1,000건, 부하 테스트용 회원 100,000건을 만듭니다.
+SQL 파일의 내용이 바뀌면 Terraform이 SSM association을 교체하므로, 다음 `terraform apply`에서
+반드시 RDS 초기화가 다시 실행됩니다. SQL이 바뀌지 않은 apply는 초기화를 재실행하지 않습니다.
+
+초기화 명령은 대상 DB에 기존 테이블이 있으면 먼저 모든 테이블을 제거한 뒤 SQL을 실행합니다.
+따라서 이 구성은 부하 테스트 전용 RDS에만 사용해야 하며, 운영 데이터가 있는 RDS에는 적용하면 안
+됩니다. 실행 후 회원 수가 정확히 100,000명인지 확인합니다. 운영 백엔드는 `ddl-auto: validate`로
+실행되어 스키마를 변경하지 않습니다.
+
 EC2·NAT·모니터링 인스턴스는 최신 AL2023 AMI SSM 파라미터를 최초 생성 시에만 사용합니다.
 이후 AMI 갱신은 Terraform apply만으로 인스턴스를 교체하지 않습니다. AMI 업그레이드는 별도
 점검·교체 계획으로 수행합니다.
