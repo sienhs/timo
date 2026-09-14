@@ -155,10 +155,10 @@ public final class StubFixtures {
      */
     public static SeatStatus initialStatus(int index) {
         if (index % 9 == 0) {
-            return SeatStatus.OCCUPIED;
+            return SeatStatus.SOLD;
         }
         if (index % 13 == 0) {
-            return SeatStatus.RESERVED;
+            return SeatStatus.HELD;
         }
         return SeatStatus.AVAILABLE;
     }

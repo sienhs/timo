@@ -1,10 +1,7 @@
 package com.ssafy.timo.domain.seat.repository;
 
 import com.ssafy.timo.domain.seat.entity.Seat;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,58 +9,61 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
+/**
+ * 좌석 조회.
+ *
+ * <p>좌석 상태를 묻는 메서드는 <b>전부 공연 id 를 받는다.</b> 좌석은 공연장 마스터 데이터라 공연을
+ * 빼고는 상태가 정해지지 않기 때문이다. 공연을 안 받는 메서드는 위치·개수처럼 공연과 무관한 것뿐이다.
+ *
+ * <p>{@code SELECT ... FOR UPDATE} 는 두지 않는다. 좌석 행은 모든 공연이 공유하므로 거기 잠금을 걸면
+ * 서로 다른 공연의 선점 요청이 같은 행 앞에 줄을 선다. 동시성 판정은 {@code seat_hold} ·
+ * {@code reservation} 의 유니크 제약이 맡는다.
+ */
 @Repository
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 
     long countBySectionId(Long sectionId);
 
-    /**
-     * 한 구역의 좌석을 배치도 순서(행 -> 자리)로 읽는다.
-     *
-     * <p>구역은 이미 조회한 상태에서 부르므로 fetch join 하지 않는다. 좌석마다 구역을 다시 읽으면
-     * 그게 N+1 이다.
-     */
+    /** 한 구역의 좌석을 배치도 순서로 읽는다. 상태는 보지 않으므로 공연과 무관하다. */
     List<Seat> findAllBySectionIdOrderBySeatNoAscSeatColAsc(Long sectionId);
 
     /**
-     * 선점하려는 좌석을 행 잠금과 함께 읽는다.
+     * 한 구역의 좌석을, <b>이 공연에서 본 상태와 함께</b> 배치도 순서로 읽는다.
      *
-     * <p>{@code SELECT ... FOR UPDATE} 다. 잠그지 않고 "예매 가능인지 확인 -> 선점" 순서로 처리하면,
-     * 두 요청이 같은 좌석을 동시에 확인하고 둘 다 선점에 성공한다. 확인과 선점이 한 잠금 안에서
-     * 일어나야 "동일 좌석에 대한 동시 선점은 성립하지 않는다"가 지켜진다.
+     * <p>선점과 주문을 각각 LEFT JOIN 한다. 조인 조건에 {@code concert_id} 가 들어 있으므로 다른 공연의
+     * 선점·주문은 아예 붙지 않는다 — 9/20 공연에서 팔린 자리가 9/21 좌석표에 팔린 것으로 보이던
+     * 문제가 여기서 끊긴다.
      *
-     * <p>잠금은 트랜잭션이 끝날 때 풀리므로 이 메서드는 반드시 트랜잭션 안에서 부른다.
-     */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select s from Seat s where s.id = :id")
-    Optional<Seat> findByIdForUpdate(@Param("id") Long id);
-
-    /**
-     * 이 회원이 지금 붙잡고 있는 좌석들. 만료된 선점은 제외한다.
-     *
-     * <p>"한 계정은 동시에 하나의 좌석만 선점한다"를 지키려고 이전 선점을 찾는 데 쓴다. 규칙상
-     * 최대 한 건이지만, 과거에 어긋난 데이터가 남아 있어도 함께 풀 수 있도록 목록으로 받는다.
+     * <p>선점 쪽 조인에 {@code expiresAt > :now} 를 건다. 만료된 선점은 아직 {@code HELD} 로 남아
+     * 있어도 자리를 붙들지 않으므로 좌석표에서는 빈 자리로 보여야 한다.
      */
     @Query("""
-            select s
+            select new com.ssafy.timo.domain.seat.repository.SeatWithStatus(
+                       s.id, s.seatNo, s.seatCol, h.id, r.id)
             from Seat s
-            where s.heldByMemberId = :memberId
-              and s.status = com.ssafy.timo.domain.seat.entity.SeatStatus.RESERVED
-              and s.heldUntil > :now
-              and s.id <> :excludedSeatId
+            left join SeatHold h
+                   on h.seat = s
+                  and h.concert.id = :concertId
+                  and h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.HELD
+                  and h.expiresAt > :now
+            left join Reservation r
+                   on r.seat = s
+                  and r.concert.id = :concertId
+                  and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID
+            where s.section.id = :sectionId
+            order by s.seatNo asc, s.seatCol asc
             """)
-    List<Seat> findActiveHoldsOfMember(@Param("memberId") Long memberId,
-                                       @Param("now") LocalDateTime now,
-                                       @Param("excludedSeatId") Long excludedSeatId);
+    List<SeatWithStatus> findSeatsWithStatus(@Param("concertId") Long concertId,
+                                             @Param("sectionId") Long sectionId,
+                                             @Param("now") LocalDateTime now);
 
     /**
-     * 여러 구역의 예매 가능 좌석 수를 한 번에 센다.
+     * 여러 구역의 예매 가능 좌석 수를 이 공연 기준으로 한 번에 센다.
      *
-     * <p>{@code status} 가 예매 가능인 좌석에, <b>선점이 만료된 좌석</b>을 더해서 센다. 만료된 선점을
-     * 정리하는 작업을 두지 않았으므로 {@code status} 만 보면 이미 풀린 자리를 팔 수 없는 것으로
-     * 잘못 센다.
+     * <p>조인 대신 {@code not exists} 를 쓴다. 조인으로 세면 한 좌석에 선점·주문 행이 여럿 붙었을 때
+     * 좌석이 중복으로 세어질 수 있다. 유니크 제약상 그럴 일이 없어야 하지만, 집계가 제약의 정확성에
+     * 기대지 않는 편이 안전하다.
      *
      * <p>예매 가능 좌석이 하나도 없는 구역은 결과에 포함되지 않는다. 읽는 쪽에서 0 으로 채운다 —
      * 빠뜨리면 매진 구역이 목록에서 사라진다.
@@ -73,15 +73,45 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
                        s.section.id, count(s))
             from Seat s
             where s.section.id in :sectionIds
-              and (s.status = com.ssafy.timo.domain.seat.entity.SeatStatus.AVAILABLE
-                   or (s.status = com.ssafy.timo.domain.seat.entity.SeatStatus.RESERVED
-                       and s.heldUntil <= :now))
+              and not exists (
+                    select 1 from SeatHold h
+                    where h.seat = s
+                      and h.concert.id = :concertId
+                      and h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.HELD
+                      and h.expiresAt > :now)
+              and not exists (
+                    select 1 from Reservation r
+                    where r.seat = s
+                      and r.concert.id = :concertId
+                      and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID)
             group by s.section.id
             """)
     List<SectionAvailableCount> countAvailableGroupedBySection(
+            @Param("concertId") Long concertId,
             @Param("sectionIds") Collection<Long> sectionIds,
             @Param("now") LocalDateTime now);
 
-    /** 상태만으로 세는 집계. 선점 만료를 따지지 않으므로 테스트·점검용으로만 쓴다. */
-    long countBySectionIdAndStatus(Long sectionId, SeatStatus status);
+    /**
+     * 이 공연의 남은 좌석 수. 공연이 열리는 공연장의 전체 좌석에서 선점·판매분을 뺀다.
+     *
+     * <p>공연장을 파라미터로 받지 않고 공연에서 찾아 들어간다. 호출하는 쪽이 공연장을 따로 조회해
+     * 넘기게 하면, 공연과 다른 공연장을 넘기는 실수가 조용히 통과한다.
+     */
+    @Query("""
+            select count(s)
+            from Seat s
+            where s.section.venue.id = (select c.venue.id from Concert c where c.id = :concertId)
+              and not exists (
+                    select 1 from SeatHold h
+                    where h.seat = s
+                      and h.concert.id = :concertId
+                      and h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.HELD
+                      and h.expiresAt > :now)
+              and not exists (
+                    select 1 from Reservation r
+                    where r.seat = s
+                      and r.concert.id = :concertId
+                      and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID)
+            """)
+    long countAvailable(@Param("concertId") Long concertId, @Param("now") LocalDateTime now);
 }

@@ -4,7 +4,6 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
-import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import lombok.RequiredArgsConstructor;
@@ -35,27 +34,18 @@ public class SeatController implements SeatApi {
     private final SeatService seatService;
 
     @Override
-    public ResponseEntity<SectionSeatListResponseDto> findSeats(Long sectionId) {
-        return ResponseEntity.ok(seatService.findSeats(sectionId));
+    public ResponseEntity<SectionSeatListResponseDto> findSeats(Long concertId, Long sectionId) {
+        return ResponseEntity.ok(seatService.findSeats(concertId, sectionId));
     }
 
     @Override
-    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId) {
-        return ResponseEntity.ok(seatService.hold(seatId));
-    }
-    @Override
-    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId) {
-        return ResponseEntity.ok(seatService.cancelHold(seatId));
+    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId) {
+        return ResponseEntity.ok(seatService.hold(concertId, seatId));
     }
 
     @Override
-    public ResponseEntity<SeatOccupancyResponseDto> occupy(Long seatId) {
-        return ResponseEntity.ok(seatService.occupy(seatId));
-    }
-
-    @Override
-    public ResponseEntity<SeatOccupancyResponseDto> releaseOccupancy(Long seatId) {
-        return ResponseEntity.ok(seatService.releaseOccupancy(seatId));
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId) {
+        return ResponseEntity.ok(seatService.cancelHold(concertId, seatId));
     }
 
     @Override

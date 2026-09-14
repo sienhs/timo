@@ -18,10 +18,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface SectionApi {
 
     /**
-     * 공연장의 구역을 잔여석과 함께 조회한다. 구역 선택 화면이 쓴다.
+     * 한 공연의 구역을 잔여석과 함께 조회한다. 구역 선택 화면이 쓴다.
      *
-     * <p>개별 좌석은 담기지 않는다. 구역을 고른 뒤 {@link SeatApi#findSeats(Long)} 로 받는다.
+     * <p>공연장이 아니라 <b>공연</b>을 받는다. 구역 자체는 공연장 것이지만 잔여석은 공연마다 다르다 —
+     * 같은 공연장에서 두 공연이 열리면 같은 구역의 남은 자리 수가 각각이다.
+     *
+     * <p>개별 좌석은 담기지 않는다. 구역을 고른 뒤 {@link SeatApi#findSeats(Long, Long)} 로 받는다.
      */
     @GetMapping
-    ResponseEntity<SectionListResponseDto> findSections(@RequestParam Long venueId);
+    ResponseEntity<SectionListResponseDto> findSections(@RequestParam Long concertId);
 }

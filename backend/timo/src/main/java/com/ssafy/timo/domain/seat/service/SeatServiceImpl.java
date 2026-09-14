@@ -1,34 +1,38 @@
 package com.ssafy.timo.domain.seat.service;
 
+import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
+import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
-import com.ssafy.timo.domain.seat.dto.SeatOccupancyResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.entity.Seat;
+import com.ssafy.timo.domain.seat.entity.SeatHold;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
+import com.ssafy.timo.domain.seat.exception.SeatHoldNotOwnedException;
+import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
+import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
 import com.ssafy.timo.domain.seat.exception.SeatPositionOutOfBoundsException;
 import com.ssafy.timo.domain.seat.exception.SectionNameDuplicatedException;
-import com.ssafy.timo.domain.seat.exception.SeatHoldNotOwnedException;
-import com.ssafy.timo.domain.seat.exception.SeatNotHeldException;
-import com.ssafy.timo.domain.seat.exception.SeatNotHoldableException;
-import com.ssafy.timo.domain.seat.exception.SeatNotFoundException;
-import com.ssafy.timo.domain.seat.exception.SeatNotOccupiedException;
-import com.ssafy.timo.domain.seat.exception.SeatOccupancyNotOwnedException;
 import com.ssafy.timo.domain.seat.exception.SectionNotFoundException;
-import com.ssafy.timo.domain.seat.repository.SectionAvailableCount;
+import com.ssafy.timo.domain.seat.repository.SeatHoldRepository;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
+import com.ssafy.timo.domain.seat.repository.SeatWithStatus;
+import com.ssafy.timo.domain.seat.repository.SectionAvailableCount;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.global.security.CurrentMemberProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +43,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,18 +57,16 @@ public class SeatServiceImpl implements SeatService {
 
     private final SectionRepository sectionRepository;
     private final SeatRepository seatRepository;
+    private final SeatHoldRepository seatHoldRepository;
+    private final ReservationRepository reservationRepository;
     private final VenueRepository venueRepository;
+    private final ConcertRepository concertRepository;
+    private final MemberRepository memberRepository;
     private final CurrentMemberProvider currentMemberProvider;
     private final Clock clock;
 
-    /**
-     * 공연장의 구역과 좌석을 등록한다.
-     *
-     * <p>한 트랜잭션이므로 구역 하나라도 실패하면 앞서 만들어진 좌석까지 함께 롤백된다.
-     */
     @Override
     public CommandSeatResponseDto register(CommandSeatRequestDto request) {
-        // 응답에 공연장 이름을 실어야 해서 참조만 만드는 대신 실제로 조회한다.
         Venue venue = venueRepository.findById(request.venueId())
                 .orElseThrow(() -> new VenueNotFoundException(request.venueId()));
 
@@ -78,212 +81,191 @@ public class SeatServiceImpl implements SeatService {
     }
 
     /**
-     * 공연장의 구역 목록을 잔여석과 함께 돌려준다.
+     * 이 공연 기준의 구역 목록과 잔여석.
      *
-     * <p>개별 좌석은 읽지 않는다. 구역 선택 화면에 필요한 것은 구역당 남은 자리 수뿐이고,
-     * 공연장 전체 좌석을 읽으면 수만 건이 된다.
-     *
-     * <p>잔여석은 구역마다 세지 않고 group by 한 번으로 모아 온다. 구역 수만큼 count 쿼리를
-     * 날리면 그게 N+1 이다.
+     * <p>공연장이 아니라 공연을 받는다. 잔여석은 공연마다 다르기 때문이다 — 같은 공연장에서 두 공연이
+     * 열리면 구역의 남은 자리 수도 각각이다.
      */
     @Override
     @Transactional(readOnly = true)
-    public SectionListResponseDto findSections(Long venueId) {
-        Venue venue = venueRepository.findById(venueId)
-                .orElseThrow(() -> new VenueNotFoundException(venueId));
+    public SectionListResponseDto findSections(Long concertId) {
+        Concert concert = concertRepository.findByIdWithVenue(concertId)
+                .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        Venue venue = concert.getVenue();
 
-        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId);
+        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venue.getId());
         if (sections.isEmpty()) {
             // 좌석을 아직 등록하지 않은 공연장이다. 오류가 아니므로 빈 목록으로 답한다.
             return SectionListResponseDto.from(venue, sections, Map.of());
         }
 
         return SectionListResponseDto.from(
-                venue, sections, availableCountsOf(sections, LocalDateTime.now(clock)));
+                venue, sections, availableCountsOf(concertId, sections, LocalDateTime.now(clock)));
     }
 
     /**
-     * 구역 하나의 좌석을 배치도 순서로 돌려준다.
+     * 이 공연 기준의 구역 좌석 배치도.
      *
-     * <p>페이지로 나누지 않는다. 배치도는 좌석이 전부 있어야 그려진다. 대신 범위가 구역 하나라
-     * 응답 크기가 공연장 전체가 아니라 구역 크기로 묶인다.
+     * <p>좌석마다 선점·주문을 따로 묻지 않는다. 한 쿼리에서 LEFT JOIN 두 번으로 상태까지 받아 온다 —
+     * 구역 좌석이 수천 건이라 좌석당 조회를 돌면 그게 N+1 이다.
      */
     @Override
     @Transactional(readOnly = true)
-    public SectionSeatListResponseDto findSeats(Long sectionId) {
+    public SectionSeatListResponseDto findSeats(Long concertId, Long sectionId) {
+        Concert concert = concertRepository.findById(concertId)
+                .orElseThrow(() -> new ConcertNotFoundException(concertId));
         Section section = sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new SectionNotFoundException(sectionId));
+        verifySectionBelongsTo(concert, section);
 
         return SectionSeatListResponseDto.from(
                 section,
-                seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId),
-                LocalDateTime.now(clock));
+                seatRepository.findSeatsWithStatus(concertId, sectionId, LocalDateTime.now(clock)));
     }
 
     /**
      * 좌석을 선점한다.
      *
-     * <p>대상 좌석을 <b>행 잠금과 함께</b> 읽고, 그 잠금 안에서 선점 가능 여부를 확인하고 상태를
-     * 바꾼다. 확인과 변경이 한 잠금 안에 있어야 같은 좌석에 대한 동시 선점이 성립하지 않는다.
+     * <p>좌석 행을 잠그지 않는다. 좌석은 모든 공연이 공유하는 한 행이라 거기 잠금을 걸면 서로 다른
+     * 공연의 선점 요청이 같은 줄에 선다. 대신 {@code seat_hold} INSERT 를 시도하고,
+     * {@code uk_hold_seat} 에 걸리면 진 것으로 본다. 충돌은 <b>같은 공연의 같은 좌석</b>에서만 난다.
      *
-     * <p>만료된 선점은 그 자리에서 인수한다. 정리 작업을 따로 두지 않았으므로 만료 여부는 기준
-     * 시각으로 판단한다.
-     *
-     * <p>잠그는 순서는 <b>대상 좌석 -> 내가 잡고 있던 좌석</b>이다. 대상이 남의 선점이면 그 지점에서
-     * 바로 끝내므로 두 번째 잠금까지 가지 않고, 내가 잡고 있던 좌석은 나만 건드리는 행이라
-     * 두 요청이 서로를 기다리는 상황이 생기지 않는다.
+     * <p>넣기 전에 만료된 선점을 정리한다. 유니크 인덱스는 만료 여부를 모르고 {@code status='HELD'} 만
+     * 보므로, 정리하지 않으면 <b>이미 풀린 선점 때문에</b> 새 선점이 거절된다.
      */
     @Override
-    public SeatHoldResponseDto hold(Long seatId) {
+    public SeatHoldResponseDto hold(Long concertId, Long seatId) {
         Long memberId = currentMemberProvider.currentMemberId();
         LocalDateTime now = LocalDateTime.now(clock);
 
-        Seat seat = seatRepository.findByIdForUpdate(seatId)
+        Concert concert = concertRepository.findById(concertId)
+                .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new SeatNotFoundException(seatId));
+        verifySectionBelongsTo(concert, seat.getSection());
 
-        // 이미 내가 잡고 있는 좌석을 다시 누른 경우다. 만료 시각을 새로 미뤄 준다.
-        if (!seat.isHeldBy(memberId, now) && !seat.isHoldableAt(now)) {
+        seatHoldRepository.expireAllStale(now);
+
+        // 팔린 자리는 선점 유니크에 걸리지 않으므로 따로 막는다.
+        if (reservationRepository.existsPaidSeat(concertId, seatId)) {
             throw new SeatNotHoldableException(seatId);
         }
 
-        Long releasedSeatId = releasePreviousHold(memberId, now, seatId);
-        seat.hold(memberId, now.plus(HOLD_DURATION));
+        // 이미 내가 잡고 있는 자리를 다시 누른 경우다. 새로 넣으면 내 선점에 스스로 걸리므로 미뤄만 준다.
+        Optional<SeatHold> onSeat = seatHoldRepository.findActive(concertId, seatId, now);
+        if (onSeat.isPresent()) {
+            SeatHold existing = onSeat.get();
+            if (!existing.isOwnedBy(memberId)) {
+                throw new SeatNotHoldableException(seatId);
+            }
+            existing.extendTo(now.plus(HOLD_DURATION));
+            return SeatHoldResponseDto.from(seat, existing, null);
+        }
 
-        return SeatHoldResponseDto.from(seat, releasedSeatId);
+        Long releasedSeatId = releasePreviousHold(concertId, memberId, now);
+
+        SeatHold hold = SeatHold.builder()
+                .concert(concert)
+                .seat(seat)
+                .member(memberRepository.getReferenceById(memberId))
+                .expiresAt(now.plus(HOLD_DURATION))
+                .build();
+
+        try {
+            // flush 까지 해야 유니크 위반이 이 자리에서 난다. save 만 하면 트랜잭션 커밋 시점에 터진다.
+            seatHoldRepository.saveAndFlush(hold);
+        } catch (DataIntegrityViolationException e) {
+            // 같은 순간 다른 요청이 이 자리를 먼저 가져갔다.
+            throw new SeatNotHoldableException(seatId);
+        }
+
+        return SeatHoldResponseDto.from(seat, hold, releasedSeatId);
     }
 
     /**
-     * 좌석 선점을 취소한다.
+     * 선점을 취소한다.
      *
-     * <p>선점과 같은 행 잠금 안에서 처리한다. 잠그지 않으면 내가 취소하는 사이 다른 회원의 선점이
-     * 끼어들어, 그 사람의 선점을 내가 풀어 버리는 경우가 생긴다.
-     *
-     * <p>내가 잡고 있는 좌석이면 푼다. 아무도 잡지 않았거나 선점이 만료된 좌석이면 이미 빈 자리이므로
-     * 할 일 없이 성공으로 답한다 — 만료 직후에 취소를 눌러도 화면에 오류가 뜨지 않아야 한다.
-     * 남이 잡고 있거나 결제까지 끝난 좌석만 거절한다.
-     *
-     * <p>결제 완료({@link com.ssafy.timo.domain.seat.entity.SeatStatus#OCCUPIED})는 여기서 풀지
-     * 않는다. 그것은 선점 해제가 아니라 점유 해제이고, 예매 취소 규칙과 함께 예매 도메인에서 정한다.
+     * <p>내 선점이면 푼다. 아무도 잡지 않았거나 이미 만료된 자리면 할 일 없이 성공으로 답한다 —
+     * 만료 직후에 취소를 눌러도 화면에 오류가 뜨면 안 된다. 남의 선점과 팔린 자리만 거절한다.
      */
     @Override
-    public SeatHoldCancelResponseDto cancelHold(Long seatId) {
+    public SeatHoldCancelResponseDto cancelHold(Long concertId, Long seatId) {
         Long memberId = currentMemberProvider.currentMemberId();
         LocalDateTime now = LocalDateTime.now(clock);
 
-        Seat seat = seatRepository.findByIdForUpdate(seatId)
+        Concert concert = concertRepository.findById(concertId)
+                .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new SeatNotFoundException(seatId));
+        verifySectionBelongsTo(concert, seat.getSection());
 
-        if (seat.isHeldBy(memberId, now)) {
-            seat.releaseHold();
-        } else if (!seat.isHoldableAt(now)) {
-            // 남의 유효한 선점이거나 결제 완료다. 둘을 구분해 알려주지 않는다.
+        seatHoldRepository.expireAllStale(now);
+
+        Optional<SeatHold> active = seatHoldRepository.findActive(concertId, seatId, now);
+        if (active.isPresent()) {
+            if (!active.get().isOwnedBy(memberId)) {
+                throw new SeatHoldNotOwnedException(seatId);
+            }
+            active.get().release(now);
+        } else if (reservationRepository.existsPaidSeat(concertId, seatId)) {
+            // 이미 팔린 자리다. 선점 취소로 풀 수 있는 상태가 아니다.
             throw new SeatHoldNotOwnedException(seatId);
         }
 
-        return SeatHoldCancelResponseDto.from(seat, now);
+        return SeatHoldCancelResponseDto.from(seat);
     }
 
     @Override
-    public SeatOccupancyResponseDto occupy(Long seatId) {
-        return occupy(seatId, currentMemberProvider.currentMemberId());
-    }
-
-    /**
-     * 선점을 점유(결제 확정)로 바꾼다.
-     *
-     * <p>유효한 <b>내</b> 선점 위에서만 성립한다. 만료된 선점 위에 결제를 얹어 주면 5 분 규칙이
-     * 무의미해지므로 아무도 잡지 않은 좌석과 같이 거절한다(409). 남이 잡고 있거나 남이 결제한
-     * 좌석은 자격 문제라 403 이다. 이미 내가 점유한 좌석은 다시 불러도 그대로 성공이다.
-     *
-     * <p>선점과 같은 행 잠금 안에서 처리한다. 만료 판정과 상태 변경 사이에 다른 회원이 만료된
-     * 내 선점을 인수하는 일이 없어야 한다.
-     */
-    @Override
-    public SeatOccupancyResponseDto occupy(Long seatId, Long memberId) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
-        Seat seat = seatRepository.findByIdForUpdate(seatId)
-                .orElseThrow(() -> new SeatNotFoundException(seatId));
-
-        if (seat.isHeldBy(memberId, now)) {
-            seat.occupy();
-        } else if (seat.isHoldableAt(now)) {
-            // 아무도 없거나 만료된 선점이다. 다시 선점하고 와야 한다.
-            throw new SeatNotHeldException(seatId);
-        } else if (!seat.isOccupiedBy(memberId)) {
-            // 남의 유효한 선점이거나 남의 점유다. 둘을 구분해 알려주지 않는다.
-            throw new SeatHoldNotOwnedException(seatId);
+    @Transactional(readOnly = true)
+    public long countAvailable(Long concertId) {
+        if (!concertRepository.existsById(concertId)) {
+            throw new ConcertNotFoundException(concertId);
         }
-
-        return SeatOccupancyResponseDto.from(seat, now);
-    }
-
-    @Override
-    public SeatOccupancyResponseDto releaseOccupancy(Long seatId) {
-        return releaseOccupancy(seatId, currentMemberProvider.currentMemberId());
+        return seatRepository.countAvailable(concertId, LocalDateTime.now(clock));
     }
 
     /**
-     * 점유를 풀어 예매 가능으로 되돌린다.
+     * 한 계정은 한 공연에서 좌석 하나만 잡을 수 있으므로, 새로 잡기 전에 이전 선점을 푼다.
      *
-     * <p>내 점유면 푼다. 아무도 잡지 않았거나 만료된 선점만 남은 좌석은 이미 빈 자리이므로 할 일 없이
-     * 성공으로 답한다. 유효한 선점 상태(결제 전)라면 예매 취소가 들어올 수 없는 좌석이므로 데이터가
-     * 어긋난 것으로 보고 409 로 알린다. 남의 점유는 403 이다.
+     * <p>풀지 않고 넣으면 {@code uk_hold_member} 에 걸린다. 공연이 다르면 서로 영향이 없다.
      *
-     * <p>선점 취소({@link #cancelHold(Long)})와는 별개의 전이다. 그쪽은 결제 전 선점을 풀고,
-     * 여기는 결제까지 끝난 좌석을 푼다. 환불·취소 수수료 같은 예매 규칙은 여기서 보지 않는다.
+     * @return 풀린 좌석 id. 이전 선점이 없었으면 {@code null}
      */
-    @Override
-    public SeatOccupancyResponseDto releaseOccupancy(Long seatId, Long memberId) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
-        Seat seat = seatRepository.findByIdForUpdate(seatId)
-                .orElseThrow(() -> new SeatNotFoundException(seatId));
-
-        if (seat.isOccupiedBy(memberId)) {
-            seat.releaseOccupancy();
-        } else if (seat.getStatus() == SeatStatus.OCCUPIED) {
-            throw new SeatOccupancyNotOwnedException(seatId);
-        } else if (!seat.isHoldableAt(now)) {
-            // 누군가의 유효한 선점이다. 결제 전 좌석에 예매 취소가 들어온 것이므로 그냥 넘기지 않는다.
-            throw new SeatNotOccupiedException(seatId);
-        }
-
-        return SeatOccupancyResponseDto.from(seat, now);
-    }
-
-    /**
-     * 한 계정은 좌석 하나만 잡을 수 있으므로, 새로 잡기 전에 이전 선점을 푼다.
-     *
-     * @return 풀린 좌석 id. 이전 선점이 없었으면 {@code null}.
-     */
-    private Long releasePreviousHold(Long memberId, LocalDateTime now, Long targetSeatId) {
-        List<Seat> previous = seatRepository.findActiveHoldsOfMember(memberId, now, targetSeatId);
+    private Long releasePreviousHold(Long concertId, Long memberId, LocalDateTime now) {
+        Optional<SeatHold> previous = seatHoldRepository.findActiveOfMember(concertId, memberId, now);
         if (previous.isEmpty()) {
             return null;
         }
 
-        previous.forEach(Seat::releaseHold);
+        SeatHold hold = previous.get();
+        hold.release(now);
+        // 유니크 재료인 생성 칼럼이 갱신돼야 새 선점이 들어갈 수 있다.
+        seatHoldRepository.flush();
 
-        // 규칙상 한 건이다. 어긋난 데이터가 있어도 전부 풀고, 응답에는 가장 최근 것을 알려 준다.
-        return previous.get(previous.size() - 1).getId();
+        return hold.getSeat().getId();
     }
 
-    /** 구역 id -> 예매 가능 좌석 수. 남은 자리가 없는 구역은 키가 없으므로 읽는 쪽에서 0 으로 채운다. */
-    private Map<Long, Long> availableCountsOf(List<Section> sections, LocalDateTime now) {
+    /** 구역 id -> 이 공연의 예매 가능 좌석 수. 남은 자리가 없는 구역은 키가 없으므로 읽는 쪽에서 0 으로 채운다. */
+    private Map<Long, Long> availableCountsOf(Long concertId, List<Section> sections, LocalDateTime now) {
         List<Long> sectionIds = sections.stream().map(Section::getId).toList();
 
-        return seatRepository.countAvailableGroupedBySection(sectionIds, now).stream()
+        return seatRepository.countAvailableGroupedBySection(concertId, sectionIds, now).stream()
                 .collect(Collectors.toMap(
                         SectionAvailableCount::sectionId, SectionAvailableCount::availableCount));
     }
 
     /**
-     * 구역 하나와 그 좌석을 만든다.
+     * 이 공연이 열리는 공연장의 구역인지 확인한다.
      *
-     * <p>배치도 격자 크기를 보내지 않았으면 좌석 목록의 최대 번호에서 뽑아낸다. 이 값은 배치도를 그리는
-     * 용도이므로 실제 좌석 수({@code seatCount})와 같지 않을 수 있다.
+     * <p>없으면 다른 공연장의 좌석을 이 공연으로 선점할 수 있다. 좌석과 공연이 각각 존재하기만 하면
+     * 조인 조건은 통과하므로, 둘의 관계를 여기서 따로 봐야 한다.
      */
+    private void verifySectionBelongsTo(Concert concert, Section section) {
+        if (!section.getVenue().getId().equals(concert.getVenue().getId())) {
+            throw new SectionNotFoundException(section.getId());
+        }
+    }
+
     private Section registerSection(Venue venue, CommandSeatRequestDto.SectionLayout layout) {
         List<SeatPosition> positions = layout.toPositions();
         validatePositions(layout, positions);
@@ -301,12 +283,6 @@ public class SeatServiceImpl implements SeatService {
         return section;
     }
 
-    /**
-     * 나열된 자리를 검사한다. 같은 자리가 두 번 들어왔는지, 그리고 선언한 격자 크기를 벗어난 자리가 있는지 본다.
-     *
-     * <p>중복을 미리 걸러내는 이유는 {@code uk_seat_section_position} 제약에 걸려 500 이 되는 것을 막기 위해서다.
-     * 격자 범위 검사는 격자 크기를 함께 보낸 경우에만 한다. 생략했다면 좌석 목록이 곧 기준이므로 벗어날 것이 없다.
-     */
     private void validatePositions(CommandSeatRequestDto.SectionLayout layout,
                                    List<SeatPosition> positions) {
         Set<SeatPosition> seen = new HashSet<>();
@@ -325,12 +301,6 @@ public class SeatServiceImpl implements SeatService {
         }
     }
 
-    /**
-     * 구역명 중복을 걸러낸다. 이미 등록된 것과 겹치는 경우, 그리고 같은 요청 안에서 겹치는 경우 둘 다 본다.
-     *
-     * <p>최종 방어선은 {@code uk_section_venue_name} 제약이다. 여기서는 흔한 경우를 409 로 먼저 걸러낸다.
-     * 요청 안의 중복까지 보는 이유는, 그대로 두면 제약에 걸려 500 이 되기 때문이다.
-     */
     private void validateNamesNotDuplicated(CommandSeatRequestDto request) {
         Set<String> namesInRequest = new HashSet<>();
 

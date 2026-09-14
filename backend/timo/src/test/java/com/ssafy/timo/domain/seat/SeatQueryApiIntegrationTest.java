@@ -1,8 +1,15 @@
 package com.ssafy.timo.domain.seat;
 
+import com.ssafy.timo.domain.concert.entity.AgeRating;
+import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.concert.entity.ConcertGenre;
+import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.member.entity.Member;
+import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.reservation.entity.Reservation;
+import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
@@ -14,9 +21,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,16 +58,45 @@ class SeatQueryApiIntegrationTest {
     private VenueRepository venueRepository;
 
     @Autowired
+    private ConcertRepository concertRepository;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private ReservationRepository reservationRepository;
+
+    @Autowired
     private EntityManager em;
 
     private Long venueId;
+    private Long concertId;
+    private Long buyerId;
 
     @BeforeEach
     void setUpFixtures() {
-        venueId = venueRepository.save(Venue.builder()
+        Venue venue = venueRepository.save(Venue.builder()
                 .name("고척돔")
                 .address("서울시 구로구 경인로 430")
                 .totalSeatCount(16000)
+                .build());
+        venueId = venue.getId();
+
+        // 좌석 상태는 공연 기준으로 유도되므로 조회에도 공연이 필요하다.
+        concertId = concertRepository.save(Concert.builder()
+                .title("9월 20일 공연")
+                .genre(ConcertGenre.CONCERT)
+                .ageRating(AgeRating.ALL)
+                .startDate(LocalDateTime.now().plusDays(20))
+                .endDate(LocalDateTime.now().plusDays(20).plusHours(3))
+                .openAt(LocalDateTime.now().plusDays(10))
+                .venue(venue)
+                .build()).getId();
+
+        buyerId = memberRepository.save(Member.builder()
+                .phoneNumber("01011112222")
+                .name("전재민")
+                .nickname("구매자")
                 .build()).getId();
     }
 
@@ -73,7 +109,7 @@ class SeatQueryApiIntegrationTest {
         saveSection("2층 B블록", 90000, 2, 2);
         flushAndClear();
 
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.venueId").value(venueId.intValue()))
                 .andExpect(jsonPath("$.venueName").value("고척돔"))
@@ -96,7 +132,7 @@ class SeatQueryApiIntegrationTest {
         saveSection("1층 A블록", 150000, 3, 2);
         flushAndClear();
 
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[0].seats").doesNotExist());
     }
@@ -108,7 +144,7 @@ class SeatQueryApiIntegrationTest {
         occupyFirstSeats(section, 2);
         flushAndClear();
 
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[0].seatCount").value(6))
                 .andExpect(jsonPath("$.sections[0].availableCount").value(4))
@@ -124,7 +160,7 @@ class SeatQueryApiIntegrationTest {
         flushAndClear();
 
         // group by 결과에 이 구역이 없다고 목록에서 빠지면, 매진 구역이 화면에서 사라진다.
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections.length()").value(2))
                 .andExpect(jsonPath("$.sections[0].name").value("1층 A블록"))
@@ -136,7 +172,7 @@ class SeatQueryApiIntegrationTest {
     @Test
     @DisplayName("좌석을 아직 등록하지 않은 공연장은 200 과 빈 구역 목록을 돌려준다")
     void findSections_returnsEmptyListWhenNoSectionRegistered() throws Exception {
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections.length()").value(0))
                 .andExpect(jsonPath("$.totalSeatCount").value(0))
@@ -156,27 +192,27 @@ class SeatQueryApiIntegrationTest {
         saveSectionIn(other, "남의 구역", 50000, 2, 2);
         flushAndClear();
 
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(venueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections.length()").value(1))
                 .andExpect(jsonPath("$.sections[0].name").value("1층 A블록"));
     }
 
     @Test
-    @DisplayName("존재하지 않는 공연장이면 404 를 반환한다")
-    void findSections_returnsNotFoundWhenVenueMissing() throws Exception {
-        long missingVenueId = venueId + 1_000L;
+    @DisplayName("존재하지 않는 공연이면 404 를 반환한다")
+    void findSections_returnsNotFoundWhenConcertMissing() throws Exception {
+        long missingConcertId = concertId + 1_000L;
 
-        mvc.perform(get(SECTION_PATH).param("venueId", String.valueOf(missingVenueId)))
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(missingConcertId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorMessage")
-                        .value("존재하지 않는 공연장입니다. (venueId=" + missingVenueId + ")"))
-                .andExpect(jsonPath("$.exception").value("VenueNotFoundException"));
+                        .value("존재하지 않는 공연입니다. (concertId=" + missingConcertId + ")"))
+                .andExpect(jsonPath("$.exception").value("ConcertNotFoundException"));
     }
 
     @Test
-    @DisplayName("venueId 를 주지 않으면 400 을 반환한다")
-    void findSections_rejectsMissingVenueId() throws Exception {
+    @DisplayName("concertId 를 주지 않으면 400 을 반환한다")
+    void findSections_rejectsMissingConcertId() throws Exception {
         mvc.perform(get(SECTION_PATH))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.exception")
@@ -194,7 +230,7 @@ class SeatQueryApiIntegrationTest {
                         new SeatPosition(2, 1), new SeatPosition(1, 1)));
         flushAndClear();
 
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(section.getId())))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seats.length()").value(4))
                 .andExpect(jsonPath("$.seats[0].seatNo").value(1))
@@ -213,7 +249,7 @@ class SeatQueryApiIntegrationTest {
         Section section = saveSection("1층 A블록", 150000, 2, 2);
         flushAndClear();
 
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(section.getId())))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sectionId").value(section.getId().intValue()))
                 .andExpect(jsonPath("$.sectionName").value("1층 A블록"))
@@ -233,11 +269,11 @@ class SeatQueryApiIntegrationTest {
         occupyFirstSeats(section, 1);
         flushAndClear();
 
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(section.getId())))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seatCount").value(4))
                 .andExpect(jsonPath("$.availableCount").value(3))
-                .andExpect(jsonPath("$.seats[0].status").value("OCCUPIED"))
+                .andExpect(jsonPath("$.seats[0].status").value("SOLD"))
                 .andExpect(jsonPath("$.seats[1].status").value("AVAILABLE"));
     }
 
@@ -248,7 +284,7 @@ class SeatQueryApiIntegrationTest {
         flushAndClear();
 
         // status 로 잔여석을 세는 헬퍼가 getter 모양이면 available 필드가 딸려 나간다.
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(section.getId())))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seats[0].available").doesNotExist())
                 .andExpect(jsonPath("$.seats[0].section").doesNotExist());
@@ -261,7 +297,7 @@ class SeatQueryApiIntegrationTest {
         saveSection("2층 B블록", 90000, 3, 3);
         flushAndClear();
 
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(target.getId())))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(target.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seats.length()").value(4));
     }
@@ -271,7 +307,7 @@ class SeatQueryApiIntegrationTest {
     void findSeats_returnsNotFoundWhenSectionMissing() throws Exception {
         long missingSectionId = 999_999L;
 
-        mvc.perform(get(SEAT_PATH).param("sectionId", String.valueOf(missingSectionId)))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(missingSectionId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorMessage")
                         .value("존재하지 않는 구역입니다. (sectionId=" + missingSectionId + ")"))
@@ -290,7 +326,7 @@ class SeatQueryApiIntegrationTest {
     @Test
     @DisplayName("sectionId 가 숫자가 아니면 400 을 반환한다")
     void findSeats_rejectsNonNumericSectionId() throws Exception {
-        mvc.perform(get(SEAT_PATH).param("sectionId", "abc"))
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", "abc"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -333,14 +369,36 @@ class SeatQueryApiIntegrationTest {
                 .toList();
     }
 
-    /** 앞에서부터 좌석 몇 개를 판매 완료로 바꾼다. 상태 전이 API 가 아직 없어 직접 바꾼다. */
+    /**
+     * 앞에서부터 좌석 몇 개를 이 공연에서 판매 완료로 만든다.
+     *
+     * <p>좌석 행이 아니라 주문 행을 넣는다. 판매 상태는 이제 좌석이 아니라 {@code reservation} 이
+     * 갖기 때문이다. 주문 확정 API 가 아직 없어 행을 직접 만든다.
+     *
+     * <p>구매자를 좌석마다 새로 만든다. {@code uk_rsv_member} 가 한 공연에서 회원당 한 건만
+     * 허용하므로 같은 회원으로 여러 자리를 살 수 없다.
+     */
     private void occupyFirstSeats(Section section, int count) {
         List<Seat> seats = seatRepository
                 .findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId())
                 .subList(0, count);
 
-        seats.forEach(seat -> ReflectionTestUtils.setField(seat, "status", SeatStatus.OCCUPIED));
-        seatRepository.saveAll(seats);
+        Concert concert = concertRepository.getReferenceById(concertId);
+        for (int i = 0; i < seats.size(); i++) {
+            Member buyer = i == 0
+                    ? memberRepository.getReferenceById(buyerId)
+                    : memberRepository.save(Member.builder()
+                            .phoneNumber("0102222" + String.format("%04d", i))
+                            .name("전재민")
+                            .nickname("구매자" + section.getId() + "-" + i)
+                            .build());
+
+            reservationRepository.save(Reservation.builder()
+                    .concert(concert)
+                    .member(buyer)
+                    .seat(seats.get(i))
+                    .build());
+        }
     }
 
     /**

@@ -1,27 +1,23 @@
 package com.ssafy.timo.domain.reservation.entity;
 
 /**
- * 주문(예매)의 발행 상태.
- *
- * <p>좌석 배정과 잔액 차감은 주문 확정 시점에 오프체인에서 끝나고, 온체인 티켓 발행은 비동기로 따라간다.
- * 그래서 주문은 "결제됐는가" 가 아니라 "티켓이 나왔는가" 를 상태로 든다. 자세한 흐름은
- * {@code backend/docs/BE_RESERVATION_DOMAIN_DRAFT.md} 참고.
+ * 주문(예매)의 상태.
  *
  * <pre>
- * PENDING_MINT ──(mint 성공)──▶ MINTED
- *      └──(3회 실패)──▶ MINT_FAILED ──(보상 환불)──▶ REFUNDED
+ * PAID ──(취소)──▶ CANCELLED
  * </pre>
+ *
+ * <p>{@link #PAID} 만 자리를 붙들고 있다. 취소된 주문은 좌석을 놓아 준다 — 좌석 상태를 유도할 때
+ * {@link #PAID} 인지만 보는 이유다({@code SeatStatus}).
+ *
+ * <p>온체인 발행 진행 상태(발행 대기·발행 완료·발행 실패·보상 환불)는 여기에 담지 않는다. 주문은
+ * "이 자리가 팔렸는가" 만 알면 되고, 발행이 어디까지 갔는지는 티켓 쪽 관심사다. 둘을 한 enum 에
+ * 섞으면 좌석 상태 유도가 발행 재시도 상태까지 알아야 한다.
  */
 public enum ReservationStatus {
 
-    /** 주문 확정. 좌석은 배정됐고 잔액은 차감됐지만 온체인 발행은 아직이다. */
-    PENDING_MINT,
-    /** 온체인 티켓 발행 완료. {@code tokenId} 가 있다. */
-    MINTED,
-    /** 발행 재시도를 모두 실패했다. 보상 환불이 진행 중이다. */
-    MINT_FAILED,
-    /** 보상 환불까지 끝났다. 좌석은 회수됐고 결제 금액은 잔액으로 돌아갔다. */
-    REFUNDED,
-    /** 회원이 취소했다. 티켓은 회수({@code REVOKED})되고 정가가 전액 환원됐다. */
+    /** 결제 완료. 이 주문이 좌석을 붙들고 있다. */
+    PAID,
+    /** 취소됨. 좌석은 풀렸다. */
     CANCELLED
 }

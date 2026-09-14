@@ -11,6 +11,7 @@ import com.ssafy.timo.domain.seat.dto.SectionListResponseDto.SectionSummary;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
+import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.seat.service.SeatService;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
@@ -85,6 +86,9 @@ class LocalDataSeederTest {
     private SeatRepository seatRepository;
 
     @Autowired
+    private SectionRepository sectionRepository;
+
+    @Autowired
     private ArtistRepository artistRepository;
 
     @Autowired
@@ -115,7 +119,13 @@ class LocalDataSeederTest {
         Venue venue = venueRepository.findByName("고척돔").orElseThrow();
         assertThat(venue.getTotalSeatCount()).isEqualTo(EXPECTED_TOTAL_SEATS);
 
-        SectionListResponseDto sections = seatService.findSections(venue.getId());
+        // 구역 조회는 공연 기준이다. 시드 공연 중 이 공연장에서 열리는 것 하나를 고른다.
+        Long seedConcertId = concertRepository.findAll().stream()
+                .filter(c -> c.getVenue().getId().equals(venue.getId()))
+                .findFirst()
+                .orElseThrow()
+                .getId();
+        SectionListResponseDto sections = seatService.findSections(seedConcertId);
         assertThat(sections.sections()).hasSize(EXPECTED_SECTIONS);
         assertThat(sections.totalSeatCount()).isEqualTo(EXPECTED_TOTAL_SEATS);
         assertThat(sections.sections())
@@ -132,75 +142,13 @@ class LocalDataSeederTest {
                 .containsExactly(150_000, 150_000, 120_000, 120_000, 99_000);
     }
 
-    @Test
-    @DisplayName("좌석 일부를 판매 완료·선점 중으로 섞어 잔여석이 총좌석보다 적다")
-    void mixesTakenSeatsSoAvailableCountIsLowerThanTotal() {
-        seeder.run(new DefaultApplicationArguments());
-        flushAndClear();
-
-        Venue venue = venueRepository.findByName("고척돔").orElseThrow();
-        SectionListResponseDto sections = seatService.findSections(venue.getId());
-
-        assertThat(sections.totalAvailableCount())
-                .isEqualTo(EXPECTED_AVAILABLE_PER_SECTION * EXPECTED_SECTIONS)
-                .isLessThan(sections.totalSeatCount());
-        assertThat(sections.sections())
-                .extracting(SectionSummary::availableCount)
-                .containsOnly(EXPECTED_AVAILABLE_PER_SECTION);
-
-        Long sectionId = sections.sections().getFirst().id();
-        Map<SeatStatus, Long> distribution = seatRepository
-                .findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId).stream()
-                .collect(Collectors.groupingBy(Seat::getStatus, Collectors.counting()));
-
-        assertThat(distribution).containsOnly(
-                Map.entry(SeatStatus.OCCUPIED, (long) EXPECTED_OCCUPIED_PER_SECTION),
-                Map.entry(SeatStatus.RESERVED, (long) EXPECTED_RESERVED_PER_SECTION),
-                Map.entry(SeatStatus.AVAILABLE, (long) EXPECTED_AVAILABLE_PER_SECTION));
-    }
-
-    @Test
-    @DisplayName("좌석 상태는 자리 번호로 정해진다 - 9의 배수는 판매 완료, 13의 배수는 선점")
-    void seatStatusFollowsSeatIndexRule() {
-        seeder.run(new DefaultApplicationArguments());
-        flushAndClear();
-
-        Venue venue = venueRepository.findByName("고척돔").orElseThrow();
-        Long sectionId = seatService.findSections(venue.getId()).sections().getFirst().id();
-
-        List<Seat> seats = seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId);
-        assertThat(seats).hasSize(EXPECTED_SEATS_PER_SECTION);
-
-        for (int i = 0; i < seats.size(); i++) {
-            int seatIndex = i + 1;
-            assertThat(seats.get(i).getStatus())
-                    .as("%d번째 자리", seatIndex)
-                    .isEqualTo(expectedStatusOf(seatIndex));
-        }
-    }
-
-    @Test
-    @DisplayName("선점 자리는 만료가 넉넉해 곧바로 예매 가능으로 돌아가지 않는다")
-    void reservedSeatsDoNotExpireImmediately() {
-        seeder.run(new DefaultApplicationArguments());
-        flushAndClear();
-
-        Venue venue = venueRepository.findByName("고척돔").orElseThrow();
-        Long sectionId = seatService.findSections(venue.getId()).sections().getFirst().id();
-
-        List<Seat> reserved = seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(sectionId).stream()
-                .filter(seat -> seat.getStatus() == SeatStatus.RESERVED)
-                .toList();
-
-        LocalDateTime oneHourLater = LocalDateTime.now(clock).plusHours(1);
-        assertThat(reserved)
-                .isNotEmpty()
-                .allSatisfy(seat -> assertThat(seat.effectiveStatus(oneHourLater))
-                        .isEqualTo(SeatStatus.RESERVED));
-
-        // 선점을 한 사람이 몰아 쥐면 "한 계정 동시 하나" 규칙에 어긋나는 데이터가 된다.
-        assertThat(reserved).extracting(Seat::getHeldByMemberId).doesNotHaveDuplicates();
-    }
+    /*
+     * 좌석 상태 시딩 테스트 3건을 걷어냈다.
+     *
+     * 선점·판매가 좌석 행이 아니라 공연별 seat_hold / reservation 행이 되면서 러너가 상태를 넣지
+     * 못한다(LocalDataSeeder#markSomeSeatsTaken 참고). 시드 회원·공연으로 다시 넣게 되면
+     * 그때 이 자리에 되살린다.
+     */
 
     @Test
     @DisplayName("공연 4건을 상태·조회수·이미지까지 시드대로 넣는다")
@@ -290,6 +238,7 @@ class LocalDataSeederTest {
                 concertRepository,
                 venueRepository,
                 seatRepository,
+                sectionRepository,
                 artistRepository,
                 em,
                 clock);
@@ -299,16 +248,6 @@ class LocalDataSeederTest {
     private void flushAndClear() {
         em.flush();
         em.clear();
-    }
-
-    private static SeatStatus expectedStatusOf(int seatIndex) {
-        if (seatIndex % 9 == 0) {
-            return SeatStatus.OCCUPIED;
-        }
-        if (seatIndex % 13 == 0) {
-            return SeatStatus.RESERVED;
-        }
-        return SeatStatus.AVAILABLE;
     }
 
     private static Artist artist(String name, String profileImage) {

@@ -4,7 +4,6 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatGrade;
-import com.ssafy.timo.domain.seat.entity.SeatStatus;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.exception.DuplicatedSeatPositionException;
 import com.ssafy.timo.domain.seat.exception.SeatErrorCode;
@@ -201,7 +200,6 @@ class SeatServiceImplTest {
         List<Seat> seats = seatsCaptor.getValue();
         assertThat(seats).hasSize(3);
         assertThat(seats).allSatisfy(seat -> {
-            assertThat(seat.getStatus()).isEqualTo(SeatStatus.AVAILABLE);
             assertThat(seat.getSection().getName()).isEqualTo("1층 A블록");
         });
     }
