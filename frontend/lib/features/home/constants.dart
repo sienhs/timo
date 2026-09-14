@@ -1,4 +1,5 @@
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/timo_logo.dart';
 import 'models/refresh_hint.dart';
 
 /// 홈 화면 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
@@ -24,7 +25,12 @@ class HomeMetrics {
   static const searchFieldRadius = 20.0;
   static const logoGap = 12.0;
 
+  /// 상단 바 로고 높이. 로그인 헤더의 로고와 같다.
+  static const logoHeight = TimoLogo.defaultHeight;
+
   // 배너 캐러셀
+  /// 배너로 올리는 공연 수. 인기 공연 응답의 앞에서부터 이만큼 쓴다.
+  static const bannerCount = 3;
   static const bannerHeight = 160.0;
   static const bannerRadius = 12.0;
 
@@ -90,13 +96,34 @@ class HomeMetrics {
   /// 가운데 + 버튼은 바 위로 솟아 본문 영역을 덮는다. 마지막 카드가 그
   /// 버튼에 가리지 않도록 이만큼 띄운다.
   static const bottomGap = 40.0;
+
+  // 서버 요청
+  /// 카드 한 줄에 받아 오는 공연 수. 가로로 넘기는 줄이라 이보다 많이 받아도
+  /// 끝까지 넘겨 보는 사람이 없고, '더보기' 가 나머지를 맡는다.
+  static const showRowSize = 10;
+
+  /// 검색 결과 한 번에 받아 오는 수. 서버 기본값과 같다.
+  static const searchPageSize = 20;
+
+  /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태와 새로 고침
+  /// 안내 문구가 눈에 보인다. 안내 문구의 튀어오르기 연출이 끝나기 전에
+  /// 응답이 오면 문구가 도중에 접힌다.
+  static const mockLatency = Duration(milliseconds: 1200);
+
+  /// 불러오는 동안 그리는 빈 카드 수. 폰 폭(360)에 카드 두 장 반이 보인다.
+  static const skeletonCardCount = 3;
+
+  // 검색 결과 줄
+  static const searchThumbWidth = 56.0;
+  static const searchThumbRadius = 6.0;
+  static const searchTileGap = 12.0;
+  static const searchTileVerticalPadding = 10.0;
 }
 
 /// 홈 화면 문구. 숫자에서 파생되는 문구는 파생 규칙까지 여기 둔다.
 class HomeStrings {
   HomeStrings._();
 
-  static const logo = 'TIMO';
   static const searchHint = '찾으시는 공연이 있나요?';
   static const searchEntry = '공연 검색';
 
@@ -110,8 +137,21 @@ class HomeStrings {
   /// 시안대로 둔다 — 기획 확인 후 [ticketOpenMore] 와 맞추면 된다.
   static const popularMore = 'More';
 
-  /// 검색 화면은 아직 없다. 시안의 검색 바는 두고 안내만 띄운다.
-  static const searchNotReady = '공연 검색은 준비 중이에요.';
+  /// 검색 화면. 검색어를 넣기 전과 결과가 없을 때의 문구.
+  static const searchIdle = '공연 이름으로 검색해 보세요.';
+  static String searchEmpty(String keyword) => "'$keyword' 에 맞는 공연이 없어요.";
+
+  /// 서버가 빈 목록을 줬을 때 카드 줄 자리에 적는다.
+  static const noShows = '아직 보여 드릴 공연이 없어요.';
+
+  /// 공연 시작일이 정해지지 않은 공연의 기간 문구.
+  static const periodUndecided = '일정 미정';
+
+  /// 서버 응답이 JSON 목록이 아닐 때(프록시 오류 등) 화면에 보여 줄 문구.
+  static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
+
+  /// 불러오는 동안 스켈레톤에 달아 두는 스크린 리더용 라벨.
+  static const loading = '공연을 불러오는 중이에요.';
 
   /// 아래로 당길 때 보여 주는 문구. 당길 때마다 순서대로 돌아간다 —
   /// 무작위로 뽑으면 같은 문구가 연달아 나와 안 바뀌는 것처럼 보인다.

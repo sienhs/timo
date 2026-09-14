@@ -21,9 +21,11 @@ import 'package:timo/features/auth/state/auth_api_scope.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/auth/widgets/duplicate_check_button.dart';
-import 'package:timo/features/auth/widgets/timo_logo.dart';
+import 'package:timo/core/widgets/timo_logo.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
 void main() {
@@ -503,12 +505,15 @@ void main() {
       // 홈 위에 전화번호 화면이 깔린 스택을 만들고, 그 위에 닉네임 화면을
       // 올린다. 중간 화면들은 이 검사의 관심이 아니다.
       await tester.pumpWidget(
-        AuthApiScope(
-          api: const _FailingAuthApi(onSignUp: error),
-          child: MaterialApp(
-            theme: AppTheme.light,
-            initialRoute: AppRoutes.signupPhone,
-            routes: AppRoutes.routes,
+        HomeApiScope(
+          api: const MockHomeApi(latency: Duration.zero),
+          child: AuthApiScope(
+            api: const _FailingAuthApi(onSignUp: error),
+            child: MaterialApp(
+              theme: AppTheme.light,
+              initialRoute: AppRoutes.signupPhone,
+              routes: AppRoutes.routes,
+            ),
           ),
         ),
       );
@@ -592,14 +597,17 @@ void main() {
       // 하는 것처럼 스코프로 감싸 목과 빈 세션을 내려준다.
       final session = AuthSession(storage: InMemoryTokenStorage());
       await tester.pumpWidget(
-        AuthSessionScope(
-          session: session,
-          child: AuthApiScope(
-            api: api,
-            child: MaterialApp(
-              theme: AppTheme.light,
-              initialRoute: AppRoutes.home,
-              routes: AppRoutes.routes,
+        HomeApiScope(
+          api: const MockHomeApi(latency: Duration.zero),
+          child: AuthSessionScope(
+            session: session,
+            child: AuthApiScope(
+              api: api,
+              child: MaterialApp(
+                theme: AppTheme.light,
+                initialRoute: AppRoutes.home,
+                routes: AppRoutes.routes,
+              ),
             ),
           ),
         ),

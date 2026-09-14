@@ -41,8 +41,8 @@ class ShowPosterCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: PosterImage(
-                      assetPath: show.posterAsset,
+                    child: PosterImage.network(
+                      url: show.posterImageUrl,
                       borderRadius: HomeMetrics.posterRadius,
                       decodeWidth: width,
                     ),

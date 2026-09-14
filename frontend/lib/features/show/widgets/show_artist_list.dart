@@ -69,7 +69,7 @@ class _ArtistFace extends StatelessWidget {
   Widget build(BuildContext context) {
     final photo = artist.photoAsset;
     if (photo != null) {
-      return PosterImage(
+      return PosterImage.asset(
         assetPath: photo,
         decodeWidth: ShowDetailMetrics.artistAvatarSize,
       );

@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/features/payment/constants.dart';
 import 'package:timo/features/payment/screens/payment_complete_screen.dart';
 import 'package:timo/features/payment/screens/payment_screen.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 폰 화면 크기. 이보다 좁아지면 레이아웃이 깨지는지 확인하는 기준이 된다.
@@ -13,8 +15,13 @@ Future<void> _pumpApp(WidgetTester tester, String initialRoute) async {
   await tester.binding.setSurfaceSize(_phoneSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
+  // 완료 화면의 '티켓 보러 가기' 가 홈으로 가고, 홈 탭은 공연 API 를 위에서
+  // 찾는다. 앱처럼 스코프로 감싼다.
   await tester.pumpWidget(
-    MaterialApp(initialRoute: initialRoute, routes: AppRoutes.routes),
+    HomeApiScope(
+      api: const MockHomeApi(latency: Duration.zero),
+      child: MaterialApp(initialRoute: initialRoute, routes: AppRoutes.routes),
+    ),
   );
 }
 

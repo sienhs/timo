@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
-import '../models/home_banner.dart';
+import '../models/show_summary.dart';
 import '../../../core/widgets/poster_image.dart';
 
 /// 상단 배너 캐러셀. 옆으로 넘길 수 있다는 걸 알리려고 다음 배너가 오른쪽에
@@ -18,8 +18,9 @@ class HomeBannerCarousel extends StatefulWidget {
     required this.onBannerPressed,
   });
 
-  final List<HomeBanner> banners;
-  final ValueChanged<HomeBanner> onBannerPressed;
+  /// 배너로 보여 줄 공연. 비어 있으면 아무것도 그리지 않는다.
+  final List<ShowSummary> banners;
+  final ValueChanged<ShowSummary> onBannerPressed;
 
   @override
   State<HomeBannerCarousel> createState() => _HomeBannerCarouselState();
@@ -39,6 +40,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.banners.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
         SizedBox(
@@ -71,7 +73,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
 class _BannerCard extends StatelessWidget {
   const _BannerCard({required this.banner, required this.onPressed});
 
-  final HomeBanner banner;
+  final ShowSummary banner;
   final VoidCallback onPressed;
 
   @override
@@ -84,8 +86,8 @@ class _BannerCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            PosterImage(
-              assetPath: banner.posterAsset,
+            PosterImage.network(
+              url: banner.posterImageUrl,
               decodeWidth: MediaQuery.sizeOf(context).width,
             ),
             // 포스터 밝은 부분에 흰 글자가 묻히지 않게 아래쪽만 어둡게 깐다.
@@ -116,7 +118,7 @@ class _BannerCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    banner.subtitle,
+                    banner.venueName,
                     style: textTheme.labelMedium?.copyWith(
                       color: Colors.white70,
                     ),

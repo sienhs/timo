@@ -12,10 +12,13 @@ import 'features/auth/state/auth_session_scope.dart';
 import 'features/booking/data/mock_booking_data.dart';
 import 'features/booking/state/booking_controller.dart';
 import 'features/booking/state/booking_scope.dart';
+import 'features/home/data/home_api.dart';
+import 'features/home/data/http_home_api.dart';
+import 'features/home/state/home_api_scope.dart';
 import 'routes/app_routes.dart';
 
 class App extends StatefulWidget {
-  const App({super.key, this.session, this.authApi});
+  const App({super.key, this.session, this.authApi, this.homeApi});
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
   /// 메모리 저장소로 된 로그아웃 상태에서 시작한다.
@@ -23,6 +26,10 @@ class App extends StatefulWidget {
 
   /// 인증 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는 목을 넣는다.
   final AuthApi? authApi;
+
+  /// 홈·검색 화면이 쓰는 공연 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는
+  /// 목을 넣는다.
+  final HomeApi? homeApi;
 
   @override
   State<App> createState() => _AppState();
@@ -36,6 +43,10 @@ class _AppState extends State<App> {
   /// 내려준다. 화면이 각자 만들면 서버 주소·로그 설정이 흩어지고, 테스트에서
   /// 목으로 갈아끼울 자리도 없어진다.
   late final AuthApi _authApi = widget.authApi ?? HttpAuthApi();
+
+  /// 홈·검색 화면이 쓰는 공연 API. 인증 API 와 같은 이유로 앱에 하나만 두고
+  /// [HomeApiScope] 로 내려준다.
+  late final HomeApi _homeApi = widget.homeApi ?? HttpHomeApi();
 
   /// 로그인 상태면 서버 요청에 토큰을 붙이고, 401 이면 로그아웃시키는 인터셉터.
   /// 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다(테스트가 App 을 여러 번
@@ -84,15 +95,18 @@ class _AppState extends State<App> {
       session: _session,
       child: AuthApiScope(
         api: _authApi,
-        child: BookingScope(
-          controller: _bookingController,
-          child: MaterialApp(
-            title: 'TIMO',
-            theme: AppTheme.light,
-            // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-            // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-            initialRoute: AppRoutes.home,
-            routes: AppRoutes.routes,
+        child: HomeApiScope(
+          api: _homeApi,
+          child: BookingScope(
+            controller: _bookingController,
+            child: MaterialApp(
+              title: 'TIMO',
+              theme: AppTheme.light,
+              // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+              // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+              initialRoute: AppRoutes.home,
+              routes: AppRoutes.routes,
+            ),
           ),
         ),
       ),

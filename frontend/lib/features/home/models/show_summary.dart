@@ -1,6 +1,8 @@
 import '../../../core/utils/formatters.dart';
+import '../constants.dart';
 
-/// 목록·카드에 필요한 만큼만 담은 공연 요약.
+/// 목록·카드에 필요한 만큼만 담은 공연 요약. 서버의 공연 목록 응답
+/// (`ConcertSummaryResponseDto`) 한 건이다.
 ///
 /// MVP 는 콘서트만 다룬다. 그래서 분류(카테고리) 필드를 두지 않는다 —
 /// 값이 하나뿐인 필드는 화면마다 "콘서트"만 찍게 만들 뿐이고, 필터로 쓰면
@@ -15,27 +17,63 @@ class ShowSummary {
   const ShowSummary({
     required this.id,
     required this.title,
-    required this.posterAsset,
-    required this.startAt,
+    required this.venueName,
+    this.posterImageUrl,
+    this.startAt,
     this.endAt,
     this.ticketOpenAt,
   });
 
-  final String id;
+  /// 서버 응답 한 건을 읽는다.
+  ///
+  /// 오픈 일시는 **아직 오픈하지 않은 공연**에만 담는다. 서버는 이미 오픈한
+  /// 공연에도 `openAt` 을 주지만, 홈의 오픈 뱃지는 "언제 열리는가" 를 알리는
+  /// 것이라 지난 시각을 찍으면 뜻이 어긋난다. 상태를 보고 여기서 한 번 거른다.
+  factory ShowSummary.fromJson(Map<String, dynamic> json) {
+    final isUpcoming = json['status'] == upcomingStatus;
+    return ShowSummary(
+      id: (json['id'] as num).toInt(),
+      title: json['title'] as String,
+      venueName: json['venueName'] as String,
+      posterImageUrl: json['posterImageUrl'] as String?,
+      startAt: _dateTimeOrNull(json['startDate']),
+      endAt: _dateTimeOrNull(json['endDate']),
+      ticketOpenAt: isUpcoming ? _dateTimeOrNull(json['openAt']) : null,
+    );
+  }
+
+  /// "등록됐고 아직 예매가 열리지 않음". 백엔드 `ConcertStatus` 의 상수명과 같다.
+  static const upcomingStatus = 'SCHEDULED';
+
+  /// 서버가 준 공연 id. 상세 조회에 쓴다.
+  final int id;
+
   final String title;
 
-  /// 포스터 이미지 경로. 서버 연동 시 URL 로 바뀐다.
-  final String posterAsset;
+  /// 공연장 이름. 카드에는 없고 검색 결과 줄에 찍는다.
+  final String venueName;
 
-  /// 공연 시작일.
-  final DateTime startAt;
+  /// 포스터 이미지 주소. 포스터가 없는 공연이면 null 이다.
+  final String? posterImageUrl;
 
-  /// 마지막 공연일. 하루짜리 공연은 null 이다.
+  /// 공연 시작일. 아직 정해지지 않았으면 null 이다.
+  final DateTime? startAt;
+
+  /// 마지막 공연일. 하루짜리 공연이거나 미정이면 null 이다.
   final DateTime? endAt;
 
-  /// 티켓 예매 오픈 일시. 이미 오픈한 공연은 null 이다.
+  /// 티켓 예매 오픈 일시. 이미 오픈했거나 미정이면 null 이다.
   final DateTime? ticketOpenAt;
 
   /// 카드에 찍는 기간 문구. (예: `2026.07.05 ~ 07.07`)
-  String get periodLabel => formatShowPeriod(startAt, endAt);
+  String get periodLabel {
+    final start = startAt;
+    if (start == null) return HomeStrings.periodUndecided;
+    return formatShowPeriod(start, endAt);
+  }
+
+  /// 서버는 `LocalDateTime` 을 시간대 없는 ISO 문자열(`2026-10-10T19:00:00`)로
+  /// 준다. `DateTime.parse` 는 이를 기기 현지 시각으로 읽는다.
+  static DateTime? _dateTimeOrNull(Object? value) =>
+      value is String ? DateTime.parse(value) : null;
 }
