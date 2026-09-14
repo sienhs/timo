@@ -11,7 +11,17 @@ import 'package:timo/features/ticket/widgets/ticket_list_skeleton.dart';
 import 'package:timo/features/ticket/widgets/upcoming_ticket_card.dart';
 
 void main() {
+  /// 테스트가 보는 '지금'. 언제 돌려도 결과가 같아야 해서 고정한다.
+  ///
+  /// 낮 시각인 것이 중요하다. 목 데이터의 첫 티켓은 '1시간 뒤' 공연인데, 실제
+  /// 시계를 쓰면 밤 11시 이후에 그 공연이 자정을 넘어 **내일**이 되어 D-day
+  /// 배지가 `D-DAY` 대신 `D-1` 로 찍힌다.
+  DateTime now() => DateTime(2026, 9, 15, 14);
+
   /// 화면을 목과 함께 띄운다. 지연은 0 이라 한 번 더 pump 하면 목록이 나온다.
+  ///
+  /// 화면과 목이 **같은 시각**을 봐야 한다. 한쪽만 고정하면 목이 만든 날짜와
+  /// 화면이 재는 기준이 어긋나 배지가 다시 흔들린다.
   Future<void> pumpScreen(
     WidgetTester tester, {
     TicketApi? api,
@@ -19,8 +29,14 @@ void main() {
   }) async {
     await tester.pumpWidget(
       TicketApiScope(
-        api: api ?? MockTicketApi(latency: Duration.zero, scenario: scenario),
-        child: const MaterialApp(home: MyTicketsScreen()),
+        api:
+            api ??
+            MockTicketApi(
+              latency: Duration.zero,
+              scenario: scenario,
+              clock: now,
+            ),
+        child: MaterialApp(home: MyTicketsScreen(clock: now)),
       ),
     );
   }
@@ -135,7 +151,10 @@ void main() {
     testWidgets('불러오는 동안 뼈대 카드를 세운다', (tester) async {
       await pumpScreen(
         tester,
-        api: MockTicketApi(latency: const Duration(milliseconds: 100)),
+        api: MockTicketApi(
+          latency: const Duration(milliseconds: 100),
+          clock: now,
+        ),
       );
       await tester.pump();
 
@@ -164,7 +183,7 @@ void main() {
     });
 
     testWidgets('많아지면 검색 칸이 나오고 제목으로 걸러진다', (tester) async {
-      await pumpScreen(tester, api: _ManyTicketsApi());
+      await pumpScreen(tester, api: _ManyTicketsApi(now));
       await tester.pumpAndSettle();
 
       expect(find.byType(TextField), findsOneWidget);
@@ -177,7 +196,7 @@ void main() {
     });
 
     testWidgets('걸러서 비면 찾는 게 없다고 알린다', (tester) async {
-      await pumpScreen(tester, api: _ManyTicketsApi());
+      await pumpScreen(tester, api: _ManyTicketsApi(now));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), '없는공연');
@@ -194,7 +213,12 @@ void main() {
 /// 시나리오로 만들지 않은 이유: 검색 칸이 뜨는 경계를 보려고 만든 데이터라
 /// 앱에서 골라 볼 일이 없다. `MockTicketApi` 에 두면 실행 인자만 늘어난다.
 class _ManyTicketsApi implements TicketApi {
-  final _base = MockTicketApi(latency: Duration.zero);
+  /// 화면과 같은 시계를 받아야 한다. 여기서 진짜 시계를 쓰면 목이 만든 공연
+  /// 날짜와 화면이 재는 기준이 갈려, 예정 공연이 지난 공연으로 넘어가 버린다.
+  _ManyTicketsApi(DateTime Function() clock)
+    : _base = MockTicketApi(latency: Duration.zero, clock: clock);
+
+  final MockTicketApi _base;
 
   @override
   Future<List<MyTicket>> fetchMyTickets() async {

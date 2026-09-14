@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/async_boundary.dart';
 import '../../../routes/app_routes.dart';
+import '../constants.dart';
+import '../data/booking_api.dart';
 import '../models/seat.dart';
 import '../models/zone.dart';
+import '../models/zone_seats.dart';
+import '../state/booking_api_scope.dart';
+import '../state/booking_controller.dart';
 import '../state/booking_scope.dart';
 import '../widgets/booking_bottom_bar.dart';
 import '../widgets/performance_header.dart';
@@ -15,36 +22,150 @@ import '../widgets/seat_legend.dart';
 class SeatSelectionScreen extends StatefulWidget {
   const SeatSelectionScreen({super.key, required this.zoneId});
 
-  final String zoneId;
+  /// 서버가 준 구역 번호. 공연 번호는 예매 상태([BookingScope])가 들고 있다.
+  final int zoneId;
 
   @override
   State<SeatSelectionScreen> createState() => _SeatSelectionScreenState();
 }
 
 class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
-  void _onSeatTap(Seat seat) {
-    // 고를 수 없는 좌석도 탭을 받아 사유를 알려준다. 셀이 10px 대라 오탭이
-    // 잦은데 아무 반응이 없으면 사용자는 앱이 멈춘 줄로 안다.
-    switch (seat.status) {
-      case SeatStatus.sold:
-        _showMessage('이미 예매가 완료된 좌석이에요.');
-        return;
-      case SeatStatus.available:
-        BookingScope.read(context).selectSeat(seat);
-        return;
+  late BookingApi _api;
+  late int _concertId;
+  late BookingController _controller;
+  late Future<ZoneSeats> _seats;
+
+  /// 선점 요청이 나가 있는 동안 참. 결제하기 버튼을 잠가 둔다.
+  ///
+  /// 두 번 눌러 두 번 잡히는 것을 막는 것이 첫째지만, 요청이 오가는 몇 백
+  /// 밀리초 동안 버튼이 멀쩡해 보이면 사용자는 눌리지 않았다고 생각한다.
+  bool _holding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = BookingApiScope.of(context);
+    _controller = BookingScope.read(context);
+    _concertId = _controller.concertId;
+    _seats = _fetch();
+  }
+
+  @override
+  void dispose() {
+    // 자리를 잡아 둔 채 화면이 사라지는 경우다(결제 완료 후 홈으로 빠지는 등).
+    // 컨텍스트가 이미 없어 결과를 볼 수 없으므로 요청만 던진다. 실패해도
+    // 5분 뒤 서버가 알아서 푼다.
+    final hold = _controller.hold;
+    if (hold != null) {
+      _api.cancelHold(concertId: _concertId, seatId: hold.seatId).ignore();
+    }
+    super.dispose();
+  }
+
+  Future<ZoneSeats> _fetch() =>
+      _api.fetchSeats(concertId: _concertId, zoneId: widget.zoneId);
+
+  /// 좌석을 다시 받아 온다. 남이 잡았다 푼 자리가 이때 보인다.
+  ///
+  /// 화살표로 쓰지 않는다. `setState(() => _seats = _fetch())` 는 대입식의
+  /// 값(Future)을 콜백의 반환값으로 넘기게 되어, Flutter 가 "setState 안에서
+  /// 비동기 작업을 한다" 고 보고 막는다.
+  void _refresh() {
+    final next = _fetch();
+    setState(() {
+      _seats = next;
+    });
+  }
+
+  void _onSeatTap(ZoneSeats zoneSeats, Seat seat) {
+    // 회색 자리(예매완료·선점중)는 눌러도 아무 말도 하지 않는다. 고를 수 없다는
+    // 것이 색으로 이미 보이고, 배치도를 훑다 보면 회색을 스치듯 누르는 일이
+    // 잦아서 그때마다 안내를 띄우면 스낵바가 떴다 사라지기를 반복한다.
+    //
+    // 알려 줘야 하는 경우는 따로 있다. 초록 자리를 눌러 잡으려는데 그 사이
+    // 남이 채 간 때다(409). 그건 [_onHoldFailed] 가 맡는다.
+    if (!seat.isSelectable) return;
+    BookingScope.read(context).selectSeat(_zoneOf(zoneSeats), seat);
+  }
+
+  /// 확인을 받고 서버에 자리를 잡은 뒤 결제 화면으로 보낸다.
+  ///
+  /// **탭한 순간이 아니라 여기서 잡는다.** 칸이 작아 오탭이 잦은데 탭마다
+  /// 요청을 보내면 남의 자리까지 풀렸다 잡혔다 한다.
+  Future<void> _onCheckout() async {
+    final seat = _controller.selectedSeat;
+    final seatLabel = _controller.selectedSeatLabel;
+    if (seat == null || seatLabel == null || _holding) return;
+
+    final confirmed = await showSeatConfirmDialog(context, seatLabel);
+    if (!confirmed || !mounted) return;
+
+    setState(() => _holding = true);
+    try {
+      final hold = await _api.holdSeat(concertId: _concertId, seatId: seat.id);
+      if (!mounted) return;
+      _controller.holdSeat(hold);
+    } on ApiException catch (e) {
+      if (mounted) _onHoldFailed(e);
+      return;
+    } finally {
+      if (mounted) setState(() => _holding = false);
+    }
+
+    await Navigator.pushNamed(context, AppRoutes.payment);
+    // 결제를 마치지 않고 돌아왔다. 잡아 둔 자리를 놓아 남이 살 수 있게 한다.
+    //
+    // 결제를 끝내고 온 경우와 구분하지 않는 이유: 주문 API 가 아직 없어
+    // 결제 화면이 서버에 아무것도 남기지 않는다. 주문이 붙으면 결제 성공
+    // 여부를 받아 갈라야 한다.
+    if (mounted) await _releaseHold();
+  }
+
+  /// 잡아 둔 자리를 푼다. 실패는 삼킨다 — 5분 뒤 서버가 알아서 푼다.
+  Future<void> _releaseHold() async {
+    final hold = _controller.hold;
+    if (hold == null) return;
+
+    _controller.clearHold();
+    try {
+      await _api.cancelHold(concertId: _concertId, seatId: hold.seatId);
+    } on ApiException {
+      return;
+    }
+    // 놓은 자리가 다시 예매 가능으로 보이도록 배치도를 새로 받는다.
+    if (mounted) _refresh();
+  }
+
+  void _onHoldFailed(ApiException e) {
+    switch (e.status) {
+      case 401:
+        // 서버가 요청자를 알아야 자리를 잡아 준다. 고른 자리는 그대로 두므로
+        // 로그인하고 돌아와 결제하기를 한 번 더 누르면 된다.
+        _showMessage(BookingStrings.loginRequired);
+        Navigator.pushNamed(context, AppRoutes.login);
+      case 409:
+        // 고르는 사이에 남이 가져갔다. 지금 배치도는 이미 낡았으므로 다시 받는다.
+        _showMessage(BookingStrings.seatTaken);
+        _controller.clearSelection();
+        _refresh();
+      default:
+        _showMessage(e.message);
     }
   }
 
-  Future<void> _onCheckout() async {
-    final controller = BookingScope.read(context);
-    final seat = controller.selectedSeat;
-    if (seat == null) return;
-
-    final confirmed = await showSeatConfirmDialog(context, seat);
-    if (!confirmed || !mounted) return;
-
-    await Navigator.pushNamed(context, AppRoutes.payment);
-  }
+  /// 좌석 응답이 함께 준 구역 정보로 [Zone] 을 만든다.
+  ///
+  /// 구역 목록을 다시 받지 않는 이유: 서버가 좌석 응답 머리에 구역 이름과
+  /// 가격을 실어 준다. 결제 금액과 좌석 이름에 필요한 건 그 둘뿐이다.
+  Zone _zoneOf(ZoneSeats zoneSeats) => Zone(
+    id: zoneSeats.zoneId,
+    name: zoneSeats.zoneName,
+    price: zoneSeats.price,
+    seatCount: zoneSeats.seatCount,
+    availableCount: zoneSeats.availableCount,
+    rowCount: zoneSeats.rows.length,
+    seatsPerRow: zoneSeats.rows.isEmpty ? 0 : zoneSeats.rows.first.length,
+  );
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
@@ -55,7 +176,6 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = BookingScope.of(context);
-    final zone = controller.zoneById(widget.zoneId);
     final selectedSeat = controller.selectedSeat;
 
     return Scaffold(
@@ -63,7 +183,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
         title: const Text('좌석 선택'),
         actions: [
           IconButton(
-            onPressed: () => _showMessage('좌석 정보를 새로 불러왔어요.'),
+            onPressed: _refresh,
             icon: const Icon(Icons.refresh),
             tooltip: '좌석 정보 새로고침',
           ),
@@ -73,18 +193,28 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
         children: [
           PerformanceHeader(performance: controller.performance),
           const SeatLegend(),
-          _ViewingZoneRow(
-            zone: zone,
-            onChangeZone: () => Navigator.pop(context),
-          ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SeatGrid(
-                zone: zone,
-                seatRows: controller.seatRowsOf(zone.id),
-                selectedSeatId: selectedSeat?.id,
-                onSeatTap: _onSeatTap,
+            child: AsyncBoundary<ZoneSeats>(
+              future: _seats,
+              onRetry: _refresh,
+              builder: (context, zoneSeats) => Column(
+                children: [
+                  _ViewingZoneRow(
+                    zoneName: zoneSeats.zoneName,
+                    onChangeZone: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SeatGrid(
+                        seatsPerRow: _zoneOf(zoneSeats).seatsPerRow,
+                        seatRows: zoneSeats.rows,
+                        selectedSeatId: selectedSeat?.id,
+                        onSeatTap: (seat) => _onSeatTap(zoneSeats, seat),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -111,10 +241,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                 const SizedBox(height: 5),
                 Text(
                   '* 1인 1매만 예매할 수 있어요',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: AppColors.accent),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: AppColors.accent),
                 ),
               ],
             ),
@@ -122,20 +251,21 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
         ],
       ),
       bottomNavigationBar: BookingBottomBar(
-        seatLabel: selectedSeat?.label,
+        seatLabel: controller.selectedSeatLabel,
         amount: controller.payableAmount,
         actionLabel: '결제하기',
-        onPressed: selectedSeat == null ? null : _onCheckout,
+        // 자리를 잡는 동안에도 잠근다. 두 번 누르면 두 번 잡힌다.
+        onPressed: selectedSeat == null || _holding ? null : _onCheckout,
       ),
     );
   }
 }
 
-/// '지금 보고 있는 구역은 A구역이에요' + 구역 변경 버튼.
+/// '지금 보고 있는 구역은 ... 입니다' + 구역 변경 버튼.
 class _ViewingZoneRow extends StatelessWidget {
-  const _ViewingZoneRow({required this.zone, required this.onChangeZone});
+  const _ViewingZoneRow({required this.zoneName, required this.onChangeZone});
 
-  final Zone zone;
+  final String zoneName;
   final VoidCallback onChangeZone;
 
   @override
@@ -152,13 +282,15 @@ class _ViewingZoneRow extends StatelessWidget {
                 children: [
                   const TextSpan(text: '지금 보고 있는 구역은 '),
                   TextSpan(
-                    text: zone.shortLabel,
+                    text: zoneName,
                     style: const TextStyle(
                       color: AppColors.accent,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const TextSpan(text: '이에요'),
+                  // 구역명이 서버에서 오므로 받침을 알 수 없다. '이에요'/'예요'
+                  // 를 고를 수 없어 조사가 필요 없는 형태로 끊는다.
+                  const TextSpan(text: ' 입니다'),
                 ],
               ),
               style: textTheme.bodySmall,

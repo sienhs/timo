@@ -3,43 +3,45 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../models/zone.dart';
-import '../state/booking_scope.dart';
 
 /// '잔여좌석보기' 패널.
 class RemainingSeatsPanel extends StatelessWidget {
-  const RemainingSeatsPanel({super.key});
+  const RemainingSeatsPanel({super.key, required this.zones});
+
+  final List<Zone> zones;
 
   @override
   Widget build(BuildContext context) {
-    final controller = BookingScope.of(context);
-
     return _ZoneInfoPanel(
-      description: '좌석명을 선택하시면 각 구역 별 잔여좌석을 확인할 수 있습니다. '
+      description:
+          '좌석명을 선택하시면 각 구역 별 잔여좌석을 확인할 수 있습니다. '
           '좌석이 선점되어 있는 경우, 표기 된 잔여좌석과 선택할 수 있는 잔여좌석이 다를 수 있습니다.',
       rows: [
-        for (final zone in controller.zones)
+        for (final zone in zones)
           _ZoneInfoRow(
             zone: zone,
-            trailing: '${controller.availableCountOf(zone.id)}석',
-            emphasizeTrailing: controller.isSoldOut(zone.id),
+            trailing: '${zone.availableCount}석',
+            emphasizeTrailing: zone.isSoldOut,
           ),
       ],
     );
   }
 }
 
-/// '좌석가격보기' 패널. 요구사항상 모든 좌석이 동일 금액이므로
-/// 구역별로 같은 값이 찍히는 게 정상이다.
+/// '좌석가격보기' 패널.
+///
+/// 요구사항상 좌석 등급이 없어 구역마다 같은 값이 찍히는 게 정상이지만, 서버
+/// 데이터는 층마다 가격이 갈린다. 어느 쪽이든 서버가 준 값을 그대로 보여준다.
 class ZonePricePanel extends StatelessWidget {
-  const ZonePricePanel({super.key});
+  const ZonePricePanel({super.key, required this.zones});
+
+  final List<Zone> zones;
 
   @override
   Widget build(BuildContext context) {
-    final controller = BookingScope.of(context);
-
     return _ZoneInfoPanel(
       rows: [
-        for (final zone in controller.zones)
+        for (final zone in zones)
           _ZoneInfoRow(
             zone: zone,
             trailing: formatWon(zone.price),
@@ -116,8 +118,9 @@ class _ZoneInfoRow extends StatelessWidget {
             trailing,
             style: textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
-              color:
-                  emphasizeTrailing ? AppColors.accent : AppColors.textPrimary,
+              color: emphasizeTrailing
+                  ? AppColors.accent
+                  : AppColors.textPrimary,
             ),
           ),
         ],

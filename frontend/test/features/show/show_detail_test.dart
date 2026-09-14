@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
 import 'package:timo/core/theme/app_theme.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/booking/constants.dart';
+import 'package:timo/features/booking/data/mock_booking_api.dart';
 import 'package:timo/features/booking/data/mock_booking_data.dart';
+import 'package:timo/features/booking/state/booking_api_scope.dart';
 import 'package:timo/features/booking/screens/zone_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
@@ -36,8 +43,8 @@ void main() {
     title: '2026 아이유 콘서트',
     venue: '고척스카이돔',
     posterAsset: 'assets/images/sample_poster.jpg',
+    // 단일 회차 공연이라 종료일이 없다. 화면에는 하루로 찍힌다.
     startAt: DateTime(2026, 5, 20),
-    endAt: DateTime(2026, 5, 21),
     ticketOpenAt: after == null ? null : now.add(after),
     seatPrices: const [SeatPrice(grade: '모든 좌석', price: 154000)],
     artists: const [ShowArtist(name: '아이유')],
@@ -48,32 +55,54 @@ void main() {
   ///
   /// `pumpAndSettle` 을 쓰지 않는다 — 오픈 전 공연은 1초마다 남은 시간을
   /// 다시 그려서 영원히 '정착'하지 않는다.
+  /// 로그인 상태를 만드는 토큰.
+  const tokens = AuthTokens(
+    memberId: 1,
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    accessTokenExpiresIn: Duration(minutes: 30),
+  );
+
   Future<void> pumpDetail(
     WidgetTester tester,
     ShowDetail detail, {
     DateTime Function()? clock,
+    bool loggedIn = true,
   }) async {
     usePhoneSize(tester);
-    // 좌석 선택 화면은 예매 컨트롤러를 위에서 받는다. 앱에서는 App 이
-    // 내려주므로, 단독으로 띄울 때는 여기서 같은 것을 세워 준다.
+    // 좌석 선택 화면은 예매 컨트롤러와 예매 API 를 위에서 받는다. 앱에서는
+    // App 이 내려주므로, 단독으로 띄울 때는 여기서 같은 것을 세워 준다.
     final controller = BookingController(
       performance: MockBookingData.performance,
-      zones: MockBookingData.zones,
-      seatRowsByZone: MockBookingData.seatRowsByZone,
     );
     addTearDown(controller.dispose);
 
+    // 예매 진입은 로그인을 요구한다. 로그인 여부를 보는 화면이므로 세션도
+    // 세워 준다. 기본은 로그인 상태다 — 이 파일의 관심사는 예매 진입 자체가
+    // 아니라 상세 화면의 표시이고, 로그인 분기는 따로 검사한다.
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    if (loggedIn) await session.signIn(tokens);
+    addTearDown(session.dispose);
+
     await tester.pumpWidget(
-      BookingScope(
-        controller: controller,
-        child: MaterialApp(
-          theme: AppTheme.light,
-          home: ShowDetailScreen(
-            detail: detail,
-            clock: clock ?? () => now,
+      AuthSessionScope(
+        session: session,
+        child: BookingApiScope(
+          api: MockBookingApi(latency: Duration.zero),
+          child: BookingScope(
+            controller: controller,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: ShowDetailScreen(detail: detail, clock: clock ?? () => now),
+              // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
+              routes: {
+                AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen(
+                  concertId: BookingConstants.fallbackConcertId,
+                ),
+                AppRoutes.login: (_) => const Scaffold(body: Text('로그인 화면')),
+              },
+            ),
           ),
-          // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
-          routes: {AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen()},
         ),
       ),
     );
@@ -141,7 +170,7 @@ void main() {
       await pumpDetail(tester, detailOpening());
 
       expect(find.text(ShowDetailStrings.onSaleBadge), findsOneWidget);
-      expect(find.text('2026.05.20 ~ 05.21'), findsOneWidget);
+      expect(find.text('2026.05.20'), findsOneWidget);
       expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
     });
 
@@ -160,7 +189,7 @@ void main() {
 
     expect(find.text('2026 아이유 콘서트'), findsOneWidget);
     expect(find.text('공연 장소: 고척스카이돔'), findsOneWidget);
-    expect(find.text('일시: 2026.05.20 ~ 05.21'), findsOneWidget);
+    expect(find.text('일시: 2026.05.20'), findsOneWidget);
     expect(find.text(ShowDetailStrings.seatPriceSection), findsOneWidget);
     expect(find.text('모든 좌석'), findsOneWidget);
     expect(find.text('154,000원'), findsOneWidget);

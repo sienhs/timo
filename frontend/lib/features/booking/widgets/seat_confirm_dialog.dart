@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../models/seat.dart';
 
 /// 결제로 넘어가기 직전의 좌석 확인 다이얼로그.
 ///
@@ -9,19 +8,25 @@ import '../models/seat.dart';
 /// (확인 화면에서도 하단 바에 좌석이 이미 선택돼 있다).
 /// 좌석마다 다이얼로그를 띄우면 자리 비교조차 못 하게 된다.
 ///
+/// 좌석이 아니라 다 만들어진 이름([seatLabel])을 받는다. 이름에는 구역명이
+/// 들어가는데 좌석은 제 구역의 이름을 모르기 때문이다.
+///
 /// 사용자가 '예'를 눌렀으면 true.
-Future<bool> showSeatConfirmDialog(BuildContext context, Seat seat) async {
+Future<bool> showSeatConfirmDialog(
+  BuildContext context,
+  String seatLabel,
+) async {
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (context) => _SeatConfirmDialog(seat: seat),
+    builder: (context) => _SeatConfirmDialog(seatLabel: seatLabel),
   );
   return confirmed ?? false;
 }
 
 class _SeatConfirmDialog extends StatelessWidget {
-  const _SeatConfirmDialog({required this.seat});
+  const _SeatConfirmDialog({required this.seatLabel});
 
-  final Seat seat;
+  final String seatLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +56,7 @@ class _SeatConfirmDialog extends StatelessWidget {
                 children: [
                   const TextSpan(text: '선택한 좌석이\n'),
                   TextSpan(
-                    text: seat.label,
+                    text: seatLabel,
                     style: const TextStyle(color: AppColors.accent),
                   ),
                   const TextSpan(text: '이 맞나요?'),

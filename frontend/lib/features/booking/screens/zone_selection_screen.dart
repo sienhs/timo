@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/async_boundary.dart';
 import '../../../routes/app_routes.dart';
+import '../constants.dart';
+import '../data/booking_api.dart';
 import '../models/zone.dart';
+import '../state/booking_api_scope.dart';
 import '../state/booking_scope.dart';
 import '../widgets/performance_header.dart';
 import '../widgets/venue_map.dart';
@@ -10,7 +14,10 @@ import '../widgets/zone_info_panels.dart';
 
 /// 시안 '좌석 선택 시작' 화면. 구역 배치도에서 구역을 골라 들어간다.
 class ZoneSelectionScreen extends StatefulWidget {
-  const ZoneSelectionScreen({super.key});
+  const ZoneSelectionScreen({super.key, required this.concertId});
+
+  /// 서버가 준 공연 번호. 구역과 잔여석은 공연마다 다르다.
+  final int concertId;
 
   @override
   State<ZoneSelectionScreen> createState() => _ZoneSelectionScreenState();
@@ -23,30 +30,45 @@ enum _OpenPanel { none, remainingSeats, price }
 class _ZoneSelectionScreenState extends State<ZoneSelectionScreen> {
   _OpenPanel _open = _OpenPanel.none;
 
+  late BookingApi _api;
+  late Future<List<Zone>> _zones;
+
+  @override
+  void initState() {
+    super.initState();
+    // 이 화면이 예매 흐름의 시작이다. 어느 공연인지 여기서 정해 두면 좌석·결제
+    // 화면이 라우트 인자를 다시 나르지 않아도 된다.
+    BookingScope.read(context).startBooking(widget.concertId);
+    _api = BookingApiScope.of(context);
+    _zones = _api.fetchZones(widget.concertId);
+  }
+
   void _toggle(_OpenPanel panel) {
     setState(() => _open = _open == panel ? _OpenPanel.none : panel);
   }
 
   void _openZone(Zone zone) {
-    if (BookingScope.read(context).isSoldOut(zone.id)) {
+    if (zone.isSoldOut) {
       // '구역은' 으로 붙이는 이유: 구역명이 'FLOOR B'(비) 처럼 모음으로 끝나면
       // '은' 이 틀린다. 이름마다 조사를 고를 수 없으니 조사가 필요 없는 형태로 쓴다.
-      _showMessage('${zone.name} 구역은 매진됐어요. 다른 구역을 골라주세요.');
+      _showMessage(BookingStrings.zoneSoldOut(zone.name));
       return;
     }
-    Navigator.pushNamed(
-      context,
-      AppRoutes.seatSelection,
-      arguments: zone.id,
-    );
+    Navigator.pushNamed(context, AppRoutes.seatSelection, arguments: zone.id);
   }
 
-  /// 목업이라 좌석 데이터가 고정이므로 실제로 다시 불러올 것은 없다.
+  /// 구역 목록을 다시 받아 온다.
   ///
-  /// 다만 이 버튼은 요구사항의 "취소표를 겨냥한 자동 새로고침이 겨냥할 시점을
-  /// 갖지 못하게 한다"는 정책과 신호가 어긋난다(회수 좌석은 재노출되지 않음).
+  /// 요구사항의 "취소표를 겨냥한 자동 새로고침이 겨냥할 시점을 갖지 못하게
+  /// 한다"는 정책과 이 버튼의 신호는 어긋난다(회수 좌석은 재노출되지 않음).
   /// 시안을 유지하되 정책 확인이 필요한 지점으로 남겨둔다.
-  void _refresh() => _showMessage('좌석 정보를 새로 불러왔어요.');
+  /// 화살표로 쓰지 않는 이유는 좌석 화면의 같은 메서드 주석 참고.
+  void _refresh() {
+    final next = _api.fetchZones(widget.concertId);
+    setState(() {
+      _zones = next;
+    });
+  }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
@@ -74,11 +96,18 @@ class _ZoneSelectionScreenState extends State<ZoneSelectionScreen> {
           PerformanceHeader(performance: controller.performance),
           _DisclosureRow(open: _open, onToggle: _toggle),
           Expanded(
-            child: switch (_open) {
-              _OpenPanel.none => _MapSection(onZoneTap: _openZone),
-              _OpenPanel.remainingSeats => const RemainingSeatsPanel(),
-              _OpenPanel.price => const ZonePricePanel(),
-            },
+            child: AsyncBoundary<List<Zone>>(
+              future: _zones,
+              onRetry: _refresh,
+              builder: (context, zones) => switch (_open) {
+                _OpenPanel.none => _MapSection(
+                  zones: zones,
+                  onZoneTap: _openZone,
+                ),
+                _OpenPanel.remainingSeats => RemainingSeatsPanel(zones: zones),
+                _OpenPanel.price => ZonePricePanel(zones: zones),
+              },
+            ),
           ),
         ],
       ),
@@ -166,8 +195,9 @@ class _DisclosureButton extends StatelessWidget {
 }
 
 class _MapSection extends StatelessWidget {
-  const _MapSection({required this.onZoneTap});
+  const _MapSection({required this.zones, required this.onZoneTap});
 
+  final List<Zone> zones;
   final void Function(Zone zone) onZoneTap;
 
   @override
@@ -191,7 +221,7 @@ class _MapSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          VenueMap(onZoneTap: onZoneTap),
+          VenueMap(zones: zones, onZoneTap: onZoneTap),
           const SizedBox(height: 10),
           Text(
             '* 1인 1매만 예매할 수 있어요',

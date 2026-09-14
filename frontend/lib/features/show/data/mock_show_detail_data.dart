@@ -30,21 +30,20 @@ class MockShowDetailData {
   static ShowDetail get sample => _iu;
 
   /// 공연 id 로 상세를 찾는다. 모르는 id 면 [sample] 로 대체한다.
-  static ShowDetail byId(String? showId) =>
-      _byId[showId] ?? sample;
+  static ShowDetail byId(String? showId) => _byId[showId] ?? sample;
 
   static Map<String, ShowDetail> get _byId => {
-        for (final detail in all) detail.id: detail,
-      };
+    for (final detail in all) detail.id: detail,
+  };
 
   static List<ShowDetail> get all => [
-        _iu,
-        _blackSkirt,
-        _remind,
-        _bigbang,
-        _xia,
-        _peggyGou,
-      ];
+    _iu,
+    _blackSkirt,
+    _remind,
+    _bigbang,
+    _xia,
+    _peggyGou,
+  ];
 
   /// 오늘 자정. 오픈 일시를 여기서 더해 만든다(홈 목업과 같은 기준).
   static DateTime get _today {
@@ -60,7 +59,6 @@ class MockShowDetailData {
     venue: '고척스카이돔',
     posterAsset: _poster,
     startAt: DateTime(2026, 11, 1),
-    endAt: DateTime(2026, 12, 31),
     // 예매 목업(`MockBookingData`)의 구역 가격과 같은 값이다. 상세에서 본
     // 금액과 좌석 선택 화면의 금액이 다르면 시연 중에 버그로 보인다.
     seatPrices: const [SeatPrice(grade: '모든 좌석', price: 186000)],
@@ -87,7 +85,6 @@ class MockShowDetailData {
     venue: '올림픽공원 체조경기장',
     posterAsset: _poster,
     startAt: DateTime(2026, 7, 5),
-    endAt: DateTime(2026, 7, 7),
     // 하루 넘게 남았다 — 카운트다운 대신 오픈 일시를 적는다.
     ticketOpenAt: _today.add(const Duration(days: 5, hours: 19)),
     // 등급이 둘인 공연. 가격 카드가 한 줄에 맞춰져 있지 않은지 여기서 드러난다.
@@ -121,7 +118,6 @@ class MockShowDetailData {
     venue: '잠실실내체육관',
     posterAsset: _poster,
     startAt: DateTime(2026, 9, 1),
-    endAt: DateTime(2026, 9, 3),
     seatPrices: const [SeatPrice(grade: '모든 좌석', price: 143000)],
     artists: const [ShowArtist(name: '김준수')],
     notice: _notice,

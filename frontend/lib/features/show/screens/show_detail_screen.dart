@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/widgets/poster_image.dart';
 import '../../../routes/app_routes.dart';
+import '../../auth/state/auth_session_scope.dart';
 import '../constants.dart';
 import '../models/show_detail.dart';
 import '../widgets/seat_price_card.dart';
@@ -23,10 +24,19 @@ class ShowDetailScreen extends StatefulWidget {
   const ShowDetailScreen({
     super.key,
     required this.detail,
+    this.concertId,
     this.clock = DateTime.now,
   });
 
   final ShowDetail detail;
+
+  /// 서버가 준 공연 번호. 예매 흐름이 좌석을 물을 때 이 번호를 함께 보낸다.
+  ///
+  /// [detail] 과 따로 받는 이유: 상세 조회가 아직 목업이라 화면에 그려지는
+  /// 공연과 서버가 아는 공연이 다르다. 그래도 **홈에서 누른 공연의 진짜 번호**
+  /// 는 라우트 인자로 여기까지 와 있어서, 좌석만은 맞는 공연으로 물을 수 있다.
+  /// 공연 상세 API 연동(S15P21D206-175)이 붙으면 [detail] 안으로 합친다.
+  final int? concertId;
 
   /// 지금 시각을 읽는 함수. 테스트에서 시간을 흐르게 하려고 받는다
   /// (홈의 오픈 뱃지가 `now` 를 받는 것과 같은 이유다).
@@ -138,8 +148,26 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     );
   }
 
-  void _startBooking() {
-    Navigator.pushNamed(context, AppRoutes.zoneSelection);
+  /// 예매를 시작한다. 로그인부터 확인한다.
+  ///
+  /// 좌석을 다 고르고 결제 직전에 막는 것보다 들어가기 전에 막는 편이 낫다.
+  /// 서버는 좌석을 **잡을 때** 요청자를 요구하므로(조회는 누구나 된다) 로그인
+  /// 없이도 배치도까지는 그려진다. 그대로 두면 자리를 고르고 확인 다이얼로그까지
+  /// 누른 뒤에야 로그인하라는 말을 듣게 된다.
+  ///
+  /// 로그인 화면은 성공하면 결과로 true 를 넘기며 닫힌다. 돌아오면 고르던
+  /// 공연 그대로 예매를 이어 간다.
+  Future<void> _startBooking() async {
+    if (!AuthSessionScope.of(context).isLoggedIn) {
+      final loggedIn = await Navigator.pushNamed(context, AppRoutes.login);
+      if (loggedIn != true || !mounted) return;
+    }
+    if (!mounted) return;
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.zoneSelection,
+      arguments: widget.concertId,
+    );
   }
 
   void _notify(String message) {
