@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import 'auth_page.dart';
-import 'timo_logo.dart';
+import '../../../core/widgets/timo_logo.dart';
 
 /// 회원가입 단계 화면의 공통 틀.
 ///

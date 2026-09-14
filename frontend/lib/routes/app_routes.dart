@@ -10,6 +10,7 @@ import '../features/auth/screens/signup_username_screen.dart';
 import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
+import '../features/home/screens/show_search_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
 import '../features/show/data/mock_show_detail_data.dart';
 import '../features/show/screens/show_detail_screen.dart';
@@ -26,6 +27,9 @@ class AppRoutes {
 
   /// 공연 상세. 공연 id 를 arguments 로 받는다.
   static const showDetail = '/show';
+
+  /// 공연 검색. 홈 상단 검색 바에서 들어온다.
+  static const showSearch = '/search';
 
   /// 구역 배치도(좌석 선택 시작)
   static const zoneSelection = '/booking/zones';
@@ -58,6 +62,7 @@ class AppRoutes {
         ModalRoute.of(context)!.settings.arguments as String?,
       ),
     ),
+    showSearch: (_) => const ShowSearchScreen(),
     zoneSelection: (_) => const ZoneSelectionScreen(),
     // 인자를 받는 화면은 여기서 한 번만 꺼내 타입을 맞춘다. 화면 위젯이
     // ModalRoute 를 직접 뒤지지 않게 해서 단독 테스트가 가능하다.

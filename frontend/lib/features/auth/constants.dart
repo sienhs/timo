@@ -79,13 +79,6 @@ class AuthServerErrors {
   static const loginFailed = 'LoginFailedException';
 }
 
-class AuthAssets {
-  AuthAssets._();
-
-  /// 로고 이미지. 파일이 없으면 TimoLogo 가 글자로 대신 그린다.
-  static const logo = 'assets/images/timo_logo.png';
-}
-
 class AuthStrings {
   AuthStrings._();
 

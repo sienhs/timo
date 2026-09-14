@@ -14,7 +14,7 @@ import '../state/auth_session_scope.dart';
 import '../widgets/auth_page.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/obscure_toggle.dart';
-import '../widgets/timo_logo.dart';
+import '../../../core/widgets/timo_logo.dart';
 
 /// 로그인 화면. 로고 → 아이디 → 비밀번호 → '회원가입' 링크 → 하단 '로그인'.
 ///

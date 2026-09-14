@@ -1,11 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/widgets/timo_logo.dart';
+import 'package:timo/core/widgets/async_boundary.dart';
 import 'package:timo/features/home/constants.dart';
+import 'package:timo/features/home/data/home_api.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/models/artist_summary.dart';
+import 'package:timo/features/home/models/show_summary.dart';
+import 'package:timo/features/home/screens/show_search_screen.dart';
 import 'package:timo/features/home/models/refresh_hint.dart';
 import 'package:timo/features/home/widgets/home_refresh_hint.dart';
 import 'package:timo/features/home/widgets/artist_section.dart';
+import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 import 'package:timo/features/home/widgets/home_section_header.dart';
+import 'package:timo/features/home/widgets/show_card_row_skeleton.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 
 /// 홈 화면과 검색 화면.
@@ -20,9 +32,15 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  Future<void> pumpHome(WidgetTester tester) async {
+  /// 홈을 띄운다. [api] 를 주지 않으면 실제 서버처럼 잠깐 기다리는 목이다 —
+  /// 새로 고침 안내 문구가 보이는 시간을 확보하려면 응답이 바로 오면 안 된다.
+  Future<void> pumpHome(WidgetTester tester, {HomeApi? api}) async {
     usePhoneSize(tester);
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(App(homeApi: api ?? const MockHomeApi()));
+    // 목 응답 지연만큼 시간을 넘겨 첫 로딩을 끝낸다. 타이머는 프레임을 잡지
+    // 않아 pumpAndSettle 만으로는 기다려지지 않고, 남은 타이머는 테스트가
+    // 끝날 때 실패로 잡힌다.
+    await tester.pump(HomeMetrics.mockLatency);
     await tester.pumpAndSettle();
   }
 
@@ -76,19 +94,18 @@ void main() {
 
   /// '더보기' 는 아티스트 섹션과 오픈 임박 섹션에 모두 있다. 어느 섹션의
   /// 것인지 제목으로 좁힌다.
-  Finder moreButtonOf(String sectionTitle, String moreLabel) =>
-      find.descendant(
-        of: find.ancestor(
-          of: find.text(sectionTitle),
-          matching: find.byType(HomeSectionHeader),
-        ),
-        matching: find.text(moreLabel),
-      );
+  Finder moreButtonOf(String sectionTitle, String moreLabel) => find.descendant(
+    of: find.ancestor(
+      of: find.text(sectionTitle),
+      matching: find.byType(HomeSectionHeader),
+    ),
+    matching: find.text(moreLabel),
+  );
 
   testWidgets('홈에 시안의 섹션이 모두 있다', (tester) async {
     await pumpHome(tester);
 
-    expect(find.text(HomeStrings.logo), findsOneWidget);
+    expect(find.byType(TimoLogo), findsOneWidget);
     expect(find.text(HomeStrings.searchHint), findsOneWidget);
 
     // 아래쪽 섹션은 화면 밖이라 스크롤해서 확인한다.
@@ -107,15 +124,7 @@ void main() {
 
     await scrollTo(tester, find.text(HomeStrings.artistSection));
 
-    for (final name in [
-      '김준수',
-      '옥주현',
-      '검정치마',
-      '정명훈',
-      '아이유',
-      '박보검',
-      '페기구',
-    ]) {
+    for (final name in ['김준수', '옥주현', '검정치마', '정명훈', '아이유', '박보검', '페기구']) {
       expect(find.text(name), findsOneWidget, reason: '$name 이 없다');
     }
     expect(
@@ -130,8 +139,9 @@ void main() {
   testWidgets('손을 떼기 전 당기는 중부터 안내 문구가 보인다', (tester) async {
     await pumpHome(tester);
 
-    final gesture =
-        await tester.startGesture(tester.getCenter(find.byType(ListView).first));
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ListView).first),
+    );
     await gesture.moveBy(const Offset(0, 150));
     await tester.pump();
     await tester.pump(HomeMetrics.refreshHintTransition);
@@ -145,11 +155,7 @@ void main() {
   testWidgets('아래로 당기면 안내 문구와 함께 새로 고치고, 끝나면 접힌다', (tester) async {
     await pumpHome(tester);
 
-    await tester.fling(
-      find.byType(ListView).first,
-      const Offset(0, 400),
-      1000,
-    );
+    await tester.fling(find.byType(ListView).first, const Offset(0, 400), 1000);
     await tester.pump();
     await tester.pump(HomeMetrics.refreshHintTransition);
 
@@ -168,11 +174,7 @@ void main() {
     const highlight = '기다리고';
     double highlightTop() => tester.getTopLeft(find.text(highlight)).dy;
 
-    await tester.fling(
-      find.byType(ListView).first,
-      const Offset(0, 400),
-      1000,
-    );
+    await tester.fling(find.byType(ListView).first, const Offset(0, 400), 1000);
     await tester.pump();
 
     // 당기는 중에는 아직 튀지 않는다.
@@ -238,13 +240,73 @@ void main() {
     );
   });
 
-  testWidgets('검색 화면이 없어 검색 바를 누르면 준비 중 안내가 뜬다', (tester) async {
+  testWidgets('검색 바를 누르면 검색 화면이 열린다', (tester) async {
     await pumpHome(tester);
 
     await tester.tap(find.text(HomeStrings.searchHint));
     await tester.pumpAndSettle();
 
-    expect(find.text(HomeStrings.searchNotReady), findsOneWidget);
+    expect(find.byType(ShowSearchScreen), findsOneWidget);
+  });
+
+  group('서버에서 받아 오는 공연 줄', () {
+    testWidgets('오픈 임박 · 인기 공연 카드가 응답 순서대로 나온다', (tester) async {
+      await pumpHome(tester, api: const MockHomeApi(latency: Duration.zero));
+
+      await scrollTo(tester, find.text(HomeStrings.ticketOpenSection));
+      for (final show in MockHomeApi.ticketOpenSoon) {
+        expect(
+          find.text(show.title),
+          findsWidgets,
+          reason: '${show.title} 카드가 없다',
+        );
+      }
+
+      await scrollTo(tester, find.text(HomeStrings.popularSection));
+      // 인기 1위 카드에 순위 뱃지가 붙는다.
+      expect(find.text(HomeStrings.rank(1)), findsOneWidget);
+    });
+
+    testWidgets('배너는 인기 공연 앞 세 건이다', (tester) async {
+      await pumpHome(tester, api: const MockHomeApi(latency: Duration.zero));
+
+      final carousel = tester.widget<HomeBannerCarousel>(
+        find.byType(HomeBannerCarousel),
+      );
+      expect(
+        carousel.banners.map((s) => s.id).toList(),
+        MockHomeApi.popular
+            .take(HomeMetrics.bannerCount)
+            .map((s) => s.id)
+            .toList(),
+      );
+      // 첫 배너에 공연 제목과 공연장이 찍힌다.
+      expect(find.text(MockHomeApi.popular.first.venueName), findsOneWidget);
+    });
+
+    testWidgets('응답을 기다리는 동안 카드 자리에 빈 카드가 있다', (tester) async {
+      await pumpHome(tester, api: _NeverRespondingHomeApi());
+
+      await scrollTo(tester, find.text(HomeStrings.ticketOpenSection));
+
+      expect(find.byType(ShowCardRowSkeleton), findsWidgets);
+      expect(find.byType(ShowPosterCard), findsNothing);
+    });
+
+    testWidgets('실패하면 서버 문구와 다시 시도가 보이고, 누르면 다시 받아 온다', (tester) async {
+      final api = _FlakyHomeApi();
+      await pumpHome(tester, api: api);
+
+      await scrollTo(tester, find.text(HomeStrings.ticketOpenSection));
+      expect(find.text(_FlakyHomeApi.failureMessage), findsWidgets);
+      expect(find.byType(ShowPosterCard), findsNothing);
+
+      api.failing = false;
+      await tester.tap(find.text(AsyncBoundary.retryLabel).first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ShowPosterCard), findsWidgets);
+    });
   });
 
   testWidgets('아티스트를 누르면 준비 중 안내가 뜬다', (tester) async {
@@ -316,4 +378,54 @@ void main() {
       );
     });
   });
+}
+
+/// 응답이 영원히 오지 않는 서버. 로딩 상태를 붙잡아 두는 데 쓴다.
+class _NeverRespondingHomeApi implements HomeApi {
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenSoon() =>
+      Completer<List<ShowSummary>>().future;
+
+  @override
+  Future<List<ShowSummary>> fetchPopular() =>
+      Completer<List<ShowSummary>>().future;
+
+  @override
+  Future<List<ShowSummary>> search(String keyword) =>
+      Completer<List<ShowSummary>>().future;
+
+  @override
+  Future<List<ArtistSummary>> fetchPopularArtists() =>
+      Completer<List<ArtistSummary>>().future;
+}
+
+/// [failing] 인 동안은 서버 오류로 실패하고, 끄면 목 데이터로 성공한다.
+/// 실패 -> 다시 시도 -> 성공 흐름을 한 테스트 안에서 본다.
+class _FlakyHomeApi implements HomeApi {
+  bool failing = true;
+
+  static const failureMessage = '서버 응답이 늦어지고 있어요. 잠시 후 다시 시도해주세요.';
+
+  static const _mock = MockHomeApi(latency: Duration.zero);
+
+  Future<List<ShowSummary>> _guard(Future<List<ShowSummary>> Function() ok) {
+    if (failing) return Future.error(const ApiException(failureMessage));
+    return ok();
+  }
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenSoon() =>
+      _guard(_mock.fetchTicketOpenSoon);
+
+  @override
+  Future<List<ShowSummary>> fetchPopular() => _guard(_mock.fetchPopular);
+
+  @override
+  Future<List<ShowSummary>> search(String keyword) =>
+      _guard(() => _mock.search(keyword));
+
+  /// 아티스트는 서버 구현도 목업을 돌려주므로 실패를 흉내 내지 않는다.
+  @override
+  Future<List<ArtistSummary>> fetchPopularArtists() =>
+      _mock.fetchPopularArtists();
 }

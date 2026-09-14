@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
-import '../widgets/timo_logo.dart';
+import '../../../core/widgets/timo_logo.dart';
 
 /// 가입 완료 화면. 로고(위 가운데) → 그림 → 문구 → '티켓 보러 가기'.
 ///

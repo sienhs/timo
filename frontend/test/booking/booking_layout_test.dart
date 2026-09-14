@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 
 /// 레이아웃 스모크 테스트.
@@ -30,7 +31,9 @@ void main() {
 
   testWidgets('폰 크기에서 예매 흐름 화면이 오버플로 없이 그려진다', (tester) async {
     usePhoneSize(tester);
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(
+      const App(homeApi: MockHomeApi(latency: Duration.zero)),
+    );
     await tester.pumpAndSettle();
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.
@@ -67,7 +70,9 @@ void main() {
 
   testWidgets('매진 구역을 누르면 안내만 뜨고 진입하지 않는다', (tester) async {
     usePhoneSize(tester);
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(
+      const App(homeApi: MockHomeApi(latency: Duration.zero)),
+    );
     await tester.pumpAndSettle();
 
     // 앱은 하단 바를 두른 홈 셸에서 시작한다. 예매 흐름은 홈에서 들어간다.

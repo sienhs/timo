@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/timo_logo.dart';
 import '../constants.dart';
 
 /// 로고와 검색 입구. 스크롤을 따라 올라가도록 AppBar 가 아니라 본문 위젯이다
@@ -24,13 +25,9 @@ class HomeTopBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Text(
-              HomeStrings.logo,
-              style: textTheme.titleMedium?.copyWith(
-                color: AppColors.brand,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            // 로그인 헤더와 같은 로고·같은 높이. 글자 로고는 이미지가 없을 때의
+            // 대체일 뿐이라 여기서 따로 그리지 않는다.
+            const TimoLogo(height: HomeMetrics.logoHeight),
             const SizedBox(width: HomeMetrics.logoGap),
             Expanded(
               child: Semantics(

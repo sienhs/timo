@@ -10,7 +10,9 @@ import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
-import 'package:timo/features/auth/widgets/timo_logo.dart';
+import 'package:timo/core/widgets/timo_logo.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
 void main() {
@@ -115,11 +117,15 @@ void main() {
       // initialRoute 가 '/login' 이면 홈('/')이 먼저 깔리고 그 위에 로그인이
       // 올라간다. 라우트 등록과 뒤로가기를 한 번에 확인한다.
       usePhoneSize(tester);
+      // 홈 탭이 공연 API 를 위에서 찾으므로 앱처럼 스코프로 감싼다.
       await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          initialRoute: AppRoutes.login,
-          routes: AppRoutes.routes,
+        HomeApiScope(
+          api: const MockHomeApi(latency: Duration.zero),
+          child: MaterialApp(
+            theme: AppTheme.light,
+            initialRoute: AppRoutes.login,
+            routes: AppRoutes.routes,
+          ),
         ),
       );
       await tester.pumpAndSettle();

@@ -42,8 +42,9 @@ class AppColors {
   /// 회색을 쓴다.
   static const swatch = Color(0xFFD3D3D3);
 
-  // 좌석 3상태. 시안 범례와 같다.
-  static const seatAvailable = Color(0xFFFFFFFF);
+  // 좌석 3상태. 시안 범례는 예매 가능을 흰색으로 그리지만, 흰 배치도 배경
+  // 위에서는 빈 칸과 구분이 안 가서 브랜드색을 아주 옅게 깐다.
+  static const seatAvailable = Color(0xFFEAF7EF);
   static const seatSelected = primary;
   static const seatSold = Color(0xFFD6D6D6);
 

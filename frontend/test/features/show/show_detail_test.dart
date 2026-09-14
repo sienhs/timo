@@ -6,6 +6,7 @@ import 'package:timo/features/booking/data/mock_booking_data.dart';
 import 'package:timo/features/booking/screens/zone_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
+import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 import 'package:timo/features/show/constants.dart';
 import 'package:timo/features/show/models/seat_price.dart';
@@ -186,20 +187,20 @@ void main() {
     });
   });
 
-  testWidgets('홈 카드를 누르면 그 공연의 상세가 열린다', (tester) async {
+  testWidgets('홈 카드를 누르면 상세가 열린다', (tester) async {
     usePhoneSize(tester);
-    await tester.pumpWidget(const App());
+    await tester.pumpWidget(
+      const App(homeApi: MockHomeApi(latency: Duration.zero)),
+    );
     await tester.pumpAndSettle();
 
-    // 티켓 오픈 임박 줄의 첫 카드 = 목업의 검정치마 단독공연.
+    // 홈 카드는 서버 공연 id 를 넘기는데 상세는 아직 목업이라 그 id 를 모른다.
+    // 표본 공연(이미 오픈)으로 대체되므로 카운트다운 없이 정착한다. 상세 API
+    // 를 붙이면 누른 공연의 상세가 열리는지로 바꾼다.
     await tester.tap(find.byType(ShowPosterCard).first);
-    // 오픈 전 공연이라 매초 다시 그려진다. `pumpAndSettle` 은 정착하지
-    // 않으므로 화면 전환 시간만큼만 넘긴다.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
 
     expect(find.byType(ShowDetailScreen), findsOneWidget);
-    // 제목은 뒤에 남은 홈 카드에도 있으므로 상세에만 있는 줄로 확인한다.
-    expect(find.text('공연 장소: 무신사 개러지'), findsOneWidget);
+    expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
   });
 }

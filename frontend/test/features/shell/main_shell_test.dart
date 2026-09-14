@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
@@ -8,8 +10,13 @@ import 'package:timo/features/shell/widgets/quick_menu_button.dart';
 
 void main() {
   Future<void> pumpShell(WidgetTester tester) async {
+    // 홈 탭이 공연 API 를 위에서 찾는다. 앱에서는 App 이 내려주므로 여기서
+    // 같은 것을 세워 준다.
     await tester.pumpWidget(
-      const MaterialApp(home: MainShellScreen()),
+      const HomeApiScope(
+        api: MockHomeApi(latency: Duration.zero),
+        child: MaterialApp(home: MainShellScreen()),
+      ),
     );
   }
 

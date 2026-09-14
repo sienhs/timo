@@ -86,7 +86,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         children: [
           AspectRatio(
             aspectRatio: ShowDetailMetrics.posterAspectRatio,
-            child: PosterImage(
+            child: PosterImage.asset(
               assetPath: detail.posterAsset,
               decodeWidth: MediaQuery.sizeOf(context).width,
             ),
