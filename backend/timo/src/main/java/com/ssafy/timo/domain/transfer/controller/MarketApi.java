@@ -1,66 +1,138 @@
 package com.ssafy.timo.domain.transfer.controller;
 
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
-import com.ssafy.timo.domain.transfer.dto.ListingListRequestDto;
-import com.ssafy.timo.domain.transfer.dto.ListingResponseDto;
+import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
+import com.ssafy.timo.domain.transfer.dto.ListingSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.MarketConcertSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
+import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 /**
  * 공식 양도 마켓 API 규약.
  *
- * <p>양도는 이 마켓을 통해서만 이루어진다. 개인 간 직접 전송은 컨트랙트가 막는다. 매물은 {@code tokenId} 로
- * 식별한다. 티켓 하나는 동시에 매물 하나만 될 수 있어 별도 매물 id 가 필요 없다.
+ * <p>양도는 이 마켓을 통해서만 이루어진다. 개인 간 직접 전송은 컨트랙트가 막는다.
+ *
+ * <p><b>매물은 {@code listingId} 로 식별한다.</b> 티켓 식별자({@code ticketId} · {@code tokenId})를
+ * 외부에 내보내지 않기 위해서다. 노출되면 원 예매 건과 재양도 이력이 역추적되고, 특히
+ * {@code tokenId} 는 온체인 공개값이라 체인 탐색기에서 소유 이력이 그대로 보인다. 한 티켓이
+ * 여러 번 등록될 수 있으므로 매물마다 새 식별자가 생기는 편이 익명성에도 맞다.
+ *
+ * <p>모든 경로가 인증을 요구한다. {@code mine} 판정에 요청자가 필요하고, 요청자의 근거는
+ * 서명된 토큰의 {@code sub} 하나뿐이다 — 경로·본문으로 회원 식별자를 받지 않는다.
  *
  * <p>메서드 매핑과 요청 검증 애노테이션은 여기에만 둔다. 구현체(v1 실제 컨트롤러, v0 스텁)는
  * 클래스 레벨 {@code @RequestMapping} 으로 버전 경로만 정하고 이 메서드들을 그대로 오버라이드한다.
  * 자세한 이유는 {@link com.ssafy.timo.domain.venue.controller.VenueApi} 참고.
  *
- * <p>v1 실제 구현은 아직 없다. 등록·취소는 {@code TicketNFT.listForTransfer / delist}, 체결은
- * {@code Marketplace.buy} 를 백엔드 오퍼레이터 지갑이 대신 호출한다.
+ * <p>v1 실제 구현은 아직 없다. 온체인 연동(등록은 {@code TicketNFT.listForTransfer},
+ * 취소는 {@code delist}, 체결은 {@code Marketplace.buy})은 방식이 정해지지 않아
+ * {@code TicketTransferService} 인터페이스 뒤로 미뤄 두었다.
  */
 public interface MarketApi {
 
     /**
-     * 내 티켓을 양도 매물로 등록한다.
+     * 양도 매물이 올라와 있는 공연 목록.
      *
-     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 등록되면 티켓은 {@code LISTED} 가 되어 취소·회수·입장이
-     * 막힌다. 남의 티켓이면 403, 정가 초과면 400, 이미 등록 중이면 409 다.
+     * <p>공연마다 매물 수와 최저가만 준다. 개별 매물은 {@link #findListings} 에서 받는다.
+     * {@code LISTED} 매물이 없거나 이미 시작한 공연은 나오지 않는다.
+     *
+     * <p>정렬은 공연 시작일 오름차순이다. 티켓은 공연이 끝나면 가치가 없어 임박한 것부터가
+     * 유일하게 의미 있는 순서다.
+     */
+    @GetMapping("/concerts")
+    ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
+            @Valid @ModelAttribute MarketListRequestDto request);
+
+    /**
+     * 공연 하나의 매물 목록. 낮은 가격순이다.
+     *
+     * <p>매물은 정가 이하로만 등록되므로 구매자에게 의미 있는 순서가 그것이다. 동가는 마지막에
+     * 유일 키({@code listingId} 오름차순)를 덧붙여 페이지를 넘길 때 같은 매물이 두 번 나오지 않게 한다.
+     *
+     * <p>내 매물도 함께 나오고 {@code mine} 으로 구분된다. 목록에서 내 것을 빼면 내가 올린 매물이
+     * 지금 어떤 가격대에 놓여 있는지 알 수 없다.
+     *
+     * <p>공연이 없으면 404 지만, 공연이 있고 매물만 없으면 빈 목록으로 200 이다.
+     */
+    @GetMapping("/concerts/{concertId}/listings")
+    ResponseEntity<PagedModel<ListingSummaryResponseDto>> findListings(
+            @PathVariable Long concertId,
+            @Valid @ModelAttribute MarketListRequestDto request);
+
+    /**
+     * 매물 한 건의 상세.
+     *
+     * <p>팔렸거나 취소된 매물도 200 으로 조회된다. 목록에서 상세로 들어가는 사이에 팔릴 수 있고,
+     * 그때 404 를 주면 화면이 "없는 매물"로 오해한다. 구매 가능 여부는 {@code status} 로 판단한다.
+     */
+    @GetMapping("/listings/{listingId}")
+    ResponseEntity<ListingDetailResponseDto> findListing(@PathVariable Long listingId);
+
+    /**
+     * 내 거래 내역. 판매와 구매를 한 목록에 섞어 최신순으로 준다.
+     *
+     * <p>경로를 둘로 나누면 "내 거래 내역" 화면 하나가 두 번 호출하고 시간순 병합을 클라이언트가
+     * 해야 한다. 쿼리 파라미터로 나눠도 서버는 결국 같은 두 테이블을 합쳐야 하면서 분기만 는다.
+     */
+    @GetMapping("/listings/me")
+    ResponseEntity<PagedModel<MyTradeSummaryResponseDto>> findMyTrades(
+            @Valid @ModelAttribute MarketListRequestDto request);
+
+    /**
+     * 내 티켓을 양도 매물로 등록한다. 201 이다.
+     *
+     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 정가 기준은 현재 구역 가격이 아니라
+     * 예매 시점 정가 스냅샷({@code ticket.face_value}) 이다. 등록되면 티켓은 {@code LISTED} 가 되어
+     * 취소·회수·입장이 막힌다.
+     *
+     * <p>남의 티켓이면 403, 정가 초과면 400, 이미 등록 중이면 409 다.
      */
     @PostMapping("/listings")
-    ResponseEntity<ListingResponseDto> list(@Valid @RequestBody CreateListingRequestDto request);
+    ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request);
 
     /**
      * 등록을 취소한다. 티켓은 다시 보유 상태로 돌아간다. 204 다.
      *
-     * <p><b>페널티 규칙은 미확정이다</b> (D-7 100% / 하루 80% / 당일 10% 중 미정). 정해지면 여기서 차감한다.
+     * <p>{@code DELETE} 가 아닌 이유는 행을 지우지 않기 때문이다. 매물은 {@code CANCELED} 로 남고
+     * {@code closedAt} 이 기록된다 — 취소 이력이 남아야 재양도 추적과 CS 가 가능하다.
+     *
+     * <p><b>페널티 규칙은 미확정이다</b> (D-7 100% / 하루 80% / 당일 10% 중 미정). 정해지면 여기서
+     * 차감하게 되고 응답이 204 가 아니게 될 수 있다.
      */
-    @DeleteMapping("/listings/{tokenId}")
-    ResponseEntity<Void> delist(@PathVariable String tokenId);
+    @PostMapping("/listings/{listingId}/cancel")
+    ResponseEntity<Void> cancel(@PathVariable Long listingId);
 
     /**
-     * 매물 목록. 낮은 가격순. {@code concertId} 로 공연 하나만 볼 수 있다.
+     * 매물을 구매한다. 선착순이며 응모·추첨·가격제안은 없다. <b>202</b> 다.
      *
-     * <p>내 매물도 함께 나오고 {@code mine} 으로 구분된다. 목록에서 내 것을 빼면 내가 올린 매물이 지금 어떤
-     * 가격대에 놓여 있는지 알 수 없다.
-     */
-    @GetMapping("/listings")
-    ResponseEntity<PagedModel<ListingResponseDto>> findAll(@Valid @ModelAttribute ListingListRequestDto request);
-
-    /**
-     * 매물을 구매한다. 대금 수령·소유 이전·판매자 정산이 한 번에 끝난다.
+     * <p>200 이 아닌 이유는 코인 전송과 NFT 소유권 이전이 DB 트랜잭션 밖이기 때문이다. 응답
+     * 시점에는 DB 상 체결만 끝났고 온체인은 아직이다. 진행은 {@code ticket_trade.status} 로
+     * 추적하며, 확인은 별도 폴링 API 가 아니라 {@link #findMyTrades} 에서 읽는다.
      *
-     * <p>구매자에게도 1인 1매가 적용된다. 그 공연의 티켓을 이미 보유하고 있으면 409
-     * ({@code AlreadyReservedException}) 다. 내 매물이면 409, 매물이 아니면 404 다.
+     * <p>{@code Idempotency-Key} 로 재시도가 결제를 두 번 일으키지 않게 한다. 클라이언트가 구매
+     * 시도마다 UUID 를 만들고, 재시도는 <b>같은 키</b>로 보낸다.
+     *
+     * <p>이미 팔렸거나 취소됐으면 409, 가격이 다르면 409, 내 매물이면 409, 매물이 없으면 404 다.
      */
-    @PostMapping("/listings/{tokenId}/purchase")
-    ResponseEntity<PurchaseResponseDto> purchase(@PathVariable String tokenId);
+    @PostMapping("/listings/{listingId}/purchase")
+    ResponseEntity<PurchaseResponseDto> purchase(
+            @PathVariable Long listingId,
+            @RequestHeader("Idempotency-Key")
+            @NotBlank(message = "멱등키는 필수입니다.")
+            @Size(max = 100, message = "멱등키는 100자 이하여야 합니다.")
+            String idempotencyKey,
+            @Valid @RequestBody PurchaseRequestDto request);
 }

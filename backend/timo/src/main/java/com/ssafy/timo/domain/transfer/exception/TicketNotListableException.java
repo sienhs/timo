@@ -9,8 +9,8 @@ import com.ssafy.timo.global.exception.BusinessException;
  */
 public class TicketNotListableException extends BusinessException {
 
-    public TicketNotListableException(String tokenId, String why) {
+    public TicketNotListableException(Long ticketId, String why) {
         super(TransferErrorCode.TICKET_NOT_LISTABLE,
-                TransferErrorCode.TICKET_NOT_LISTABLE.getMessage() + " (tokenId=" + tokenId + ", " + why + ")");
+                TransferErrorCode.TICKET_NOT_LISTABLE.getMessage() + " (ticketId=" + ticketId + ", " + why + ")");
     }
 }

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Clock;
@@ -23,9 +24,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -541,170 +544,276 @@ class StubApiTest {
     @DisplayName("양도 마켓")
     class Market {
 
-        /** 내가 처음부터 보유한 티켓. 3번 공연 2층 C블록, 정가 99,000. */
-        private static final String MY_TOKEN = StubFixtures.MY_TICKET_TOKEN_ID;
+        /** 내가 처음부터 보유한 티켓. 3번 공연 2층 C블록, 정가 99,000. 등록 전이라 매물이 아니다. */
+        private static final long MY_TICKET_ID = Long.parseLong(StubFixtures.MY_TICKET_TOKEN_ID);
 
-        private String listingBody(String tokenId, long askPrice) {
+        /** 고정 매물은 티켓 순서대로 열리므로 listingId 가 곧 티켓 번호다. 1~3 은 1번 공연, 4~5 는 3번 공연. */
+        private static final long OTHERS_LISTING_CONCERT1 = 3L;
+        private static final long OTHERS_LISTING_CONCERT3 = 5L;
+
+        private String listingBody(long ticketId, int price) {
             return """
-                    {"tokenId": "%s", "askPrice": %d}
-                    """.formatted(tokenId, askPrice);
+                    {"ticketId": %d, "price": %d}
+                    """.formatted(ticketId, price);
+        }
+
+        private String purchaseBody(int expectedPrice) {
+            return """
+                    {"expectedPrice": %d}
+                    """.formatted(expectedPrice);
+        }
+
+        private ResultActions purchase(long listingId, int expectedPrice) throws Exception {
+            return mockMvc.perform(post("/api/v0/market/listings/{listingId}/purchase", listingId)
+                    .header("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(purchaseBody(expectedPrice)));
         }
 
         @Test
-        void 매물_목록은_낮은_가격순이고_공연으로_걸러진다() throws Exception {
-            mockMvc.perform(get("/api/v0/market/listings"))
+        void 양도마켓_공연_목록은_매물_수와_최저가만_준다() throws Exception {
+            mockMvc.perform(get("/api/v0/market/concerts"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", hasSize(5)))
-                    .andExpect(jsonPath("$.content[0].tokenId").value("5"))
-                    .andExpect(jsonPath("$.content[0].listPrice").value(90_000))
-                    .andExpect(jsonPath("$.content[0].discountRate").value(9))
-                    .andExpect(jsonPath("$.content[4].tokenId").value("1"))
-                    .andExpect(jsonPath("$.content[4].discountRate").value(0))
-                    .andExpect(jsonPath("$.content[*].mine", everyItem(is(false))))
-                    .andExpect(jsonPath("$.content[0].sellerAddress").value(StubFixtures.OTHER_WALLET_ADDRESS));
-
-            // 내 보유 티켓(101)은 등록 전이라 매물에 없다.
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "3"))
                     .andExpect(jsonPath("$.content", hasSize(2)))
-                    .andExpect(jsonPath("$.content[0].tokenId").value("5"));
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "1"))
-                    .andExpect(jsonPath("$.content", hasSize(3)))
-                    .andExpect(jsonPath("$.content[0].tokenId").value("3"));
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "2"))
-                    .andExpect(jsonPath("$.content", hasSize(0)));
+                    .andExpect(jsonPath("$.content[?(@.concertId == 1)].listingCount", contains(3)))
+                    .andExpect(jsonPath("$.content[?(@.concertId == 1)].lowestPrice", contains(120_000)))
+                    .andExpect(jsonPath("$.content[?(@.concertId == 3)].listingCount", contains(2)))
+                    .andExpect(jsonPath("$.content[?(@.concertId == 3)].lowestPrice", contains(90_000)))
+                    // 개별 매물은 여기서 주지 않는다.
+                    .andExpect(jsonPath("$.content[0].listingId").doesNotExist());
         }
 
         @Test
-        void 구매하면_내_것이_되고_매물에서_사라지며_다시_등록할_수_있다() throws Exception {
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", "3"))
+        void 매물_목록은_낮은_가격순이고_좌석과_판매자를_내리지_않는다() throws Exception {
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 1))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.tradeId", startsWith("0x")))
-                    .andExpect(jsonPath("$.txHash", startsWith("0x")))
-                    .andExpect(jsonPath("$.tokenId").value("3"))
+                    .andExpect(jsonPath("$.content", hasSize(3)))
+                    .andExpect(jsonPath("$.content[0].listingId").value(3))
+                    .andExpect(jsonPath("$.content[0].price").value(120_000))
+                    .andExpect(jsonPath("$.content[0].faceValue").value(150_000))
+                    .andExpect(jsonPath("$.content[0].discountRate").value(20))
+                    .andExpect(jsonPath("$.content[0].sectionName").value("1층 B블록"))
+                    .andExpect(jsonPath("$.content[0].grade").value("COMMON"))
+                    .andExpect(jsonPath("$.content[2].listingId").value(1))
+                    .andExpect(jsonPath("$.content[2].discountRate").value(0))
+                    .andExpect(jsonPath("$.content[*].mine", everyItem(is(false))))
+                    // 체결 전에는 좌석이 특정되면 안 되고, 판매자도 어떤 형태로도 드러나면 안 된다.
+                    .andExpect(jsonPath("$.content[0].seatNo").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].seatCol").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].seatId").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].sellerAddress").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].ticketId").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].tokenId").doesNotExist());
+
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 3))
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[0].listingId").value(5))
+                    .andExpect(jsonPath("$.content[0].price").value(90_000));
+
+            // 매물이 없는 공연은 빈 목록이고, 없는 공연은 404 다.
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 2))
+                    .andExpect(jsonPath("$.content", hasSize(0)));
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", StubFixtures.NOT_FOUND_ID))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("ConcertNotFoundException"));
+        }
+
+        @Test
+        void 매물_상세는_팔린_뒤에도_조회된다() throws Exception {
+            mockMvc.perform(get("/api/v0/market/listings/{listingId}", OTHERS_LISTING_CONCERT1))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.listingId").value(OTHERS_LISTING_CONCERT1))
+                    .andExpect(jsonPath("$.status").value("LISTED"))
+                    .andExpect(jsonPath("$.concertId").value(1))
+                    .andExpect(jsonPath("$.venueName").exists())
+                    .andExpect(jsonPath("$.closedAt").doesNotExist())
+                    .andExpect(jsonPath("$.seatNo").doesNotExist());
+
+            purchase(OTHERS_LISTING_CONCERT1, 120_000).andExpect(status().isAccepted());
+
+            // 목록에서 상세로 들어가는 사이에 팔릴 수 있어 404 로 감추지 않는다.
+            mockMvc.perform(get("/api/v0/market/listings/{listingId}", OTHERS_LISTING_CONCERT1))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("SOLD"))
+                    .andExpect(jsonPath("$.closedAt").value("2026-09-10T12:00:00"));
+        }
+
+        @Test
+        void 구매하면_202와_PENDING_이고_내_거래_내역에_남는다() throws Exception {
+            purchase(OTHERS_LISTING_CONCERT1, 120_000)
+                    .andExpect(status().isAccepted())
+                    .andExpect(jsonPath("$.tradeId").value(1))
+                    .andExpect(jsonPath("$.listingId").value(OTHERS_LISTING_CONCERT1))
+                    // 온체인 전송이 남아 있어 완료로 적지 않는다.
+                    .andExpect(jsonPath("$.status").value("PENDING"))
                     .andExpect(jsonPath("$.price").value(120_000))
                     .andExpect(jsonPath("$.sectionName").value("1층 B블록"))
-                    .andExpect(jsonPath("$.purchasedAt").value("2026-09-10T12:00:00"));
+                    .andExpect(jsonPath("$.tradedAt").value("2026-09-10T12:00:00"))
+                    .andExpect(jsonPath("$.txHash").doesNotExist())
+                    .andExpect(jsonPath("$.seatNo").doesNotExist());
 
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "1"))
+            // 매물에서 사라지고 내 것이 되어 다시 등록할 수 있다.
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 1))
                     .andExpect(jsonPath("$.content", hasSize(2)));
 
-            mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody("3", 100_000)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.mine").value(true))
-                    .andExpect(jsonPath("$.sellerAddress").value(StubFixtures.MY_WALLET_ADDRESS));
-        }
-
-        @Test
-        void 그_공연_티켓을_보유하면_1인_1매로_구매가_막힌다() throws Exception {
-            // 내 티켓 101 이 3번 공연이라 3번 공연 매물은 처음부터 못 산다.
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", "5"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.exception").value("AlreadyReservedException"));
-
-            // 1번 공연은 살 수 있고, 사고 나면 그 공연의 다른 매물이 막힌다.
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", "3")).andExpect(status().isOk());
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", "2"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.exception").value("AlreadyReservedException"));
+            mockMvc.perform(get("/api/v0/market/listings/me"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].type").value("PURCHASE"))
+                    .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                    .andExpect(jsonPath("$.content[0].tradeId").value(1))
+                    .andExpect(jsonPath("$.content[0].price").value(120_000))
+                    .andExpect(jsonPath("$.content[0].occurredAt").value("2026-09-10T12:00:00"));
         }
 
         @Test
         void 등록은_정가_이하만_되고_취소하면_다시_등록할_수_있다() throws Exception {
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 99_001)))
+                            .content(listingBody(MY_TICKET_ID, 99_001)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.exception").value("ListPriceExceedsFacePriceException"));
 
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 90_000)))
+                            .content(listingBody(MY_TICKET_ID, 90_000)))
                     .andExpect(status().isCreated())
-                    .andExpect(header().string("Location", "/api/v0/market/listings/" + MY_TOKEN))
-                    .andExpect(jsonPath("$.facePrice").value(99_000))
-                    .andExpect(jsonPath("$.listPrice").value(90_000))
+                    .andExpect(header().string("Location", "/api/v0/market/listings/6"))
+                    .andExpect(jsonPath("$.listingId").value(6))
+                    .andExpect(jsonPath("$.status").value("LISTED"))
+                    .andExpect(jsonPath("$.faceValue").value(99_000))
+                    .andExpect(jsonPath("$.price").value(90_000))
                     .andExpect(jsonPath("$.discountRate").value(9))
                     .andExpect(jsonPath("$.mine").value(true))
                     .andExpect(jsonPath("$.listedAt").value("2026-09-10T12:00:00"));
 
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "3"))
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 3))
                     .andExpect(jsonPath("$.content", hasSize(3)))
-                    .andExpect(jsonPath("$.content[?(@.tokenId == '" + MY_TOKEN + "')].mine", everyItem(is(true))));
+                    .andExpect(jsonPath("$.content[?(@.listingId == 6)].mine", everyItem(is(true))));
 
             // 이미 등록 중인 티켓은 다시 등록할 수 없다.
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 80_000)))
+                            .content(listingBody(MY_TICKET_ID, 80_000)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("TicketNotListableException"));
 
-            mockMvc.perform(delete("/api/v0/market/listings/{tokenId}", MY_TOKEN))
+            // 취소는 행을 지우지 않고 CANCELED 로 남긴다.
+            mockMvc.perform(post("/api/v0/market/listings/{listingId}/cancel", 6))
                     .andExpect(status().isNoContent());
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "3"))
+            mockMvc.perform(get("/api/v0/market/listings/{listingId}", 6))
+                    .andExpect(jsonPath("$.status").value("CANCELED"))
+                    .andExpect(jsonPath("$.closedAt").value("2026-09-10T12:00:00"));
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 3))
                     .andExpect(jsonPath("$.content", hasSize(2)));
+
+            // 취소했으니 다시 등록되고, 매물 식별자는 새로 생긴다.
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 80_000)))
+                            .content(listingBody(MY_TICKET_ID, 80_000)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.listingId").value(7));
+        }
+
+        @Test
+        void 내_거래_내역은_판매와_구매를_섞어_최신순으로_준다() throws Exception {
+            mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
+                            .content(listingBody(MY_TICKET_ID, 90_000)))
                     .andExpect(status().isCreated());
+            purchase(OTHERS_LISTING_CONCERT1, 120_000).andExpect(status().isAccepted());
+
+            mockMvc.perform(get("/api/v0/market/listings/me"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[?(@.type == 'SALE')].listingId", contains(6)))
+                    .andExpect(jsonPath("$.content[?(@.type == 'SALE')].status", contains("LISTED")))
+                    .andExpect(jsonPath("$.content[?(@.type == 'SALE')].tradeId", contains(nullValue())))
+                    .andExpect(jsonPath("$.content[?(@.type == 'PURCHASE')].status", contains("PENDING")))
+                    // 거래 상대는 어느 쪽에서도 드러나지 않는다.
+                    .andExpect(jsonPath("$.content[0].sellerAddress").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].seatNo").doesNotExist());
         }
 
         @Test
         void 내_매물은_10초_뒤_팔린_것으로_보인다() throws Exception {
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 90_000)))
+                            .content(listingBody(MY_TICKET_ID, 90_000)))
                     .andExpect(status().isCreated());
 
             clock.advance(Duration.ofSeconds(StubFixtures.LISTING_SOLD_AFTER_SECONDS));
 
-            mockMvc.perform(get("/api/v0/market/listings").param("concertId", "3"))
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 3))
                     .andExpect(jsonPath("$.content", hasSize(2)))
-                    .andExpect(jsonPath("$.content[?(@.tokenId == '" + MY_TOKEN + "')]").doesNotExist());
+                    .andExpect(jsonPath("$.content[?(@.listingId == 6)]").doesNotExist());
 
-            // 팔았으니 내 티켓이 아니다. 다시 등록하려면 403 이고, 그 공연 매물을 살 수 있게 된다.
+            // 내 판매 내역에는 SOLD 로 남는다.
+            mockMvc.perform(get("/api/v0/market/listings/me"))
+                    .andExpect(jsonPath("$.content[?(@.type == 'SALE')].status", contains("SOLD")));
+
+            // 팔았으니 내 티켓이 아니다. 다시 등록하려면 403 이다.
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 80_000)))
+                            .content(listingBody(MY_TICKET_ID, 80_000)))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.exception").value("NotTicketOwnerException"));
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", "5"))
-                    .andExpect(status().isOk());
         }
 
         @Test
         void 남의_티켓_등록_403_남의_매물_취소_403_내_매물_구매_409() throws Exception {
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody("1", 100_000)))
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.exception").value("NotTicketOwnerException"));
-            mockMvc.perform(delete("/api/v0/market/listings/{tokenId}", "1"))
+                            .content(listingBody(1L, 100_000)))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.exception").value("NotTicketOwnerException"));
 
+            // 매물 취소는 티켓 소유가 아니라 등록자인지를 본다.
+            mockMvc.perform(post("/api/v0/market/listings/{listingId}/cancel", OTHERS_LISTING_CONCERT1))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.exception").value("NotListingSellerException"));
+
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                    .content(listingBody(MY_TOKEN, 90_000)));
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", MY_TOKEN))
+                    .content(listingBody(MY_TICKET_ID, 90_000)));
+            purchase(6L, 90_000)
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("CannotBuyOwnListingException"));
         }
 
         @Test
+        void 이미_팔린_매물과_가격_불일치는_409() throws Exception {
+            purchase(OTHERS_LISTING_CONCERT3, 90_000).andExpect(status().isAccepted());
+
+            // 선착순 경쟁에서 진 쪽. 404 가 아니라 409 다.
+            purchase(OTHERS_LISTING_CONCERT3, 90_000)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingAlreadyClosedException"));
+
+            // 화면이 들고 있던 가격이 서버와 다르면 거절한다.
+            purchase(OTHERS_LISTING_CONCERT1, 119_000)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingPriceMismatchException"));
+        }
+
+        @Test
         void 없는_티켓_없는_매물_필수값_누락은_거절된다() throws Exception {
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(String.valueOf(StubFixtures.NOT_FOUND_ID), 1000)))
+                            .content(listingBody(StubFixtures.NOT_FOUND_ID, 1000)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("TicketNotFoundException"));
-            mockMvc.perform(post("/api/v0/market/listings/{tokenId}/purchase", StubFixtures.NOT_FOUND_ID))
+            purchase(StubFixtures.NOT_FOUND_ID, 1000)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
-            // 등록되지 않은 내 티켓은 매물이 아니라 404 다.
-            mockMvc.perform(delete("/api/v0/market/listings/{tokenId}", MY_TOKEN))
+            mockMvc.perform(post("/api/v0/market/listings/{listingId}/cancel", StubFixtures.NOT_FOUND_ID))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
 
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON).content("{}"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.errors[?(@.field == 'tokenId')]").exists())
-                    .andExpect(jsonPath("$.errors[?(@.field == 'askPrice')]").exists());
+                    .andExpect(jsonPath("$.errors[?(@.field == 'ticketId')]").exists())
+                    .andExpect(jsonPath("$.errors[?(@.field == 'price')]").exists());
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
-                            .content(listingBody(MY_TOKEN, 0)))
+                            .content(listingBody(MY_TICKET_ID, 0)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.errors[?(@.field == 'askPrice')]").exists());
+                    .andExpect(jsonPath("$.errors[?(@.field == 'price')]").exists());
+
+            // 멱등키가 없으면 구매를 받지 않는다.
+            mockMvc.perform(post("/api/v0/market/listings/{listingId}/purchase", OTHERS_LISTING_CONCERT1)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(purchaseBody(120_000)))
+                    .andExpect(status().isBadRequest());
         }
     }
 

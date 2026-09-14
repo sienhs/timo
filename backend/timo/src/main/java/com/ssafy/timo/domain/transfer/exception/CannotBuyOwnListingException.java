@@ -9,8 +9,8 @@ import com.ssafy.timo.global.exception.BusinessException;
  */
 public class CannotBuyOwnListingException extends BusinessException {
 
-    public CannotBuyOwnListingException(String tokenId) {
+    public CannotBuyOwnListingException(Long listingId) {
         super(TransferErrorCode.CANNOT_BUY_OWN_LISTING,
-                TransferErrorCode.CANNOT_BUY_OWN_LISTING.getMessage() + " (tokenId=" + tokenId + ")");
+                TransferErrorCode.CANNOT_BUY_OWN_LISTING.getMessage() + " (listingId=" + listingId + ")");
     }
 }
