@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 /// 로그인 상태면 요청에 액세스 토큰을 붙이고, 서버가 401 을 주면 알려주는
 /// dio 인터셉터.
@@ -16,10 +17,19 @@ import 'package:dio/dio.dart';
 /// 401 은 "지금 토큰이 더는 안 통한다" 는 뜻이다. 재발급 API 가 아직 없어
 /// [onUnauthorized] 로 로그아웃 상태로 돌리는 데까지만 한다. 재발급 API 가
 /// 생기면 여기서 재발급을 시도하고 실패할 때만 알리도록 바꾼다.
+///
+/// **로컬 백엔드용 회원 번호 헤더.** 백엔드의 `local` 프로필은 토큰을 검사하지
+/// 않고 `X-Member-Id` 헤더로 요청자를 정한다(`MockCurrentMemberProvider`). 그
+/// 헤더가 없으면 내 정보 조회가 401 이라 로그인 직후 바로 로그아웃돼 버린다.
+/// 그래서 [sendMemberIdHeader] 가 참이면 토큰과 함께 회원 번호도 보낸다. 기본값은
+/// 디버그 빌드에서만 참이다 — 배포 서버는 이 헤더를 보지 않지만, 클라이언트가
+/// 주장하는 신원을 릴리스 빌드가 보낼 이유는 없다.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required this.accessToken,
     required this.onUnauthorized,
+    this.memberId,
+    this.sendMemberIdHeader = kDebugMode,
     this.publicPathPrefix = '/api/v1/auth/',
   });
 
@@ -29,10 +39,20 @@ class AuthInterceptor extends Interceptor {
   /// 서버가 401 을 줬을 때.
   final void Function() onUnauthorized;
 
+  /// 지금 로그인한 회원 번호. 로그인 상태가 아니면 null. [sendMemberIdHeader] 가
+  /// 참일 때만 쓴다.
+  final int? Function()? memberId;
+
+  /// 로컬 백엔드가 읽는 회원 번호 헤더를 붙일지.
+  final bool sendMemberIdHeader;
+
   /// 토큰을 붙이지 않는 주소의 앞부분.
   final String publicPathPrefix;
 
   static const authorizationHeader = 'Authorization';
+
+  /// 백엔드 `MockCurrentMemberProvider.MEMBER_ID_HEADER` 와 이름이 같다.
+  static const memberIdHeader = 'X-Member-Id';
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -41,6 +61,8 @@ class AuthInterceptor extends Interceptor {
     final isPublic = options.uri.path.startsWith(publicPathPrefix);
     if (token != null && !isPublic) {
       options.headers[authorizationHeader] = 'Bearer $token';
+      final id = sendMemberIdHeader ? memberId?.call() : null;
+      if (id != null) options.headers[memberIdHeader] = id.toString();
     }
     handler.next(options);
   }

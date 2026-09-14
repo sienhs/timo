@@ -15,10 +15,19 @@ import 'features/booking/state/booking_scope.dart';
 import 'features/home/data/home_api.dart';
 import 'features/home/data/http_home_api.dart';
 import 'features/home/state/home_api_scope.dart';
+import 'features/mypage/data/http_my_page_api.dart';
+import 'features/mypage/data/my_page_api.dart';
+import 'features/mypage/state/my_page_api_scope.dart';
 import 'routes/app_routes.dart';
 
 class App extends StatefulWidget {
-  const App({super.key, this.session, this.authApi, this.homeApi});
+  const App({
+    super.key,
+    this.session,
+    this.authApi,
+    this.homeApi,
+    this.myPageApi,
+  });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
   /// 메모리 저장소로 된 로그아웃 상태에서 시작한다.
@@ -30,6 +39,9 @@ class App extends StatefulWidget {
   /// 홈·검색 화면이 쓰는 공연 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는
   /// 목을 넣는다.
   final HomeApi? homeApi;
+
+  /// 마이페이지가 쓰는 회원·지갑 API. 안 넘기면 진짜 서버 구현을 쓴다.
+  final MyPageApi? myPageApi;
 
   @override
   State<App> createState() => _AppState();
@@ -48,11 +60,15 @@ class _AppState extends State<App> {
   /// [HomeApiScope] 로 내려준다.
   late final HomeApi _homeApi = widget.homeApi ?? HttpHomeApi();
 
+  /// 마이페이지가 쓰는 회원·지갑 API. 위 둘과 같은 이유로 앱에 하나만 둔다.
+  late final MyPageApi _myPageApi = widget.myPageApi ?? HttpMyPageApi();
+
   /// 로그인 상태면 서버 요청에 토큰을 붙이고, 401 이면 로그아웃시키는 인터셉터.
   /// 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다(테스트가 App 을 여러 번
   /// 띄워도 인터셉터가 쌓이지 않게).
   late final _authInterceptor = AuthInterceptor(
     accessToken: () => _session.accessToken,
+    memberId: () => _session.memberId,
     onUnauthorized: _session.signOut,
   );
 
@@ -97,15 +113,18 @@ class _AppState extends State<App> {
         api: _authApi,
         child: HomeApiScope(
           api: _homeApi,
-          child: BookingScope(
-            controller: _bookingController,
-            child: MaterialApp(
-              title: 'TIMO',
-              theme: AppTheme.light,
-              // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-              // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-              initialRoute: AppRoutes.home,
-              routes: AppRoutes.routes,
+          child: MyPageApiScope(
+            api: _myPageApi,
+            child: BookingScope(
+              controller: _bookingController,
+              child: MaterialApp(
+                title: 'TIMO',
+                theme: AppTheme.light,
+                // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                initialRoute: AppRoutes.home,
+                routes: AppRoutes.routes,
+              ),
             ),
           ),
         ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
+import 'package:timo/core/widgets/async_boundary.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -10,7 +12,15 @@ import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/state/auth_api_scope.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/mypage/constants.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/data/mock_my_page_data.dart';
+import 'package:timo/features/mypage/data/my_page_api.dart';
+import 'package:timo/features/mypage/models/member_profile.dart';
+import 'package:timo/features/mypage/models/wallet_summary.dart';
 import 'package:timo/features/mypage/screens/my_page_screen.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
+import 'package:timo/features/mypage/widgets/transaction_tile.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 서버에 로그아웃을 알렸는지 기록하는 목. 나머지 동작은 [MockAuthApi] 그대로다.
@@ -27,8 +37,35 @@ class _RecordingAuthApi extends MockAuthApi {
   }
 }
 
-/// 임시 마이페이지의 버튼이 로그인 상태를 따라가는지 본다. 지금 앱에서 로그인
-/// 여부를 눈으로 확인할 수 있는 유일한 자리다.
+/// 처음 몇 번은 실패하고 그다음부터 성공하는 목. 다시 시도를 검사한다.
+class _FlakyMyPageApi implements MyPageApi {
+  _FlakyMyPageApi({required this.failuresBeforeSuccess});
+
+  final int failuresBeforeSuccess;
+  int profileCalls = 0;
+  int walletCalls = 0;
+
+  static const message = '인터넷 연결을 확인해주세요.';
+
+  @override
+  Future<MemberProfile> fetchProfile() {
+    profileCalls++;
+    if (profileCalls <= failuresBeforeSuccess) {
+      return Future.error(const ApiException(message));
+    }
+    return Future.value(MockMyPageData.profile);
+  }
+
+  @override
+  Future<WalletSummary> fetchWallet() {
+    walletCalls++;
+    if (walletCalls <= failuresBeforeSuccess) {
+      return Future.error(const ApiException(message));
+    }
+    return Future.value(MockMyPageData.wallet);
+  }
+}
+
 void main() {
   final routes = Map.of(AppRoutes.routes)..remove(AppRoutes.home);
 
@@ -40,25 +77,38 @@ void main() {
     accessTokenExpiresIn: Duration(minutes: 30),
   );
 
-  late _RecordingAuthApi api;
+  late _RecordingAuthApi authApi;
+
+  /// 360 x 800 dp. 시안 폭에서 글자가 넘치지 않는지 함께 본다.
+  void usePhoneSize(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
 
   Future<AuthSession> pumpMyPage(
     WidgetTester tester, {
     required bool loggedIn,
     AuthTokens tokens = MockAuthApi.tokens,
+    MyPageApi api = const MockMyPageApi(latency: Duration.zero),
+    VoidCallback? onBackPressed,
   }) async {
-    api = _RecordingAuthApi();
+    usePhoneSize(tester);
+    authApi = _RecordingAuthApi();
     final session = AuthSession(storage: InMemoryTokenStorage());
     if (loggedIn) await session.signIn(tokens);
     await tester.pumpWidget(
       AuthSessionScope(
         session: session,
         child: AuthApiScope(
-          api: api,
-          child: MaterialApp(
-            theme: AppTheme.light,
-            home: const Scaffold(body: MyPageScreen()),
-            routes: routes,
+          api: authApi,
+          child: MyPageApiScope(
+            api: api,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: Scaffold(body: MyPageScreen(onBackPressed: onBackPressed)),
+              routes: routes,
+            ),
           ),
         ),
       ),
@@ -66,59 +116,260 @@ void main() {
     return session;
   }
 
-  testWidgets('로그아웃 상태면 로그인 버튼이고, 누르면 로그인 화면으로 간다', (tester) async {
-    await pumpMyPage(tester, loggedIn: false);
+  /// 목 응답이 도착해 화면이 채워질 때까지.
+  Future<void> settle(WidgetTester tester) => tester.pumpAndSettle();
 
-    expect(find.text(AuthStrings.login), findsOneWidget);
-    expect(find.text(AuthStrings.logout), findsNothing);
-
-    await tester.tap(find.text(AuthStrings.login));
+  /// 본문은 ListView 라 화면 밖 위젯은 아직 만들어지지도 않았다. 찾으려는
+  /// 것이 나올 때까지 내린다. (기본 테스트 화면은 폰보다 낮다.)
+  ///
+  /// `scrollUntilVisible` 은 위젯이 만들어지는(캐시 범위에 들어오는) 순간
+  /// 멈춰서 아직 화면 아래에 걸쳐 있을 수 있다. 그래서 끝까지 끌어올린다.
+  Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(finder, 200);
+    await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
-    expect(find.byType(LoginScreen), findsOneWidget);
+  }
+
+  group('로그인 안 한 상태', () {
+    testWidgets('안내와 로그인 버튼이 보이고, 누르면 로그인 화면으로 간다', (tester) async {
+      await pumpMyPage(tester, loggedIn: false);
+
+      expect(find.text(MyPageStrings.loginPrompt), findsOneWidget);
+      expect(find.text(AuthStrings.login), findsOneWidget);
+      expect(find.text(AuthStrings.logout), findsNothing);
+
+      await tester.tap(find.text(AuthStrings.login));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+    });
+
+    testWidgets('스코프 없이 띄우면 로그아웃 상태로 그린다', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: const Scaffold(body: MyPageScreen()),
+          routes: routes,
+        ),
+      );
+
+      expect(find.text(AuthStrings.login), findsOneWidget);
+    });
   });
 
-  testWidgets('로그인 상태면 로그아웃 버튼이고, 누르면 로그아웃 상태가 되며 서버에도 알린다', (tester) async {
-    final session = await pumpMyPage(tester, loggedIn: true);
+  group('로그인 상태', () {
+    testWidgets('응답을 기다리는 동안 스피너가 돌고 인사말은 아직 없다', (tester) async {
+      await pumpMyPage(
+        tester,
+        loggedIn: true,
+        api: const MockMyPageApi(latency: Duration(seconds: 1)),
+      );
 
-    expect(find.text(AuthStrings.logout), findsOneWidget);
-    expect(find.text(AuthStrings.login), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.textContaining(MyPageStrings.greetingSuffix), findsNothing);
 
-    await tester.tap(find.text(AuthStrings.logout));
-    await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      await settle(tester);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
 
-    expect(session.isLoggedIn, isFalse);
-    // 세션이 바뀌면 화면이 따라 바뀐다.
-    expect(find.text(AuthStrings.login), findsOneWidget);
-    expect(find.text(AuthStrings.logout), findsNothing);
-    // 세션을 비우기 전에 꺼내 둔 리프레시 토큰이 서버로 갔다.
-    expect(api.loggedOutWith, [MockAuthApi.tokens.refreshToken]);
+    testWidgets('닉네임 인사말 · 잔액 · 최근 내역 4건이 시안대로 보인다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      // 인사말은 닉네임(굵게)과 나머지가 한 Text.rich 안에 있다.
+      expect(
+        find.textContaining(
+          MockMyPageData.profile.nickname,
+          findRichText: true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(MyPageStrings.walletTitle), findsOneWidget);
+      expect(find.text('123,000'), findsOneWidget);
+      expect(find.text(MyPageStrings.charge), findsOneWidget);
+
+      expect(find.text(MyPageStrings.historyTitle), findsOneWidget);
+      expect(
+        find.byType(TransactionTile),
+        findsNWidgets(MyPageMetrics.recentTransactionCount),
+      );
+      expect(find.text('-176,000 MSR'), findsOneWidget);
+      expect(find.text('+150,000 MSR'), findsOneWidget);
+      expect(find.text('09.12 19:42 · 양도 마켓'), findsOneWidget);
+      expect(find.text(MyPageStrings.balanceAfter('23,400')), findsOneWidget);
+      await scrollTo(tester, find.text(MyPageStrings.seeAllHistory));
+      expect(find.text(MyPageStrings.seeAllHistory), findsOneWidget);
+      await scrollTo(tester, find.text(AuthStrings.logout));
+      expect(find.text(AuthStrings.logout), findsOneWidget);
+    });
+
+    testWidgets('필터를 누르면 충전(늘어난 것)·사용(줄어든 것)만 남는다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await tester.tap(find.text('충전'));
+      await tester.pump();
+      expect(find.byType(TransactionTile), findsNWidgets(2));
+      expect(find.text('+150,000 MSR'), findsOneWidget);
+      expect(find.text('+98,000 MSR'), findsOneWidget);
+      expect(find.text('-176,000 MSR'), findsNothing);
+
+      await tester.tap(find.text('사용'));
+      await tester.pump();
+      expect(find.byType(TransactionTile), findsNWidgets(2));
+      expect(find.text('-176,000 MSR'), findsOneWidget);
+      expect(find.text('-121,000 MSR'), findsOneWidget);
+      expect(find.text('+150,000 MSR'), findsNothing);
+
+      await tester.tap(find.text('전체'));
+      await tester.pump();
+      expect(
+        find.byType(TransactionTile),
+        findsNWidgets(MyPageMetrics.recentTransactionCount),
+      );
+    });
+
+    testWidgets('해당 종류의 내역이 없으면 빈 상태 문구를 보여 준다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true, api: _OnlyDebitsApi());
+      await settle(tester);
+
+      await tester.tap(find.text('충전'));
+      await tester.pump();
+
+      expect(find.byType(TransactionTile), findsNothing);
+      expect(find.text(MyPageStrings.noTransactions), findsOneWidget);
+    });
+
+    testWidgets('실패하면 문구와 다시 시도가 보이고, 다시 시도하면 채워진다', (tester) async {
+      final api = _FlakyMyPageApi(failuresBeforeSuccess: 1);
+      await pumpMyPage(tester, loggedIn: true, api: api);
+      await settle(tester);
+
+      // 인사말과 지갑이 각자 실패를 알린다.
+      expect(find.text(_FlakyMyPageApi.message), findsNWidgets(2));
+      expect(find.text(AsyncBoundary.retryLabel), findsNWidgets(2));
+      expect(find.text('123,000'), findsNothing);
+
+      await tester.tap(find.text(AsyncBoundary.retryLabel).last);
+      await settle(tester);
+      expect(api.walletCalls, 2);
+      expect(find.text('123,000'), findsOneWidget);
+      expect(find.text(_FlakyMyPageApi.message), findsOneWidget);
+
+      await tester.tap(find.text(AsyncBoundary.retryLabel));
+      await settle(tester);
+      expect(api.profileCalls, 2);
+      expect(find.text(_FlakyMyPageApi.message), findsNothing);
+      expect(
+        find.textContaining(
+          MockMyPageData.profile.nickname,
+          findRichText: true,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('충전하기를 누르면 준비 중 안내가 뜬다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await tester.tap(find.text(MyPageStrings.charge));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(MyPageStrings.notReady(MyPageStrings.charge)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('전체 내역 보기를 누르면 준비 중 안내가 뜬다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await scrollTo(tester, find.text(MyPageStrings.seeAllHistory));
+      await tester.tap(find.text(MyPageStrings.seeAllHistory));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(MyPageStrings.notReady(MyPageStrings.seeAllHistory)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('알림을 누르면 준비 중 안내가 뜬다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await tester.tap(find.byTooltip(MyPageStrings.notifications));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(MyPageStrings.notReady(MyPageStrings.notifications)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('뒤로가기는 넘겨받은 콜백을 부른다', (tester) async {
+      var backPressed = 0;
+      await pumpMyPage(
+        tester,
+        loggedIn: true,
+        onBackPressed: () => backPressed++,
+      );
+      await settle(tester);
+
+      await tester.tap(find.byTooltip(MyPageStrings.back));
+      expect(backPressed, 1);
+    });
+
+    testWidgets('로그아웃을 누르면 로그아웃 상태가 되며 서버에도 알린다', (tester) async {
+      final session = await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await scrollTo(tester, find.text(AuthStrings.logout));
+      await tester.tap(find.text(AuthStrings.logout));
+      await tester.pumpAndSettle();
+
+      expect(session.isLoggedIn, isFalse);
+      // 세션이 바뀌면 화면이 따라 바뀐다.
+      expect(find.text(AuthStrings.login), findsOneWidget);
+      expect(find.text(AuthStrings.logout), findsNothing);
+      // 세션을 비우기 전에 꺼내 둔 리프레시 토큰이 서버로 갔다.
+      expect(authApi.loggedOutWith, [MockAuthApi.tokens.refreshToken]);
+    });
+
+    testWidgets('서버에 못 알려도(연결 끊김) 로그아웃 상태가 된다', (tester) async {
+      final session = await pumpMyPage(
+        tester,
+        loggedIn: true,
+        tokens: offlineTokens,
+      );
+      await settle(tester);
+
+      await scrollTo(tester, find.text(AuthStrings.logout));
+      await tester.tap(find.text(AuthStrings.logout));
+      await tester.pumpAndSettle();
+
+      expect(session.isLoggedIn, isFalse);
+      expect(find.text(AuthStrings.login), findsOneWidget);
+      // 시도는 했다. 실패를 무시한 것이지 건너뛴 게 아니다.
+      expect(authApi.loggedOutWith, [MockAuthApi.offlineRefreshToken]);
+    });
   });
+}
 
-  testWidgets('서버에 못 알려도(연결 끊김) 로그아웃 상태가 된다', (tester) async {
-    final session = await pumpMyPage(
-      tester,
-      loggedIn: true,
-      tokens: offlineTokens,
-    );
+/// 줄어든 거래만 있는 지갑. 필터의 빈 상태를 보는 데 쓴다.
+class _OnlyDebitsApi implements MyPageApi {
+  @override
+  Future<MemberProfile> fetchProfile() => Future.value(MockMyPageData.profile);
 
-    await tester.tap(find.text(AuthStrings.logout));
-    await tester.pumpAndSettle();
-
-    expect(session.isLoggedIn, isFalse);
-    expect(find.text(AuthStrings.login), findsOneWidget);
-    // 시도는 했다. 실패를 무시한 것이지 건너뛴 게 아니다.
-    expect(api.loggedOutWith, [MockAuthApi.offlineRefreshToken]);
-  });
-
-  testWidgets('스코프 없이 띄우면 로그아웃 상태로 그린다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: const Scaffold(body: MyPageScreen()),
-        routes: routes,
-      ),
-    );
-
-    expect(find.text(AuthStrings.login), findsOneWidget);
-  });
+  @override
+  Future<WalletSummary> fetchWallet() => Future.value(
+    WalletSummary(
+      balance: 0,
+      transactions: MockMyPageData.wallet.transactions
+          .where((t) => !t.isCredit)
+          .toList(),
+    ),
+  );
 }

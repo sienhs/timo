@@ -26,6 +26,8 @@ import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/state/home_api_scope.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
 void main() {
@@ -599,21 +601,24 @@ void main() {
       await tester.pumpWidget(
         HomeApiScope(
           api: const MockHomeApi(latency: Duration.zero),
-          child: AuthSessionScope(
-            session: session,
-            child: AuthApiScope(
-              api: api,
-              child: MaterialApp(
-                theme: AppTheme.light,
-                initialRoute: AppRoutes.home,
-                routes: AppRoutes.routes,
+          child: MyPageApiScope(
+            api: const MockMyPageApi(latency: Duration.zero),
+            child: AuthSessionScope(
+              session: session,
+              child: AuthApiScope(
+                api: api,
+                child: MaterialApp(
+                  theme: AppTheme.light,
+                  initialRoute: AppRoutes.home,
+                  routes: AppRoutes.routes,
+                ),
               ),
             ),
           ),
         ),
       );
 
-      // 마이페이지 탭의 임시 '로그인' 버튼 → 로그인 화면의 '회원가입' 링크로 진입
+      // 마이페이지 탭의 '로그인' 버튼 → 로그인 화면의 '회원가입' 링크로 진입
       await tester.tap(
         find.descendant(
           of: find.byType(AppBottomNavBar),
@@ -692,7 +697,8 @@ void main() {
       expect(find.byType(MainShellScreen), findsOneWidget);
       expect(find.byType(SignupCompleteScreen), findsNothing);
 
-      // 마이페이지 탭의 임시 버튼도 로그인 상태를 따라 '로그아웃' 으로 바뀌어 있다.
+      // 마이페이지 탭도 로그인 상태를 따라 회원 화면(로그아웃 버튼)으로 바뀌어 있다.
+      // 버튼은 본문 맨 아래라 내려서 찾는다.
       await tester.tap(
         find.descendant(
           of: find.byType(AppBottomNavBar),
@@ -700,6 +706,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text(AuthStrings.logout), 200);
       expect(find.text(AuthStrings.logout), findsOneWidget);
     });
   });

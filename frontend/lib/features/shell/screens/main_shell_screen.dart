@@ -22,8 +22,16 @@ class MainShellScreen extends StatefulWidget {
 class _MainShellScreenState extends State<MainShellScreen> {
   int _selectedIndex = 0;
 
-  /// 하단 바의 인덱스와 순서가 같아야 한다.
-  static const _tabs = [HomeScreen(), MyPageScreen()];
+  static const _homeTab = 0;
+
+  void _selectTab(int index) => setState(() => _selectedIndex = index);
+
+  /// 하단 바의 인덱스와 순서가 같아야 한다. 마이페이지의 뒤로가기는 홈 탭으로
+  /// 돌아오는 일이라 그 콜백을 여기서 넘긴다.
+  List<Widget> get _tabs => [
+    const HomeScreen(),
+    MyPageScreen(onBackPressed: () => _selectTab(_homeTab)),
+  ];
 
   Future<void> _openQuickMenu() async {
     final selected = await showQuickMenu(context);
@@ -45,7 +53,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       body: _tabs[_selectedIndex],
       bottomNavigationBar: AppBottomNavBar(
         selectedIndex: _selectedIndex,
-        onTabSelected: (index) => setState(() => _selectedIndex = index),
+        onTabSelected: _selectTab,
         onQuickMenuPressed: _openQuickMenu,
       ),
       // 원형 버튼은 바 위로 솟아 본문에 겹친다. 바 위젯에 넣으면 솟은 만큼을

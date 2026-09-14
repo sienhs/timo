@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/state/home_api_scope.dart';
+import 'package:timo/features/mypage/constants.dart';
 import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
@@ -63,7 +64,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('마이페이지는 준비 중이에요.'), findsOneWidget);
+    // 세션 스코프가 없어 로그아웃 상태의 마이페이지가 보인다.
+    expect(find.text(MyPageStrings.loginPrompt), findsOneWidget);
     expect(find.byType(AppBottomNavBar), findsOneWidget);
     expect(quickMenuButton(), findsOneWidget);
   });
@@ -78,10 +80,16 @@ void main() {
       expect(find.text(item.label), findsWidgets, reason: item.label);
     }
     // 시안 순서(입장QR → ... → 환경 설정)가 목록 순서다.
-    expect(
-      quickMenuItems.map((item) => item.label).toList(),
-      ['입장QR', '마이 티켓', '컬렉션', '찜', '코인 충전', '양도마켓', '카테고리', '환경 설정'],
-    );
+    expect(quickMenuItems.map((item) => item.label).toList(), [
+      '입장QR',
+      '마이 티켓',
+      '컬렉션',
+      '찜',
+      '코인 충전',
+      '양도마켓',
+      '카테고리',
+      '환경 설정',
+    ]);
   });
 
   testWidgets('메뉴가 열려 있어도 하단 바와 + 버튼이 보인다', (tester) async {
