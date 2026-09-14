@@ -128,6 +128,81 @@ CREATE TABLE `refresh_token` (
     PRIMARY KEY (`refresh_token_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 공연별 좌석 선점 이력. HELD 상태인 행만 생성 컬럼을 통해 유일하게 만든다.
+CREATE TABLE `seat_hold` (
+    `seat_hold_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `concert_id` BIGINT NOT NULL,
+    `seat_id` BIGINT NOT NULL,
+    `member_id` BIGINT NOT NULL,
+    `expires_at` DATETIME(6) NOT NULL,
+    `released_at` DATETIME(6) NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `active_seat` BIGINT GENERATED ALWAYS AS (IF(`status` = 'HELD', `seat_id`, NULL)) STORED,
+    `active_member` BIGINT GENERATED ALWAYS AS (IF(`status` = 'HELD', `member_id`, NULL)) STORED,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`seat_hold_id`),
+    UNIQUE KEY `uk_hold_seat` (`concert_id`, `active_seat`),
+    UNIQUE KEY `uk_hold_member` (`concert_id`, `active_member`),
+    KEY `ix_hold_expire` (`status`, `expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 결제된 예매와 취소 이력. PAID 상태인 행만 좌석·회원별로 유일하다.
+CREATE TABLE `reservation` (
+    `reservation_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `concert_id` BIGINT NOT NULL,
+    `member_id` BIGINT NOT NULL,
+    `seat_id` BIGINT NOT NULL,
+    `cancelled_at` DATETIME(6) NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `active_seat` BIGINT GENERATED ALWAYS AS (IF(`status` = 'PAID', `seat_id`, NULL)) STORED,
+    `active_member` BIGINT GENERATED ALWAYS AS (IF(`status` = 'PAID', `member_id`, NULL)) STORED,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`reservation_id`),
+    UNIQUE KEY `uk_rsv_seat` (`concert_id`, `active_seat`),
+    UNIQUE KEY `uk_rsv_member` (`concert_id`, `active_member`),
+    KEY `ix_rsv_member` (`member_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 티켓 양도 매물. 티켓 도메인 테이블이 없으므로 ticket_id는 식별자만 보관한다.
+CREATE TABLE `ticket_listing` (
+    `listing_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `ticket_id` BIGINT NOT NULL,
+    `seller_member_id` BIGINT NOT NULL,
+    `concert_id` BIGINT NOT NULL,
+    `section_id` BIGINT NOT NULL,
+    `price` INT NOT NULL,
+    `face_value` INT NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `listed_at` DATETIME(6) NOT NULL,
+    `closed_at` DATETIME(6) NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`listing_id`),
+    KEY `idx_listing_concert_status_price` (`concert_id`, `status`, `price`),
+    KEY `idx_listing_seller_status` (`seller_member_id`, `status`),
+    KEY `idx_listing_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 티켓 양도 체결 이력. 하나의 매물은 한 번만 체결할 수 있다.
+CREATE TABLE `ticket_trade` (
+    `trade_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `listing_id` BIGINT NOT NULL,
+    `ticket_id` BIGINT NOT NULL,
+    `seller_member_id` BIGINT NOT NULL,
+    `buyer_member_id` BIGINT NOT NULL,
+    `price` INT NOT NULL,
+    `traded_at` DATETIME(6) NOT NULL,
+    `status` VARCHAR(20) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`trade_id`),
+    UNIQUE KEY `uk_ticket_trade_listing` (`listing_id`),
+    KEY `idx_trade_buyer` (`buyer_member_id`, `traded_at`),
+    KEY `idx_trade_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 즉시 좌석 선점 부하 테스트를 할 수 있는 단일 공연장·공연·구역·좌석 1,000석.
 INSERT INTO `venue` (
     `venue_name`, `venue_address`, `total_seat_count`, `created_at`, `updated_at`
