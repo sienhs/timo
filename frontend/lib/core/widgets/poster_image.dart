@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../network/api_client.dart';
 import '../theme/app_colors.dart';
 
 /// 공연 포스터 이미지. 부모가 준 크기를 꽉 채우고, 못 읽으면 회색 자리로
@@ -32,12 +33,23 @@ class PosterImage extends StatelessWidget {
 
   /// 서버가 준 주소의 이미지. 주소가 없으면(포스터 없는 공연) 바로 회색
   /// 자리를 그린다.
+  ///
+  /// 주소는 [ApiClient.imageUrl] 을 거친다. 서버가 저장소 key 만 주기 때문에
+  /// (`poster/xxx.gif`) 그대로 쓰면 안드로이드에서 한 장도 안 뜬다. 호출부마다
+  /// 서버 주소를 붙이게 하면 빠뜨린 화면만 조용히 깨지므로 여기서 한 번에 한다.
   PosterImage.network({
     super.key,
     required String? url,
     this.borderRadius = 0,
     this.decodeWidth,
-  }) : _image = url == null ? null : NetworkImage(url);
+  }) : _image = _networkImageOrNull(url);
+
+  /// 서버 주소를 붙여 [NetworkImage] 를 만든다. 붙일 주소가 없으면 null 이라
+  /// 회색 자리가 그려진다.
+  static ImageProvider? _networkImageOrNull(String? url) {
+    final resolved = ApiClient.imageUrl(url);
+    return resolved == null ? null : NetworkImage(resolved);
+  }
 
   final ImageProvider? _image;
   final double borderRadius;

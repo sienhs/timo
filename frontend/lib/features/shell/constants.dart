@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../routes/app_routes.dart';
 import 'models/quick_menu_item.dart';
 
 /// 하단 바 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
@@ -56,7 +57,11 @@ class ShellStrings {
 /// 아이콘 에셋이 나오면 이 목록만 교체하면 된다.
 const quickMenuItems = <QuickMenuItem>[
   QuickMenuItem(icon: Icons.qr_code_2, label: '입장QR'),
-  QuickMenuItem(icon: Icons.confirmation_number_outlined, label: '마이 티켓'),
+  QuickMenuItem(
+    icon: Icons.confirmation_number_outlined,
+    label: '마이 티켓',
+    routeName: AppRoutes.myTickets,
+  ),
   QuickMenuItem(icon: Icons.collections_bookmark_outlined, label: '컬렉션'),
   QuickMenuItem(icon: Icons.favorite_border, label: '찜'),
   QuickMenuItem(icon: Icons.savings_outlined, label: '코인 충전'),
