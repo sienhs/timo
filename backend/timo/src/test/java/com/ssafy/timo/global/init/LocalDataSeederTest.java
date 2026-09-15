@@ -196,8 +196,9 @@ class LocalDataSeederTest {
         seeder.run(new DefaultApplicationArguments());
         flushAndClear();
 
-        long expected = (long) EXPECTED_OCCUPIED_PER_SECTION * EXPECTED_SECTIONS;
-        assertThat(loginInfoRepository.count()).isEqualTo(expected);
+        long soldPerConcert = (long) EXPECTED_OCCUPIED_PER_SECTION * EXPECTED_SECTIONS;
+        long heldPerConcert = (long) EXPECTED_RESERVED_PER_SECTION * EXPECTED_SECTIONS;
+        assertThat(loginInfoRepository.count()).isEqualTo(soldPerConcert + heldPerConcert);
 
         // seed001 은 시드가 만든 선점과 주문을 둘 다 가진 계정이다.
         LoginInfo first = loginInfoRepository.findByUsernameWithMember("seed001").orElseThrow();
@@ -243,14 +244,17 @@ class LocalDataSeederTest {
             }
         }
 
-        // 유니크가 (concert_id, member) 라 공연이 다르면 같은 회원을 다시 쓸 수 있다. 그래서
-        // 필요한 회원 수는 전체 좌석 수가 아니라 공연 하나에서 가장 많이 필요한 수(= 판매 수)다.
+        // 유니크가 (concert_id, member) 라 공연이 다르면 같은 회원을 다시 쓸 수 있다. 그래서 필요한
+        // 회원 수는 전체 좌석 수가 아니라 공연 하나에서 필요한 수(판매+선점)다. 다만 판매자와
+        // 선점자는 같은 공연 안에서 겹치면 안 된다 — 겹치면 이미 표를 산 회원이 같은 공연에서 또
+        // 선점하는 꼴이라 "1인 1매" 에 걸린다.
         long soldPerConcert = (long) EXPECTED_OCCUPIED_PER_SECTION * EXPECTED_SECTIONS;
-        assertThat(memberRepository.count()).isEqualTo(soldPerConcert);
+        long heldPerConcert = (long) EXPECTED_RESERVED_PER_SECTION * EXPECTED_SECTIONS;
+        assertThat(memberRepository.count()).isEqualTo(soldPerConcert + heldPerConcert);
         assertThat(reservationRepository.count())
                 .isEqualTo(soldPerConcert * EXPECTED_ON_SALE_CONCERTS);
-        assertThat(seatHoldRepository.count()).isEqualTo(
-                (long) EXPECTED_RESERVED_PER_SECTION * EXPECTED_SECTIONS * EXPECTED_ON_SALE_CONCERTS);
+        assertThat(seatHoldRepository.count())
+                .isEqualTo(heldPerConcert * EXPECTED_ON_SALE_CONCERTS);
     }
 
 

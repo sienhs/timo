@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.seat;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
+import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
@@ -398,6 +399,49 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("예매 중이 아닌 공연이면 409 를 반환한다")
+    void hold_returnsConflictWhenConcertNotOnSale() throws Exception {
+        Long seatId = seatIdAt(1, 1);
+        ReflectionTestUtils.setField(concertA, "status", ConcertStatus.SCHEDULED);
+        concertRepository.save(concertA);
+        flushAndClear();
+
+        mvc.perform(holdBy(me, concertA, seatId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("예매 중인 공연이 아닙니다. (concertId=" + concertA.getId()
+                                + ", status=SCHEDULED)"))
+                .andExpect(jsonPath("$.exception").value("ConcertNotOnSaleException"));
+        flushAndClear();
+
+        assertThat(seatHoldRepository.findActive(concertA.getId(), seatId, LocalDateTime.now()))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("이미 이 공연의 티켓을 보유한 회원이면 409 를 반환한다")
+    void hold_returnsConflictWhenAlreadyReserved() throws Exception {
+        Long ownedSeatId = seatIdAt(1, 1);
+        Long anotherSeatId = seatIdAt(1, 2);
+        reservationRepository.save(Reservation.builder()
+                .concert(concertA)
+                .member(memberRepository.getReferenceById(me))
+                .seat(seatRepository.getReferenceById(ownedSeatId))
+                .build());
+        flushAndClear();
+
+        mvc.perform(holdBy(me, concertA, anotherSeatId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorMessage")
+                        .value("이미 이 공연의 티켓을 보유하고 있습니다. (concertId=" + concertA.getId() + ")"))
+                .andExpect(jsonPath("$.exception").value("AlreadyReservedException"));
+        flushAndClear();
+
+        assertThat(seatHoldRepository.findActive(concertA.getId(), anotherSeatId, LocalDateTime.now()))
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("존재하지 않는 좌석이면 404 를 반환한다")
     void hold_returnsNotFoundWhenSeatMissing() throws Exception {
         long missingSeatId = 999_999L;
@@ -501,7 +545,7 @@ class SeatHoldApiIntegrationTest {
     }
 
     private Concert saveConcert(String title, LocalDateTime startDate) {
-        return concertRepository.save(Concert.builder()
+        Concert concert = concertRepository.save(Concert.builder()
                 .title(title)
                 .genre(ConcertGenre.CONCERT)
                 .ageRating(AgeRating.ALL)
@@ -510,6 +554,9 @@ class SeatHoldApiIntegrationTest {
                 .openAt(startDate.minusDays(10))
                 .venue(venue)
                 .build());
+        // 선점은 예매 중인 공연만 허용하므로, 등록 직후의 SCHEDULED 그대로면 이 테스트의 선점 호출이 다 막힌다.
+        ReflectionTestUtils.setField(concert, "status", ConcertStatus.ON_SALE);
+        return concert;
     }
 
     private Member saveMember(String phoneNumber, String nickname) {
