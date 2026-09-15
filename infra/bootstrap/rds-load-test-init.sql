@@ -104,7 +104,8 @@ CREATE TABLE `login_info` (
     `password_hash` VARCHAR(255) NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`member_id`)
+    PRIMARY KEY (`member_id`),
+    UNIQUE KEY `uk_login_info_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `wallet` (
@@ -291,5 +292,22 @@ FROM (
         (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
          UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS ten_thousands
 ) AS numbers;
+
+-- k6의 인증 준비용 계정 1,000개. 10만 회원 전체를 로그인 가능하게 만들면
+-- BCrypt 검증·토큰 발급 부하가 핵심 API 측정에 섞인다. k6 setup()은 이 계정들로
+-- 한 번씩만 로그인하고, 램프 구간에서는 받은 access token만 사용한다.
+--
+-- PasswordEncoder(BCrypt)의 검증값은 "password"다. 부하테스트 전용 RDS에서만
+-- 사용하며, 운영 자격 증명이나 JWT 비밀키를 테스트 스크립트에 넣지 않는다.
+INSERT INTO `login_info` (
+    `member_id`, `username`, `password_hash`, `created_at`, `updated_at`
+)
+SELECT
+    `member_id`,
+    CONCAT('loadtest', LPAD(`member_id`, 4, '0')),
+    '$2b$10$M4vw0C.ttFr3B8XhCWUsOuiSVms7TDwuXtLI6BREh2GVr5ijw3CiO',
+    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+FROM `member`
+WHERE `member_id` BETWEEN 1 AND 1000;
 
 
