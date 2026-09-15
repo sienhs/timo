@@ -28,15 +28,17 @@ class ShowDetailSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ShowStatusBadge(isOpen: isOpen),
-        const SizedBox(height: ShowDetailMetrics.summaryLineGap),
+        // 끝난 공연에는 뱃지를 달지 않는다. 오픈 시각은 이미 지났으니 판정만
+        // 보면 '예매중' 이 되는데, 끝난 공연에 그 말이 붙으면 거짓말이 된다.
+        // 대신 하단 바가 잠긴 버튼으로 끝난 공연임을 알린다.
+        if (!detail.isFinished) ...[
+          ShowStatusBadge(isOpen: isOpen),
+          const SizedBox(height: ShowDetailMetrics.summaryLineGap),
+        ],
         Text(detail.title, style: textTheme.headlineSmall),
         const SizedBox(height: ShowDetailMetrics.summaryLineGap),
         Text(ShowDetailStrings.venueLine(detail.venue), style: lineStyle),
-        Text(
-          ShowDetailStrings.periodLine(detail.periodLabel),
-          style: lineStyle,
-        ),
+        Text(ShowDetailStrings.periodLine(detail.dateLabel), style: lineStyle),
       ],
     );
   }

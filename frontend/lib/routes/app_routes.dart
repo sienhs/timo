@@ -17,7 +17,6 @@ import '../features/shell/screens/main_shell_screen.dart';
 import '../features/ticket/models/my_ticket.dart';
 import '../features/ticket/screens/entry_qr_screen.dart';
 import '../features/ticket/screens/my_tickets_screen.dart';
-import '../features/show/data/mock_show_detail_data.dart';
 import '../features/show/screens/show_detail_screen.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
@@ -68,16 +67,8 @@ class AppRoutes {
     home: (context) => MainShellScreen(
       initialTab: ModalRoute.of(context)!.settings.arguments as int? ?? 0,
     ),
-    // 목록에서는 공연 id 만 넘어온다. 상세 조회를 여기서 해 두면 화면은
-    // 모델만 받아 그리므로 상태별로 단독 실행할 수 있다. 모르는 id 로
-    // 열리면(딥링크) 표본 공연으로 대체한다.
-    //
-    // 같은 인자를 숫자로도 넘긴다. 상세 본문은 아직 목업이지만 예매 흐름은
-    // 서버에 붙어 있어, 좌석을 물을 때 쓸 진짜 공연 번호가 필요하다.
-    showDetail: (context) => ShowDetailScreen(
-      detail: MockShowDetailData.byId(_showIdArg(context)),
-      concertId: int.tryParse(_showIdArg(context) ?? ''),
-    ),
+    // 목록에서는 공연 번호만 넘어온다. 조회는 화면이 직접 한다.
+    showDetail: (context) => ShowDetailScreen(showId: _showIdArg(context)),
     showSearch: (_) => const ShowSearchScreen(),
     myTickets: (_) => const MyTicketsScreen(),
     // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
@@ -121,9 +112,13 @@ class AppRoutes {
     signupComplete: (_) => const SignupCompleteScreen(),
   };
 
-  /// 공연 상세가 받는 라우트 인자. 서버가 준 공연 id 를 문자열로 넘긴다.
-  static String? _showIdArg(BuildContext context) =>
-      ModalRoute.of(context)!.settings.arguments as String?;
+  /// 공연 상세가 받는 라우트 인자. 서버가 준 공연 번호다.
+  ///
+  /// 번호 없이 열리면(딥링크, 화면 단위 실행) 기본 공연으로 대신한다. 예매
+  /// 흐름이 [BookingConstants.fallbackConcertId] 로 하는 것과 같다.
+  static int _showIdArg(BuildContext context) =>
+      ModalRoute.of(context)!.settings.arguments as int? ??
+      BookingConstants.fallbackConcertId;
 
   /// 회원가입 단계 화면이 받는 초안. 초안 없이 열리면(화면 단위 테스트,
   /// 딥링크) 빈 초안으로 시작해 화면이 죽지 않게 한다.

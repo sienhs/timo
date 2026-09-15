@@ -59,7 +59,7 @@ class _ArtistCell extends StatelessWidget {
   }
 }
 
-/// 프로필 사진. 에셋이 아직 없는 아티스트는 이름 첫 글자로 대신한다.
+/// 프로필 사진. 사진이 없는 아티스트는 이름 첫 글자로 대신한다.
 class _ArtistFace extends StatelessWidget {
   const _ArtistFace({required this.artist});
 
@@ -67,10 +67,10 @@ class _ArtistFace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final photo = artist.photoAsset;
+    final photo = artist.photoUrl;
     if (photo != null) {
-      return PosterImage.asset(
-        assetPath: photo,
+      return PosterImage.network(
+        url: photo,
         decodeWidth: ShowDetailMetrics.artistAvatarSize,
       );
     }

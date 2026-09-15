@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
-import '../models/seat_price.dart';
+import '../models/zone_price.dart';
 
-/// 등급별 가격 카드. 등급이 여럿이면 줄이 늘고 사이에 구분선이 들어간다.
-class SeatPriceCard extends StatelessWidget {
-  const SeatPriceCard({super.key, required this.seatPrices});
+/// 구역별 가격 카드. 구역이 여럿이면 줄이 늘고 사이에 구분선이 들어간다.
+class ZonePriceCard extends StatelessWidget {
+  const ZonePriceCard({super.key, required this.zonePrices});
 
-  final List<SeatPrice> seatPrices;
+  final List<ZonePrice> zonePrices;
 
   @override
   Widget build(BuildContext context) {
@@ -22,24 +22,21 @@ class SeatPriceCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var index = 0; index < seatPrices.length; index++) ...[
+          for (var index = 0; index < zonePrices.length; index++) ...[
             if (index > 0) const Divider(),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
-                      seatPrices[index].grade,
+                      zonePrices[index].zoneName,
                       style: textTheme.bodyMedium,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    seatPrices[index].priceLabel,
+                    zonePrices[index].priceLabel,
                     style: textTheme.titleSmall,
                   ),
                 ],

@@ -80,7 +80,6 @@ BookingController _buildController() => BookingController(
     title: '테스트 공연',
     venue: '테스트홀',
     startAt: DateTime(2026, 11, 4, 18),
-    posterAsset: 'assets/images/sample_poster.jpg',
     bookingFee: 3000,
   ),
 );

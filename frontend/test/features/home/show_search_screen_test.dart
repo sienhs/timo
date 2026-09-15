@@ -20,6 +20,7 @@ import 'package:timo/features/home/widgets/trending_keyword_list.dart';
 import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
+import 'package:timo/features/show/data/mock_show_api.dart';
 import 'package:timo/features/show/screens/show_detail_screen.dart';
 
 /// 공연 검색 화면. 홈에서 들어가 '무엇이 보이는가' 와 '누르면 어디로 가는가' 만
@@ -50,6 +51,9 @@ void main() {
       App(
         homeApi: api ?? MockHomeApi(latency: Duration.zero, clock: () => now),
         recentSearchStore: store,
+        // 검색 결과를 누르면 공연 상세가 열린다. 목을 안 꽂으면 진짜 서버로
+        // 요청이 나간다.
+        showApi: const MockShowApi(latency: Duration.zero),
       ),
     );
     await tester.pumpAndSettle();

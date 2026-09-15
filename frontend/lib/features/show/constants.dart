@@ -53,6 +53,9 @@ class ShowDetailMetrics {
 
   /// 남은 시간을 다시 계산하는 주기.
   static const countdownTick = Duration(seconds: 1);
+
+  /// 가짜 API 의 응답 지연. 실제 서버처럼 로딩 상태가 보이게 한다.
+  static const mockLatency = Duration(milliseconds: 400);
 }
 
 /// 공연 상세 화면 문구.
@@ -61,11 +64,31 @@ class ShowDetailStrings {
 
   static const appBarTitle = '공연 상세';
 
+  /// 서버 응답을 JSON 으로 읽지 못했을 때. 프록시가 HTML 을 준 경우 등.
+  static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
+
   static const favoriteAction = '찜하기';
 
-  static const seatPriceSection = '좌석별 가격';
+  /// 시안에는 '좌석별 가격' 이지만 구역별로 낸다. 서버에 좌석 등급이 하나뿐이라
+  /// 금액이 갈리는 단위가 구역이다(`ZonePrice` 주석 참고).
+  static const zonePriceSection = '구역별 가격';
   static const artistSection = '아티스트';
   static const noticeSection = 'NOTICE';
+
+  /// 공연 안내문. 서버 응답에 없는 값이라 앱이 들고 있는다.
+  ///
+  /// 공연마다 다를 수 있는 성질의 글이지만, 지금 담긴 내용(포인트 결제 · 1인
+  /// 1매)은 공연이 아니라 이 서비스의 규칙이라 모든 공연에서 같다. 공연별
+  /// 안내가 생기면 서버에서 받아 온다.
+  ///
+  /// 문단 사이 간격은 화면이 준다 — 문자열에 빈 줄을 넣으면 간격을 바꿀 때
+  /// 문구를 고쳐야 한다.
+  static const notice = [
+    '본 공연은 포인트로만 결제하실 수 있습니다.',
+    '예매 전 보유 포인트를 반드시 확인해 주시기 바라며, 포인트가 부족할 경우 '
+        '결제 과정에서 예매가 정상적으로 진행되지 않을 수 있습니다.',
+    '또한 본 공연은 1인 1매에 한해 예매 가능하오니 이용에 참고해 주시기 바랍니다.',
+  ];
 
   /// 상태 뱃지. 오픈 전후로 갈린다.
   ///
@@ -76,6 +99,12 @@ class ShowDetailStrings {
 
   static const notifyAction = '오픈 알림 받기';
   static const bookAction = '예매하러 가기';
+
+  /// 이미 끝난 공연의 하단 바. 버튼은 잠기고 이 문구가 대신 선다.
+  ///
+  /// 매진에는 붙이지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.
+  static const closedNotice = '종료된 공연입니다';
+  static const canceledNotice = '취소된 공연입니다';
 
   /// 아직 화면이 없는 조작부. 시안대로 두고 안내만 띄운다.
   static const favoriteNotReady = '찜하기는 준비 중이에요.';

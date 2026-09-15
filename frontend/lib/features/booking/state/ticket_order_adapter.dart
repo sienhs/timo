@@ -38,7 +38,7 @@ TicketOrder? ticketOrderOf(BookingController controller) {
     venue: performance.venue,
     seat: seatLabel,
     bookerName: MockBookingData.bookerName,
-    posterAsset: performance.posterAsset,
+    posterUrl: performance.posterUrl,
     ticketPrice: zone.price,
     bookingFee: performance.bookingFee,
   );
