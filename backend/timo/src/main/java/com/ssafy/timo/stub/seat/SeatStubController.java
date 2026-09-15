@@ -104,6 +104,7 @@ public class SeatStubController implements SeatApi {
                 seat.seatNo(),
                 seat.seatCol(),
                 SeatStatus.HELD,
+                seat.section().price(),
                 heldUntil,
                 releasedSeatId));
     }

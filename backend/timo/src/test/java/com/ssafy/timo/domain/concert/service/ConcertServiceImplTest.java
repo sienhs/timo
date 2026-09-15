@@ -18,6 +18,8 @@ import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
+import com.ssafy.timo.domain.seat.entity.Section;
+import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,9 @@ class ConcertServiceImplTest {
 
     @Mock
     private ArtistRepository artistRepository;
+
+    @Mock
+    private SectionRepository sectionRepository;
 
     @Mock
     private ImageStorage imageStorage;
@@ -296,6 +301,53 @@ class ConcertServiceImplTest {
         assertThat(response.imageUrls()).containsExactly(
                 "https://cdn.timo.io/concert/1/detail-1.png",
                 "https://cdn.timo.io/concert/1/detail-2.png");
+    }
+
+    @Test
+    @DisplayName("상세 응답에 공연장의 구역별 가격이 담긴다")
+    void find_includesSectionPrices() {
+        // given
+        Concert concert = concertWithId(1L);
+        given(concertRepository.increaseViewCount(1L)).willReturn(1);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        givenImageStoragePrefixesKeys();
+        given(sectionRepository.findAllByVenueIdOrderByIdAsc(10L))
+                .willReturn(List.of(section(1L, "A구역", 150_000), section(2L, "B구역", 99_000)));
+
+        // when
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        // then
+        assertThat(response.sectionPrices())
+                .extracting(ConcertDetailResponseDto.SectionPrice::sectionName,
+                        ConcertDetailResponseDto.SectionPrice::price)
+                .containsExactly(Tuple.tuple("A구역", 150_000), Tuple.tuple("B구역", 99_000));
+    }
+
+    @Test
+    @DisplayName("좌석을 아직 등록하지 않은 공연장이면 구역별 가격은 빈 목록이다")
+    void find_returnsEmptySectionPricesWhenVenueHasNoSection() {
+        // given
+        given(concertRepository.increaseViewCount(1L)).willReturn(1);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concertWithId(1L)));
+        givenImageStoragePrefixesKeys();
+        given(sectionRepository.findAllByVenueIdOrderByIdAsc(10L)).willReturn(List.of());
+
+        // when
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        // then — 오류가 아니다. 공연장만 만들고 배치도를 아직 안 넣은 상태다.
+        assertThat(response.sectionPrices()).isEmpty();
+    }
+
+    /** 가격만 보는 테스트라 격자·좌석 수는 채우지 않는다. */
+    private static Section section(Long id, String name, int price) {
+        Section section = Section.builder()
+                .name(name)
+                .price(price)
+                .build();
+        ReflectionTestUtils.setField(section, "id", id);
+        return section;
     }
 
     @Test

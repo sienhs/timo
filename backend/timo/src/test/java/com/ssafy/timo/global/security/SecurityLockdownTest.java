@@ -45,7 +45,25 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityLockdownTest {
 
     private static final String SECRET = "local-dev-only-secret-please-change-in-prod-0123456789";
-    private static final String PROTECTED_PATH = "/api/v1/concerts/1";
+    /**
+     * 아직 인증이 필요한 경로. "잠겨 있는가" 를 확인하는 표본이다.
+     *
+     * <p>원래는 공연 상세({@code /api/v1/concerts/{concertId}})를 썼다. S15P21D206-300 이 그 경로를
+     * {@code permitAll} 로 열면서 표본이 되지 못한다 — 토큰이 없어도 필터를 통과해 404 가 나간다.
+     *
+     * <p>구역 목록으로 옮겼다. 고른 이유가 두 가지다.
+     *
+     * <ul>
+     *   <li><b>계속 잠겨 있을 경로다.</b> 공연·아티스트는 비로그인 탐색을 위해 열었지만
+     *       구역·좌석은 공개하지 않기로 했다. 표본이 또 공개로 바뀌어 이 테스트가 다시 깨지는 일이 없다.</li>
+     *   <li><b>응답 모양이 같다.</b> 통과하면 공연 1번이 없어 404 다. 그래서 아래 네 테스트의
+     *       기대값을 그대로 둘 수 있었다.</li>
+     * </ul>
+     *
+     * <p>바꾸려거든 두 조건을 모두 지키는 경로여야 한다. {@code /api/v1/members/me} 는 잠겨 있지만
+     * 유효 토큰에서 401(회원 없음)이 나와 {@link #validToken} 의 404 기대가 깨진다.
+     */
+    private static final String PROTECTED_PATH = "/api/v1/sections?concertId=1";
 
     @Autowired
     private MockMvc mvc;
