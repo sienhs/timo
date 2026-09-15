@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/token_storage.dart';
 import '../models/auth_tokens.dart';
+import '../models/reissued_access_token.dart';
 
 /// 앱 전체가 공유하는 로그인 상태.
 ///
@@ -9,9 +10,9 @@ import '../models/auth_tokens.dart';
 /// [restore] 로 저장된 것을 되살리고, [signOut] 이면 비우고 지운다. 값이 바뀌면
 /// 알려서(ChangeNotifier) [AuthSessionScope] 아래 화면들이 다시 그려진다.
 ///
-/// 토큰 재발급은 아직 붙이지 않았다(백엔드 API 는 있고, 별도 작업). 로그인이
-/// 필요한 API 가 401 을 주면 인터셉터가 [signOut] 을 불러 로그아웃 상태로 돌린다.
-/// 재발급을 붙일 때 그 자리를 "재발급 시도 → 실패하면 로그아웃" 으로 바꾼다.
+/// 로그인이 필요한 API 가 "토큰이 만료됐다"고 하면 인터셉터가 재발급을 시도하고,
+/// 받은 새 토큰을 [renewAccessToken] 으로 갈아끼운다. 재발급까지 실패하면
+/// [signOut] 이 불려 로그아웃 상태가 된다.
 ///
 /// [now] 는 테스트에서 시계를 고정하기 위해 받는다. 앱에서는 넘기지 않는다.
 class AuthSession extends ChangeNotifier {
@@ -86,6 +87,29 @@ class AuthSession extends ChangeNotifier {
     await _storage.write(TokenStorageKeys.memberId, tokens.memberId.toString());
     await _storage.write(TokenStorageKeys.accessToken, tokens.accessToken);
     await _storage.write(TokenStorageKeys.refreshToken, tokens.refreshToken);
+    await _storage.write(
+      TokenStorageKeys.accessTokenExpiresAt,
+      _accessTokenExpiresAt!.toIso8601String(),
+    );
+  }
+
+  /// 재발급받은 **액세스 토큰만** 갈아끼운다. 인터셉터가 부른다.
+  ///
+  /// 회원 번호와 리프레시 토큰은 건드리지 않는다. 서버가 리프레시 토큰을
+  /// 회전시키지 않아 그대로 유효하고, 회원도 그대로이기 때문이다.
+  ///
+  /// **로그아웃 상태면 아무것도 하지 않는다.** 재발급 요청이 서버를 다녀오는
+  /// 사이에 사용자가 로그아웃 버튼을 누를 수 있다. 그때 새 토큰을 넣어 버리면
+  /// 로그아웃했는데 다시 로그인 상태가 된다. 이미 비운 세션을 되살리지 않도록
+  /// 넣기 직전에 한 번 더 본다.
+  Future<void> renewAccessToken(ReissuedAccessToken reissued) async {
+    if (!isLoggedIn) return;
+
+    _accessToken = reissued.accessToken;
+    _accessTokenExpiresAt = _now().add(reissued.expiresIn);
+    notifyListeners();
+
+    await _storage.write(TokenStorageKeys.accessToken, reissued.accessToken);
     await _storage.write(
       TokenStorageKeys.accessTokenExpiresAt,
       _accessTokenExpiresAt!.toIso8601String(),

@@ -50,6 +50,34 @@ class AuthMetrics {
   static const mockLatency = Duration(milliseconds: 400);
 }
 
+/// 서버가 인증 실패 응답의 `errorCode` 에 싣는 이유.
+///
+/// 백엔드 `AuthErrorCode` 열거형의 이름과 같아야 한다. [AuthServerErrors] 와
+/// 역할이 겹쳐 보이지만, 저쪽은 자바 클래스 이름이라 백엔드가 클래스를 옮기면
+/// 조용히 어긋난다. 이건 그러지 말라고 따로 만든 값이다. **인증 판단은 이걸로
+/// 한다.**
+class AuthErrorCodes {
+  AuthErrorCodes._();
+
+  /// 액세스 토큰이 수명을 다했다(401). 재발급하면 풀린다.
+  static const tokenExpired = 'TOKEN_EXPIRED';
+
+  /// 토큰이 위조됐거나 폐기됐다(401). **재발급해도 소용없다.**
+  ///
+  /// 이걸 만료와 같이 취급하면 재발급받은 새 토큰도 같은 이유로 막혀서 앱이
+  /// 재발급을 무한히 반복한다. 백엔드가 둘을 굳이 나눠 주는 이유가 이것이다.
+  static const tokenInvalid = 'TOKEN_INVALID';
+
+  /// 폐기된 리프레시 토큰이 다시 쓰였다(401). 탈취로 보고 세션을 끊은 상태다.
+  /// 지금 백엔드는 재사용 탐지를 하지 않아 실제로 오지는 않지만, 오면 [tokenInvalid]
+  /// 과 똑같이 다뤄야 한다.
+  static const refreshReused = 'REFRESH_REUSED';
+
+  /// 재발급해 봐야 소용없는 이유인지. 참이면 바로 로그아웃한다.
+  static bool isHopeless(String? errorCode) =>
+      errorCode == tokenInvalid || errorCode == refreshReused;
+}
+
 /// 서버가 실패 응답(ProblemDetail)의 `exception` 에 싣는 오류 이름.
 ///
 /// 백엔드 `domain/auth/exception` 패키지의 클래스 이름과 같아야 한다. 같은

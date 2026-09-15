@@ -373,4 +373,81 @@ void main() {
       );
     });
   });
+
+  group('토큰 재발급', () {
+    test('리프레시 토큰과 기기 식별자 헤더를 POST /reissue 로 보내고 새 토큰을 읽는다', () async {
+      final api = build(
+        (_) => jsonResponse({
+          'accessToken': 'new-access-jwt',
+          'accessTokenExpiresIn': 1800,
+        }),
+      );
+
+      final reissued = await api.reissue('refresh-random');
+
+      expect(reissued.accessToken, 'new-access-jwt');
+      expect(reissued.expiresIn, const Duration(seconds: 1800));
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '$basePath/reissue');
+      expect(request.headers[HttpAuthApi.deviceIdHeader], deviceId);
+      expect(request.jsonBody, {'refreshToken': 'refresh-random'});
+    });
+
+    test('응답에 리프레시 토큰이 없다. 회전시키지 않으므로 갖고 있던 걸 계속 쓴다', () async {
+      final api = build(
+        (_) => jsonResponse({
+          'accessToken': 'new-access-jwt',
+          'accessTokenExpiresIn': 1800,
+        }),
+      );
+
+      // 모델에 담을 자리 자체가 없다는 것을 형으로 못 박아 둔다. 서버가 나중에
+      // 회전을 시작하면 이 테스트가 아니라 모델부터 바꿔야 한다.
+      final reissued = await api.reissue('refresh-random');
+
+      expect(reissued.toString(), isNot(contains('refresh')));
+    });
+
+    test('서버가 거절하면(401 TOKEN_INVALID) 이유 코드를 담은 예외로 던진다', () async {
+      // 인터셉터가 이 코드를 보고 "재발급은 끝났다, 로그아웃" 을 판단한다.
+      final api = build(
+        (_) => problemResponse(
+          status: 401,
+          errorCode: AuthErrorCodes.tokenInvalid,
+          errorMessage: '인증 정보가 올바르지 않습니다. 다시 로그인해 주세요.',
+          exception: 'TokenInvalidException',
+        ),
+      );
+
+      await expectLater(
+        api.reissue('never-issued'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 401)
+              .having(
+                (e) => e.errorCode,
+                'errorCode',
+                AuthErrorCodes.tokenInvalid,
+              ),
+        ),
+      );
+    });
+
+    test('서버에 닿지 못하면 안내 문구를 담은 예외가 나간다', () async {
+      final api = build(connectionLost);
+
+      await expectLater(
+        api.reissue('refresh-random'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            '인터넷 연결을 확인해주세요.',
+          ),
+        ),
+      );
+    });
+  });
 }

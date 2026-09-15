@@ -2,6 +2,7 @@ import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/signup_draft.dart';
 import '../models/auth_tokens.dart';
+import '../models/reissued_access_token.dart';
 import 'auth_api.dart';
 
 /// 서버 없이 쓰는 가짜 [AuthApi]. 화면 테스트가 쓴다.
@@ -12,6 +13,7 @@ import 'auth_api.dart';
 /// - 아이디 [takenUsernames], 닉네임 [takenNicknames] 는 이미 사용 중
 /// - 로그인 비밀번호 [wrongPassword] 는 틀린 비밀번호(아이디는 무엇이든)
 /// - 로그아웃 리프레시 토큰 [offlineRefreshToken] 은 서버에 닿지 못한 것으로 친다
+/// - 재발급 리프레시 토큰 [rejectedRefreshToken] 은 서버가 거절한 것으로 친다
 ///
 /// 응답마다 [latency] 만큼 기다려 실제 서버처럼 로딩 상태가 보이게 한다.
 /// 테스트에서는 `Duration.zero` 를 넣어 바로 응답받는다.
@@ -33,6 +35,14 @@ class MockAuthApi implements AuthApi {
   /// 실패로 돌려주지 않아, 흉내 낼 실패는 "서버에 닿지 못함" 하나뿐이다. 화면
   /// 테스트가 "서버에 못 알려도 로그아웃은 된다" 를 볼 때 쓴다.
   static const offlineRefreshToken = 'mock-offline';
+
+  /// 이 토큰으로 재발급하면 서버가 거절한 것처럼 401 예외를 던진다.
+  /// "재발급까지 실패하면 로그아웃된다" 를 볼 때 쓴다.
+  static const rejectedRefreshToken = 'mock-rejected';
+
+  /// 재발급이 돌려주는 새 액세스 토큰. 원래 토큰([tokens])과 값이 달라야
+  /// 테스트가 "갈아끼워졌는지" 를 구분할 수 있다.
+  static const reissuedAccessToken = 'mock-access-token-2';
 
   /// 가입·로그인 응답 흉내. 서버에 보내지 않으므로 값은 아무것이어도 된다.
   static const tokens = AuthTokens(
@@ -92,5 +102,21 @@ class MockAuthApi implements AuthApi {
     if (refreshToken == offlineRefreshToken) {
       throw const ApiException('인터넷 연결을 확인해주세요.');
     }
+  }
+
+  @override
+  Future<ReissuedAccessToken> reissue(String refreshToken) async {
+    await _respond();
+    if (refreshToken == rejectedRefreshToken) {
+      throw ApiException(
+        '인증 정보가 올바르지 않습니다. 다시 로그인해 주세요.',
+        status: 401,
+        errorCode: AuthErrorCodes.tokenInvalid,
+      );
+    }
+    return const ReissuedAccessToken(
+      accessToken: reissuedAccessToken,
+      expiresIn: Duration(minutes: 30),
+    );
   }
 }

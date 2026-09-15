@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
+import 'package:timo/features/auth/models/reissued_access_token.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 
 /// 로그인 상태 상자. 저장소는 메모리 구현을 쓰고 시계는 고정한다.
@@ -126,6 +127,68 @@ void main() {
       expect(session.accessToken, isNull);
       expect(storage.values, {TokenStorageKeys.deviceId: 'device-1'});
       expect(notified, 2); // restore 한 번, signOut 한 번
+    });
+  });
+
+  group('토큰 재발급', () {
+    const reissued = ReissuedAccessToken(
+      accessToken: 'access-jwt-2',
+      expiresIn: Duration(minutes: 30),
+    );
+
+    test('액세스 토큰과 만료 시각만 바뀌고 나머지는 그대로다', () async {
+      var notified = 0;
+      final storage = InMemoryTokenStorage(savedValues);
+      final at = now.add(const Duration(minutes: 40));
+      final session = build(storage, at: at);
+      await session.restore();
+      session.addListener(() => notified++);
+
+      await session.renewAccessToken(reissued);
+
+      expect(session.accessToken, 'access-jwt-2');
+      // 새 수명은 발급 시점부터 다시 센다.
+      expect(session.accessTokenExpiresAt, at.add(const Duration(minutes: 30)));
+      expect(session.isAccessTokenExpired, isFalse);
+      // 서버가 리프레시 토큰을 회전시키지 않으므로 그대로 쓴다. 회원도 그대로다.
+      expect(session.refreshToken, 'refresh-random');
+      expect(session.memberId, 7);
+      expect(notified, 1);
+    });
+
+    test('기기에도 새 토큰과 만료 시각을 저장한다', () async {
+      final storage = InMemoryTokenStorage(savedValues);
+      final at = now.add(const Duration(minutes: 40));
+      final session = build(storage, at: at);
+      await session.restore();
+
+      await session.renewAccessToken(reissued);
+
+      expect(storage.values, {
+        TokenStorageKeys.memberId: '7',
+        TokenStorageKeys.accessToken: 'access-jwt-2',
+        TokenStorageKeys.refreshToken: 'refresh-random',
+        TokenStorageKeys.accessTokenExpiresAt: at
+            .add(const Duration(minutes: 30))
+            .toIso8601String(),
+      });
+    });
+
+    test('로그아웃 상태면 무시한다. 다녀오는 사이 로그아웃했을 수 있다', () async {
+      // 이 방어가 없으면 로그아웃했는데 재발급 응답이 세션을 되살린다.
+      var notified = 0;
+      final storage = InMemoryTokenStorage(savedValues);
+      final session = build(storage);
+      await session.restore();
+      await session.signOut();
+      session.addListener(() => notified++);
+
+      await session.renewAccessToken(reissued);
+
+      expect(session.isLoggedIn, isFalse);
+      expect(session.accessToken, isNull);
+      expect(storage.values, isEmpty);
+      expect(notified, 0);
     });
   });
 }

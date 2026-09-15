@@ -1,7 +1,8 @@
 import '../models/signup_draft.dart';
 import '../models/auth_tokens.dart';
+import '../models/reissued_access_token.dart';
 
-/// 인증(회원가입·로그인·로그아웃) 화면이 서버에 요청하는 일 일곱 가지.
+/// 인증(회원가입·로그인·로그아웃·재발급) 요청 여덟 가지.
 ///
 /// 화면은 이 인터페이스만 안다. 앱에서는 [HttpAuthApi] 가 실제 서버에 요청하고,
 /// 테스트는 [MockAuthApi] 를 쓴다.
@@ -60,4 +61,17 @@ abstract class AuthApi {
   /// 액세스 토큰은 서버가 끊지 못한다(JWT). 남은 수명 동안 그대로 통하므로 기기
   /// 토큰을 지우는 일([AuthSession.signOut])이 이 호출보다 중요하다.
   Future<void> logout(String refreshToken);
+
+  /// 리프레시 토큰으로 **새 액세스 토큰**을 받는다.
+  ///
+  /// 화면이 부르는 요청이 아니다. 로그인이 필요한 API 가 "토큰이 만료됐다"고
+  /// 할 때 `AuthInterceptor` 가 사용자 모르게 부른다.
+  ///
+  /// 리프레시 토큰은 바뀌지 않는다(서버가 회전시키지 않는다). 앱은 갖고 있던
+  /// 것을 계속 쓰고, 받은 액세스 토큰만 갈아끼우면 된다.
+  ///
+  /// 실패는 전부 예외다. 리프레시 토큰이 위조됐든, 로그아웃으로 이미 끊겼든,
+  /// 만료됐든 서버는 401 하나로 묶어 준다. 사유를 나눠 줘도 앱이 할 수 있는
+  /// 일이 로그아웃뿐이라 그렇다.
+  Future<ReissuedAccessToken> reissue(String refreshToken);
 }
