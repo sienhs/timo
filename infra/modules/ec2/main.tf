@@ -221,6 +221,13 @@ resource "aws_instance" "this" {
                 fi
                 sleep 2
               done
+              # Keep the application failure visible to the SSM caller before
+              # rollback removes the failed replacement container.  The CI job
+              # collects StandardErrorContent on a failed command invocation.
+              echo "Backend health check did not become ready; replacement container logs:" >&2
+              docker logs --tail 200 timo-backend >&2 || true
+              echo "Replacement container state:" >&2
+              docker inspect --format '{{json .State}}' timo-backend >&2 || true
               false
               SCRIPT
               chmod 0755 /opt/timo/deploy.sh
