@@ -18,8 +18,10 @@ import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.global.security.exception.AuthErrorCode;
+import com.ssafy.timo.support.Authenticated;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,9 +46,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>선점은 이제 <b>공연별</b>이다. 같은 공연장에서 열리는 두 공연이 같은 좌석을 각자 팔 수 있어야
  * 하므로, 이 테스트는 공연장 하나에 공연 둘을 두고 <b>서로 간섭하지 않는지</b>를 핵심으로 본다.
  *
- * <p>요청자는 인증이 아직 없어 {@code X-Member-Id} 헤더로 흉내 낸다
- * ({@code MockCurrentMemberProvider}). 다만 선점 행이 회원 FK 를 들고 있어 헤더에 아무 숫자나 넣을 수
- * 없고, 실제로 저장한 회원 id 를 쓴다.
+ * <p>요청자는 access token 의 {@code sub} 로 정해진다({@code @AuthenticationPrincipal}).
+ * {@code addFilters = false} 라 필터가 인증 객체를 만들어 주지 않으므로
+ * {@link Authenticated} 가 홀더에 직접 넣는다. 다만 선점 행이 회원 FK 를 들고 있어 아무 숫자나
+ * 쓸 수는 없고, 실제로 저장한 회원 id 를 쓴다.
  *
  * <p><b>동시 선점은 여기서 검증하지 않는다.</b> {@code @IntegrationTest} 가 테스트 전체를 한
  * 트랜잭션으로 묶으므로 두 요청을 실제로 겹치게 만들 수 없다. 판정을 맡은 유니크 제약이 스키마에
@@ -60,7 +63,6 @@ class SeatHoldApiIntegrationTest {
 
     private static final String SEAT_PATH = "/api/v1/seats";
     private static final String SECTION_PATH = "/api/v1/sections";
-    private static final String MEMBER_HEADER = "X-Member-Id";
 
     @Autowired
     private MockMvc mvc;
@@ -113,6 +115,12 @@ class SeatHoldApiIntegrationTest {
 
         section = saveSection("1층 A블록", 150000, 2, 2);
         flushAndClear();
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        // 홀더는 스레드에 남는다. 비우지 않으면 다음 테스트가 이 요청자를 물려받는다.
+        Authenticated.clear();
     }
 
     // ---------------------------------------------------------------- 선점 성공
@@ -396,7 +404,7 @@ class SeatHoldApiIntegrationTest {
 
         mvc.perform(post(SEAT_PATH + "/{seatId}/hold", missingSeatId)
                         .param("concertId", String.valueOf(concertA.getId()))
-                        .header(MEMBER_HEADER, me))
+                        .with(Authenticated.as(me)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorMessage")
                         .value("존재하지 않는 좌석입니다. (seatId=" + missingSeatId + ")"))
@@ -408,14 +416,14 @@ class SeatHoldApiIntegrationTest {
     void hold_returnsNotFoundWhenConcertMissing() throws Exception {
         mvc.perform(post(SEAT_PATH + "/{seatId}/hold", seatIdAt(1, 1))
                         .param("concertId", "999999")
-                        .header(MEMBER_HEADER, me))
+                        .with(Authenticated.as(me)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.exception").value("ConcertNotFoundException"));
     }
 
     @Test
-    @DisplayName("요청자를 특정할 수 없으면 401 을 반환하고 아무것도 선점되지 않는다")
-    void hold_returnsUnauthorizedWhenMemberHeaderMissing() throws Exception {
+    @DisplayName("토큰이 없으면 401 을 반환하고 아무것도 선점되지 않는다")
+    void hold_returnsUnauthorizedWhenTokenMissing() throws Exception {
         Long seatId = seatIdAt(1, 1);
 
         mvc.perform(post(SEAT_PATH + "/{seatId}/hold", seatId)
@@ -430,11 +438,12 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("요청자 헤더가 숫자가 아니면 401 을 반환한다")
-    void hold_returnsUnauthorizedWhenMemberHeaderMalformed() throws Exception {
+    @DisplayName("토큰의 sub 가 회원 id 가 아니면 401 을 반환한다")
+    void hold_returnsUnauthorizedWhenSubjectIsNotMemberId() throws Exception {
+        // 우리가 발급한 토큰의 sub 는 항상 회원 id 다. 아니면 우리 토큰이 아니다.
         mvc.perform(post(SEAT_PATH + "/{seatId}/hold", seatIdAt(1, 1))
                         .param("concertId", String.valueOf(concertA.getId()))
-                        .header(MEMBER_HEADER, "not-a-number"))
+                        .with(Authenticated.asSubject("not-a-number")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.exception").value("TokenInvalidException"));
     }
@@ -444,7 +453,7 @@ class SeatHoldApiIntegrationTest {
     private MockHttpServletRequestBuilder holdBy(long memberId, Concert concert, Long seatId) {
         return post(SEAT_PATH + "/{seatId}/hold", seatId)
                 .param("concertId", String.valueOf(concert.getId()))
-                .header(MEMBER_HEADER, memberId);
+                .with(Authenticated.as(memberId));
     }
 
     private MockHttpServletRequestBuilder seatsOf(Concert concert) {

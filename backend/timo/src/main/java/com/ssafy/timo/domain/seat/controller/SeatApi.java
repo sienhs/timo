@@ -5,6 +5,7 @@ import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
+import com.ssafy.timo.global.security.CurrentMember;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,6 +25,11 @@ import org.springframework.web.bind.annotation.RequestParam;
  * <p><b>조회와 선점은 {@code concertId} 를 반드시 받는다.</b> 좌석은 공연장에 속한 마스터 데이터라
  * 여러 공연이 같은 자리를 공유하고, 판매 여부는 공연마다 다르기 때문이다. 공연을 빼고 물으면
  * 어느 공연의 좌석표인지 정해지지 않는다.
+ *
+ * <p><b>선점·선점 취소는 요청자를 {@link CurrentMember} 로만 받는다.</b> 경로·쿼리·본문 어디에도
+ * 회원 식별자를 두지 않아 남의 자리를 잡거나 푸는 요청을 만들 자체가 불가능하다. 그 값이 access
+ * token 의 {@code sub} 에서만 온다는 것과, 요청자를 특정할 수 없을 때 401 이라는 것은 그 애노테이션의
+ * 규약이다.
  *
  * <p>점유(결제 확정) 엔드포인트는 없어졌다. 판매 상태는 이제 좌석이 아니라 주문이 갖는다.
  */
@@ -51,7 +57,9 @@ public interface SeatApi {
      * <p>남이 잡고 있거나 이미 팔린 자리는 409 다.
      */
     @PostMapping("/{seatId}/hold")
-    ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId, @RequestParam Long concertId);
+    ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId,
+                                             @RequestParam Long concertId,
+                                             @CurrentMember Long memberId);
 
     /**
      * 이 공연의 좌석 선점을 취소한다. 자리는 즉시 예매 가능으로 돌아간다.
@@ -61,7 +69,8 @@ public interface SeatApi {
      */
     @DeleteMapping("/{seatId}/hold")
     ResponseEntity<SeatHoldCancelResponseDto> cancelHold(@PathVariable Long seatId,
-                                                          @RequestParam Long concertId);
+                                                          @RequestParam Long concertId,
+                                                          @CurrentMember Long memberId);
 
     /**
      * 공연장의 구역과 좌석을 등록한다. 마스터 데이터라 공연을 받지 않는다.

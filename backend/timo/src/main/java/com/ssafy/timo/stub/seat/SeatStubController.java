@@ -85,7 +85,7 @@ public class SeatStubController implements SeatApi {
     }
 
     @Override
-    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId) {
+    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId, Long memberId) {
         SeatFixture seat = findSeat(seatId);
         if (!seatStateStore.isMine(seat) && seatStateStore.statusOf(seat) != SeatStatus.AVAILABLE) {
             throw new SeatNotHoldableException(seatId);
@@ -109,7 +109,7 @@ public class SeatStubController implements SeatApi {
     }
 
     @Override
-    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId) {
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId, Long memberId) {
         SeatFixture seat = findSeat(seatId);
         SeatStatus status = seatStateStore.statusOf(seat);
 

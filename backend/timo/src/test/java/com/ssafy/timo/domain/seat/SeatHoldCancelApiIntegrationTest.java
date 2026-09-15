@@ -17,8 +17,10 @@ import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
+import com.ssafy.timo.support.Authenticated;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,12 +47,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 뜨면 안 되기 때문이다. 남의 선점과 이미 팔린 자리만 거절한다.
  *
  * <p>선점과 마찬가지로 <b>공연별</b>이다. 한 공연의 취소가 다른 공연의 선점을 건드리지 않는지 본다.
+ *
+ * <p>요청자는 access token 의 {@code sub} 로 정해진다({@code @AuthenticationPrincipal}).
+ * {@code addFilters = false} 라 필터가 인증 객체를 만들어 주지 않으므로 {@link Authenticated} 가
+ * 홀더에 직접 넣는다.
  */
 @IntegrationTest
 class SeatHoldCancelApiIntegrationTest {
 
     private static final String SEAT_PATH = "/api/v1/seats";
-    private static final String MEMBER_HEADER = "X-Member-Id";
 
     @Autowired
     private MockMvc mvc;
@@ -102,6 +107,12 @@ class SeatHoldCancelApiIntegrationTest {
 
         section = saveSection("1층 A블록", 150000, 2, 2);
         flushAndClear();
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        // 홀더는 스레드에 남는다. 비우지 않으면 다음 테스트가 이 요청자를 물려받는다.
+        Authenticated.clear();
     }
 
     @Test
@@ -241,14 +252,14 @@ class SeatHoldCancelApiIntegrationTest {
     void cancel_returnsNotFoundWhenSeatMissing() throws Exception {
         mvc.perform(delete(SEAT_PATH + "/{seatId}/hold", 999_999L)
                         .param("concertId", String.valueOf(concertA.getId()))
-                        .header(MEMBER_HEADER, me))
+                        .with(Authenticated.as(me)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.exception").value("SeatNotFoundException"));
     }
 
     @Test
-    @DisplayName("요청자를 특정할 수 없으면 401 이다")
-    void cancel_returnsUnauthorizedWhenMemberHeaderMissing() throws Exception {
+    @DisplayName("토큰이 없으면 401 이다")
+    void cancel_returnsUnauthorizedWhenTokenMissing() throws Exception {
         mvc.perform(delete(SEAT_PATH + "/{seatId}/hold", seatIdAt(1, 1))
                         .param("concertId", String.valueOf(concertA.getId())))
                 .andExpect(status().isUnauthorized())
@@ -260,13 +271,13 @@ class SeatHoldCancelApiIntegrationTest {
     private MockHttpServletRequestBuilder holdBy(long memberId, Concert concert, Long seatId) {
         return post(SEAT_PATH + "/{seatId}/hold", seatId)
                 .param("concertId", String.valueOf(concert.getId()))
-                .header(MEMBER_HEADER, memberId);
+                .with(Authenticated.as(memberId));
     }
 
     private MockHttpServletRequestBuilder cancelBy(long memberId, Concert concert, Long seatId) {
         return delete(SEAT_PATH + "/{seatId}/hold", seatId)
                 .param("concertId", String.valueOf(concert.getId()))
-                .header(MEMBER_HEADER, memberId);
+                .with(Authenticated.as(memberId));
     }
 
     private MockHttpServletRequestBuilder seatsOf(Concert concert) {

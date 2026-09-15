@@ -23,7 +23,13 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>TODO</b>: 좌석 도메인이 토큰 기반으로 옮겨오면 이 클래스를 삭제하고
  * {@link JwtCurrentMemberProvider} 의 프로파일 제한을 없앤다.
+ *
+ * @deprecated 좌석 도메인은 {@link CurrentMember} 로 옮겨 갔다. 새 API 는 이 헤더를 쓰지 말고
+ *             그 애노테이션을 쓴다. 남은 사용처는 {@code MemberService} 하나이며, 그쪽까지
+ *             옮겨오면 이 클래스와 {@link CurrentMemberProvider}·{@link JwtCurrentMemberProvider}
+ *             를 함께 지운다.
  */
+@Deprecated
 @Component
 @Profile("!prod & !securitytest")
 @RequiredArgsConstructor
