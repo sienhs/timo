@@ -12,7 +12,8 @@ package com.ssafy.timo.domain.seat.entity;
  * <pre>
  * SOLD      : reservation 에 status='PAID' 행이 있다
  * HELD      : seat_hold 에 status='HELD' 행이 있다
- * AVAILABLE : 둘 다 없다
+ * REVOKED   : reservation 에 status='CANCELLED' 행이 있고, 위 둘은 없다
+ * AVAILABLE : 셋 다 없다
  * </pre>
  *
  * <p>같은 좌석이라도 공연이 다르면 상태가 다르다. 그래서 좌석 상태를 묻는 코드는 언제나
@@ -25,5 +26,10 @@ public enum SeatStatus {
     /** 선점됨. 결제 대기 중이라 다른 회원이 잡을 수 없다. */
     HELD,
     /** 판매 완료. 이 공연의 주문이 이 자리를 붙들고 있다. */
-    SOLD
+    SOLD,
+    /**
+     * 회수됨. 이 공연의 주문이 취소된 적이 있는 자리다. 취소는 자리를 곧바로 예매 가능으로 되돌리지
+     * 않는다 — 재오픈 절차(스토리 35) 전까지는 선택 화면에 다시 노출되지 않는다.
+     */
+    REVOKED
 }
