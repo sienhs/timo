@@ -148,6 +148,8 @@ module "monitoring" {
   root_volume_size         = var.monitoring_root_volume_size
   aws_region               = var.aws_region
   application_private_ip   = module.ec2.private_ip
+  application_instance_id  = module.ec2.instance_id
+  rds_instance_identifier  = module.rds.identifier
   grafana_admin_password   = var.grafana_admin_password
   grafana_domain           = "${var.grafana_subdomain}.${var.domain_name}"
 

@@ -76,6 +76,14 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+  - name: AWS CloudWatch
+    uid: cloudwatch
+    type: cloudwatch
+    access: proxy
+    jsonData:
+      authType: default
+      defaultRegion: ${aws_region}
+    editable: false
 GRAFANA
 
 cat >/opt/timo-monitoring/grafana/provisioning/dashboards/default.yml <<'DASHBOARD_PROVIDER'
@@ -165,6 +173,43 @@ cat >/opt/timo-monitoring/grafana/dashboards/timo-overview.json <<'DASHBOARD'
         {"refId": "C", "expr": "hikaricp_connections_max{application=\"timo\"}", "legendFormat": "max"}
       ],
       "fieldConfig": {"defaults": {"unit": "short", "decimals": 0, "min": 0}, "overrides": []}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "EC2 CPU utilization",
+      "gridPos": {"x": 0, "y": 16, "w": 6, "h": 8},
+      "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+      "targets": [{"refId": "A", "region": "${aws_region}", "namespace": "AWS/EC2", "metricName": "CPUUtilization", "dimensions": {"InstanceId": "${application_instance_id}"}, "statistic": "Average", "period": "60", "matchExact": true, "metricEditorMode": 0, "metricQueryType": 0, "legendFormat": "CPU"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "min": 0, "max": 100}, "overrides": []}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "EC2 memory used",
+      "gridPos": {"x": 6, "y": 16, "w": 6, "h": 8},
+      "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+      "targets": [{"refId": "A", "region": "${aws_region}", "namespace": "Timo/EC2", "metricName": "mem_used_percent", "dimensions": {"InstanceId": "${application_instance_id}"}, "statistic": "Average", "period": "60", "matchExact": true, "metricEditorMode": 0, "metricQueryType": 0, "legendFormat": "memory used"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "min": 0, "max": 100}, "overrides": []}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "RDS CPU utilization",
+      "gridPos": {"x": 12, "y": 16, "w": 6, "h": 8},
+      "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+      "targets": [{"refId": "A", "region": "${aws_region}", "namespace": "AWS/RDS", "metricName": "CPUUtilization", "dimensions": {"DBInstanceIdentifier": "${rds_instance_identifier}"}, "statistic": "Average", "period": "60", "matchExact": true, "metricEditorMode": 0, "metricQueryType": 0, "legendFormat": "CPU"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "min": 0, "max": 100}, "overrides": []}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "RDS freeable memory",
+      "description": "RDS does not expose used-memory percentage; this is the amount of memory the engine can reclaim.",
+      "gridPos": {"x": 18, "y": 16, "w": 6, "h": 8},
+      "datasource": {"type": "cloudwatch", "uid": "cloudwatch"},
+      "targets": [{"refId": "A", "region": "${aws_region}", "namespace": "AWS/RDS", "metricName": "FreeableMemory", "dimensions": {"DBInstanceIdentifier": "${rds_instance_identifier}"}, "statistic": "Average", "period": "60", "matchExact": true, "metricEditorMode": 0, "metricQueryType": 0, "legendFormat": "freeable memory"}],
+      "fieldConfig": {"defaults": {"unit": "bytes", "decimals": 1, "min": 0}, "overrides": []}
     }
   ]
 }
