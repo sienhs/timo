@@ -265,7 +265,9 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
   document_type   = "Command"
   document_format = "JSON"
 
-  content = jsonencode({
+  # SSM runs this as a Linux shell script.  Terraform on Windows can preserve
+  # CRLF inside the heredoc, which makes the shebang resolve as `bash\r`.
+  content = replace(jsonencode({
     schemaVersion = "2.2"
     description   = "Initialise the Timo RDS schema and load test members"
     mainSteps = [{
@@ -273,7 +275,7 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
       name   = "initialiseRds"
       inputs = {
         timeoutSeconds = "1800"
-        runCommand = [<<-SCRIPT
+        runCommand = [replace(<<-SCRIPT
           #!/usr/bin/env bash
           set -euo pipefail
 
@@ -366,10 +368,10 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
           exit 0
 
           SCRIPT
-        ]
+        , "\r", "")]
       }
     }]
-  })
+  }), "\r", "")
 }
 
 # The association has no schedule and normally runs only when it is created.
