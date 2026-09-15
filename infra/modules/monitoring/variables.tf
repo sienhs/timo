@@ -36,6 +36,16 @@ variable "application_private_ip" {
   type        = string
 }
 
+variable "application_instance_id" {
+  description = "Application EC2 instance ID displayed in Grafana CloudWatch panels"
+  type        = string
+}
+
+variable "rds_instance_identifier" {
+  description = "RDS DB instance identifier displayed in Grafana CloudWatch panels"
+  type        = string
+}
+
 variable "grafana_admin_password" {
   description = "Initial Grafana admin password; provide this through an ignored terraform.tfvars file"
   type        = string

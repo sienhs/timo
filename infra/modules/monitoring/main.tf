@@ -47,6 +47,38 @@ resource "aws_iam_role_policy" "grafana_secret_read" {
   })
 }
 
+# Grafana's built-in CloudWatch data source uses the monitoring instance role.
+# Keep this read-only and limited to metric discovery/query APIs so dashboards
+# can show application EC2 and load-test RDS resource pressure.
+resource "aws_iam_role_policy" "grafana_cloudwatch_read" {
+  name = "${var.name}-monitoring-grafana-cloudwatch-read"
+  role = aws_iam_role.ssm.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "cloudwatch:DescribeAlarms",
+        "logs:DescribeLogGroups",
+        "logs:GetLogGroupFields",
+        "logs:StartQuery",
+        "logs:StopQuery",
+        "logs:GetQueryResults",
+        "ec2:DescribeInstances",
+        "ec2:DescribeRegions",
+        "ec2:DescribeTags",
+        "rds:DescribeDBInstances",
+        "tag:GetResources"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "this" {
   name = "${var.name}-monitoring-profile"
   role = aws_iam_role.ssm.name
@@ -81,13 +113,15 @@ resource "aws_instance" "this" {
   # Windows checkouts may contain CRLF; Linux shebangs and shell commands
   # require LF. Normalize the complete rendered script before EC2/SSM use.
   user_data = replace(templatefile("${path.module}/user_data.sh", {
-    application_private_ip = var.application_private_ip
-    aws_region             = var.aws_region
-    grafana_secret_arn     = aws_secretsmanager_secret.grafana.arn
-    prometheus_image       = var.prometheus_image
-    grafana_image          = var.grafana_image
-    grafana_domain         = var.grafana_domain
-    jaeger_image           = var.jaeger_image
+    application_private_ip  = var.application_private_ip
+    aws_region              = var.aws_region
+    grafana_secret_arn      = aws_secretsmanager_secret.grafana.arn
+    prometheus_image        = var.prometheus_image
+    grafana_image           = var.grafana_image
+    grafana_domain          = var.grafana_domain
+    jaeger_image            = var.jaeger_image
+    application_instance_id = var.application_instance_id
+    rds_instance_identifier = var.rds_instance_identifier
   }), "\r\n", "\n")
 
   tags = {
@@ -117,7 +151,8 @@ resource "aws_ssm_association" "bootstrap" {
 
   depends_on = [
     aws_iam_role_policy_attachment.ssm,
-    aws_iam_role_policy.grafana_secret_read
+    aws_iam_role_policy.grafana_secret_read,
+    aws_iam_role_policy.grafana_cloudwatch_read
   ]
 
   # The provider waits for execution success on creation, not on updates.
