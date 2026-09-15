@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/show_summary.dart';
-import '../../../core/widgets/poster_image.dart';
+import 'show_banner_card.dart';
 
 /// 상단 배너 캐러셀. 옆으로 넘길 수 있다는 걸 알리려고 다음 배너가 오른쪽에
 /// 살짝 걸쳐 보이게 한다([HomeMetrics.bannerViewportFraction]).
@@ -55,10 +55,9 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               padding: const EdgeInsets.symmetric(
                 horizontal: HomeMetrics.bannerGap / 2,
               ),
-              child: _BannerCard(
-                banner: widget.banners[index],
-                onPressed: () =>
-                    widget.onBannerPressed(widget.banners[index]),
+              child: ShowBannerCard(
+                show: widget.banners[index],
+                onPressed: () => widget.onBannerPressed(widget.banners[index]),
               ),
             ),
           ),
@@ -66,71 +65,6 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
         const SizedBox(height: 10),
         _PageDots(count: widget.banners.length, current: _currentPage),
       ],
-    );
-  }
-}
-
-class _BannerCard extends StatelessWidget {
-  const _BannerCard({required this.banner, required this.onPressed});
-
-  final ShowSummary banner;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return GestureDetector(
-      onTap: onPressed,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(HomeMetrics.bannerRadius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            PosterImage.network(
-              url: banner.posterImageUrl,
-              decodeWidth: MediaQuery.sizeOf(context).width,
-            ),
-            // 포스터 밝은 부분에 흰 글자가 묻히지 않게 아래쪽만 어둡게 깐다.
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.center,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black54],
-                ),
-              ),
-              child: SizedBox.expand(),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 14,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    banner.title,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    banner.venueName,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: Colors.white70,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

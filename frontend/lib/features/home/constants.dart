@@ -113,11 +113,43 @@ class HomeMetrics {
   /// 불러오는 동안 그리는 빈 카드 수. 폰 폭(360)에 카드 두 장 반이 보인다.
   static const skeletonCardCount = 3;
 
-  // 검색 결과 줄
-  static const searchThumbWidth = 56.0;
-  static const searchThumbRadius = 6.0;
-  static const searchTileGap = 12.0;
-  static const searchTileVerticalPadding = 10.0;
+  // 검색 화면
+  /// 상단 바(뒤로가기 · 로고)와 검색 필드 사이, 필드와 첫 섹션 사이 간격.
+  static const searchFieldTopGap = 4.0;
+  static const searchFieldBottomGap = 24.0;
+  static const searchFieldIconSize = 20.0;
+  static const searchFieldHorizontalPadding = 14.0;
+  static const searchFieldIconGap = 8.0;
+
+  /// 최근 검색어 칩. 가로로 넘기는 한 줄이다.
+  static const recentChipHeight = 36.0;
+  static const recentChipGap = 8.0;
+  static const recentChipHorizontalPadding = 14.0;
+  static const recentChipIconSize = 16.0;
+  static const recentChipIconGap = 4.0;
+
+  /// 기기에 남기는 최근 검색어 수. 넘치면 오래된 것부터 떨어진다.
+  static const recentSearchLimit = 10;
+
+  /// 실시간 인기 검색어 줄.
+  static const trendingRowHeight = 48.0;
+  static const trendingRankWidth = 32.0;
+  static const trendingChangeIconSize = 20.0;
+
+  /// 순위 숫자를 강조색으로 찍는 상위 범위. 시안은 1~3위만 색이 다르다.
+  static const trendingHighlightRanks = 3;
+
+  /// 검색 결과 카드. 홈 배너와 같은 모양이되 더 높다.
+  static const searchCardHeight = 200.0;
+  static const searchCardGap = 12.0;
+  static const favoriteIconSize = 24.0;
+  static const favoriteButtonInset = 4.0;
+
+  /// 처음 보여 주는 결과 카드 수. 넘치면 더보기가 나머지를 펼친다.
+  static const searchPreviewCount = 3;
+
+  /// 관련 아티스트 칸 폭. 아바타보다 조금 넓어 이름이 들어간다.
+  static const relatedArtistCellWidth = 88.0;
 }
 
 /// 홈 화면 문구. 숫자에서 파생되는 문구는 파생 규칙까지 여기 둔다.
@@ -137,8 +169,32 @@ class HomeStrings {
   /// 시안대로 둔다 — 기획 확인 후 [ticketOpenMore] 와 맞추면 된다.
   static const popularMore = 'More';
 
-  /// 검색 화면. 검색어를 넣기 전과 결과가 없을 때의 문구.
-  static const searchIdle = '공연 이름으로 검색해 보세요.';
+  // 검색 화면
+  static const back = '뒤로';
+  static const clearSearch = '검색어 지우기';
+  static const recentSection = '최근 검색어';
+  static const clearRecent = '전체 삭제';
+  static String removeRecent(String keyword) => '$keyword 삭제';
+  static const recommendedSection = '추천 검색어';
+  static const trendingSection = '실시간 인기 검색어';
+  static const trendingUp = '상승';
+  static const trendingDown = '하락';
+  static const resultSection = '오픈 예정 / 예매중';
+  static const resultMore = '더보기';
+  static const relatedArtistSection = '관련 아티스트';
+  static const favorite = '찜';
+
+  /// 찜 API 가 아직 없다. 하트를 누르면 이 문구를 띄운다.
+  static const favoriteNotReady = '찜 기능은 준비 중이에요.';
+
+  /// 검색어를 누르면 그 말로 검색한다는 스크린 리더용 라벨. (예: `아이유 검색`)
+  static String searchFor(String keyword) => '$keyword 검색';
+
+  /// 인기 검색어 집계 시각. 앱의 다른 일시와 같은 표기(0 을 붙인다)를 쓴다 —
+  /// 시안은 `2026.9.4` 로 0 을 뗐지만 한 앱 안에서 표기가 갈릴 이유가 없다.
+  static String trendingAsOf(DateTime asOf) => '${formatPerformedAt(asOf)} 기준';
+
+  /// 결과가 없을 때. 검색어를 되비춰 준다.
   static String searchEmpty(String keyword) => "'$keyword' 에 맞는 공연이 없어요.";
 
   /// 서버가 빈 목록을 줬을 때 카드 줄 자리에 적는다.
