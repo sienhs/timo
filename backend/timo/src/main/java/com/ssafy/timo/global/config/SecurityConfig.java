@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/auth/availability",
                                 "/api/v1/concerts",
+                                "/api/v1/concerts/{concertId}",
                                 "/api/v1/artists",
                                 "/api/v1/artists/{artistId}").permitAll()
                         // 프론트 연동용 스텁. AuthControllerStub 가 @Profile("!prod") 라
