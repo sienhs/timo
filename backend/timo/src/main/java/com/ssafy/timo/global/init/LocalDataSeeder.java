@@ -335,9 +335,14 @@ public class LocalDataSeeder implements ApplicationRunner {
      * {@code reservation} 을 조인해 계산되므로({@code SeatRepository.findSeatsWithStatus}),
      * 상태를 보이게 하려면 그 행을 실제로 넣는 수밖에 없다.
      *
-     * <p><b>공연마다 같은 회원을 다시 쓴다.</b> 유니크가 {@code (concert_id, member)} 라
+     * <p><b>공연마다 같은 회원 풀을 다시 쓴다.</b> 유니크가 {@code (concert_id, member)} 라
      * "한 계정은 한 공연에서 하나" 일 뿐, 공연이 다르면 같은 사람이 또 잡을 수 있다. 그래서 필요한
-     * 회원 수는 전체 좌석 수가 아니라 <b>공연 하나에서 가장 많이 필요한 수</b>다.
+     * 회원 수는 전체 좌석 수가 아니라 <b>공연 하나에서 판매·선점을 합쳐 필요한 수</b>다.
+     *
+     * <p>다만 판매자와 선점자는 같은 공연 안에서는 겹치면 안 된다. 이미 티켓을 산 회원이 같은 공연의
+     * 다른 자리를 선점하려 하면 {@link SeatService#hold} 가 "1인 1매" 로 거절한다. 그래서 이 둘은
+     * 회원 풀을 {@code [0, soldPerConcert)} · {@code [soldPerConcert, soldPerConcert+heldPerConcert)}
+     * 로 나눠 쓴다.
      *
      * <p>판매를 먼저 넣는다. {@link SeatService#hold} 가 이미 팔린 자리를 거절하므로 순서가 뒤집히면
      * 겹치는 자리(117번째)에서 기동이 실패한다.
@@ -350,14 +355,15 @@ public class LocalDataSeeder implements ApplicationRunner {
                         section -> seatRepository
                                 .findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId())));
 
-        List<Member> holders = seedMembers(requiredMemberCount(sections, seatsBySection));
+        SeatDemand demand = countSeatDemand(sections, seatsBySection);
+        List<Member> holders = seedMembers(demand.sold() + demand.held());
 
         int soldTotal = 0;
         int heldTotal = 0;
         for (Long concertId : concertIds) {
             Concert concert = concertRepository.getReferenceById(concertId);
             int soldIndex = 0;
-            int heldIndex = 0;
+            int heldIndex = demand.sold();
 
             for (Section section : sections) {
                 List<Seat> seats = seatsBySection.get(section.getId());
@@ -388,13 +394,19 @@ public class LocalDataSeeder implements ApplicationRunner {
                 String.format("%03d", holders.size()), SEED_MEMBER_PASSWORD);
     }
 
+    /** 공연 하나에서 판매·선점에 각각 필요한 회원 수. */
+    private record SeatDemand(int sold, int held) {
+    }
+
     /**
-     * 공연 하나에서 동시에 필요한 회원 수. 판매와 선점 중 많은 쪽이다.
+     * 공연 하나에서 판매·선점 자리가 각각 몇 자리인지. {@code markSomeSeatsTaken} 의 판정과 똑같이
+     * 9·13 배수가 겹치는 자리(117번째)는 판매만 센다 — 여기서 따로 세어 그 규칙이 어긋나면 회원 풀이
+     * 실제로 쓰는 것보다 남거나 모자란다.
      *
      * <p>세어서 구한다. 배치도 크기나 주기 상수를 바꿨을 때 회원이 모자라
      * {@code IndexOutOfBoundsException} 으로 기동이 죽는 일이 없게 하기 위해서다.
      */
-    private int requiredMemberCount(List<Section> sections, Map<Long, List<Seat>> seatsBySection) {
+    private SeatDemand countSeatDemand(List<Section> sections, Map<Long, List<Seat>> seatsBySection) {
         int sold = 0;
         int held = 0;
         for (Section section : sections) {
@@ -407,7 +419,7 @@ public class LocalDataSeeder implements ApplicationRunner {
                 }
             }
         }
-        return Math.max(sold, held);
+        return new SeatDemand(sold, held);
     }
 
     /**
@@ -545,5 +557,13 @@ public class LocalDataSeeder implements ApplicationRunner {
                 .setParameter("viewCount", seed.viewCount())
                 .setParameter("id", concertId)
                 .executeUpdate();
+
+        // 벌크 업데이트는 영속성 컨텍스트를 갱신하지 않는다. 방금 만든 concertId 는 이미 SCHEDULED 로
+        // 캐시돼 있어, 비우지 않으면 뒤이은 markSomeSeatsTaken 의 SeatService#hold 호출이 이 상태를
+        // 그대로 읽어 "예매 중이 아닌 공연" 으로 거절한다. clear() 는 flush 되지 않은 변경을 그냥
+        // 버리므로, seedSeats 가 아직 flush 하지 않은 Section.seatCount 변경(좌석 등록 시 채운 값)까지
+        // 함께 날리지 않도록 먼저 flush 한다.
+        entityManager.flush();
+        entityManager.clear();
     }
 }

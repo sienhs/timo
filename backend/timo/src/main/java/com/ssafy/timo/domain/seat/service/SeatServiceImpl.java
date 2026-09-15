@@ -1,9 +1,12 @@
 package com.ssafy.timo.domain.seat.service;
 
 import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
+import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
@@ -124,6 +127,12 @@ public class SeatServiceImpl implements SeatService {
     /**
      * 좌석을 선점한다.
      *
+     * <p>예매 중({@link ConcertStatus#ON_SALE})인 공연만 선점할 수 있다. 오픈 전·매진·종료·취소된
+     * 공연은 좌석이 남아 있어도(혹은 아직 없어도) 선점이 성립하지 않는다.
+     *
+     * <p>이 공연의 티켓을 이미 산 회원은 다른 자리를 선점할 수 없다("1인 1매"). 지금 잡고 있는
+     * 내 선점을 다시 누르는 것과는 다른 얘기다 — 그건 결제 전 단계라 여기 걸리지 않는다.
+     *
      * <p>좌석 행을 잠그지 않는다. 좌석은 모든 공연이 공유하는 한 행이라 거기 잠금을 걸면 서로 다른
      * 공연의 선점 요청이 같은 줄에 선다. 대신 {@code seat_hold} INSERT 를 시도하고,
      * {@code uk_hold_seat} 에 걸리면 진 것으로 본다. 충돌은 <b>같은 공연의 같은 좌석</b>에서만 난다.
@@ -137,6 +146,12 @@ public class SeatServiceImpl implements SeatService {
 
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        if (concert.getStatus() != ConcertStatus.ON_SALE) {
+            throw new ConcertNotOnSaleException(concertId, concert.getStatus());
+        }
+        if (reservationRepository.findPaidOfMember(concertId, memberId).isPresent()) {
+            throw new AlreadyReservedException(concertId);
+        }
         Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new SeatNotFoundException(seatId));
         verifySectionBelongsTo(concert, seat.getSection());

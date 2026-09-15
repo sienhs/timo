@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.seat;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
+import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
@@ -311,7 +312,7 @@ class SeatHoldCancelApiIntegrationTest {
     }
 
     private Concert saveConcert(String title, LocalDateTime startDate) {
-        return concertRepository.save(Concert.builder()
+        Concert concert = concertRepository.save(Concert.builder()
                 .title(title)
                 .genre(ConcertGenre.CONCERT)
                 .ageRating(AgeRating.ALL)
@@ -320,6 +321,9 @@ class SeatHoldCancelApiIntegrationTest {
                 .openAt(startDate.minusDays(10))
                 .venue(venue)
                 .build());
+        // 취소 대상 선점을 만들려면 선점 자체가 먼저 성립해야 하므로, 이 테스트의 공연도 예매 중이어야 한다.
+        ReflectionTestUtils.setField(concert, "status", ConcertStatus.ON_SALE);
+        return concert;
     }
 
     private Member saveMember(String phoneNumber, String nickname) {
