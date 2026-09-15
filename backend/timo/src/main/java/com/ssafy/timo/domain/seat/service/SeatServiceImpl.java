@@ -30,7 +30,6 @@ import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
-import com.ssafy.timo.global.security.CurrentMemberProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -62,7 +61,6 @@ public class SeatServiceImpl implements SeatService {
     private final VenueRepository venueRepository;
     private final ConcertRepository concertRepository;
     private final MemberRepository memberRepository;
-    private final CurrentMemberProvider currentMemberProvider;
     private final Clock clock;
 
     @Override
@@ -134,8 +132,7 @@ public class SeatServiceImpl implements SeatService {
      * 보므로, 정리하지 않으면 <b>이미 풀린 선점 때문에</b> 새 선점이 거절된다.
      */
     @Override
-    public SeatHoldResponseDto hold(Long concertId, Long seatId) {
-        Long memberId = currentMemberProvider.currentMemberId();
+    public SeatHoldResponseDto hold(Long memberId, Long concertId, Long seatId) {
         LocalDateTime now = LocalDateTime.now(clock);
 
         Concert concert = concertRepository.findById(concertId)
@@ -189,8 +186,7 @@ public class SeatServiceImpl implements SeatService {
      * 만료 직후에 취소를 눌러도 화면에 오류가 뜨면 안 된다. 남의 선점과 팔린 자리만 거절한다.
      */
     @Override
-    public SeatHoldCancelResponseDto cancelHold(Long concertId, Long seatId) {
-        Long memberId = currentMemberProvider.currentMemberId();
+    public SeatHoldCancelResponseDto cancelHold(Long memberId, Long concertId, Long seatId) {
         LocalDateTime now = LocalDateTime.now(clock);
 
         Concert concert = concertRepository.findById(concertId)

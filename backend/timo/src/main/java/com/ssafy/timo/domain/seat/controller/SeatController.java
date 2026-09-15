@@ -18,8 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>엔드포인트 매핑과 검증 규약은 {@link SeatApi} 에 있다. 이 클래스는 버전 경로를 정하고
  * 서비스에 위임만 한다. 프론트 연동용 스텁은 {@code /api/v0/seats} 에 같은 규약으로 떠 있다.
  *
- * <p>요청자는 요청 본문이 아니라 {@link com.ssafy.timo.global.security.CurrentMemberProvider}
- * 가 알려 준다. 인증이 붙어도 이 API 규약은 그대로다.
+ * <p>요청자는 요청 본문이 아니라 {@link com.ssafy.timo.global.security.CurrentMember} 가
+ * 알려 준다. 토큰을 까서 회원 id 를 꺼내고 아니면 401 로 끊는 일은 그 애노테이션의 리졸버가 하므로
+ * 여기서는 받은 값을 그대로 넘기기만 한다.
  *
  * <p>요청 검증 실패는 {@link com.ssafy.timo.global.exception.GlobalExceptionHandler} 가
  * Problem Details 로 변환하므로 여기서 따로 처리하지 않는다.
@@ -39,13 +40,13 @@ public class SeatController implements SeatApi {
     }
 
     @Override
-    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId) {
-        return ResponseEntity.ok(seatService.hold(concertId, seatId));
+    public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId, Long memberId) {
+        return ResponseEntity.ok(seatService.hold(memberId, concertId, seatId));
     }
 
     @Override
-    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId) {
-        return ResponseEntity.ok(seatService.cancelHold(concertId, seatId));
+    public ResponseEntity<SeatHoldCancelResponseDto> cancelHold(Long seatId, Long concertId, Long memberId) {
+        return ResponseEntity.ok(seatService.cancelHold(memberId, concertId, seatId));
     }
 
     @Override

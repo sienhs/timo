@@ -1,6 +1,7 @@
 package com.ssafy.timo.stub;
 
 import com.ssafy.timo.global.exception.GlobalExceptionHandler;
+import com.ssafy.timo.global.security.CurrentMemberArgumentResolver;
 import com.ssafy.timo.global.storage.PlaceholderImageStorage;
 import com.ssafy.timo.stub.concert.ConcertStore;
 import com.ssafy.timo.stub.concert.ConcertStubController;
@@ -10,6 +11,8 @@ import com.ssafy.timo.stub.seat.SeatStubController;
 import com.ssafy.timo.stub.seat.SectionStubController;
 import com.ssafy.timo.stub.transfer.MarketStubController;
 import com.ssafy.timo.stub.venue.VenueStubController;
+import com.ssafy.timo.support.Authenticated;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -40,8 +43,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * v0 스텁 컨트롤러 검증.
  *
- * <p>스프링 컨텍스트를 띄우지 않는 standalone MockMvc 다. 스텁은 DB 도 시큐리티도 필요 없고,
+ * <p>스프링 컨텍스트를 띄우지 않는 standalone MockMvc 다. 스텁은 DB 도 인증도 필요 없고,
  * {@code IntegrationTest} 컨텍스트에 속성을 덧씌우면 컨텍스트가 하나 더 떠 전체 테스트가 느려진다.
+ *
+ * <p>다만 {@link CurrentMemberArgumentResolver} 는 직접 끼우고 요청자도 하나 정해 둔다.
+ * {@code WebMvcConfig} 가 등록하는 리졸버라 standalone 에는 없고, 없으면 스텁이 전부 500 이 된다.
  *
  * <p>여기서 확인하려는 것은 두 가지다.
  * <ul>
@@ -53,6 +59,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StubApiTest {
 
     private static final Instant START = Instant.parse("2026-09-10T03:00:00Z");
+
+    /** 스텁은 요청자를 쓰지 않는다. 리졸버가 401 을 내지 않을 만큼만 있으면 된다. */
+    private static final long STUB_MEMBER_ID = 1L;
 
     /** 예매 스텁은 주문 뒤 흐른 시간으로 발행 상태를 정하므로 테스트가 시간을 움직일 수 있어야 한다. */
     private final MutableClock clock = new MutableClock(START);
@@ -72,7 +81,15 @@ class StubApiTest {
                         new ReservationStubController(seatStateStore, concertStore, imageStorage, clock),
                         new MarketStubController(concertStore, imageStorage, clock))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new CurrentMemberArgumentResolver())
                 .build();
+        Authenticated.set(STUB_MEMBER_ID);
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        // 홀더는 스레드에 남는다. 비우지 않으면 다음 테스트가 이 요청자를 물려받는다.
+        Authenticated.clear();
     }
 
     @Nested
