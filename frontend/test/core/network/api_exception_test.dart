@@ -47,6 +47,30 @@ void main() {
       expect(result.fieldErrors, isNull);
     });
 
+    test('인증 실패의 errorCode 를 읽는다', () {
+      // 인증 응답에만 붙는 필드다. 만료인지 못 쓰는 토큰인지를 이걸로 가른다.
+      final result = ApiException.from(
+        badResponse({
+          'status': 401,
+          'errorCode': 'TOKEN_EXPIRED',
+          'errorMessage': '인증이 만료되었습니다.',
+          'exception': 'TokenExpiredException',
+        }, status: 401),
+      );
+
+      expect(result.errorCode, 'TOKEN_EXPIRED');
+      expect(result.status, 401);
+    });
+
+    test('errorCode 가 없는 응답이면 null 이다', () {
+      // 공연·좌석 같은 다른 도메인의 실패에는 이 필드가 붙지 않는다.
+      final result = ApiException.from(
+        badResponse({'status': 404, 'errorMessage': '공연을 찾을 수 없습니다.'}),
+      );
+
+      expect(result.errorCode, isNull);
+    });
+
     test('errors 배열을 필드명 → 사유 맵으로 바꾼다', () {
       final result = ApiException.from(
         badResponse({

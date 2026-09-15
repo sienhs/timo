@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/network/api_client.dart';
+import 'core/network/api_exception.dart';
 import 'core/network/auth_interceptor.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_api.dart';
@@ -137,14 +138,37 @@ class _AppState extends State<App> {
   /// [ShowApiScope] 로 내려준다.
   late final ShowApi _showApi = widget.showApi ?? HttpShowApi();
 
-  /// 로그인 상태면 서버 요청에 토큰을 붙이고, 401 이면 로그아웃시키는 인터셉터.
-  /// 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다(테스트가 App 을 여러 번
-  /// 띄워도 인터셉터가 쌓이지 않게).
+  /// 로그인 상태면 서버 요청에 토큰을 붙이고, 만료되면 재발급받아 요청을
+  /// 이어가는 인터셉터. 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다
+  /// (테스트가 App 을 여러 번 띄워도 인터셉터가 쌓이지 않게).
   late final _authInterceptor = AuthInterceptor(
+    dio: ApiClient.dio,
     accessToken: () => _session.accessToken,
     memberId: () => _session.memberId,
     onUnauthorized: _session.signOut,
+    reissue: _reissueAccessToken,
   );
+
+  /// 리프레시 토큰으로 새 액세스 토큰을 받아 세션에 넣는다. 성공하면 참.
+  ///
+  /// 인터셉터가 부른다. 이 조립을 세션이나 인터셉터 안에 두지 않은 이유는
+  /// 로그아웃 때와 같다 — 세션은 네트워크를 모르고, 인터셉터(공통 모듈)는 인증
+  /// 기능 폴더를 모른다. 둘을 아는 곳은 앱을 조립하는 여기뿐이다.
+  Future<bool> _reissueAccessToken() async {
+    final refreshToken = _session.refreshToken;
+    if (refreshToken == null) return false;
+
+    try {
+      await _session.renewAccessToken(await _authApi.reissue(refreshToken));
+    } on ApiException {
+      // 서버가 거절했거나 닿지 못했다. 어느 쪽이든 재시도할 토큰이 없다.
+      return false;
+    }
+
+    // 다녀오는 사이 사용자가 로그아웃했으면 세션이 새 토큰을 받지 않았다.
+    // 그때는 실패로 쳐서 원래 요청을 되살리지 않는다.
+    return _session.isLoggedIn;
+  }
 
   /// 예매 플로우는 좌석 선택 → 결제 → 완료가 서로 다른 라우트인데 고른
   /// 좌석은 그 경계를 넘어 유지돼야 한다. 그래서 컨트롤러를 라우트보다

@@ -6,6 +6,7 @@ class ApiException implements Exception {
   const ApiException(
     this.message, {
     this.status,
+    this.errorCode,
     this.exceptionName,
     this.fieldErrors,
   });
@@ -43,6 +44,7 @@ class ApiException implements Exception {
     return ApiException(
       data['errorMessage'] as String? ?? fallback,
       status: status,
+      errorCode: data['errorCode'] as String?,
       exceptionName: data['exception'] as String?,
       fieldErrors: _fieldErrorsOf(data['errors']),
     );
@@ -66,6 +68,19 @@ class ApiException implements Exception {
 
   /// HTTP 상태 코드. 서버 응답이 없는 실패(타임아웃 등)면 null.
   final int? status;
+
+  /// 인증 실패의 이유를 나타내는 안 바뀌는 식별자(ProblemDetail 의 `errorCode`).
+  /// `TOKEN_EXPIRED`, `TOKEN_INVALID` 처럼 온다.
+  ///
+  /// **인증 응답에만 붙는다.** 백엔드가 인증 전용 처리기에서만 실어 주기 때문에
+  /// 공연·좌석 같은 다른 도메인의 실패에는 없다(null).
+  ///
+  /// [exceptionName] 과 역할이 겹쳐 보이지만 쓰임이 다르다. 저쪽은 자바 클래스
+  /// 이름이라 백엔드가 클래스를 옮기거나 이름을 바꾸면 조용히 어긋난다. 이건
+  /// 그러라고 따로 만든 값이라 안 바뀐다. **만료된 토큰인지 못 쓰는 토큰인지를
+  /// 가르는 판단은 반드시 이걸로 한다** — 401 을 받고 재발급을 시도할지 바로
+  /// 로그아웃할지가 여기서 갈리고, 잘못 가르면 재발급이 무한히 반복된다.
+  final String? errorCode;
 
   /// 서버가 던진 예외의 클래스 이름(ProblemDetail 의 `exception`). 우리 포맷이
   /// 아닌 응답이나 서버에 닿지 못한 실패면 null.

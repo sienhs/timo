@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/signup_draft.dart';
 import '../models/auth_tokens.dart';
+import '../models/reissued_access_token.dart';
 import 'auth_api.dart';
 import 'device_id.dart';
 
@@ -138,6 +139,22 @@ class HttpAuthApi implements AuthApi {
         options: Options(headers: {deviceIdHeader: _deviceId}),
       ),
     );
+  }
+
+  @override
+  Future<ReissuedAccessToken> reissue(String refreshToken) async {
+    // 이 요청은 인증 주소라 인터셉터가 액세스 토큰을 붙이지 않는다. 그게 맞다 —
+    // 부르는 시점의 액세스 토큰은 이미 만료돼 있어서, 붙이면 재발급 요청 자체가
+    // 401 로 막힌다.
+    final response = await _guard(
+      () => _dio.post<dynamic>(
+        '$basePath/reissue',
+        data: {'refreshToken': refreshToken},
+        // 서버가 토큰이 발급된 기기와 같은지 대조한다. 다르면 401 이다.
+        options: Options(headers: {deviceIdHeader: _deviceId}),
+      ),
+    );
+    return ReissuedAccessToken.fromJson(_body(response));
   }
 
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.

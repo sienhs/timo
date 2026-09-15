@@ -57,12 +57,20 @@ class FakeHttpAdapter implements HttpClientAdapter {
 
 /// 가짜 서버에 도착한 요청 하나.
 class RecordedRequest {
-  RecordedRequest(this.options, this.rawBody);
+  /// [headers] 는 **도착한 순간의 사본**이다. 참조를 들고 있으면 안 된다 —
+  /// 토큰 재발급 뒤 재시도는 같은 [RequestOptions] 를 다시 쓰기 때문에, 그때
+  /// 헤더가 새 토큰으로 덮어써지면서 **먼저 기록해 둔 요청의 헤더까지 같이
+  /// 바뀐다.** 그러면 "처음엔 옛 토큰, 재시도엔 새 토큰" 을 검사할 수가 없다.
+  RecordedRequest(this.options, this.rawBody)
+    : headers = Map<String, dynamic>.of(options.headers);
 
   final RequestOptions options;
 
   /// 본문 원문. 본문 없는 요청(GET)이면 null.
   final String? rawBody;
+
+  /// 이 요청이 나갈 때 붙어 있던 헤더.
+  final Map<String, dynamic> headers;
 
   String get method => options.method;
 
@@ -70,10 +78,6 @@ class RecordedRequest {
   String get path => options.uri.path;
 
   Map<String, String> get query => options.uri.queryParameters;
-
-  /// 헤더. dio 가 키 대소문자를 구분하지 않는 맵으로 들고 있어 'X-Device-Id'
-  /// 로 그대로 찾을 수 있다.
-  Map<String, dynamic> get headers => options.headers;
 
   /// JSON 본문을 맵으로. 본문이 없으면 실패한다(그 요청엔 본문이 없어야 한다는
   /// 검사는 [rawBody] 로 한다).
@@ -94,10 +98,14 @@ ResponseBody jsonResponse(Object body, {int status = 200}) =>
 /// 서버 실패 응답. 백엔드 GlobalExceptionHandler 가 만드는 ProblemDetail 모양을
 /// 그대로 따른다. 실제 서버는 `application/problem+json` 으로 내려주므로 그
 /// 타입으로도 dio 가 JSON 을 풀어 주는지 함께 검사된다.
+///
+/// [errorCode] 는 **인증 실패 응답에만** 붙는다(백엔드 AuthExceptionHandler).
+/// 다른 도메인의 실패를 흉내 낼 때는 넘기지 않아야 실제 응답과 같아진다.
 ResponseBody problemResponse({
   required int status,
   required String errorMessage,
   required String exception,
+  String? errorCode,
   List<Map<String, String>>? errors,
 }) => ResponseBody.fromString(
   jsonEncode({
@@ -105,6 +113,7 @@ ResponseBody problemResponse({
     'title': 'Error',
     'status': status,
     'instance': '/api/v1/auth',
+    'errorCode': ?errorCode,
     'errorMessage': errorMessage,
     'timestamp': '2026-09-09 09:06:26',
     'exception': exception,
