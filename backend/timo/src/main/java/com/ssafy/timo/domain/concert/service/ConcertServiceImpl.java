@@ -13,6 +13,7 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
 import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
@@ -37,6 +38,7 @@ public class ConcertServiceImpl implements ConcertService {
     private final ConcertRepository concertRepository;
     private final VenueRepository venueRepository;
     private final ArtistRepository artistRepository;
+    private final SectionRepository sectionRepository;
     private final ImageStorage imageStorage;
 
     @Override
@@ -80,7 +82,11 @@ public class ConcertServiceImpl implements ConcertService {
         Concert concert = concertRepository.findByIdWithVenue(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
 
-        return ConcertDetailResponseDto.from(concert, imageStorage);
+        // 구역은 공연이 아니라 공연장에 속한다. 좌석을 아직 등록하지 않은 공연장이면 빈 목록이다.
+        return ConcertDetailResponseDto.from(
+                concert,
+                sectionRepository.findAllByVenueIdOrderByIdAsc(concert.getVenue().getId()),
+                imageStorage);
     }
 
     /**

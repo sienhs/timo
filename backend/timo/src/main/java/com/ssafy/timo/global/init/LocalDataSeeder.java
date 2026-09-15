@@ -2,6 +2,8 @@ package com.ssafy.timo.global.init;
 
 import com.ssafy.timo.domain.artist.entity.Artist;
 import com.ssafy.timo.domain.artist.repository.ArtistRepository;
+import com.ssafy.timo.domain.auth.entity.LoginInfo;
+import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
@@ -10,12 +12,16 @@ import com.ssafy.timo.domain.concert.entity.ConcertGenre;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.concert.service.ConcertService;
+import com.ssafy.timo.domain.member.entity.Member;
+import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.reservation.entity.Reservation;
+import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SeatPositionRequest;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SectionLayout;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
-import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto.SectionSummary;
 import com.ssafy.timo.domain.seat.entity.Seat;
+import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.seat.service.SeatService;
@@ -32,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -110,12 +117,29 @@ public class LocalDataSeeder implements ApplicationRunner {
     private static final int RESERVED_EVERY = 13;
 
     /**
-     * 시드가 만들어 두는 좌석 주인의 회원 id 시작값. 자리마다 1 씩 올려 서로 다른 사람이 잡은 것으로 만든다.
+     * 시드 회원의 전화번호·닉네임 접두. 개발자가 직접 가입해 만든 계정과 섞이지 않게 띄워 둔다.
      *
-     * <p>실재하지 않는 회원 id 다. {@code held_by_member_id} 는 연관관계가 아니라 id 만 들고 있고
-     * 좌석은 회원의 실재 여부를 확인하지 않는다. 로컬에서 흔히 쓰는 회원 id(1~) 와 겹치지 않게 띄웠다.
+     * <p><b>실재하는 회원 행이 필요하다.</b> {@code seat_hold} · {@code reservation} 모두
+     * {@code member_id} 를 NOT NULL 연관관계로 들고 있어, 예전처럼 아무 숫자를 박아 넣을 수 없다.
+     *
+     * <p>{@code member} 는 전화번호와 닉네임에 유니크가 걸려 있다. 접두가 겹치면 기동이 그 자리에서
+     * 실패하므로, 값을 바꿀 때는 두 가지 모두 확인한다.
      */
-    private static final long SEED_HOLDER_ID_BASE = 900L;
+    private static final String SEED_MEMBER_PHONE_PREFIX = "0109900";
+    private static final String SEED_MEMBER_NICKNAME_PREFIX = "시드";
+
+    /**
+     * 시드 회원의 로그인 정보. <b>로컬 전용이다.</b>
+     *
+     * <p>아이디는 {@code seed001} 부터, 비밀번호는 전원 같다. 가입 API 가 요구하는 형식
+     * ({@code AuthPatterns.USERNAME} · {@code PASSWORD_SHAPE})에 맞춰 두어, 이 계정으로 로그인한
+     * 뒤의 동작이 직접 가입한 계정과 갈리지 않게 한다.
+     *
+     * <p>{@code seed001} 이 시드가 만든 선점과 주문을 <b>둘 다</b> 갖는다. 좌석을 나눠 줄 때
+     * 회원을 순서대로 쓰기 때문이다. "내가 잡은 자리" 화면을 볼 때 이 계정으로 들어가면 된다.
+     */
+    private static final String SEED_MEMBER_USERNAME_PREFIX = "seed";
+    private static final String SEED_MEMBER_PASSWORD = "timo1234!";
 
     /**
      * 시드 선점의 유지 시간. 실제 규약(5분)과 무관하게 길게 잡는다.
@@ -128,11 +152,11 @@ public class LocalDataSeeder implements ApplicationRunner {
      * 시드 구역 5개. 층이 올라갈수록 가격을 낮춰 구역 선택 화면에서 가격대가 갈리는 것을 볼 수 있게 했다.
      */
     private static final List<SectionSeed> SECTION_SEEDS = List.of(
-            new SectionSeed("1층 A블록", 150_000),
-            new SectionSeed("1층 B블록", 150_000),
-            new SectionSeed("2층 C블록", 120_000),
-            new SectionSeed("2층 D블록", 120_000),
-            new SectionSeed("3층 E블록", 99_000));
+            new SectionSeed("A구역", 150_000),
+            new SectionSeed("B구역", 150_000),
+            new SectionSeed("C구역", 120_000),
+            new SectionSeed("2층 D구역", 120_000),
+            new SectionSeed("2층 E구역", 99_000));
 
     // ---- 공연 -----------------------------------------------------------------------------------
 
@@ -169,32 +193,49 @@ public class LocalDataSeeder implements ApplicationRunner {
      * <p>상태·장르·조회수가 골고루 갈리도록 골랐다. 그래야 목록의 상태 필터와 인기순 정렬을 눌러 볼 수
      * 있다. 로이킴 공연만 상세 이미지가 비어 있는데, {@code static/detail} 에 해당 파일이 없어서다 —
      * 상세 이미지가 없는 공연도 화면이 깨지지 않는지 확인하는 자리도 된다.
+     *
+     * <p><b>상태와 날짜를 서로 맞춰 둔다.</b> {@link ConcertStatus} 는 오픈 전 · 예매 중 · 종료를
+     * 뜻하는데 날짜가 따로 놀면, 오픈이 한 달 남은 공연이 예매 중이거나 이미 끝난 공연을 예매할 수
+     * 있는 데이터가 된다. 규칙은 이렇다.
+     *
+     * <ul>
+     *   <li>{@code ON_SALE} — {@code openAt} 은 과거, {@code startDate} 는 미래</li>
+     *   <li>{@code SCHEDULED} — {@code openAt} 도 {@code startDate} 도 미래</li>
+     *   <li>{@code CLOSED} — 전부 과거</li>
+     * </ul>
+     *
+     * <p>날짜를 고정값으로 박아 둔 탓에 <b>시간이 지나면 이 관계가 깨진다.</b> {@code ON_SALE} 공연의
+     * {@code startDate} 가 지나면 "예매 중인데 이미 끝난 공연" 이 된다. 그때는 여기 날짜를 뒤로 민다.
      */
     private static final List<ConcertSeed> CONCERT_SEEDS = List.of(
+            // 내역. 이미 끝난 공연이라 예매 화면이 아니라 지난 공연 목록에서 확인한다.
             new ConcertSeed("김필 단독 콘서트", ConcertGenre.CONCERT,
                     "poster/poster_main_kim_feel.gif",
                     List.of("detail/poster_detail_kim.jpg"),
-                    "김필 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 1_203,
-                    LocalDateTime.of(2026, 10, 10, 19, 0), LocalDateTime.of(2026, 10, 12, 21, 0),
-                    LocalDateTime.of(2026, 9, 1, 20, 0), List.of("김필")),
+                    "김필 단독 콘서트", AgeRating.AGE_7, ConcertStatus.CLOSED, 1_203,
+                    LocalDateTime.of(2026, 7, 10, 19, 0), LocalDateTime.of(2026, 7, 12, 21, 0),
+                    LocalDateTime.of(2026, 6, 1, 20, 0), List.of("김필")),
+            // 대기. 오픈이 아직 남아 좌석 화면에 들어갈 수 없다.
             new ConcertSeed("이승기 콘서트", ConcertGenre.CONCERT,
                     "poster/poster_main_lee.gif",
                     List.of("detail/poster_detail_lee.jpg"),
                     "이승기 단독 콘서트", AgeRating.ALL, ConcertStatus.SCHEDULED, 512,
                     LocalDateTime.of(2026, 11, 21, 18, 0), LocalDateTime.of(2026, 11, 22, 21, 0),
                     LocalDateTime.of(2026, 10, 15, 20, 0), List.of("이승기")),
+            // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
             new ConcertSeed("로이킴 콘서트", ConcertGenre.CONCERT,
                     "poster/poster_main_roykim.jpg",
                     List.of(),
-                    "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.SOLD_OUT, 3_300,
+                    "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 3_300,
                     LocalDateTime.of(2026, 9, 20, 19, 30), LocalDateTime.of(2026, 9, 21, 21, 30),
                     LocalDateTime.of(2026, 8, 1, 14, 0), List.of("로이킴")),
+            // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
             new ConcertSeed("Bruno Mars 내한공연", ConcertGenre.CONCERT,
                     "poster/poster_main_mars.gif",
                     List.of("detail/poster_detail_mars.jpg"),
-                    "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.CLOSED, 87,
-                    LocalDateTime.of(2026, 6, 1, 19, 0), LocalDateTime.of(2026, 6, 2, 21, 0),
-                    LocalDateTime.of(2026, 5, 1, 20, 0), List.of("Bruno Mars")));
+                    "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 87,
+                    LocalDateTime.of(2026, 12, 5, 19, 0), LocalDateTime.of(2026, 12, 6, 21, 0),
+                    LocalDateTime.of(2026, 9, 1, 20, 0), List.of("Bruno Mars")));
 
     private final ConcertService concertService;
     private final SeatService seatService;
@@ -204,6 +245,10 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final SeatRepository seatRepository;
     private final SectionRepository sectionRepository;
     private final ArtistRepository artistRepository;
+    private final MemberRepository memberRepository;
+    private final LoginInfoRepository loginInfoRepository;
+    private final ReservationRepository reservationRepository;
+    private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final Clock clock;
 
@@ -226,7 +271,19 @@ public class LocalDataSeeder implements ApplicationRunner {
         seedSeats(venueId);
 
         Map<String, Long> artistIds = findArtistIdsByName();
-        CONCERT_SEEDS.forEach(seed -> seedConcert(seed, venueId, artistIds));
+
+        // 좌석 상태는 예매 중인 공연에만 넣는다. 오픈 전이거나 끝난 공연에 팔린 자리가 있으면
+        // 상태와 배치도가 어긋나, 화면을 보는 쪽이 어느 쪽을 믿어야 할지 알 수 없다.
+        List<Long> onSaleConcertIds = new ArrayList<>();
+        for (ConcertSeed seed : CONCERT_SEEDS) {
+            Long concertId = seedConcert(seed, venueId, artistIds);
+            if (seed.status() == ConcertStatus.ON_SALE) {
+                onSaleConcertIds.add(concertId);
+            }
+        }
+
+        // 좌석 상태는 공연이 생긴 뒤에 입힌다. 선점·판매가 공연별 행이라 공연 없이는 만들 수 없다.
+        markSomeSeatsTaken(venueId, onSaleConcertIds);
 
         log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", CONCERT_SEEDS.size(), venueId);
     }
@@ -269,23 +326,143 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         log.info("로컬 시드: 구역 {}개 · 좌석 {}석을 넣었다.",
                 registered.sections().size(), registered.totalSeatCount());
-
-        markSomeSeatsTaken(registered.sections());
     }
 
     /**
-     * 좌석 상태 시딩은 지금 하지 않는다.
+     * 시드 공연마다 일부 자리를 판매 완료 · 선점 중으로 만든다.
      *
-     * <p>예전에는 좌석 행의 {@code status} 를 직접 바꿔 일부를 판매 완료·선점 중으로 만들었다. 좌석에서
-     * 판매 상태가 사라지면서 그 방법이 없어졌다 — 선점은 {@code seat_hold}, 판매는 {@code reservation}
-     * 행이고 둘 다 <b>공연과 회원</b>을 FK 로 요구한다.
+     * <p>좌석 행에는 판매 상태가 없다. 배치도의 상태는 조회 시점에 {@code seat_hold} 와
+     * {@code reservation} 을 조인해 계산되므로({@code SeatRepository.findSeatsWithStatus}),
+     * 상태를 보이게 하려면 그 행을 실제로 넣는 수밖에 없다.
      *
-     * <p>되살리려면 시드 회원을 먼저 만들고, 시드 공연을 기준으로 {@code SeatHold} ·
-     * {@code Reservation} 행을 넣어야 한다. 지금 러너는 회원을 만들지 않으므로 그 작업을 함께 해야 한다.
-     * 그전까지 로컬 배치도는 전 좌석이 예매 가능으로 보인다.
+     * <p><b>공연마다 같은 회원을 다시 쓴다.</b> 유니크가 {@code (concert_id, member)} 라
+     * "한 계정은 한 공연에서 하나" 일 뿐, 공연이 다르면 같은 사람이 또 잡을 수 있다. 그래서 필요한
+     * 회원 수는 전체 좌석 수가 아니라 <b>공연 하나에서 가장 많이 필요한 수</b>다.
+     *
+     * <p>판매를 먼저 넣는다. {@link SeatService#hold} 가 이미 팔린 자리를 거절하므로 순서가 뒤집히면
+     * 겹치는 자리(117번째)에서 기동이 실패한다.
      */
-    private void markSomeSeatsTaken(List<SectionSummary> sections) {
-        log.info("로컬 시드: 좌석 상태는 넣지 않는다. 선점·판매가 공연별 행이 되어 시드 회원·공연이 먼저 필요하다.");
+    private void markSomeSeatsTaken(Long venueId, List<Long> concertIds) {
+        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId);
+        Map<Long, List<Seat>> seatsBySection = sections.stream()
+                .collect(Collectors.toMap(
+                        Section::getId,
+                        section -> seatRepository
+                                .findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId())));
+
+        List<Member> holders = seedMembers(requiredMemberCount(sections, seatsBySection));
+
+        int soldTotal = 0;
+        int heldTotal = 0;
+        for (Long concertId : concertIds) {
+            Concert concert = concertRepository.getReferenceById(concertId);
+            int soldIndex = 0;
+            int heldIndex = 0;
+
+            for (Section section : sections) {
+                List<Seat> seats = seatsBySection.get(section.getId());
+                for (int position = 1; position <= seats.size(); position++) {
+                    Seat seat = seats.get(position - 1);
+
+                    if (position % OCCUPIED_EVERY == 0) {
+                        reservationRepository.save(Reservation.builder()
+                                .concert(concert)
+                                .member(holders.get(soldIndex++))
+                                .seat(seat)
+                                .build());
+                        soldTotal++;
+                    } else if (position % RESERVED_EVERY == 0) {
+                        seatService.hold(holders.get(heldIndex++).getId(), concertId, seat.getId());
+                        heldTotal++;
+                    }
+                }
+            }
+        }
+
+        extendSeedHolds();
+
+        log.info("로컬 시드: 공연 {}건에 판매 {}석 · 선점 {}석을 넣었다. 시드 회원 {}명.",
+                concertIds.size(), soldTotal, heldTotal, holders.size());
+        log.info("로컬 시드: 시드 계정으로 로그인할 수 있다. id={}001~{}{} / pw={}",
+                SEED_MEMBER_USERNAME_PREFIX, SEED_MEMBER_USERNAME_PREFIX,
+                String.format("%03d", holders.size()), SEED_MEMBER_PASSWORD);
+    }
+
+    /**
+     * 공연 하나에서 동시에 필요한 회원 수. 판매와 선점 중 많은 쪽이다.
+     *
+     * <p>세어서 구한다. 배치도 크기나 주기 상수를 바꿨을 때 회원이 모자라
+     * {@code IndexOutOfBoundsException} 으로 기동이 죽는 일이 없게 하기 위해서다.
+     */
+    private int requiredMemberCount(List<Section> sections, Map<Long, List<Seat>> seatsBySection) {
+        int sold = 0;
+        int held = 0;
+        for (Section section : sections) {
+            int seatCount = seatsBySection.get(section.getId()).size();
+            for (int position = 1; position <= seatCount; position++) {
+                if (position % OCCUPIED_EVERY == 0) {
+                    sold++;
+                } else if (position % RESERVED_EVERY == 0) {
+                    held++;
+                }
+            }
+        }
+        return Math.max(sold, held);
+    }
+
+    /**
+     * 좌석을 붙들어 둘 시드 회원을 만든다.
+     *
+     * <p>가입 API 를 거치지 않는다. {@code SignupService} 는 SMS 인증 티켓을 요구해 기동 중에는
+     * 통과할 수 없고, 지갑 생성까지 딸려 와 좌석 상태를 보는 데 필요 없는 일이 늘어난다.
+     * 그래서 {@link Member} · {@link LoginInfo} 의 공개 빌더만 쓴다 — 두 도메인 모두 건드리지 않는다.
+     *
+     * <p>지갑은 만들지 않는다. 좌석·주문 어느 쪽도 지갑을 요구하지 않고, 지갑 생성은 키 유도가 붙어
+     * 회원마다 수백 ms 가 든다. 지갑이 필요한 화면을 이 계정으로 보려 하면 그때 함께 넣는다.
+     *
+     * <p><b>비밀번호 해시는 한 번만 계산해 전원이 나눠 쓴다.</b> BCrypt 는 일부러 느리게 만든
+     * 해시라 회원마다 돌리면 기동이 그만큼 길어진다. 시드 계정은 전부 같은 비밀번호이므로 해시도
+     * 같아도 된다 — 로컬에만 있는 계정이라 해시를 공유해서 생기는 위험이 없다.
+     */
+    private List<Member> seedMembers(int count) {
+        String passwordHash = passwordEncoder.encode(SEED_MEMBER_PASSWORD);
+
+        List<Member> members = new ArrayList<>(count);
+        for (int index = 1; index <= count; index++) {
+            Member member = memberRepository.save(Member.builder()
+                    .phoneNumber(SEED_MEMBER_PHONE_PREFIX + String.format("%04d", index))
+                    .name("시드회원" + index)
+                    .nickname(SEED_MEMBER_NICKNAME_PREFIX + index)
+                    .build());
+
+            loginInfoRepository.save(LoginInfo.builder()
+                    .member(member)
+                    .username(SEED_MEMBER_USERNAME_PREFIX + String.format("%03d", index))
+                    .passwordHash(passwordHash)
+                    .build());
+
+            members.add(member);
+        }
+        return members;
+    }
+
+    /**
+     * 시드 선점의 만료를 하루 뒤로 미룬다.
+     *
+     * <p>{@link SeatService#hold} 가 쓰는 5분은 상수라 호출하는 쪽에서 정할 수 없다. 그대로 두면
+     * 기동 5분 뒤에 선점 자리가 전부 예매 가능으로 보여 화면에서 확인할 시간이 없다.
+     *
+     * <p>{@code HELD} 를 전부 미뤄도 되는 이유는, 이 메서드가 공연이 하나도 없을 때만 도는
+     * 시드 경로에 있어 여기 있는 {@code HELD} 는 방금 시드가 만든 것뿐이기 때문이다.
+     */
+    private void extendSeedHolds() {
+        entityManager.createQuery("""
+                        update SeatHold h
+                        set h.expiresAt = :expiresAt
+                        where h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.HELD
+                        """)
+                .setParameter("expiresAt", LocalDateTime.now(clock).plus(SEED_HOLD_DURATION))
+                .executeUpdate();
     }
 
     /**
@@ -330,7 +507,7 @@ public class LocalDataSeeder implements ApplicationRunner {
         return idsByName;
     }
 
-    private void seedConcert(ConcertSeed seed, Long venueId, Map<String, Long> artistIds) {
+    private Long seedConcert(ConcertSeed seed, Long venueId, Map<String, Long> artistIds) {
         CommandConcertResponseDto created = concertService.create(new CommandConcertRequestDto(
                 seed.title(),
                 seed.genre(),
@@ -345,6 +522,8 @@ public class LocalDataSeeder implements ApplicationRunner {
                 seed.artistNames().stream().map(artistIds::get).toList()));
 
         applySeedState(created.id(), seed);
+
+        return created.id();
     }
 
     /**

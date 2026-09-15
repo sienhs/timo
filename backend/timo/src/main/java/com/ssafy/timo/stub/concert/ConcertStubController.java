@@ -185,6 +185,11 @@ public class ConcertStubController implements ConcertApi {
                         .map(this::artist)
                         .map(artist -> new ConcertDetailResponseDto.ArtistSummary(
                                 artist.id(), artist.name(), imageStorage.getUrl(artist.profileImageKey())))
+                        .toList(),
+                // 스텁은 공연장이 하나뿐이라 고정 구역의 가격을 그대로 준다.
+                StubFixtures.SECTIONS.stream()
+                        .map(section -> new ConcertDetailResponseDto.SectionPrice(
+                                section.id(), section.name(), section.price()))
                         .toList());
     }
 

@@ -5,11 +5,17 @@ import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.auth.entity.LoginInfo;
+import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.concert.service.ConcertService;
+import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto.SectionSummary;
+import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatStatus;
+import com.ssafy.timo.domain.seat.repository.SeatHoldRepository;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.seat.service.SeatService;
@@ -26,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.context.ApplicationContext;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -53,6 +60,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @IntegrationTest
 class LocalDataSeederTest {
+
+    /** 좌석 상태가 들어가는 공연. 예매 중인 것만이다. */
+    private static final int EXPECTED_ON_SALE_CONCERTS = 2;
 
     private static final int EXPECTED_SECTIONS = 5;
     private static final int EXPECTED_SEATS_PER_SECTION = 200;
@@ -90,6 +100,21 @@ class LocalDataSeederTest {
 
     @Autowired
     private ArtistRepository artistRepository;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private LoginInfoRepository loginInfoRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ReservationRepository reservationRepository;
+
+    @Autowired
+    private SeatHoldRepository seatHoldRepository;
 
     @Autowired
     private EntityManager em;
@@ -136,19 +161,98 @@ class LocalDataSeederTest {
                 });
         assertThat(sections.sections())
                 .extracting(SectionSummary::name)
-                .containsExactly("1층 A블록", "1층 B블록", "2층 C블록", "2층 D블록", "3층 E블록");
+                .containsExactly("A구역", "B구역", "C구역", "2층 D구역", "2층 E구역");
         assertThat(sections.sections())
                 .extracting(SectionSummary::price)
                 .containsExactly(150_000, 150_000, 120_000, 120_000, 99_000);
     }
 
-    /*
-     * 좌석 상태 시딩 테스트 3건을 걷어냈다.
-     *
-     * 선점·판매가 좌석 행이 아니라 공연별 seat_hold / reservation 행이 되면서 러너가 상태를 넣지
-     * 못한다(LocalDataSeeder#markSomeSeatsTaken 참고). 시드 회원·공연으로 다시 넣게 되면
-     * 그때 이 자리에 되살린다.
-     */
+    @Test
+    @DisplayName("구역마다 9의 배수 자리는 판매 완료, 13의 배수 자리는 선점 중으로 들어간다")
+    void seedsSoldAndHeldSeatsPerSection() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        Long concertId = onSaleConcertIds().get(0);
+        Long sectionId = firstSectionId(concertId);
+
+        SectionSeatListResponseDto seats = seatService.findSeats(concertId, sectionId);
+
+        assertThat(seats.seats()).hasSize(EXPECTED_SEATS_PER_SECTION);
+        assertThat(seats.seats()).filteredOn(seat -> seat.status() == SeatStatus.SOLD)
+                .hasSize(EXPECTED_OCCUPIED_PER_SECTION);
+        assertThat(seats.seats()).filteredOn(seat -> seat.status() == SeatStatus.HELD)
+                .hasSize(EXPECTED_RESERVED_PER_SECTION);
+        assertThat(seats.availableCount()).isEqualTo(EXPECTED_AVAILABLE_PER_SECTION);
+
+        // 배치도 순서로 9번째는 판매, 13번째는 선점이다. 주기가 실제로 자리 번호를 따르는지 본다.
+        assertThat(seats.seats().get(8).status()).isEqualTo(SeatStatus.SOLD);
+        assertThat(seats.seats().get(12).status()).isEqualTo(SeatStatus.HELD);
+    }
+
+    @Test
+    @DisplayName("시드 회원은 seed001 형식의 아이디로 로그인할 수 있다")
+    void seedMembersCanSignIn() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        long expected = (long) EXPECTED_OCCUPIED_PER_SECTION * EXPECTED_SECTIONS;
+        assertThat(loginInfoRepository.count()).isEqualTo(expected);
+
+        // seed001 은 시드가 만든 선점과 주문을 둘 다 가진 계정이다.
+        LoginInfo first = loginInfoRepository.findByUsernameWithMember("seed001").orElseThrow();
+        assertThat(first.getMember().getNickname()).isEqualTo("시드1");
+        assertThat(passwordEncoder.matches("timo1234!", first.getPasswordHash()))
+                .as("시드 비밀번호로 로그인할 수 있어야 한다")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("시드 선점은 5분이 아니라 하루 뒤에 만료된다")
+    void seedHoldsOutliveTheFiveMinuteRule() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        // 규약대로 5분이면 기동 5분 뒤에 선점 자리가 전부 예매 가능으로 보여 화면에서 확인할 수 없다.
+        LocalDateTime fiveMinutesLater = LocalDateTime.now(clock).plusMinutes(5);
+        assertThat(seatHoldRepository.findAll())
+                .isNotEmpty()
+                .allSatisfy(hold -> assertThat(hold.getExpiresAt()).isAfter(fiveMinutesLater));
+    }
+
+    @Test
+    @DisplayName("좌석 상태는 예매 중인 공연에만 들어가고, 시드 회원은 공연마다 재사용된다")
+    void seedsOnlyOnSaleConcertsAndReusesMembers() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        List<Concert> concerts = concertRepository.findAll();
+        assertThat(concerts).hasSize(4);
+
+        for (Concert concert : concerts) {
+            Long sectionId = firstSectionId(concert.getId());
+            int available = seatService.findSeats(concert.getId(), sectionId).availableCount();
+
+            if (concert.getStatus() == ConcertStatus.ON_SALE) {
+                assertThat(available).as("예매 중인 %s 의 잔여석", concert.getTitle())
+                        .isEqualTo(EXPECTED_AVAILABLE_PER_SECTION);
+            } else {
+                // 오픈 전이거나 끝난 공연은 아무도 잡지 않았다. 상태와 배치도가 어긋나면 안 된다.
+                assertThat(available).as("예매 중이 아닌 %s 의 잔여석", concert.getTitle())
+                        .isEqualTo(EXPECTED_SEATS_PER_SECTION);
+            }
+        }
+
+        // 유니크가 (concert_id, member) 라 공연이 다르면 같은 회원을 다시 쓸 수 있다. 그래서
+        // 필요한 회원 수는 전체 좌석 수가 아니라 공연 하나에서 가장 많이 필요한 수(= 판매 수)다.
+        long soldPerConcert = (long) EXPECTED_OCCUPIED_PER_SECTION * EXPECTED_SECTIONS;
+        assertThat(memberRepository.count()).isEqualTo(soldPerConcert);
+        assertThat(reservationRepository.count())
+                .isEqualTo(soldPerConcert * EXPECTED_ON_SALE_CONCERTS);
+        assertThat(seatHoldRepository.count()).isEqualTo(
+                (long) EXPECTED_RESERVED_PER_SECTION * EXPECTED_SECTIONS * EXPECTED_ON_SALE_CONCERTS);
+    }
+
 
     @Test
     @DisplayName("공연 4건을 상태·조회수·이미지까지 시드대로 넣는다")
@@ -163,13 +267,26 @@ class LocalDataSeederTest {
 
         assertThat(concerts.get("김필 단독 콘서트"))
                 .satisfies(concert -> {
-                    assertThat(concert.getStatus()).isEqualTo(ConcertStatus.ON_SALE);
+                    assertThat(concert.getStatus()).isEqualTo(ConcertStatus.CLOSED);
                     assertThat(concert.getViewCount()).isEqualTo(1_203);
                     assertThat(concert.getPosterImageKey()).isEqualTo("poster/poster_main_kim_feel.gif");
                 });
         assertThat(concerts.get("이승기 콘서트").getStatus()).isEqualTo(ConcertStatus.SCHEDULED);
-        assertThat(concerts.get("로이킴 콘서트").getStatus()).isEqualTo(ConcertStatus.SOLD_OUT);
-        assertThat(concerts.get("Bruno Mars 내한공연").getStatus()).isEqualTo(ConcertStatus.CLOSED);
+        assertThat(concerts.get("로이킴 콘서트").getStatus()).isEqualTo(ConcertStatus.ON_SALE);
+        assertThat(concerts.get("Bruno Mars 내한공연").getStatus()).isEqualTo(ConcertStatus.ON_SALE);
+
+        // 상태와 날짜가 서로 맞아야 한다. 어긋나면 오픈이 남은 공연이 예매 중이거나
+        // 이미 끝난 공연을 예매할 수 있는 데이터가 된다.
+        LocalDateTime now = LocalDateTime.now(clock);
+        assertThat(concerts.values())
+                .filteredOn(concert -> concert.getStatus() == ConcertStatus.ON_SALE)
+                .hasSize(EXPECTED_ON_SALE_CONCERTS)
+                .allSatisfy(concert -> {
+                    assertThat(concert.getOpenAt()).as("%s 오픈", concert.getTitle()).isBefore(now);
+                    assertThat(concert.getStartDate()).as("%s 공연일", concert.getTitle()).isAfter(now);
+                });
+        assertThat(concerts.get("이승기 콘서트").getOpenAt()).isAfter(now);
+        assertThat(concerts.get("김필 단독 콘서트").getEndDate()).isBefore(now);
 
         // 상세 이미지 원본이 없는 공연은 빈 목록이어야 한다.
         assertThat(concerts.get("로이킴 콘서트").getImages()).isEmpty();
@@ -240,8 +357,25 @@ class LocalDataSeederTest {
                 seatRepository,
                 sectionRepository,
                 artistRepository,
+                memberRepository,
+                loginInfoRepository,
+                reservationRepository,
+                passwordEncoder,
                 em,
                 clock);
+    }
+
+    /** 좌석 상태가 들어간 공연들. 예매 중인 것만이라 상태로 고른다. */
+    private List<Long> onSaleConcertIds() {
+        return concertRepository.findAll().stream()
+                .filter(concert -> concert.getStatus() == ConcertStatus.ON_SALE)
+                .map(Concert::getId)
+                .toList();
+    }
+
+    private Long firstSectionId(Long concertId) {
+        return seatService.findSections(concertId).sections().stream()
+                .findFirst().orElseThrow().id();
     }
 
     /** 시더가 상태·조회수를 벌크 갱신으로 넣으므로, 영속성 컨텍스트를 비우고 DB 에서 다시 읽는다. */

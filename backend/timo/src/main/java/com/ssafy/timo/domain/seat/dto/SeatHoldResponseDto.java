@@ -16,6 +16,11 @@ import java.time.LocalDateTime;
  *
  * <p>선점한 회원 id 는 담지 않는다. 요청자 본인이므로 알려 줄 것이 없고, 좌석을 찔러 남의 선점
  * 현황을 읽어 내는 통로가 되면 안 된다.
+ *
+ * <p>{@code price} 를 함께 내려준다. 선점 다음은 결제 화면이고 거기서 금액을 보여 줘야 하는데,
+ * 배치도 응답에서 받은 값을 화면 사이로 들고 다니게 하면 <b>어느 구역의 가격인지 어긋날 수 있다.</b>
+ * 잡은 자리의 가격을 그 자리에서 함께 주면 그 어긋남이 생기지 않는다. 좌석이 아니라 구역의 값이다 —
+ * 같은 구역이면 모든 자리가 같은 가격이다.
  */
 public record SeatHoldResponseDto(
         Long seatId,
@@ -24,6 +29,7 @@ public record SeatHoldResponseDto(
         int seatNo,
         int seatCol,
         SeatStatus status,
+        int price,
         LocalDateTime expiresAt,
         Long releasedSeatId
 ) {
@@ -41,6 +47,7 @@ public record SeatHoldResponseDto(
                 seat.getSeatNo(),
                 seat.getSeatCol(),
                 SeatStatus.HELD,
+                seat.getSection().getPrice(),
                 hold.getExpiresAt(),
                 releasedSeatId);
     }
