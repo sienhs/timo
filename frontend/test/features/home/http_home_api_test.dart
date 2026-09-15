@@ -149,15 +149,74 @@ void main() {
         'size': '${HomeMetrics.searchPageSize}',
       });
     });
+
+    test('예매 상태를 그대로 읽어 오픈 예정·예매중만 걸러 낼 수 있다', () async {
+      final api = build(
+        (_) => jsonResponse(
+          paged([
+            concert(id: 1, status: 'SCHEDULED'),
+            concert(id: 2, status: 'ON_SALE'),
+            concert(id: 3, status: 'SOLD_OUT'),
+            concert(id: 4, status: 'CLOSED'),
+            concert(id: 5, status: 'CANCELED'),
+          ]),
+        ),
+      );
+
+      final shows = await api.search('이승기');
+
+      expect(shows.map((s) => s.status), [
+        'SCHEDULED',
+        'ON_SALE',
+        'SOLD_OUT',
+        'CLOSED',
+        'CANCELED',
+      ]);
+      expect(shows.where((s) => s.isOpenOrUpcoming).map((s) => s.id), [1, 2]);
+    });
   });
 
-  group('인기 아티스트', () {
-    test('API 가 없어 요청 없이 목업을 돌려준다', () async {
+  group('아티스트 · 인기 검색어 (API 없음)', () {
+    test('인기 아티스트는 요청 없이 목업을 돌려준다', () async {
       final api = build((_) => throw StateError('요청이 나가면 안 된다'));
 
       final artists = await api.fetchPopularArtists();
 
       expect(artists, MockHomeData.artists);
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('추천 검색어 아티스트는 요청 없이 목업을 돌려준다', () async {
+      final api = build((_) => throw StateError('요청이 나가면 안 된다'));
+
+      final artists = await api.fetchRecommendedArtists();
+
+      expect(artists, MockHomeData.recommendedArtists);
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('인기 검색어는 요청 없이 목업을 정시 집계 시각과 함께 돌려준다', () async {
+      final now = DateTime(2026, 9, 4, 13, 20);
+      adapter = FakeHttpAdapter((_) => throw StateError('요청이 나가면 안 된다'));
+      final api = HttpHomeApi(
+        dio: Dio(BaseOptions(baseUrl: 'http://fake.test'))
+          ..httpClientAdapter = adapter,
+        clock: () => now,
+      );
+
+      final trending = await api.fetchTrendingKeywords();
+
+      expect(trending.items, MockHomeData.trendingKeywords);
+      expect(trending.asOf, DateTime(2026, 9, 4, 13));
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('관련 아티스트는 요청 없이 이름으로 걸러 돌려준다', () async {
+      final api = build((_) => throw StateError('요청이 나가면 안 된다'));
+
+      final artists = await api.searchArtists('아이');
+
+      expect(artists.map((a) => a.name), ['아이유']);
       expect(adapter.requests, isEmpty);
     });
   });

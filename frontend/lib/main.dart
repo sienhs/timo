@@ -4,6 +4,7 @@ import 'app.dart';
 import 'features/auth/data/device_id.dart';
 import 'features/auth/data/token_storage.dart';
 import 'features/auth/state/auth_session.dart';
+import 'features/home/data/recent_search_store.dart';
 
 Future<void> main() async {
   // 기기 저장소(플러그인)를 runApp 전에 쓰려면 먼저 엔진과 연결해야 한다.
@@ -28,5 +29,11 @@ Future<void> main() async {
     );
   }
 
-  runApp(App(session: session));
+  runApp(
+    App(
+      session: session,
+      // 최근 검색어는 검색 화면이 열릴 때 읽으므로 여기서 기다리지 않는다.
+      recentSearchStore: SharedPreferencesRecentSearchStore(),
+    ),
+  );
 }

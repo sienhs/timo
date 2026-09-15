@@ -1,6 +1,7 @@
 import '../constants.dart';
 import '../models/artist_summary.dart';
 import '../models/show_summary.dart';
+import '../models/trending_keyword.dart';
 import 'home_api.dart';
 import 'mock_home_data.dart';
 
@@ -13,9 +14,15 @@ import 'mock_home_data.dart';
 /// 지나는 순간 `오늘 14:00 오픈` · `5일 후 오픈` 뱃지가 전부 지난 날짜로
 /// 바뀌어, 세 가지 뱃지 형태를 한 번에 볼 수 없다.
 class MockHomeApi implements HomeApi {
-  const MockHomeApi({this.latency = HomeMetrics.mockLatency});
+  const MockHomeApi({
+    this.latency = HomeMetrics.mockLatency,
+    this.clock = DateTime.now,
+  });
 
   final Duration latency;
+
+  /// 인기 검색어 집계 시각의 기준. 테스트가 고정한다.
+  final DateTime Function() clock;
 
   /// 지연이 0 이면 타이머를 만들지 않는다. 0 짜리 타이머도 타이머라, 프레임을
   /// 한 번만 그리는 위젯 테스트가 끝날 때 "아직 남은 타이머" 로 잡힌다.
@@ -50,6 +57,27 @@ class MockHomeApi implements HomeApi {
     return MockHomeData.artists;
   }
 
+  @override
+  Future<List<ArtistSummary>> fetchRecommendedArtists() async {
+    await _respond();
+    return MockHomeData.recommendedArtists;
+  }
+
+  @override
+  Future<TrendingKeywords> fetchTrendingKeywords() async {
+    await _respond();
+    return TrendingKeywords(
+      asOf: MockHomeData.trendingAsOf(clock()),
+      items: MockHomeData.trendingKeywords,
+    );
+  }
+
+  @override
+  Future<List<ArtistSummary>> searchArtists(String keyword) async {
+    await _respond();
+    return MockHomeData.matchArtists(keyword);
+  }
+
   /// 오늘 자정. 오픈 일시를 여기서 더해 만든다.
   static DateTime get _today {
     final now = DateTime.now();
@@ -62,6 +90,8 @@ class MockHomeApi implements HomeApi {
   /// 목록 순서가 곧 순위다(1위부터).
   static final popular = <ShowSummary>[remind, bigbang, iu, xia, peggyGou];
 
+  /// 검색이 뒤지는 전체. 서버처럼 예매 상태로 거르지 않아 종료된 공연
+  /// ([peggyGou])도 들어 있다.
   static final all = <ShowSummary>[
     iu,
     remind,
@@ -76,6 +106,7 @@ class MockHomeApi implements HomeApi {
     id: 1,
     title: '2026 아이유 콘서트',
     venueName: '고척스카이돔',
+    status: ShowSummary.onSaleStatus,
     startAt: DateTime(2026, 11, 1),
     endAt: DateTime(2026, 12, 31),
   );
@@ -84,6 +115,7 @@ class MockHomeApi implements HomeApi {
     id: 2,
     title: 'REMIND : 리센느',
     venueName: '올림픽공원 체조경기장',
+    status: ShowSummary.upcomingStatus,
     startAt: DateTime(2026, 7, 5),
     endAt: DateTime(2026, 7, 7),
     ticketOpenAt: _today.add(const Duration(days: 5, hours: 19)),
@@ -93,6 +125,7 @@ class MockHomeApi implements HomeApi {
     id: 3,
     title: '2026 BIGBANG',
     venueName: '고양종합운동장',
+    status: ShowSummary.upcomingStatus,
     startAt: DateTime(2026, 11, 15),
     // 한 달 뒤 이후 — 날짜를 그대로 읽어 주는 뱃지가 여기서 나온다.
     ticketOpenAt: _today.add(const Duration(days: 48, hours: 14)),
@@ -102,6 +135,7 @@ class MockHomeApi implements HomeApi {
     id: 4,
     title: '검정치마 단독공연 : 401',
     venueName: '무신사 개러지',
+    status: ShowSummary.upcomingStatus,
     startAt: DateTime(2026, 9, 20),
     // 오늘 밤 오픈 — `오늘 HH:mm 오픈` 뱃지가 여기서 나온다.
     ticketOpenAt: _today.add(const Duration(hours: 22)),
@@ -111,14 +145,21 @@ class MockHomeApi implements HomeApi {
     id: 5,
     title: '2026 김준수 콘서트 : XIGNATURE',
     venueName: '올림픽공원 핸드볼경기장',
+    status: ShowSummary.onSaleStatus,
     startAt: DateTime(2026, 9, 1),
     endAt: DateTime(2026, 9, 3),
   );
 
+  /// 이미 끝난 공연. 검색에는 잡히지만 "오픈 예정 / 예매중" 섹션에는 안 나온다.
   static final peggyGou = ShowSummary(
     id: 6,
     title: '페기구 THE LOUD SHOW',
     venueName: '잠실실내체육관',
+    status: closedStatus,
     startAt: DateTime(2026, 8, 15),
   );
+
+  /// 백엔드 `ConcertStatus.CLOSED`. 화면이 구분하지 않는 상태라 [ShowSummary]
+  /// 에는 없고, 걸러지는 예시를 만들기 위해 목에만 둔다.
+  static const closedStatus = 'CLOSED';
 }

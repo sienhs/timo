@@ -11,6 +11,7 @@ import 'package:timo/features/home/data/home_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/models/artist_summary.dart';
 import 'package:timo/features/home/models/show_summary.dart';
+import 'package:timo/features/home/models/trending_keyword.dart';
 import 'package:timo/features/home/screens/show_search_screen.dart';
 import 'package:timo/features/home/models/refresh_hint.dart';
 import 'package:timo/features/home/widgets/home_refresh_hint.dart';
@@ -397,6 +398,18 @@ class _NeverRespondingHomeApi implements HomeApi {
   @override
   Future<List<ArtistSummary>> fetchPopularArtists() =>
       Completer<List<ArtistSummary>>().future;
+
+  @override
+  Future<List<ArtistSummary>> fetchRecommendedArtists() =>
+      Completer<List<ArtistSummary>>().future;
+
+  @override
+  Future<TrendingKeywords> fetchTrendingKeywords() =>
+      Completer<TrendingKeywords>().future;
+
+  @override
+  Future<List<ArtistSummary>> searchArtists(String keyword) =>
+      Completer<List<ArtistSummary>>().future;
 }
 
 /// [failing] 인 동안은 서버 오류로 실패하고, 끄면 목 데이터로 성공한다.
@@ -424,8 +437,21 @@ class _FlakyHomeApi implements HomeApi {
   Future<List<ShowSummary>> search(String keyword) =>
       _guard(() => _mock.search(keyword));
 
-  /// 아티스트는 서버 구현도 목업을 돌려주므로 실패를 흉내 내지 않는다.
+  /// 아티스트·인기 검색어는 서버 구현도 목업을 돌려주므로 실패를 흉내 내지
+  /// 않는다.
   @override
   Future<List<ArtistSummary>> fetchPopularArtists() =>
       _mock.fetchPopularArtists();
+
+  @override
+  Future<List<ArtistSummary>> fetchRecommendedArtists() =>
+      _mock.fetchRecommendedArtists();
+
+  @override
+  Future<TrendingKeywords> fetchTrendingKeywords() =>
+      _mock.fetchTrendingKeywords();
+
+  @override
+  Future<List<ArtistSummary>> searchArtists(String keyword) =>
+      _mock.searchArtists(keyword);
 }

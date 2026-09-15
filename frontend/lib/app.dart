@@ -18,7 +18,9 @@ import 'features/booking/state/booking_controller.dart';
 import 'features/booking/state/booking_scope.dart';
 import 'features/home/data/home_api.dart';
 import 'features/home/data/http_home_api.dart';
+import 'features/home/data/recent_search_store.dart';
 import 'features/home/state/home_api_scope.dart';
+import 'features/home/state/recent_search_scope.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
 import 'features/mypage/state/my_page_api_scope.dart';
@@ -37,6 +39,7 @@ class App extends StatefulWidget {
     this.myPageApi,
     this.ticketApi,
     this.bookingApi,
+    this.recentSearchStore,
   });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
@@ -58,6 +61,10 @@ class App extends StatefulWidget {
 
   /// 예매(구역·좌석·선점) API. 안 넘기면 [_bookingApiKind] 가 고른다.
   final BookingApi? bookingApi;
+
+  /// 검색 화면의 최근 검색어 저장소. main 이 기기 저장소 구현을 넘긴다. 안
+  /// 넘기면(위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
+  final RecentSearchStore? recentSearchStore;
 
   @override
   State<App> createState() => _AppState();
@@ -148,6 +155,11 @@ class _AppState extends State<App> {
       widget.bookingApi ??
       (_bookingApiKind == 'mock' ? MockBookingApi() : HttpBookingApi());
 
+  /// 최근 검색어 저장소. API 들과 같은 이유로 앱에 하나만 두고
+  /// [RecentSearchScope] 로 내려준다.
+  late final RecentSearchStore _recentSearchStore =
+      widget.recentSearchStore ?? InMemoryRecentSearchStore();
+
   @override
   void initState() {
     super.initState();
@@ -181,13 +193,16 @@ class _AppState extends State<App> {
                 api: _bookingApi,
                 child: BookingScope(
                   controller: _bookingController,
-                  child: MaterialApp(
-                    title: 'TIMO',
-                    theme: AppTheme.light,
-                    // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                    // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                    initialRoute: AppRoutes.home,
-                    routes: AppRoutes.routes,
+                  child: RecentSearchScope(
+                    store: _recentSearchStore,
+                    child: MaterialApp(
+                      title: 'TIMO',
+                      theme: AppTheme.light,
+                      // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                      // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                      initialRoute: AppRoutes.home,
+                      routes: AppRoutes.routes,
+                    ),
                   ),
                 ),
               ),
