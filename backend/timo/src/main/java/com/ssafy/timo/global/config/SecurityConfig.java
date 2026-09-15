@@ -38,11 +38,16 @@ public class SecurityConfig {
                                 "/api/v1/auth/sms/verify",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
+
                                 // 부르는 시점에 access 가 이미 만료돼 있다. 인증을 걸면
                                 // 재발급받으려면 재발급이 필요한 순환이 된다.
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/availability").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/auth/availability",
+                                "/api/v1/concerts",
+                                "/api/v1/artists",
+                                "/api/v1/artists/{artistId}").permitAll()
                         // 프론트 연동용 스텁. AuthControllerStub 가 @Profile("!prod") 라
                         // 운영에서는 이 규칙에 걸리는 핸들러 자체가 없다(404).
                         .requestMatchers("/api/v0/**").permitAll()
