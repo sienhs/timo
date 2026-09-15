@@ -64,6 +64,7 @@ class _FakeBookingApi implements BookingApi {
     final now = DateTime.now();
     return SeatHold(
       seatId: seatId,
+      price: _zoneSeats.price,
       expiresAt: now.add(const Duration(minutes: 5)),
       heldAt: now,
     );

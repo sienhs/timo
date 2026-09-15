@@ -12,7 +12,6 @@ import 'features/auth/state/auth_session.dart';
 import 'features/auth/state/auth_session_scope.dart';
 import 'features/booking/data/booking_api.dart';
 import 'features/booking/data/http_booking_api.dart';
-import 'features/booking/data/mock_booking_api.dart';
 import 'features/booking/data/mock_booking_data.dart';
 import 'features/booking/state/booking_api_scope.dart';
 import 'features/booking/state/booking_controller.dart';
@@ -64,7 +63,7 @@ class App extends StatefulWidget {
   /// 내 티켓 화면이 쓰는 API. 안 넘기면 [_ticketApiKind] 가 고른다.
   final TicketApi? ticketApi;
 
-  /// 예매(구역·좌석·선점) API. 안 넘기면 [_bookingApiKind] 가 고른다.
+  /// 예매(구역·좌석·선점) API. 안 넘기면 진짜 서버 구현을 쓴다.
   final BookingApi? bookingApi;
 
   /// 검색 화면의 최근 검색어 저장소. main 이 기기 저장소 구현을 넘긴다. 안
@@ -91,18 +90,6 @@ class App extends StatefulWidget {
 /// 없으면 화면이 시안대로 나오는지 눈으로 볼 방법이 코드를 고쳤다 되돌리는
 /// 것뿐이다. 티켓 도메인 v1 이 붙어 서버로 다 확인되면 지운다.
 const _ticketApiKind = String.fromEnvironment('TICKET_API');
-
-/// 예매 화면이 어느 [BookingApi] 를 쓸지 고르는 실행 인자.
-///
-/// ```bash
-/// flutter run --dart-define=BOOKING_API=mock    # 고정 배치도로. 백엔드 불필요
-/// flutter run                                    # 기본값. 실제 서버(v1)
-/// ```
-///
-/// 티켓과 같은 이유로 둔다. 서버 로컬 시드가 좌석 상태를 넣지 않아 배치도가
-/// 전부 예매 가능으로 오기 때문에, 회색 자리와 선점중 자리가 어떻게 보이는지는
-/// 목으로만 확인할 수 있다. 시드가 좌석 상태를 채우게 되면 지운다.
-const _bookingApiKind = String.fromEnvironment('BOOKING_API');
 
 /// 실행 인자에 맞는 구현. 모르는 값이면 실제 서버로 간다.
 TicketApi _ticketApiFor(String kind) => switch (kind) {
@@ -186,9 +173,7 @@ class _AppState extends State<App> {
 
   /// 예매 화면이 쓰는 구역·좌석 API. 위 넷과 같은 이유로 앱에 하나만 두고
   /// [BookingApiScope] 로 내려준다.
-  late final BookingApi _bookingApi =
-      widget.bookingApi ??
-      (_bookingApiKind == 'mock' ? MockBookingApi() : HttpBookingApi());
+  late final BookingApi _bookingApi = widget.bookingApi ?? HttpBookingApi();
 
   /// 최근 검색어 저장소. API 들과 같은 이유로 앱에 하나만 두고
   /// [RecentSearchScope] 로 내려준다.

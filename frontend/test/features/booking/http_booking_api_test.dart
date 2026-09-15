@@ -166,6 +166,7 @@ void main() {
           'seatNo': 1,
           'seatCol': 5,
           'status': 'HELD',
+          'price': 150000,
           'expiresAt': '2026-09-14T19:59:22',
           'releasedSeatId': 1001,
         }),
@@ -185,6 +186,28 @@ void main() {
       expect(hold.releasedSeatId, 1001);
     });
 
+    test('잡은 자리의 값을 읽는다. 결제 화면이 보여 줄 금액이다', () async {
+      // 배치도에서 받은 구역 가격을 들고 다니지 않고 여기서 받는다. 구역을
+      // 바꿔 다시 잡았을 때 어긋나지 않게 하려는 것이다.
+      givenServer(
+        (_) => jsonResponse({
+          'seatId': 1005,
+          'sectionId': 1,
+          'sectionName': '1층 A블록',
+          'seatNo': 1,
+          'seatCol': 5,
+          'status': 'HELD',
+          'price': 150000,
+          'expiresAt': '2026-09-14T19:59:22',
+          'releasedSeatId': null,
+        }),
+      );
+
+      final hold = await api.holdSeat(concertId: 7, seatId: 1005);
+
+      expect(hold.price, 150000);
+    });
+
     test('남은 시간은 기기 시계가 서버와 어긋나도 5분에서 시작한다', () async {
       givenServer(
         (_) => jsonResponse({
@@ -194,6 +217,7 @@ void main() {
           'seatNo': 1,
           'seatCol': 5,
           'status': 'HELD',
+          'price': 150000,
           // 서버는 시간대 없는 시각을 준다. 기기 타임존이 서버와 다르면 이 값에서
           // 지금을 빼는 방식으로는 엉뚱한 시간이 나온다(에뮬레이터 타임존이 GMT
           // 라 한국 시각과 9시간 어긋나 '544분 남음' 이 찍혔다).

@@ -39,7 +39,10 @@ TicketOrder? ticketOrderOf(BookingController controller) {
     seat: seatLabel,
     bookerName: MockBookingData.bookerName,
     posterUrl: performance.posterUrl,
-    ticketPrice: zone.price,
+    // 잡은 자리의 값을 쓴다. 서버가 선점 응답에 실어 준 값이라 지금 잡고 있는
+    // 자리와 반드시 맞는다. 아직 안 잡았으면(결제 화면을 예매 흐름 밖에서 연
+    // 경우) 고른 구역의 값으로 둔다.
+    ticketPrice: controller.hold?.price ?? zone.price,
     bookingFee: performance.bookingFee,
   );
 }
