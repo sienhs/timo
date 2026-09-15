@@ -75,7 +75,7 @@ class _ConcertHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        PosterThumbnail(assetPath: order.posterAsset),
+        PosterThumbnail(url: order.posterUrl),
       ],
     );
   }

@@ -7,7 +7,10 @@ import '../models/show_detail.dart';
 /// 화면 맨 아래 고정 바. 예매 상태에 따라 안내 한 줄과 버튼이 갈린다.
 ///
 /// - 오픈 전: 남은 시간(또는 오픈 일시) + `오픈 알림 받기`
-/// - 오픈 후: 공연 기간 + `예매하러 가기`
+/// - 오픈 후: 공연일 + `예매하러 가기`
+/// - 끝난 공연: 잠긴 버튼만(`종료된 공연입니다`)
+///
+/// 매진은 잠그지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.
 ///
 /// 시각을 스스로 재지 않고 [now] 를 받는다. 타이머를 여기에 두면 상단 상태
 /// 뱃지와 하단 바가 각자 시간을 재게 되어, 오픈 시각을 넘기는 순간 둘 중
@@ -28,6 +31,7 @@ class ShowDetailBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final finished = _finishedLabel();
     final isOpen = detail.isOpenAt(now);
     final remaining = detail.remainingUntilOpenAt(now);
 
@@ -48,21 +52,28 @@ class ShowDetailBottomBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _Caption(
-                text: isOpen
-                    ? detail.periodLabel
-                    : _upcomingCaption(remaining),
-                // 시계는 남은 시간을 읽는 데 도움이 되지만, 이미 오픈한
-                // 공연의 기간 앞에 붙으면 '기간이 끝나 간다'로 잘못 읽힌다.
-                showClock: !isOpen,
-              ),
-              const SizedBox(height: ShowDetailMetrics.bottomBarGap),
+              // 끝난 공연에는 날짜를 적지 않는다. 잠긴 버튼이 이미 끝났다고
+              // 말하는데 그 위에 날짜만 남으면 무슨 날인지 헷갈린다.
+              if (finished == null) ...[
+                _Caption(
+                  text: isOpen ? detail.dateLabel : _upcomingCaption(remaining),
+                  // 시계는 남은 시간을 읽는 데 도움이 되지만, 이미 오픈한
+                  // 공연의 날짜 앞에 붙으면 '날이 끝나 간다'로 잘못 읽힌다.
+                  showClock: !isOpen,
+                ),
+                const SizedBox(height: ShowDetailMetrics.bottomBarGap),
+              ],
               FilledButton(
-                onPressed: isOpen ? onBookPressed : onNotifyPressed,
+                // 끝난 공연은 누를 곳이 없다. 버튼을 숨기지 않고 잠근 채
+                // 이유를 적는다 — 자리가 비면 왜 예매를 못 하는지 알 길이 없다.
+                onPressed: finished != null
+                    ? null
+                    : (isOpen ? onBookPressed : onNotifyPressed),
                 child: Text(
-                  isOpen
-                      ? ShowDetailStrings.bookAction
-                      : ShowDetailStrings.notifyAction,
+                  finished ??
+                      (isOpen
+                          ? ShowDetailStrings.bookAction
+                          : ShowDetailStrings.notifyAction),
                 ),
               ),
             ],
@@ -71,6 +82,13 @@ class ShowDetailBottomBar extends StatelessWidget {
       ),
     );
   }
+
+  /// 끝난 공연이면 잠긴 버튼에 적을 문구, 아니면 null.
+  String? _finishedLabel() => switch (detail.status) {
+    ShowStatus.closed => ShowDetailStrings.closedNotice,
+    ShowStatus.canceled => ShowDetailStrings.canceledNotice,
+    _ => null,
+  };
 
   /// 오픈 전 안내 문구. 하루가 넘게 남으면 초를 세지 않는다 —
   /// `1152:23:14` 는 언제인지 읽히지 않는다.

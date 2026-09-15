@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../constants.dart';
 import '../../../core/widgets/timo_logo.dart';
+import '../../../core/widgets/timo_mascot.dart';
+import '../constants.dart';
 
 /// 가입 완료 화면. 로고(위 가운데) → 그림 → 문구 → '티켓 보러 가기'.
 ///
@@ -31,12 +31,8 @@ class SignupCompleteScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 시안의 일러스트(폰과 티켓) 파일이 아직 없어 아이콘으로
-                      // 자리만 잡는다. 파일이 오면 Image.asset 으로 바꾼다.
-                      const Icon(
-                        Icons.confirmation_number_outlined,
+                      const TimoMascot.cheer(
                         size: AuthMetrics.completeIllustrationSize,
-                        color: AppColors.primary,
                       ),
                       const SizedBox(height: 32),
                       Text(

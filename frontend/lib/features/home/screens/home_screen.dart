@@ -199,8 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
           error: const SizedBox.shrink(),
           builder: (context, shows) => HomeBannerCarousel(
             banners: shows.take(HomeMetrics.bannerCount).toList(),
-            onBannerPressed: (show) =>
-                _openShowDetail(context, show.id.toString()),
+            onBannerPressed: (show) => _openShowDetail(context, show.id),
           ),
         ),
         const SizedBox(height: HomeMetrics.sectionGap),
@@ -267,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (shows.isEmpty) return const _EmptyRow();
         return ShowCardRow(
           shows: shows,
-          onShowPressed: (show) => _openShowDetail(context, show.id.toString()),
+          onShowPressed: (show) => _openShowDetail(context, show.id),
           badgeBuilder: badgeBuilder,
         );
       },
@@ -280,10 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 공연 상세로 보낸다. 예매 진입은 상세가 맡는다 — 홈에서 좌석 선택으로
   /// 바로 가면 무엇을 예매하는지 모른 채 좌석을 고르게 된다.
-  ///
-  /// 상세는 아직 목업이라 서버 공연 id 로는 찾지 못하고 표본 공연을 보여 준다.
-  /// 상세 API 연동 때 인자를 서버 id 로 맞춘다.
-  void _openShowDetail(BuildContext context, String showId) {
+  void _openShowDetail(BuildContext context, int showId) {
     Navigator.pushNamed(context, AppRoutes.showDetail, arguments: showId);
   }
 

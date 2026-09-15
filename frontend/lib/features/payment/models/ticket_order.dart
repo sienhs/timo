@@ -8,7 +8,7 @@ class TicketOrder {
     required this.venue,
     required this.seat,
     required this.bookerName,
-    required this.posterAsset,
+    this.posterUrl,
     required this.ticketPrice,
     required this.bookingFee,
   });
@@ -19,8 +19,8 @@ class TicketOrder {
   final String seat;
   final String bookerName;
 
-  /// 공연 포스터 이미지 경로. 서버 연동 시 URL로 바뀐다.
-  final String posterAsset;
+  /// 공연 포스터 주소. 포스터가 없는 공연이면 null 이다.
+  final String? posterUrl;
 
   /// 티켓 자체 가격(원).
   final int ticketPrice;

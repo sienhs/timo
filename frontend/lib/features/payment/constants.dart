@@ -48,7 +48,6 @@ class PaymentConstants {
     venue: '고척스카이돔',
     seat: 'A구역 9열 6번',
     bookerName: '홍길동',
-    posterAsset: 'assets/images/sample_poster.jpg',
     ticketPrice: 186000,
     bookingFee: 3000,
   );

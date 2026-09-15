@@ -6,7 +6,8 @@ import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/booking/data/mock_booking_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
-import 'package:timo/features/home/widgets/home_banner_carousel.dart';
+import 'package:timo/features/show/data/mock_show_api.dart';
+import 'package:timo/features/home/widgets/show_poster_card.dart';
 
 /// 레이아웃 스모크 테스트.
 ///
@@ -45,6 +46,9 @@ void main() {
         // 예매 화면은 서버에서 구역·좌석을 받아 온다. 테스트에서는 고정
         // 배치도를 주는 목을 꽂아야 배치도가 그려진다.
         bookingApi: MockBookingApi(latency: Duration.zero),
+        // 공연 상세도 서버에서 받아 온다. 예매로 들어가려면 상세를 거쳐야 해서
+        // 여기에도 목이 필요하다.
+        showApi: const MockShowApi(latency: Duration.zero),
       ),
     );
     await tester.pumpAndSettle();
@@ -53,10 +57,20 @@ void main() {
   /// 홈에서 예매 흐름으로 들어간다.
   ///
   /// 홈 -> 공연 상세 -> 좌석 선택 순이다. 예매 진입은 상세가 맡으므로 홈에서
-  /// 좌석 선택으로 바로 갈 수는 없다. 배너에 걸린 대표 공연(아이유)은 이미
-  /// 오픈한 공연이라 언제 돌려도 예매 버튼이 나온다.
+  /// 좌석 선택으로 바로 갈 수는 없다.
+  ///
+  /// 이미 오픈한 공연(아이유)을 고른다. 오픈 전 공연은 상세에 '오픈 알림 받기'
+  /// 만 있어 예매로 들어갈 수 없다.
   Future<void> enterBookingFromHome(WidgetTester tester) async {
-    await tester.tap(find.byType(HomeBannerCarousel));
+    final card = find.widgetWithText(ShowPosterCard, '2026 아이유 콘서트');
+    // 인기 공연 줄은 첫 화면 아래에 있다. 세로 목록(맨 바깥 스크롤)을 끌어
+    // 올려야 카드가 만들어진다.
+    await tester.scrollUntilVisible(
+      card,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(card);
     await tester.pumpAndSettle();
     await tester.tap(find.text('예매하러 가기'));
     await tester.pumpAndSettle();

@@ -176,11 +176,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
   }
 
   void _openShowDetail(ShowSummary show) {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.showDetail,
-      arguments: show.id.toString(),
-    );
+    Navigator.pushNamed(context, AppRoutes.showDetail, arguments: show.id);
   }
 
   /// 안내 스낵바. 하단 바와 원형 버튼에 가리지 않게 그 위로 띄운다.

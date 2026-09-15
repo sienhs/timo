@@ -25,7 +25,7 @@ class PaymentCompleteScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
                 child: Column(
                   children: [
-                    PosterAvatar(assetPath: order.posterAsset),
+                    PosterAvatar(url: order.posterUrl),
                     const SizedBox(height: 20),
                     const Text(
                       PaymentConstants.completeTitle,

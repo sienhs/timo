@@ -12,8 +12,8 @@ class AuthMetrics {
   static const headerLogoHeight = 24.0;
   static const completeLogoHeight = 32.0;
 
-  /// 가입 완료 화면 가운데 그림 자리. 일러스트 파일이 오면 같은 크기로 바꾼다.
-  static const completeIllustrationSize = 120.0;
+  /// 가입 완료 화면 가운데 마스코트 크기. 시안에서 화면 폭의 절반쯤을 차지한다.
+  static const completeIllustrationSize = 160.0;
 
   /// 입력칸 높이. 옆에 붙는 '중복 확인' 버튼도 이 높이에 맞춘다.
   static const fieldHeight = 48.0;

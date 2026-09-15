@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../constants.dart';
 import '../models/performance.dart';
 import '../models/seat.dart';
 import '../models/zone.dart';
@@ -26,12 +27,14 @@ class MockBookingData {
   /// 예매자 이름. 로그인이 붙으면 회원 정보에서 온다.
   static const bookerName = '홍길동';
 
+  /// 예매를 시작하기 전에 세워 두는 공연. 상세 화면에서 들어오면 진짜 공연으로
+  /// 바뀐다(`BookingController.startBooking`). 흐름 밖에서 열린 화면이 빈
+  /// 머리말을 그리지 않게 하는 자리다.
   static final performance = Performance(
     title: '2026 아이유 콘서트',
     venue: '고척스카이돔',
     startAt: DateTime(2026, 11, 4, 18),
-    posterAsset: 'assets/images/sample_poster.jpg',
-    bookingFee: 3000,
+    bookingFee: BookingConstants.bookingFee,
   );
 
   /// 구역 하나의 격자. 서버 시드와 같은 10열 × 20번 = 200석이다.

@@ -25,13 +25,18 @@ import '../models/zone.dart';
 /// ValueNotifier 로 노출해야 한다. 매초 notifyListeners 를 부르면 좌석
 /// 수백 칸이 매초 리빌드된다.
 class BookingController extends ChangeNotifier {
-  BookingController({required this.performance});
+  BookingController({required Performance performance}) {
+    _performance = performance;
+  }
+
+  late Performance _performance;
 
   /// 화면 위쪽에 찍는 공연 정보.
   ///
-  /// 아직 목업이다. 공연 상세 API 연동(S15P21D206-175)이 붙으면 [concertId] 로
-  /// 받아 온 값으로 바뀐다. 그때까지 제목·날짜는 예매 중인 공연과 다를 수 있다.
-  final Performance performance;
+  /// 상세 화면이 예매를 시작하면서 [startBooking] 으로 넣어 준다. 그 전에는
+  /// 앱이 만들 때 준 값이 들어 있다 — 흐름 밖에서 열린 화면(딥링크, 화면 단위
+  /// 테스트)이 빈 머리말을 그리지 않게 하는 자리다.
+  Performance get performance => _performance;
 
   int _concertId = BookingConstants.fallbackConcertId;
 
@@ -73,15 +78,20 @@ class BookingController extends ChangeNotifier {
     return zone.price + performance.bookingFee;
   }
 
-  /// 어느 공연을 예매하는지 정한다. 구역 화면에 들어올 때 부른다.
+  /// 어느 공연을 예매하는지 정한다.
+  ///
+  /// 상세 화면이 예매로 들어가면서 공연 번호와 함께 [performance] 를 넘긴다.
+  /// 구역 화면도 들어올 때 번호만 다시 넣는데, 흐름 밖에서 바로 열린 경우
+  /// (딥링크, 화면 단위 테스트) 그 번호라도 정해져야 하기 때문이다.
   ///
   /// 다른 공연으로 바꿔 들어오면 앞서 고른 자리를 버린다. 그대로 두면 A 공연의
   /// 좌석을 B 공연 결제 화면이 그리게 된다.
   ///
-  /// **알림을 보내지 않는다.** 화면이 세워지는 중(initState)에 불리는데 거기서
+  /// **알림을 보내지 않는다.** 화면이 세워지는 중(initState)에도 불리는데 거기서
   /// 리스너를 깨우면 빌드 도중 리빌드를 걸게 된다. 이 시점에는 고른 자리를
   /// 보고 있는 화면도 없다 — 예매를 막 시작한 참이기 때문이다.
-  void startBooking(int concertId) {
+  void startBooking(int concertId, {Performance? performance}) {
+    if (performance != null) _performance = performance;
     if (_concertId == concertId) return;
     _concertId = concertId;
     _selectedSeat = null;
