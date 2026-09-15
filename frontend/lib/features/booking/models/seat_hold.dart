@@ -4,6 +4,7 @@ import '../constants.dart';
 class SeatHold {
   const SeatHold({
     required this.seatId,
+    required this.price,
     required this.expiresAt,
     required this.heldAt,
     this.releasedSeatId,
@@ -13,12 +14,22 @@ class SeatHold {
   factory SeatHold.fromJson(Map<String, dynamic> json, {DateTime? now}) =>
       SeatHold(
         seatId: (json['seatId'] as num).toInt(),
+        price: (json['price'] as num).toInt(),
         expiresAt: DateTime.parse(json['expiresAt'] as String),
         heldAt: now ?? DateTime.now(),
         releasedSeatId: (json['releasedSeatId'] as num?)?.toInt(),
       );
 
   final int seatId;
+
+  /// 잡은 자리의 값. 결제 화면이 보여 줄 금액이다.
+  ///
+  /// 좌석이 아니라 구역의 값이라 같은 구역이면 모든 자리가 같다. 그런데도
+  /// 배치도에서 받은 구역 가격을 화면 사이로 들고 다니지 않고 선점 응답에서
+  /// 받는다. 들고 다니면 **어느 구역의 가격인지 어긋날 수 있기** 때문이다
+  /// (구역을 바꿔 다시 잡았을 때가 그렇다). 잡은 자리의 값을 그 자리에서 함께
+  /// 받으면 어긋날 여지가 없다.
+  final int price;
 
   /// 서버가 이 자리를 푸는 시각.
   ///

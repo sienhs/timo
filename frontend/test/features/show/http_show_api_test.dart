@@ -22,6 +22,9 @@ void main() {
   }
 
   /// 공연 단건 응답. 실제 `ConcertDetailResponseDto` 모양이다.
+  ///
+  /// 가격(`sectionPrices`)이 이 안에 들어 있다. 예전에는 구역 목록을 따로
+  /// 물어야 했다.
   Map<String, dynamic> concertJson({String status = 'ON_SALE'}) => {
     'id': 7,
     'title': '김필 단독 콘서트',
@@ -41,63 +44,40 @@ void main() {
     'artists': [
       {'id': 1, 'name': '김필', 'profileImage': 'artist/artist_kim_feel.jpg'},
     ],
-  };
-
-  /// 구역 목록 응답. 가격은 여기에만 있다.
-  Map<String, dynamic> sectionsJson() => {
-    'venueId': 1,
-    'venueName': '고척돔',
-    'totalSeatCount': 400,
-    'totalAvailableCount': 300,
-    'sections': [
-      {
-        'id': 1,
-        'name': '1층 A블록',
-        'grade': 'COMMON',
-        'price': 150000,
-        'seatCount': 200,
-        'availableCount': 199,
-        'rowCount': 10,
-        'seatPerRow': 20,
-      },
-      {
-        'id': 3,
-        'name': '2층 C블록',
-        'grade': 'COMMON',
-        'price': 120000,
-        'seatCount': 200,
-        'availableCount': 200,
-        'rowCount': 10,
-        'seatPerRow': 20,
-      },
+    'sectionPrices': [
+      {'sectionId': 1, 'sectionName': '1층 A블록', 'price': 150000},
+      {'sectionId': 3, 'sectionName': '2층 C블록', 'price': 120000},
     ],
   };
 
-  /// 공연과 구역을 모두 제대로 돌려주는 서버.
+  /// 공연을 제대로 돌려주는 서버.
   void givenWorkingServer({String status = 'ON_SALE'}) {
-    givenServer(
-      (request) => request.path.startsWith('/api/v1/concerts')
-          ? jsonResponse(concertJson(status: status))
-          : jsonResponse(sectionsJson()),
-    );
+    givenServer((_) => jsonResponse(concertJson(status: status)));
   }
 
   group('요청', () {
-    test('공연은 번호를 주소에, 구역은 조건에 실어 함께 묻는다', () async {
+    test('공연 번호를 주소에 실어 한 번만 묻는다', () async {
       givenWorkingServer();
 
       await api.fetchShowDetail(7);
 
-      expect(adapter.requests, hasLength(2));
-      final concert = adapter.requests.first;
+      // 가격이 상세 응답에 있어 구역 목록을 따로 묻지 않는다.
+      expect(adapter.requests, hasLength(1));
+      final concert = adapter.requests.single;
       expect(concert.method, 'GET');
       expect(concert.path, '/api/v1/concerts/7');
+    });
 
-      // 가격은 공연 응답에 없어서 구역을 한 번 더 묻는다.
-      final sections = adapter.requests.last;
-      expect(sections.method, 'GET');
-      expect(sections.path, '/api/v1/sections');
-      expect(sections.query['concertId'], '7');
+    test('구역 목록 주소는 부르지 않는다', () async {
+      // 그 주소는 로그인해야 열린다. 부르지 않아야 로그인 전 사용자도 가격을 본다.
+      givenWorkingServer();
+
+      await api.fetchShowDetail(7);
+
+      expect(
+        adapter.requests.map((r) => r.path),
+        isNot(contains('/api/v1/sections')),
+      );
     });
   });
 
@@ -118,7 +98,7 @@ void main() {
       expect(detail.artists.single.photoUrl, 'artist/artist_kim_feel.jpg');
     });
 
-    test('가격을 구역 순서대로 세운다', () async {
+    test('가격을 상세 응답에서 구역 순서대로 읽는다', () async {
       givenWorkingServer();
 
       final prices = (await api.fetchShowDetail(7)).zonePrices;
@@ -128,6 +108,17 @@ void main() {
       expect(prices.first.zoneName, '1층 A블록');
       expect(prices.first.price, 150000);
       expect(prices.last.zoneName, '2층 C블록');
+    });
+
+    test('가격이 비어 있어도 공연은 그린다', () async {
+      // 구역이 아직 등록되지 않은 공연이면 빈 목록이 온다.
+      final json = concertJson()..remove('sectionPrices');
+      givenServer((_) => jsonResponse(json));
+
+      final detail = await api.fetchShowDetail(7);
+
+      expect(detail.title, '김필 단독 콘서트');
+      expect(detail.zonePrices, isEmpty);
     });
 
     test('공연일은 하루만 쓴다', () async {
@@ -164,24 +155,6 @@ void main() {
   });
 
   group('실패', () {
-    test('구역을 못 받아도 공연은 그린다', () async {
-      // 구역 조회는 로그인해야 열린다. 로그인 전 사용자도 상세는 볼 수 있어야 한다.
-      givenServer(
-        (request) => request.path.startsWith('/api/v1/concerts')
-            ? jsonResponse(concertJson())
-            : problemResponse(
-                status: 401,
-                errorMessage: '인증 정보가 올바르지 않습니다. 다시 로그인해 주세요.',
-                exception: 'TokenInvalidException',
-              ),
-      );
-
-      final detail = await api.fetchShowDetail(7);
-
-      expect(detail.title, '김필 단독 콘서트');
-      expect(detail.zonePrices, isEmpty);
-    });
-
     test('없는 공연은 서버 문구를 그대로 던진다', () async {
       givenServer(
         (_) => problemResponse(

@@ -7,17 +7,18 @@ import '../models/zone_seats.dart';
 import 'booking_api.dart';
 import 'mock_booking_data.dart';
 
-/// 서버 없이 도는 [BookingApi]. 테스트와 화면 확인에 쓴다.
+/// 서버 없이 도는 [BookingApi]. **테스트가 쓴다.**
 ///
 /// 고정 배치도([MockBookingData]) 위에 이 인스턴스에서 한 선점만 덧씌운다.
 /// 그래서 잡은 자리를 다시 조회하면 선점중으로 보이고, 취소하면 되돌아온다.
 ///
-/// **서버로는 확인할 수 없는 것을 여기서 본다.** 서버 로컬 시드는 좌석 상태를
-/// 넣지 않아 전 좌석이 예매 가능으로 오기 때문에, 회색 자리와 선점중 자리가
-/// 어떻게 보이는지는 이 목으로만 확인할 수 있다.
-///
 /// 실제 규칙대로 선점은 한 공연에서 한 자리만 유지된다. 새 자리를 잡으면 이전
 /// 자리가 풀리고 그 번호를 알려 준다.
+///
+/// 앱에서 이걸로 갈아끼우는 실행 인자가 있었는데 지웠다. 서버 로컬 시드가
+/// 좌석 상태를 채우지 않던 시절, 회색 자리를 눈으로 보려면 이 목뿐이었기
+/// 때문이다. 이제 시드가 판매 완료·선점을 만들어 실제 서버로 보인다. 앱은
+/// 언제나 서버를 본다.
 class MockBookingApi implements BookingApi {
   MockBookingApi({this.latency = BookingConstants.mockLatency});
 
@@ -93,6 +94,9 @@ class MockBookingApi implements BookingApi {
     final now = DateTime.now();
     return SeatHold(
       seatId: seatId,
+      // 실제 서버는 잡은 자리가 속한 구역의 값을 준다. 목 데이터는 구역이
+      // 달라도 금액이 같아(요구사항상 좌석 등급이 없다) 상수를 바로 쓴다.
+      price: MockBookingData.price,
       expiresAt: now.add(BookingConstants.holdDuration),
       heldAt: now,
       releasedSeatId: previous == seatId ? null : previous,

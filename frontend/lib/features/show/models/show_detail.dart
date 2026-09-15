@@ -35,7 +35,7 @@ ShowStatus showStatusOf(Object? raw) => switch (raw) {
   _ => ShowStatus.onSale,
 };
 
-/// 공연 상세 한 건. 서버의 공연 단건 응답에 구역별 가격을 더한 것이다.
+/// 공연 상세 한 건. 서버의 공연 단건 응답을 화면이 쓰는 모양으로 옮긴 것이다.
 ///
 /// 목록용 `ShowSummary` 와 겹치는 필드가 있지만 상속·재사용하지 않는다.
 /// 목록은 카드 한 장에 들어갈 만큼만 필요하고, 상세는 장소·가격·아티스트까지
@@ -62,12 +62,8 @@ class ShowDetail {
     required this.artists,
   });
 
-  /// 공연 상세 응답을 읽는다. 가격은 구역 목록에서 따로 받아 넘겨준다 —
-  /// 상세 응답에는 금액이 들어 있지 않다.
-  factory ShowDetail.fromJson(
-    Map<String, dynamic> json, {
-    required List<ZonePrice> zonePrices,
-  }) => ShowDetail(
+  /// 공연 상세 응답을 읽는다. 가격도 이 응답 안에 들어 있다.
+  factory ShowDetail.fromJson(Map<String, dynamic> json) => ShowDetail(
     id: (json['id'] as num).toInt(),
     title: json['title'] as String,
     venue: json['venueName'] as String,
@@ -75,7 +71,10 @@ class ShowDetail {
     startAt: DateTime.parse(json['startDate'] as String),
     ticketOpenAt: _dateTimeOrNull(json['openAt']),
     status: showStatusOf(json['status']),
-    zonePrices: zonePrices,
+    zonePrices: (json['sectionPrices'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(ZonePrice.fromJson)
+        .toList(),
     artists: (json['artists'] as List? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(ShowArtist.fromJson)
