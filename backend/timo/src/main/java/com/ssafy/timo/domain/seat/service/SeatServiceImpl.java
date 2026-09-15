@@ -133,6 +133,12 @@ public class SeatServiceImpl implements SeatService {
      * <p>이 공연의 티켓을 이미 산 회원은 다른 자리를 선점할 수 없다("1인 1매"). 지금 잡고 있는
      * 내 선점을 다시 누르는 것과는 다른 얘기다 — 그건 결제 전 단계라 여기 걸리지 않는다.
      *
+     * <p>이 공연에서 취소된 적이 있는 자리도 선점할 수 없다("회수됨",
+     * {@link com.ssafy.timo.domain.seat.entity.SeatStatus#REVOKED}).
+     * 취소는 자리를 곧바로 예매 가능으로 되돌리지 않는다 — 재오픈 절차(스토리 35)가 생기기 전에는
+     * 이 판정이 영구적이다. 조회에서 이미 예매 가능으로 보이지 않는 자리라, 여기서 안 막으면 화면엔
+     * 안 보이는 자리를 API 로 직접 잡는 통로가 남는다.
+     *
      * <p>좌석 행을 잠그지 않는다. 좌석은 모든 공연이 공유하는 한 행이라 거기 잠금을 걸면 서로 다른
      * 공연의 선점 요청이 같은 줄에 선다. 대신 {@code seat_hold} INSERT 를 시도하고,
      * {@code uk_hold_seat} 에 걸리면 진 것으로 본다. 충돌은 <b>같은 공연의 같은 좌석</b>에서만 난다.
@@ -160,6 +166,11 @@ public class SeatServiceImpl implements SeatService {
 
         // 팔린 자리는 선점 유니크에 걸리지 않으므로 따로 막는다.
         if (reservationRepository.existsPaidSeat(concertId, seatId)) {
+            throw new SeatNotHoldableException(seatId);
+        }
+        // 회수된 자리(취소된 적 있음)도 같은 이유로 따로 막는다. 재오픈 절차(스토리 35) 전까지는
+        // 조회에서도 예매 가능으로 보이지 않으므로, API 로 직접 찔러도 뚫리면 안 된다.
+        if (reservationRepository.existsRevokedSeat(concertId, seatId)) {
             throw new SeatNotHoldableException(seatId);
         }
 

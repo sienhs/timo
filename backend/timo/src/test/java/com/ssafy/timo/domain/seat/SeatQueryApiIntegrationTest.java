@@ -152,6 +152,22 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("취소된 적이 있는 좌석도 잔여석에서 빠진다")
+    void findSections_excludesRevokedSeatsFromAvailableCount() throws Exception {
+        Section section = saveSection("1층 A블록", 150000, 3, 2);
+        revokeFirstSeats(section, 2);
+        flushAndClear();
+
+        // 취소는 재오픈 절차(스토리 35) 전까지 자리를 예매 가능으로 되돌리지 않는다 — 팔린 자리와
+        // 똑같이 잔여석에서 빠져야 한다.
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].seatCount").value(6))
+                .andExpect(jsonPath("$.sections[0].availableCount").value(4))
+                .andExpect(jsonPath("$.totalAvailableCount").value(4));
+    }
+
+    @Test
     @DisplayName("전석이 팔린 구역도 잔여석 0 으로 목록에 남는다")
     void findSections_keepsSoldOutSectionWithZeroAvailable() throws Exception {
         Section soldOut = saveSection("1층 A블록", 150000, 3, 2);
@@ -278,6 +294,22 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("취소된 적이 있는 자리는 회수 상태로 남고, 다시 예매 가능으로 보이지 않는다")
+    void findSeats_returnsRevokedStatusForCancelledSeat() throws Exception {
+        Section section = saveSection("1층 A블록", 150000, 2, 2);
+        revokeFirstSeats(section, 1);
+        flushAndClear();
+
+        // 재오픈 절차(스토리 35)가 없는 지금은 이 판정이 영구적이다 — AVAILABLE 도 SOLD 도 아니어야 한다.
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.seatCount").value(4))
+                .andExpect(jsonPath("$.availableCount").value(3))
+                .andExpect(jsonPath("$.seats[0].status").value("REVOKED"))
+                .andExpect(jsonPath("$.seats[1].status").value("AVAILABLE"));
+    }
+
+    @Test
     @DisplayName("좌석 응답에 파생 필드가 새어 나오지 않는다")
     void findSeats_doesNotLeakDerivedFields() throws Exception {
         Section section = saveSection("1층 A블록", 150000, 2, 2);
@@ -398,6 +430,35 @@ class SeatQueryApiIntegrationTest {
                     .member(buyer)
                     .seat(seats.get(i))
                     .build());
+        }
+    }
+
+    /**
+     * 구역의 앞 {@code count} 자리에 취소된 주문을 남긴다("회수됨").
+     *
+     * <p>취소 API 가 아직 없어({@code Reservation#cancel} 을 부르는 서비스가 없다) 여기서 직접
+     * 만들고 바로 취소한다. 결제 확정 → 취소 흐름 전체가 아니라 "취소된 행이 있으면 어떻게
+     * 보이는가" 만 보는 테스트라 이 정도로 충분하다.
+     */
+    private void revokeFirstSeats(Section section, int count) {
+        List<Seat> seats = seatRepository
+                .findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId())
+                .subList(0, count);
+
+        Concert concert = concertRepository.getReferenceById(concertId);
+        for (int i = 0; i < seats.size(); i++) {
+            Member buyer = memberRepository.save(Member.builder()
+                    .phoneNumber("0104444" + String.format("%04d", i))
+                    .name("전재민")
+                    .nickname("회수" + section.getId() + "-" + i)
+                    .build());
+
+            Reservation reservation = reservationRepository.save(Reservation.builder()
+                    .concert(concert)
+                    .member(buyer)
+                    .seat(seats.get(i))
+                    .build());
+            reservation.cancel(LocalDateTime.now());
         }
     }
 

@@ -399,6 +399,24 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
+                    @DisplayName("취소된 적이 있는(회수된) 좌석이면 409 를 반환한다")
+    void hold_returnsConflictWhenRevoked() throws Exception {
+        Long seatId = seatIdAt(1, 1);
+        revoke(concertA, seatId, someoneElse);
+        flushAndClear();
+
+        // 재오픈 절차(스토리 35)가 생기기 전에는 취소된 적이 있는 자리를 다시 선점할 수 없다 — 조회에서
+        // 이미 예매 가능으로 안 보이는 자리라, API 직접 호출로도 뚫리면 안 된다.
+        mvc.perform(holdBy(me, concertA, seatId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("SeatNotHoldableException"));
+        flushAndClear();
+
+        assertThat(seatHoldRepository.findActive(concertA.getId(), seatId, LocalDateTime.now()))
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("예매 중이 아닌 공연이면 409 를 반환한다")
     void hold_returnsConflictWhenConcertNotOnSale() throws Exception {
         Long seatId = seatIdAt(1, 1);
@@ -522,6 +540,16 @@ class SeatHoldApiIntegrationTest {
                 .member(memberRepository.getReferenceById(memberId))
                 .seat(seatRepository.getReferenceById(seatId))
                 .build());
+    }
+
+    /** 좌석을 취소된 적이 있는(회수된) 것으로 만든다. 취소 API 가 아직 없어 만들고 바로 취소한다. */
+    private void revoke(Concert concert, Long seatId, long memberId) {
+        Reservation reservation = reservationRepository.save(Reservation.builder()
+                .concert(concert)
+                .member(memberRepository.getReferenceById(memberId))
+                .seat(seatRepository.getReferenceById(seatId))
+                .build());
+        reservation.cancel(LocalDateTime.now());
     }
 
     private Long seatIdAt(int seatNo, int seatCol) {

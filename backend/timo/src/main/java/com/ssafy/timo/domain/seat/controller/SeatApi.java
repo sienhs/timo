@@ -54,8 +54,8 @@ public interface SeatApi {
      * 함께 풀린다. 풀린 좌석은 응답의 {@code releasedSeatId} 로 알려 준다. 다른 공연의 선점은
      * 영향을 받지 않는다. 이미 내가 잡고 있는 좌석을 다시 부르면 만료 시각이 5 분 뒤로 갱신된다.
      *
-     * <p>남이 잡고 있거나 이미 팔린 자리, 예매 중이 아닌 공연, 이미 이 공연의 티켓을 보유한
-     * 회원의 요청은 409 다.
+     * <p>남이 잡고 있거나 이미 팔린 자리, 취소된 적이 있는(회수된) 자리, 예매 중이 아닌 공연,
+     * 이미 이 공연의 티켓을 보유한 회원의 요청은 409 다.
      */
     @PostMapping("/{seatId}/hold")
     ResponseEntity<SeatHoldResponseDto> hold(@PathVariable Long seatId,
