@@ -213,28 +213,28 @@ public class LocalDataSeeder implements ApplicationRunner {
                     "poster/poster_main_kim_feel.gif",
                     List.of("detail/poster_detail_kim.jpg"),
                     "김필 단독 콘서트", AgeRating.AGE_7, ConcertStatus.CLOSED, 1_203,
-                    LocalDateTime.of(2026, 7, 10, 19, 0), LocalDateTime.of(2026, 7, 12, 21, 0),
+                    LocalDateTime.of(2026, 7, 10, 19, 0), LocalDateTime.of(2026, 7, 10, 21, 0),
                     LocalDateTime.of(2026, 6, 1, 20, 0), List.of("김필")),
             // 대기. 오픈이 아직 남아 좌석 화면에 들어갈 수 없다.
             new ConcertSeed("이승기 콘서트", ConcertGenre.CONCERT,
                     "poster/poster_main_lee.gif",
                     List.of("detail/poster_detail_lee.jpg"),
                     "이승기 단독 콘서트", AgeRating.ALL, ConcertStatus.SCHEDULED, 512,
-                    LocalDateTime.of(2026, 11, 21, 18, 0), LocalDateTime.of(2026, 11, 22, 21, 0),
+                    LocalDateTime.of(2026, 11, 21, 18, 0), LocalDateTime.of(2026, 11, 21, 21, 0),
                     LocalDateTime.of(2026, 10, 15, 20, 0), List.of("이승기")),
             // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
             new ConcertSeed("로이킴 콘서트", ConcertGenre.CONCERT,
                     "poster/poster_main_roykim.jpg",
                     List.of(),
                     "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 3_300,
-                    LocalDateTime.of(2026, 9, 20, 19, 30), LocalDateTime.of(2026, 9, 21, 21, 30),
+                    LocalDateTime.of(2026, 9, 20, 19, 30), LocalDateTime.of(2026, 9, 20, 21, 30),
                     LocalDateTime.of(2026, 8, 1, 14, 0), List.of("로이킴")),
             // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
             new ConcertSeed("Bruno Mars 내한공연", ConcertGenre.CONCERT,
                     "poster/poster_main_mars.gif",
                     List.of("detail/poster_detail_mars.jpg"),
                     "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 87,
-                    LocalDateTime.of(2026, 12, 5, 19, 0), LocalDateTime.of(2026, 12, 6, 21, 0),
+                    LocalDateTime.of(2026, 12, 5, 19, 0), LocalDateTime.of(2026, 12, 5, 21, 0),
                     LocalDateTime.of(2026, 9, 1, 20, 0), List.of("Bruno Mars")));
 
     private final ConcertService concertService;
