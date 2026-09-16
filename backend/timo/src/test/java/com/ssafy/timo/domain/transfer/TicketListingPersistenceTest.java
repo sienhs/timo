@@ -176,7 +176,7 @@ class TicketListingPersistenceTest {
 
     private TicketListing listing(long ticketId, long price) {
         return TicketListing.open(ticketId, seller.getId(), concert, section,
-                price, FACE_VALUE, LocalDateTime.now());
+                1, 1, price, FACE_VALUE, LocalDateTime.now());
     }
 
     private Concert saveConcert(Venue venue) {

@@ -509,7 +509,7 @@ class StubApiTest {
         }
 
         @Test
-        void 매물_목록은_낮은_가격순이고_좌석과_판매자를_내리지_않는다() throws Exception {
+        void 매물_목록은_낮은_가격순이고_좌석은_주되_판매자는_내리지_않는다() throws Exception {
             mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 1))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", hasSize(3)))
@@ -522,9 +522,10 @@ class StubApiTest {
                     .andExpect(jsonPath("$.content[2].listingId").value(1))
                     .andExpect(jsonPath("$.content[2].discountRate").value(0))
                     .andExpect(jsonPath("$.content[*].mine", everyItem(is(false))))
-                    // 체결 전에는 좌석이 특정되면 안 되고, 판매자도 어떤 형태로도 드러나면 안 된다.
-                    .andExpect(jsonPath("$.content[0].seatNo").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].seatCol").doesNotExist())
+                    // 좌석번호는 공개한다. 구매자가 자리를 보고 골라야 하기 때문이다.
+                    .andExpect(jsonPath("$.content[0].seatNo").exists())
+                    .andExpect(jsonPath("$.content[0].seatCol").exists())
+                    // 판매자는 어떤 형태로도 드러나면 안 된다.
                     .andExpect(jsonPath("$.content[0].seatId").doesNotExist())
                     .andExpect(jsonPath("$.content[0].sellerAddress").doesNotExist())
                     .andExpect(jsonPath("$.content[0].ticketId").doesNotExist())
@@ -552,7 +553,8 @@ class StubApiTest {
                     .andExpect(jsonPath("$.concertId").value(1))
                     .andExpect(jsonPath("$.venueName").exists())
                     .andExpect(jsonPath("$.closedAt").doesNotExist())
-                    .andExpect(jsonPath("$.seatNo").doesNotExist());
+                    .andExpect(jsonPath("$.seatNo").exists())
+                    .andExpect(jsonPath("$.seatCol").exists());
 
             purchase(OTHERS_LISTING_CONCERT1, 120_000).andExpect(status().isAccepted());
 
@@ -575,7 +577,7 @@ class StubApiTest {
                     .andExpect(jsonPath("$.sectionName").value("1층 B블록"))
                     .andExpect(jsonPath("$.tradedAt").value("2026-09-10T12:00:00"))
                     .andExpect(jsonPath("$.txHash").doesNotExist())
-                    .andExpect(jsonPath("$.seatNo").doesNotExist());
+                    .andExpect(jsonPath("$.seatNo").exists());
 
             // 매물에서 사라지고 내 것이 되어 다시 등록할 수 있다.
             mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 1))
@@ -650,9 +652,9 @@ class StubApiTest {
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].status", contains("LISTED")))
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].tradeId", contains(nullValue())))
                     .andExpect(jsonPath("$.content[?(@.type == 'PURCHASE')].status", contains("PENDING")))
+                    .andExpect(jsonPath("$.content[0].seatNo").exists())
                     // 거래 상대는 어느 쪽에서도 드러나지 않는다.
-                    .andExpect(jsonPath("$.content[0].sellerAddress").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].seatNo").doesNotExist());
+                    .andExpect(jsonPath("$.content[0].sellerAddress").doesNotExist());
         }
 
         @Test

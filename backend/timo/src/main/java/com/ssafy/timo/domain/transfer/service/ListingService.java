@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.transfer.service;
 
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
+import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
@@ -116,11 +117,14 @@ public class ListingService {
             throw new ListPriceExceedsFacePriceException(price, faceValue);
         }
 
+        Seat seat = reservation.getSeat();
         TicketListing listing = TicketListing.open(
                 ticketId,
                 memberId,
                 concert,
-                reservation.getSeat().getSection(),
+                seat.getSection(),
+                seat.getSeatNo(),
+                seat.getSeatCol(),
                 price,
                 faceValue,
                 LocalDateTime.now(clock));

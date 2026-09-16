@@ -53,6 +53,8 @@ public interface TicketTradeRepository extends JpaRepository<TicketTrade, Long> 
                    v.venue_name      as venueName,
                    s.name            as sectionName,
                    s.grade           as grade,
+                   l.seat_no         as seatNo,
+                   l.seat_col        as seatCol,
                    l.price           as price,
                    l.face_value      as faceValue,
                    l.listed_at       as occurredAt
@@ -73,6 +75,8 @@ public interface TicketTradeRepository extends JpaRepository<TicketTrade, Long> 
                    v2.venue_name,
                    s2.name,
                    s2.grade,
+                   l2.seat_no,
+                   l2.seat_col,
                    t.price,
                    l2.face_value,
                    t.traded_at

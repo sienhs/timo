@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
  * {@code tradeId}(bytes32) 와는 <b>다른 값이다.</b> 이름이 같아 헷갈리기 쉬운데, 온체인 쪽은
  * 연동 시 이 PK 에서 파생시키되 코드에서는 다른 이름으로 부른다.
  *
- * <p>좌석번호는 여기에도 없다. 체결 후 좌석 정보는 티켓 도메인에서 조회한다.
+ * <p>좌석번호를 함께 준다. 체결 직후 화면이 "어느 자리를 샀는지" 를 바로 보여 줄 수 있어야 한다.
  */
 public record PurchaseResponseDto(
         Long tradeId,
@@ -34,6 +34,8 @@ public record PurchaseResponseDto(
         LocalDateTime startDate,
         String venueName,
         String sectionName,
+        int seatNo,
+        int seatCol,
         LocalDateTime tradedAt
 ) {
 
@@ -50,6 +52,8 @@ public record PurchaseResponseDto(
                 concert.getStartDate(),
                 concert.getVenue().getName(),
                 listing.getSection().getName(),
+                listing.getSeatNo(),
+                listing.getSeatCol(),
                 trade.getTradedAt());
     }
 }

@@ -291,6 +291,8 @@ public class MarketStubController implements MarketApi {
                 concert.startDate(),
                 concert.venueName(),
                 listing.ticket.seat.section().name(),
+                listing.ticket.seat.seatNo(),
+                listing.ticket.seat.seatCol(),
                 trade.tradedAt));
     }
 
@@ -334,6 +336,8 @@ public class MarketStubController implements MarketApi {
                 listing.listingId,
                 listing.ticket.seat.section().name(),
                 SeatGrade.COMMON,
+                listing.ticket.seat.seatNo(),
+                listing.ticket.seat.seatCol(),
                 listing.price,
                 listing.ticket.faceValue,
                 discountRate(listing),
@@ -354,6 +358,8 @@ public class MarketStubController implements MarketApi {
                 concert.venueName(),
                 listing.ticket.seat.section().name(),
                 SeatGrade.COMMON,
+                listing.ticket.seat.seatNo(),
+                listing.ticket.seat.seatCol(),
                 listing.price,
                 listing.ticket.faceValue,
                 discountRate(listing),
@@ -377,6 +383,8 @@ public class MarketStubController implements MarketApi {
                 concert.venueName(),
                 listing.ticket.seat.section().name(),
                 SeatGrade.COMMON,
+                listing.ticket.seat.seatNo(),
+                listing.ticket.seat.seatCol(),
                 listing.price,
                 listing.ticket.faceValue,
                 listing.listedAt);
@@ -398,6 +406,8 @@ public class MarketStubController implements MarketApi {
                 concert.venueName(),
                 listing.ticket.seat.section().name(),
                 SeatGrade.COMMON,
+                listing.ticket.seat.seatNo(),
+                listing.ticket.seat.seatCol(),
                 listing.price,
                 listing.ticket.faceValue,
                 trade.tradedAt);
