@@ -8,7 +8,7 @@ import 'package:timo/features/ticket/models/ticket_status.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
-/// 예매 v0 스텁에 맞는 요청이 나가고 응답을 제대로 읽는지.
+/// 예매 v1 API 에 맞는 요청이 나가고 응답을 제대로 읽는지.
 /// 서버 없이 [FakeHttpAdapter] 로 검사한다.
 void main() {
   late FakeHttpAdapter adapter;
@@ -25,7 +25,7 @@ void main() {
   /// 서버 예매 목록 응답 한 건. 실제 `ReservationSummaryResponseDto` 모양이다.
   Map<String, dynamic> reservationJson({
     int id = 1,
-    String status = 'MINTED',
+    String status = 'PAID',
     String? startDate = '2026-10-10T19:00:00',
   }) => {
     'id': id,
@@ -62,8 +62,8 @@ void main() {
 
       final request = adapter.requests.single;
       expect(request.method, 'GET');
-      expect(request.path, '/api/v0/reservations');
-      // 상태로 거르지 않는다. 발행 중·실패·취소된 티켓도 카드로 그려야 한다.
+      expect(request.path, '/api/v1/reservations');
+      // 상태로 거르지 않는다. 취소된 티켓도 회색 카드로 남겨야 한다.
       expect(request.query.containsKey('status'), isFalse);
       expect(request.query['size'], '100');
     });
@@ -76,7 +76,7 @@ void main() {
       final ticket = tickets.single;
       expect(ticket.reservationId, 1);
       expect(ticket.title, '2026 REMIND: 리센느');
-      expect(ticket.status, TicketStatus.minted);
+      expect(ticket.status, TicketStatus.paid);
       expect(ticket.facePrice, 154000);
       expect(ticket.startAt, DateTime(2026, 10, 10, 19));
     });
@@ -100,16 +100,15 @@ void main() {
       expect((await api.fetchMyTickets()).single.startAt, isNull);
     });
 
-    // 서버에 상태가 하나 늘어도 목록 전체가 깨지면 안 된다.
-    test('모르는 상태는 발행 중으로 본다', () async {
+    // 서버에 상태가 하나 늘어도 목록 전체가 깨지면 안 된다. 그 카드만 잠근다.
+    test('모르는 상태는 알 수 없음으로 본다', () async {
       givenServer(
         (_) => jsonResponse(paged([reservationJson(status: 'TRANSFERRED')])),
       );
 
-      expect(
-        (await api.fetchMyTickets()).single.status,
-        TicketStatus.pendingMint,
-      );
+      final ticket = (await api.fetchMyTickets()).single;
+      expect(ticket.status, TicketStatus.unknown);
+      expect(ticket.status.isUsable, isFalse);
     });
 
     test('빈 목록은 정상 결과다', () async {
@@ -153,7 +152,7 @@ void main() {
 
       final request = adapter.requests.single;
       expect(request.method, 'DELETE');
-      expect(request.path, '/api/v0/reservations/7');
+      expect(request.path, '/api/v1/reservations/7');
     });
 
     // 취소 조건은 서버가 최종 판정한다. 화면이 미리 걸러도 시점 차이로 통과할 수 있다.

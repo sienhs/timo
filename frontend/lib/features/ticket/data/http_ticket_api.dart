@@ -6,16 +6,16 @@ import '../constants.dart';
 import '../models/my_ticket.dart';
 import 'ticket_api.dart';
 
-/// 백엔드 예매·양도 API 에 실제로 요청하는 [TicketApi].
+/// 백엔드 예매 API(`/api/v1/reservations`)에 실제로 요청하는 [TicketApi].
 ///
-/// 지금은 프론트 연동용 스텁(`/api/v0`)에 붙어 있다. 스텁은 실제 컨트롤러와
-/// 같은 `ReservationApi` 인터페이스를 구현하므로 요청·응답 모양이 v1 과 같다.
-/// 티켓 도메인 실제 API 가 열리면 [reservationsPath] 의 버전만 `v1` 으로 바꾼다.
+/// **로그인이 필요하다.** 목록은 서버가 요청한 회원의 주문만 골라 준다 — 그래서
+/// "내" 티켓이다. 토큰은 `AuthInterceptor` 가 붙이고, 비로그인이면 401 이
+/// 화면의 오류 안내로 그대로 나온다.
 ///
-/// **v0 스텁으로는 화면을 채울 수 없다.** 주문하려면 공연이 `ON_SALE` 이어야
-/// 하는데 고정 공연 4개 중 하나뿐이고, 1인 1매라 만들 수 있는 티켓이 한 장이다.
-/// 지난 공연은 아예 만들 수 없다. 화면을 눈으로 볼 때는 [MockTicketApi] 를 쓴다
-/// (`flutter run --dart-define=TICKET_API=mock`).
+/// 로컬 백엔드는 시더가 시드 회원(`seed001` 등)에게 예매를 넣어 두므로, 그
+/// 계정으로 로그인하면 목록이 바로 채워진다. 서버로는 만들 수 없는 상태(앱이
+/// 모르는 주문 상태)를 볼 때만 [MockTicketApi] 를 쓴다
+/// (`flutter run --dart-define=TICKET_API=mock-states`).
 ///
 /// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
 /// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
@@ -25,12 +25,12 @@ import 'ticket_api.dart';
 class HttpTicketApi implements TicketApi {
   HttpTicketApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
 
-  static const reservationsPath = '/api/v0/reservations';
+  static const reservationsPath = '/api/v1/reservations';
 
   final Dio _dio;
 
-  /// 상태로 거르지 않고 전부 받는다. 발행 중·실패·취소된 티켓도 카드로 그려야
-  /// 하기 때문이다. 거르는 일은 화면이 공연 날짜와 상태로 한다.
+  /// 상태로 거르지 않고 전부 받는다. 취소된 티켓도 회색 카드로 남겨 결과를
+  /// 보여줘야 하기 때문이다. 거르는 일은 화면이 공연 날짜와 상태로 한다.
   @override
   Future<List<MyTicket>> fetchMyTickets() async {
     final content = await _content(reservationsPath, {

@@ -2,25 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// 포스터 왼쪽 위에 얹는 작은 배지. `D-9` · `판매중` · `NFT 발행 중`.
+/// 포스터 왼쪽 위에 얹는 작은 배지. `D-9` · `D-DAY`.
 ///
 /// 글자가 작아 브랜드 초록 위 흰 글자로는 대비가 모자란다(3.43:1, 일반 텍스트
 /// 기준 4.5:1 미달). 그래서 바탕을 [AppColors.primaryPressed] 로 한 단계
 /// 어둡게 깐다 — `AppColors.primary` 주석이 말하는 바로 그 경우다.
 class TicketBadge extends StatelessWidget {
-  const TicketBadge({super.key, required this.label, this.muted = false});
+  const TicketBadge({super.key, required this.label});
 
   final String label;
-
-  /// 강조할 일이 아닌 배지(발행 중 등)는 회색으로 깐다.
-  final bool muted;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: muted ? AppColors.textSecondary : AppColors.primaryPressed,
-        borderRadius: const BorderRadius.only(
+      decoration: const BoxDecoration(
+        color: AppColors.primaryPressed,
+        borderRadius: BorderRadius.only(
           topLeft: Radius.circular(8),
           bottomRight: Radius.circular(8),
         ),

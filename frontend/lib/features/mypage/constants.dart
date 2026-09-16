@@ -1,3 +1,5 @@
+import '../../core/utils/formatters.dart';
+
 /// 마이페이지 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
 class MyPageMetrics {
   MyPageMetrics._();
@@ -21,7 +23,7 @@ class MyPageMetrics {
   static const cardPadding = 16.0;
   static const cardGap = 20.0;
 
-  // 내 Mushroom 카드
+  // 내 버섯 카드
   static const walletIconSize = 24.0;
   static const walletTitleGap = 8.0;
   static const balanceTopGap = 14.0;
@@ -111,20 +113,20 @@ class MyPageStrings {
   /// 그려지므로 둘을 따로 둔다.
   static const greetingSuffix = ' 님 환영해요!';
 
-  static const walletTitle = '내 Mushroom';
+  /// 코인 이름은 앱 전체에서 **'버섯'** 하나다(사용자 결정, S15P21D206-168). 전에는
+  /// 이 카드가 `Mushroom`, 빠른 메뉴가 `코인 충전` 이라 한 서비스에 이름이 셋이었다.
+  static const walletTitle = '내 버섯';
 
-  /// 코인 단위. 서비스 결제 수단은 이 코인 하나다(요구사항 #20).
-  static const currencyUnit = 'MSR';
+  /// 코인 단위. 서비스 결제 수단은 이 코인 하나다(요구사항 #20). 값은 공용
+  /// 포맷터의 [coinUnit] 하나만 본다 — 티켓 환불 금액도 같은 단위를 쓴다.
+  static const currencyUnit = coinUnit;
 
   /// 환율 안내. 충전은 1 MSR = 1원 고정이다.
-  static const exchangeRate = '1MSR = 1원';
+  static const exchangeRate = '1$coinUnit = 1원';
 
   static const charge = '충전하기';
 
-  // 버섯 충전 화면
-  /// 화면 제목·버튼은 시안 문구를 그대로 쓴다. 앱은 코인을 `Mushroom`·`MSR`
-  /// 로, 빠른 메뉴는 `코인 충전` 으로 부르고 있어 한 서비스에 이름이 셋이지만,
-  /// 용어를 하나로 맞추는 일은 화면 하나가 정할 게 아니라 따로 뺐다.
+  // 버섯 충전 화면. 제목·버튼은 시안 문구 그대로다.
   static const chargeTitle = '버섯 충전';
   static const chargeSubmit = '버섯 충전하기';
 
@@ -164,7 +166,7 @@ class MyPageStrings {
   static String balanceAfter(String formatted) => '잔액 $formatted';
 
   /// 로그인 안 한 상태의 안내.
-  static const loginPrompt = '로그인하고 내 Mushroom 을 확인해 보세요.';
+  static const loginPrompt = '로그인하고 내 버섯을 확인해 보세요.';
 
   /// 화면이 아직 없는 버튼을 눌렀을 때.
   static String notReady(String label) => '$label 화면은 준비 중이에요.';

@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
+import '../../auth/constants.dart';
+import '../../auth/state/auth_session_scope.dart';
 import '../../shell/constants.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
@@ -21,12 +23,12 @@ import '../widgets/ticket_search_field.dart';
 import '../widgets/ticket_tab_bar.dart';
 import '../widgets/upcoming_ticket_card.dart';
 
-/// 내 티켓. 예정 공연 · 지난 공연 두 탭이다.
+/// 내 티켓. 예정 공연 · 지난 공연 · 양도 목록 세 탭이다.
 ///
 /// 예정과 지난은 **같은 응답**을 공연 날짜로 가른다. 서버에 그 필터가 없어서
 /// 한 번 받아 화면이 나눈다.
 ///
-/// 시안에는 `양도 목록` 탭이 하나 더 있었다. 뺀 이유는 [TicketTabBar] 주석 참고.
+/// 양도 목록은 자리만 있고 비어 있다. 이유는 [TicketTabBar] 주석 참고.
 class MyTicketsScreen extends StatefulWidget {
   const MyTicketsScreen({super.key, this.clock = DateTime.now});
 
@@ -41,7 +43,9 @@ class MyTicketsScreen extends StatefulWidget {
 }
 
 class _MyTicketsScreenState extends State<MyTicketsScreen> {
-  late Future<_MyTicketsData> _data;
+  /// 진행 중인 조회. 로그인 상태가 아니면 null 이다 — 서버가 로그인한 회원의
+  /// 주문만 주므로 비로그인으로는 부를 이유가 없고, 부르면 401 만 받는다.
+  Future<_MyTicketsData>? _data;
 
   final _searchController = TextEditingController();
   int _tabIndex = 0;
@@ -57,11 +61,28 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 갈린다. 새로 고칠 때 함께 갱신한다.
   late DateTime _now;
 
+  /// 충전 화면과 같은 판단. 스코프가 없으면(스코프 없이 띄우는 테스트) 비로그인.
+  bool get _isLoggedIn =>
+      AuthSessionScope.maybeOf(context)?.isLoggedIn ?? false;
+
   @override
   void initState() {
     super.initState();
     _now = widget.clock();
-    _data = _load();
+  }
+
+  /// 로그인한 채로 들어왔거나 이 화면에서 로그인하고 돌아왔을 때 목록을 받아
+  /// 온다. 로그아웃되면(토큰 만료로 재발급까지 실패한 경우 포함) 들고 있던
+  /// 목록을 버린다 — 그러면 본문이 로그인 안내로 바뀐다. 충전 화면과 같은 방식.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isLoggedIn) {
+      _data ??= _load();
+    } else {
+      _data = null;
+      _loaded = null;
+    }
   }
 
   @override
@@ -114,7 +135,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   ///
   /// 확인을 받고 서버에 보낸 뒤 목록을 **다시 받는다.** 카드 하나만 회색으로
   /// 바꿔치기하면 화면이 서버와 어긋날 수 있다 — 취소가 성공해도 그 사이에
-  /// 다른 티켓의 발행이 끝났을 수 있고, 실패했다면 아무것도 바뀌지 않아야 한다.
+  /// 다른 티켓이 달라졌을 수 있고, 실패했다면 아무것도 바뀌지 않아야 한다.
   ///
   /// 서버가 거절하면(예: 그새 24시간 안으로 들어옴) 그 문구를 그대로 띄운다.
   /// 화면이 미리 걸러도 시점 차이로 통과할 수 있어 최종 판정은 서버 몫이다.
@@ -163,6 +184,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   @override
   Widget build(BuildContext context) {
     final loaded = _loaded;
+    final data = _data;
 
     return Scaffold(
       appBar: AppBar(
@@ -178,25 +200,33 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          children: [
-            TicketTabBar(
-              selectedIndex: _tabIndex,
-              counts: loaded == null
-                  ? null
-                  : [loaded.upcoming(_now).length, loaded.past(_now).length],
-              onSelected: (index) => setState(() => _tabIndex = index),
-            ),
-            Expanded(
-              child: AsyncBoundary<_MyTicketsData>(
-                future: _data,
-                onRetry: _reload,
-                loading: const TicketListSkeleton(),
-                builder: (context, data) => _body(data),
+        // 조회가 없다 = 로그인 상태가 아니다([didChangeDependencies]).
+        child: data == null
+            ? _loginPrompt()
+            : Column(
+                children: [
+                  TicketTabBar(
+                    selectedIndex: _tabIndex,
+                    // 양도 목록은 아직 셀 데이터가 없어 null — 숫자 없이 이름만.
+                    counts: loaded == null
+                        ? null
+                        : [
+                            loaded.upcoming(_now).length,
+                            loaded.past(_now).length,
+                            null,
+                          ],
+                    onSelected: (index) => setState(() => _tabIndex = index),
+                  ),
+                  Expanded(
+                    child: AsyncBoundary<_MyTicketsData>(
+                      future: data,
+                      onRetry: _reload,
+                      loading: const TicketListSkeleton(),
+                      builder: (context, data) => _body(data),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
       // 시안에 하단 바가 그려져 있다. 이 화면은 셸 위에 얹힌 것이라 셸의 바가
       // 가려지므로 여기서 한 벌 더 단다. 어느 탭도 고르지 않은 상태(-1)라
@@ -212,6 +242,15 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       floatingActionButtonLocation: quickMenuButtonLocation,
     );
   }
+
+  /// 비로그인 안내. 탭 바도 내지 않는다 — 세어 줄 것이 없는 탭 이름만 남으면
+  /// 빈 화면처럼 읽힌다. 문구와 버튼은 마이페이지·충전 화면과 같은 꼴이다.
+  /// 로그인 화면에서 돌아오면 세션이 바뀌어 [didChangeDependencies] 가 목록을 부른다.
+  Widget _loginPrompt() => TicketEmptyView(
+    message: TicketStrings.loginPrompt,
+    actionLabel: AuthStrings.login,
+    onAction: () => Navigator.pushNamed(context, AppRoutes.login),
+  );
 
   Widget _body(_MyTicketsData data) {
     return switch (_tabIndex) {
@@ -236,7 +275,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           onMore: ticket.status.isUsable ? () => _openMore(ticket) : null,
         ),
       ),
-      _ => _ticketList(
+      1 => _ticketList(
         tickets: data.past(_now),
         emptyMessage: TicketStrings.emptyPast,
         cardBuilder: (ticket) => PastTicketCard(
@@ -245,6 +284,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
               _notify(TicketStrings.notReady(TicketStrings.createCollectible)),
         ),
       ),
+      // 양도 목록. 자리만 두고 내용은 양도마켓 작업에서 채운다([TicketTabBar]
+      // 주석). 그래서 이 화면의 조회 결과([_MyTicketsData])와 아직 무관하다.
+      _ => const TicketEmptyView(message: TicketStrings.emptyListings),
     };
   }
 
@@ -319,8 +361,8 @@ class _MyTicketsData {
 
   final List<MyTicket> tickets;
 
-  /// 아직 안 지난 공연. 회수된 티켓(환불·취소)도 여기 남는다 — 결과를 보여
-  /// 줘야 하고, 지난 공연 탭에 섞이면 "다녀온 공연" 으로 읽힌다.
+  /// 아직 안 지난 공연. 취소된 티켓도 여기 남는다 — 결과를 보여 줘야 하고,
+  /// 지난 공연 탭에 섞이면 "다녀온 공연" 으로 읽힌다.
   List<MyTicket> upcoming(DateTime now) =>
       tickets.where((ticket) => !ticket.isPast(now)).toList();
 

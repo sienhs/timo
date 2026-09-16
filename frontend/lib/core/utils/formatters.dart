@@ -13,6 +13,18 @@ library;
 /// 1000 단위 쉼표를 넣고 `원`을 붙인다. (예: 186000 -> `186,000원`)
 String formatWon(int amount) => '${formatThousands(amount)}원';
 
+/// 코인 단위. 앱 안에서 코인은 **'버섯'**, 단위는 **`MSR`** 하나로 부른다(사용자
+/// 결정). 마이페이지·충전 화면도 이 값을 가리키므로 단위를 바꿀 일이 생기면 여기만
+/// 고친다.
+const coinUnit = 'MSR';
+
+/// 1000 단위 쉼표를 넣고 코인 단위를 붙인다. (예: 198000 -> `198,000 MSR`)
+///
+/// 서비스 결제 수단은 이 코인 하나라, 티켓 값·환불 금액처럼 **결제와 오가는
+/// 돈**은 원이 아니라 [coinUnit] 으로 적는다. 띄어쓰기까지 버섯 충전 화면과 같은
+/// 모양이다(`features/mypage/constants.dart` 의 `withUnit`).
+String formatMsr(int amount) => '${formatThousands(amount)} $coinUnit';
+
 /// 1000 단위 쉼표만 넣는다. (예: 186000 -> `186,000`)
 String formatThousands(int value) {
   final digits = value.abs().toString();

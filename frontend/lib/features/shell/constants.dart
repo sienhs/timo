@@ -66,7 +66,7 @@ const quickMenuItems = <QuickMenuItem>[
   QuickMenuItem(icon: Icons.favorite_border, label: '찜'),
   QuickMenuItem(
     icon: Icons.savings_outlined,
-    label: '코인 충전',
+    label: '버섯 충전',
     routeName: AppRoutes.coinCharge,
   ),
   QuickMenuItem(icon: Icons.storefront_outlined, label: '양도마켓'),

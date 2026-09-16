@@ -17,7 +17,7 @@ void main() {
     seatRow: 12,
     seatNumber: 24,
     facePrice: 154000,
-    status: TicketStatus.minted,
+    status: TicketStatus.paid,
     bookedAt: DateTime(2026, 8, 1),
     startAt: DateTime(2026, 9, 14, 19),
   );

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/features/auth/data/mock_auth_api.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
@@ -9,11 +13,18 @@ import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
 
 void main() {
+  /// 화면이 로그인 세션을 보고 목록을 부르므로 로그인한 세션을 함께 내려준다.
   Future<void> pumpScreen(WidgetTester tester, {TicketApi? api}) async {
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    await session.signIn(MockAuthApi.tokens);
+    addTearDown(session.dispose);
     await tester.pumpWidget(
-      TicketApiScope(
-        api: api ?? MockTicketApi(latency: Duration.zero),
-        child: const MaterialApp(home: MyTicketsScreen()),
+      AuthSessionScope(
+        session: session,
+        child: TicketApiScope(
+          api: api ?? MockTicketApi(latency: Duration.zero),
+          child: const MaterialApp(home: MyTicketsScreen()),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -71,7 +82,10 @@ void main() {
       expect(find.text(TicketStrings.cancelConfirmTitle), findsOneWidget);
       expect(inDialog('2026 아이유 콘서트'), findsOneWidget);
       expect(inDialog('VIP석 5열 10번'), findsOneWidget);
-      expect(inDialog(TicketStrings.refundAmount('198,000원')), findsOneWidget);
+      expect(
+        inDialog(TicketStrings.refundAmount('198,000 MSR')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('그대로 두면 아무 일도 안 일어난다', (tester) async {

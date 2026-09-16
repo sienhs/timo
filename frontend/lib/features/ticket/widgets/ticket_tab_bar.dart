@@ -5,9 +5,9 @@ import '../constants.dart';
 
 /// 내 티켓의 탭. 고른 탭 아래에 초록 밑줄이 그어진다.
 ///
-/// 시안에는 `양도 목록` 탭이 하나 더 있었다. 양도 등록 진입점이 이번 범위에
-/// 없어 늘 비어 있는 데다, 마켓 API 가 S15P21D206-297 에서 새로 설계되면서
-/// 붙여 둔 연동이 맞지 않게 됐다. 양도 작업을 할 때 새 규약으로 함께 되살린다.
+/// 시안대로 `양도 목록` 탭까지 셋이다. 양도 탭은 지금 자리만 있고 내용은 비어
+/// 있다 — 마켓 API 가 S15P21D206-297 에서 새로 설계돼 예전 연동을 걷어냈고,
+/// 양도마켓 작업에서 새 규약으로 채운다. 그래서 개수도 찍지 않는다([counts]).
 ///
 /// Material 의 `TabBar` 를 쓰지 않는다. 그쪽은 `TabController` 와 `TabBarView`
 /// 를 함께 끌고 오는데, 여기서는 탭마다 본문이 아예 다른 위젯이고 옆으로
@@ -26,10 +26,16 @@ class TicketTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
-  /// 탭 순서대로의 개수. 아직 안 불러왔으면 null.
-  final List<int>? counts;
+  /// 탭 순서대로의 개수. 아직 안 불러왔으면 목록 전체가 null 이고, 셀 데이터가
+  /// 아직 없는 탭(양도 목록)은 항목이 null 이라 숫자 없이 그린다. 0 을 찍으면
+  /// "없다" 고 단정하는 꼴인데, 세어 본 적이 없는 것과 없는 것은 다르다.
+  final List<int?>? counts;
 
-  static const labels = [TicketStrings.tabUpcoming, TicketStrings.tabPast];
+  static const labels = [
+    TicketStrings.tabUpcoming,
+    TicketStrings.tabPast,
+    TicketStrings.tabListings,
+  ];
 
   @override
   Widget build(BuildContext context) {
