@@ -14,6 +14,7 @@ module "backend_secret" {
     DB_USERNAME            = var.db_username
     DB_PASSWORD            = var.db_password
     JWT_SECRET             = var.jwt_secret
+    ADMIN_PRIVATE_KEY      = var.admin_private_key
     WALLET_MASTER_KEY      = var.wallet_master_key
   }, var.solapi_environment, module.image_storage.runtime_environment))
 }

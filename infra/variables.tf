@@ -133,6 +133,17 @@ variable "wallet_master_key" {
   }
 }
 
+variable "admin_private_key" {
+  description = "Blockchain administrator private key (0x-prefixed 32-byte hexadecimal value)."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^0x[0-9a-fA-F]{64}$", var.admin_private_key))
+    error_message = "admin_private_key must be 0x followed by exactly 64 hexadecimal characters."
+  }
+}
+
 variable "gitlab_project_path" {
   description = "Exact GitLab project path, for example group/project"
   type        = string
