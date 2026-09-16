@@ -1,0 +1,202 @@
+###############################################################################
+# 아티스트 목록 조회 - 성공 케이스
+#
+# 실행 순서: artist-success.http -> artist-fail.http
+#
+# 공연·좌석과 달리 -common.http 가 없다. 아티스트는 등록 API 가 없어서 선행 데이터를
+# 만들 요청 자체가 없고, 대신 기동 시 db/seed-local.sql 이 4명을 채워 둔다.
+#   artist_id 1(김필) / 2(이승기) / 3(로이킴) / 4(Bruno Mars)
+# ddl-auto 가 create-drop 이라 기동마다 스키마가 새로 생기고 시드도 다시 실행되므로,
+# 이 파일은 몇 번이든 다시 돌려도 된다. (application-local.yml 의 spring.sql.init 설정,
+# 자세한 내용은 backend/docs/BE_HTTP_CLIENT_TROUBLESHOOTING.md 3장)
+#
+# 환경 변수는 프로젝트 루트의 http-client.env.json 에 있는 local 을 쓴다.
+# 실행 전에 우측 상단 드롭다운에서 local 을 선택해야 {{baseUrl}} 이 치환된다.
+#
+# [주의] 시드 아티스트가 4명뿐이라는 전제로 개수를 단정하지 않는다. 아티스트 등록 API 가
+#   생기면 그 순간 깨지기 때문이다. 개수 대신 "시드 4명이 들어 있는가" 와 "정렬·필터 규약이
+#   지켜지는가" 를 본다.
+###############################################################################
+
+### 헬스 체크 - 애플리케이션이 떠 있는지 먼저 확인한다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "UP", "health: " + response.body.status);
+    });
+%}
+
+### 아티스트 목록을 조회한다 - 조건을 주지 않으면 이름순 첫 페이지
+GET {{baseUrl}}/api/v1/artists
+
+> {%
+    client.test("200 과 페이지 정보가 함께 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.number === 0, "number: " + response.body.page.number);
+        client.assert(response.body.page.size === 20, "size: " + response.body.page.size);
+        client.assert(response.body.page.totalElements >= 4,
+            "totalElements: " + response.body.page.totalElements);
+    });
+
+    client.test("Page 를 그대로 직렬화할 때 새어 나오는 내부 필드가 없다", function () {
+        client.assert(response.body.pageable === undefined, "pageable 이 노출됐다");
+        client.assert(response.body.sort === undefined, "sort 가 노출됐다");
+        client.assert(response.body.first === undefined, "first 는 PagedModel 에 없다");
+        client.assert(response.body.last === undefined, "last 는 PagedModel 에 없다");
+    });
+
+    client.test("시드 아티스트 4명이 모두 들어 있다", function () {
+        const names = response.body.content.map(a => a.name);
+        ["김필", "이승기", "로이킴", "Bruno Mars"].forEach(function (name) {
+            client.assert(names.indexOf(name) !== -1, name + " 이 목록에 없다: " + names);
+        });
+    });
+
+    // 한글과 라틴 문자의 선후는 DB 콜레이션이 정하므로 "Bruno Mars 가 몇 번째냐" 는 단정하지 않는다.
+    // 확인해야 할 규약은 같은 문자 집합 안에서 가나다순이 지켜지는가다.
+    client.test("한글 이름은 가나다순으로 내려온다", function () {
+        const names = response.body.content.map(a => a.name);
+        client.assert(names.indexOf("김필") < names.indexOf("로이킴"),
+            "김필 이 로이킴 보다 뒤에 있다: " + names);
+        client.assert(names.indexOf("로이킴") < names.indexOf("이승기"),
+            "로이킴 이 이승기 보다 뒤에 있다: " + names);
+    });
+
+    client.test("카드에 필요한 필드만 채워져 있다", function () {
+        const item = response.body.content[0];
+        client.assert(item.id !== undefined, "id 가 없다");
+        client.assert(item.name !== undefined, "name 이 없다");
+        // 아티스트 프로필은 아직 ImageStorage 를 태우지 않아 저장된 값 그대로 나간다.
+        client.assert(item.profileImage !== undefined, "profileImage 가 없다");
+        // 출연 공연은 컬렉션이라 목록에 담지 않는다.
+        client.assert(item.concerts === undefined, "concerts 가 목록에 들어 있다");
+    });
+%}
+
+### 페이지 크기를 지정한다
+GET {{baseUrl}}/api/v1/artists?page=0&size=2
+
+> {%
+    client.test("요청한 크기만큼만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length === 2,
+            "content: " + response.body.content.length);
+        client.assert(response.body.page.size === 2, "size: " + response.body.page.size);
+        client.assert(response.body.page.totalPages >= 2,
+            "totalPages: " + response.body.page.totalPages);
+    });
+
+    // 다음 요청에서 페이지 경계를 비교하려고 남겨 둔다.
+    client.global.set("firstPageIds", response.body.content.map(a => a.id).join(","));
+%}
+
+### 다음 페이지로 넘어가도 같은 아티스트가 다시 나오지 않는다
+#
+# 동명이인이 있으면 이름만으로는 순서가 정해지지 않는다. 그래서 마지막에 id 내림차순이
+# 붙어 있고, 페이지 경계에서 중복·누락이 없는지가 그 규약이 실제로 걸려 있다는 증거다.
+# 바로 앞 요청이 첫 페이지의 id 를 {{firstPageIds}} 에 담아 둔다.
+GET {{baseUrl}}/api/v1/artists?page=1&size=2
+
+> {%
+    client.test("두 번째 페이지가 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.number === 1, "number: " + response.body.page.number);
+        client.assert(response.body.content.length > 0, "두 번째 페이지가 비어 있다");
+    });
+
+    client.test("첫 페이지에 나왔던 아티스트가 다시 나오지 않는다", function () {
+        const firstPageIds = client.global.get("firstPageIds").split(",");
+        response.body.content.forEach(function (artist) {
+            client.assert(firstPageIds.indexOf(String(artist.id)) === -1,
+                "id " + artist.id + " 가 두 페이지에 모두 있다 (1페이지: " + firstPageIds + ")");
+        });
+    });
+%}
+
+### 최근 등록순으로 정렬한다
+#
+# 특정 아티스트를 1위로 지목하지 않는다. 시드 4명은 한 문장에서 NOW(6) 으로 들어가
+# created_at 이 같으므로, 실제로 순서를 정하는 것은 뒤에 붙는 id 내림차순이다.
+# 아티스트 등록 API 가 생기면 created_at 이 갈리면서 이 단정이 느슨해지는데,
+# 그때는 등록 응답의 id 를 받아 맨 앞인지 보는 방식으로 바꾼다.
+GET {{baseUrl}}/api/v1/artists?sort=LATEST
+
+> {%
+    client.test("등록 시각이 같은 시드는 id 내림차순으로 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+
+        const ids = response.body.content.map(a => a.id);
+        for (let i = 1; i < ids.length; i++) {
+            client.assert(ids[i - 1] > ids[i], "id 내림차순이 아니다: " + ids);
+        }
+    });
+%}
+
+### 아티스트명으로 검색한다 - 부분 일치
+#
+# 검색어를 "이" 로 잡은 이유: 시드에서 이승기는 맨 앞에, 로이킴은 이름 가운데에 걸린다.
+# 앞부분만 맞는 검색이 아니라는 것을 한 요청으로 보여 준다.
+GET {{baseUrl}}/api/v1/artists?keyword=이
+
+> {%
+    client.test("이름에 검색어가 들어간 아티스트만 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.totalElements === 2,
+            "totalElements: " + response.body.page.totalElements);
+
+        response.body.content.forEach(function (artist) {
+            client.assert(artist.name.indexOf("이") !== -1, "걸러지지 않았다: " + artist.name);
+        });
+    });
+
+    client.test("이름 맨 앞이 아니라 가운데에 들어가도 걸린다", function () {
+        const names = response.body.content.map(a => a.name);
+        client.assert(names.indexOf("이승기") !== -1, "이승기 가 없다: " + names);
+        client.assert(names.indexOf("로이킴") !== -1, "로이킴 이 없다: " + names);
+    });
+%}
+
+### 검색어가 공백뿐이면 조건이 없는 것으로 본다
+#
+# like '%%' 는 전체 조회와 결과가 같으면서 인덱스만 못 탄다. 공백은 조건에서 뺀다.
+GET {{baseUrl}}/api/v1/artists?keyword=%20%20%20
+
+> {%
+    client.test("전체 목록과 같은 개수가 내려온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.totalElements >= 4,
+            "totalElements: " + response.body.page.totalElements);
+    });
+%}
+
+### 조건에 맞는 아티스트가 없어도 200 과 빈 목록을 준다
+GET {{baseUrl}}/api/v1/artists?keyword=존재하지않는아티스트명
+
+> {%
+    client.test("빈 목록도 404 가 아니라 200 이다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length === 0,
+            "content: " + response.body.content.length);
+        client.assert(response.body.page.totalElements === 0,
+            "totalElements: " + response.body.page.totalElements);
+        client.assert(response.body.page.totalPages === 0,
+            "totalPages: " + response.body.page.totalPages);
+    });
+%}
+
+### Authorization 헤더 없이도 200
+#
+# [주의] 이 요청은 인가 규칙을 검증하지 못한다. local 프로필에서는 DevSecurityConfig 가
+#   anyRequest().permitAll() 로 전부 열어 두기 때문에(SecurityConfig 는 @Profile("!local")),
+#   여기서 200 이 나오는 것은 "토큰 없이 닿는다" 는 사실 이상을 말해 주지 않는다.
+#   GET /api/v1/artists 를 공개로 두는 실제 규칙은 SecurityConfig 에 있고, 그 검증은
+#   필터 체인을 실제로 태우는 테스트(securitytest 프로필)의 몫이다.
+GET {{baseUrl}}/api/v1/artists
+
+> {%
+    client.test("토큰 없이도 엔드포인트에 닿는다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}
