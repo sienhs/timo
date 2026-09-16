@@ -4,9 +4,7 @@ import '../models/wallet_transaction.dart';
 
 /// 마이페이지 목업. 시안에 그려진 값 그대로다.
 ///
-/// 지갑 API 가 서버에 아직 없어 `HttpMyPageApi` 도 지갑은 이걸 돌려준다.
-/// API 가 생기면 그쪽 본문을 바꾸고 [wallet] 을 지운다. [profile] 은 화면
-/// 테스트용이다 — 실제 앱은 `/members/me` 로 받는다.
+/// 화면 테스트용이다 — 실제 앱은 `/members/me` 와 `/members/wallet` 으로 받는다.
 class MockMyPageData {
   MockMyPageData._();
 

@@ -6,14 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/features/mypage/constants.dart';
 import 'package:timo/features/mypage/data/http_my_page_api.dart';
-import 'package:timo/features/mypage/data/mock_my_page_data.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
 /// 실제 서버 구현이 백엔드 규약대로 요청하고 응답을 읽는지, 가짜 서버로 검사한다.
 ///
-/// 주소·응답 키는 백엔드 `MemberController` · `MemberMeResponseDto` 에서 그대로
-/// 가져왔다. 백엔드가 바뀌면 이 테스트를 같이 고쳐야 한다.
+/// 주소·응답 키는 백엔드 회원 API 명세(`/members/me`, `/members/wallet`)에서
+/// 그대로 가져왔다. 백엔드가 바뀌면 이 테스트를 같이 고쳐야 한다.
 void main() {
   late FakeHttpAdapter adapter;
 
@@ -104,14 +103,70 @@ void main() {
   });
 
   group('지갑', () {
-    test('아직 서버 API 가 없어 요청을 보내지 않고 목업을 돌려준다', () async {
-      final api = build((_) => fail('요청이 나가면 안 된다'));
+    /// 지갑 응답 모양. 조회와 충전이 같은 형식을 돌려준다.
+    Map<String, Object?> wallet({int balance = 1000000}) => {
+      'balance': balance,
+      'transactions': [
+        {
+          'title': '버섯 충전',
+          'amount': 1000000,
+          'balanceAfter': 1000000,
+          'occurredAt': '2026-09-16T13:50:01.123456',
+          'source': 'PG 모의 결제',
+        },
+      ],
+    };
 
-      final wallet = await api.fetchWallet();
+    test('/members/wallet 을 GET 으로 요청하고 잔액·내역을 읽는다', () async {
+      final api = build((_) => jsonResponse(wallet()));
 
-      expect(adapter.requests, isEmpty);
-      expect(wallet.balance, MockMyPageData.wallet.balance);
-      expect(wallet.transactions, MockMyPageData.wallet.transactions);
+      final summary = await api.fetchWallet();
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, HttpMyPageApi.walletPath);
+      expect(request.rawBody, isNull);
+      expect(summary.balance, 1000000);
+
+      final transaction = summary.transactions.single;
+      expect(transaction.title, '버섯 충전');
+      expect(transaction.amount, 1000000);
+      expect(transaction.balanceAfter, 1000000);
+      expect(transaction.occurredAt, DateTime(2026, 9, 16, 13, 50, 1, 123, 456));
+      expect(transaction.source, 'PG 모의 결제');
+      expect(transaction.isCredit, isTrue);
+    });
+
+    test('충전은 금액만 본문에 담아 POST 하고 충전 뒤 지갑을 읽는다', () async {
+      final api = build((_) => jsonResponse(wallet(balance: 1150000)));
+
+      final summary = await api.charge(1000000);
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, HttpMyPageApi.chargePath);
+      // 대상 회원은 토큰이 정하므로 memberId 를 실어 보내지 않는다.
+      expect(request.jsonBody, {'amount': 1000000});
+      expect(summary.balance, 1150000);
+    });
+
+    test('서버가 거절한 금액(400)은 서버 문구를 담은 ApiException 이 된다', () {
+      final api = build(
+        (_) => problemResponse(
+          status: 400,
+          errorMessage: '충전 금액은 0보다 커야 해요.',
+          exception: 'IllegalArgumentException',
+        ),
+      );
+
+      expect(
+        api.charge(0),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 400)
+              .having((e) => e.message, 'message', '충전 금액은 0보다 커야 해요.'),
+        ),
+      );
     });
   });
 }
