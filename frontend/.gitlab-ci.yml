@@ -41,6 +41,11 @@ frontend_build:
   # A cold container has to install Android SDK/NDK/CMake before assembling
   # the release APK; the project-wide 10-minute default terminates Gradle.
   timeout: 30 minutes
+  variables:
+    # Keep the script limit below the job limit and reserve time for artifact
+    # upload/cleanup after the release build.
+    RUNNER_SCRIPT_TIMEOUT: "25m"
+    RUNNER_AFTER_SCRIPT_TIMEOUT: "4m"
 
   before_script:
     # The runner checkout can leave LFS objects as pointer files because this
