@@ -1,0 +1,42 @@
+{
+  "model": "MODNet photographic portrait matting, INT8 weights",
+  "source": {
+    "file": "modnet_photographic_portrait_matting.onnx",
+    "sha256": "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9",
+    "bytes": 25888640,
+    "export": "https://github.com/ZHKKKe/MODNet/tree/master/onnx"
+  },
+  "quantization": {
+    "method": "weight-only INT8, per-channel symmetric, Cast+Mul rebuilt in graph",
+    "op_types": [
+      "Conv",
+      "MatMul"
+    ],
+    "weight_type": "int8",
+    "per_channel": true,
+    "activations": "fp32 (unchanged)",
+    "compute": "fp32 after ONNX Runtime constant folding"
+  },
+  "tool": "tools/quantize_matting.py, onnxruntime 1.23.2",
+  "sha256": "e8c0a9ca88df6724a93ffc160ad53604e85a4bb81b7ba9eefd37e3bca7da9e6d",
+  "bytes": 6656860,
+  "verification": {
+    "images": [
+      "person_a.png",
+      "person_b.png",
+      "pose_test.jpg",
+      "pose_upper.jpg"
+    ],
+    "min_iou_vs_fp32": 0.9789,
+    "max_mae_vs_fp32": 0.0037,
+    "host_median_ms": {
+      "fp32": 360,
+      "int8": 371
+    }
+  },
+  "runtime": "ONNX Runtime >= 1.23.2 CPU execution provider",
+  "input": "input: RGB float32 NCHW, (RGB - 127.5) / 127.5, multiples of 32",
+  "output": "output: float32 [1,1,H,W], alpha in [0,1]",
+  "license": "Apache-2.0",
+  "upstream": "https://github.com/ZHKKKe/MODNet"
+}

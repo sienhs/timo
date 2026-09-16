@@ -62,7 +62,7 @@ frontend_build:
     - |
       for model in \
         frontend/assets/models/depth_anything_v2_vits_int8.onnx \
-        frontend/assets/models/modnet_photographic_portrait_matting.onnx \
+        frontend/assets/models/modnet_photographic_portrait_matting_int8.onnx \
         frontend/android/app/src/main/assets/models/pose_landmarker_lite.task
       do
         ! head -n 1 "$model" | grep -qx 'version https://git-lfs.github.com/spec/v1'

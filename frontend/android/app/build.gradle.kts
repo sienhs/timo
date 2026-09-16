@@ -81,7 +81,7 @@ dependencies {
 // 올리면 같은 파일이 APK 에 두 번 들어간다.
 //
 // 배포에는 INT8 만 싣는다. FP32 원본은 레포에 없고(.gitignore), 양자화 도구
-// (tools/quantize_depth.py)를 돌릴 때만 로컬에 둔다.
+// (tools/quantize_depth.py·tools/quantize_matting.py)를 돌릴 때만 로컬에 둔다.
 val syncDepthModel by tasks.registering(Sync::class) {
     from("../../assets/models") {
         include("depth_anything_v2_vits_int8.onnx", "depth_anything_v2_vits_int8.json", "DEPTH_ANYTHING_LICENSE.txt")
@@ -90,7 +90,7 @@ val syncDepthModel by tasks.registering(Sync::class) {
 }
 val syncMattingModel by tasks.registering(Sync::class) {
     from("../../assets/models") {
-        include("modnet_photographic_portrait_matting.onnx", "modnet_photographic_portrait_matting.json", "MODNET_LICENSE.txt")
+        include("modnet_photographic_portrait_matting_int8.onnx", "modnet_photographic_portrait_matting_int8.json", "MODNET_LICENSE.txt")
     }
     into(layout.buildDirectory.dir("generated/mattingAssets/models"))
 }
