@@ -33,6 +33,10 @@ import 'features/memory/widgets/creation_notification_host.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
 import 'features/mypage/state/my_page_api_scope.dart';
+import 'features/resale/data/http_resale_api.dart';
+import 'features/resale/data/mock_resale_api.dart';
+import 'features/resale/data/resale_api.dart';
+import 'features/resale/state/resale_api_scope.dart';
 import 'features/show/data/http_show_api.dart';
 import 'features/show/data/show_api.dart';
 import 'features/show/state/show_api_scope.dart';
@@ -55,6 +59,7 @@ class App extends StatefulWidget {
     this.showApi,
     this.ticketStore,
     this.memoryConcertApi,
+    this.resaleApi,
   });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
@@ -93,6 +98,9 @@ class App extends StatefulWidget {
   /// 백엔드에 이 주소가 없다([MemoryConcertApi] 주석).
   final MemoryConcertApi? memoryConcertApi;
 
+  /// 양도마켓 화면이 쓰는 API. 안 넘기면 [_resaleApiKind] 가 고른다.
+  final ResaleApi? resaleApi;
+
   @override
   State<App> createState() => _AppState();
 }
@@ -116,6 +124,28 @@ TicketApi _ticketApiFor(String kind) => switch (kind) {
   'mock-empty' => MockTicketApi(scenario: TicketMockScenario.empty),
   'mock-error' => MockTicketApi(scenario: TicketMockScenario.error),
   _ => HttpTicketApi(),
+};
+
+/// 양도마켓 화면이 어느 [ResaleApi] 를 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run                                   # 기본값. 목 데이터
+/// flutter run --dart-define=RESALE_API=http     # 실제 서버(v0 마켓 스텁)
+/// ```
+///
+/// 다른 도메인과 반대로 **목이 기본값이다.** 등록 흐름을 서버만으로 완결할 수
+/// 없기 때문이다 — 등록할 수 있는 티켓 목록을 주는 주소가 없어 예매 목록으로
+/// 대신하는데, 거기서 나오는 번호는 등록이 받는 티켓 번호가 아니다
+/// ([ResaleApi] 주석). 소장품(`MemoryConcertApi`)이 목을 기본값으로 둔 것과
+/// 같은 사정이다.
+const _resaleApiKind = String.fromEnvironment('RESALE_API');
+
+/// 실행 인자에 맞는 구현. 모르는 값이면 목으로 간다.
+ResaleApi _resaleApiFor(String kind) => switch (kind) {
+  'http' => HttpResaleApi(),
+  'mock-empty' => MockResaleApi(scenario: ResaleMockScenario.empty),
+  'mock-error' => MockResaleApi(scenario: ResaleMockScenario.error),
+  _ => MockResaleApi(),
 };
 
 class _AppState extends State<App> {
@@ -206,6 +236,11 @@ class _AppState extends State<App> {
   late final MemoryConcertApi _memoryConcertApi =
       widget.memoryConcertApi ?? MockMemoryConcertApi();
 
+  /// 양도마켓 화면이 쓰는 API. 다른 API 들과 같은 이유로 앱에 하나만 두고
+  /// [ResaleApiScope] 로 내려준다.
+  late final ResaleApi _resaleApi =
+      widget.resaleApi ?? _resaleApiFor(_resaleApiKind);
+
   /// '제작중' job. 제작 화면이 시작하고, 완료 배너가 결과를 받는다. 둘이 서로
   /// 다른 라우트라 라우트보다 위에서 만들어 [CreationJobScope] 로 내려준다.
   /// 예매 컨트롤러를 여기서 만드는 것과 같은 이유다.
@@ -260,30 +295,33 @@ class _AppState extends State<App> {
                         store: _ticketStore,
                         child: MemoryConcertApiScope(
                           api: _memoryConcertApi,
-                          child: CreationJobScope(
-                            job: _creationJob,
-                            child: MaterialApp(
-                              title: 'TIMO',
-                              theme: AppTheme.light,
-                              navigatorKey: _navigatorKey,
-                              // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                              // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                              initialRoute: AppRoutes.home,
-                              routes: AppRoutes.routes,
-                              // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                              // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                              // 라우트가 아니라 앱 전체를 감싼다.
-                              //
-                              // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                              // 애니메이션 채널도 같이 멈춘다.
-                              builder: (context, child) {
-                                AmbientMotion.instance.enabled =
-                                    !Motion.reduced(context);
-                                return CreationNotificationHost(
-                                  navigatorKey: _navigatorKey,
-                                  child: child!,
-                                );
-                              },
+                          child: ResaleApiScope(
+                            api: _resaleApi,
+                            child: CreationJobScope(
+                              job: _creationJob,
+                              child: MaterialApp(
+                                title: 'TIMO',
+                                theme: AppTheme.light,
+                                navigatorKey: _navigatorKey,
+                                // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                                // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                                initialRoute: AppRoutes.home,
+                                routes: AppRoutes.routes,
+                                // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                // 라우트가 아니라 앱 전체를 감싼다.
+                                //
+                                // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                // 애니메이션 채널도 같이 멈춘다.
+                                builder: (context, child) {
+                                  AmbientMotion.instance.enabled =
+                                      !Motion.reduced(context);
+                                  return CreationNotificationHost(
+                                    navigatorKey: _navigatorKey,
+                                    child: child!,
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),

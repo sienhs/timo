@@ -1,0 +1,161 @@
+import 'package:dio/dio.dart';
+
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import '../constants.dart';
+import '../models/listable_ticket.dart';
+import '../models/listing.dart';
+import '../models/listing_detail.dart';
+import '../models/market_concert.dart';
+import '../models/purchased_trade.dart';
+import '../models/trade_status.dart';
+import 'resale_api.dart';
+
+/// 백엔드 양도 마켓 API(`/api/v0/market`)에 실제로 요청하는 [ResaleApi].
+///
+/// v0 은 프론트 연동용 스텁이다. 실제 컨트롤러(v1)는 온체인 연동 방식이 정해지지
+/// 않아 아직 없고, 스텁이 같은 규약([MarketApi])을 그대로 구현한다. 홈이
+/// `/api/v0/concerts` 에 붙어 있는 것과 같은 사정이라, v1 이 열리면 [basePath]
+/// 한 줄만 바뀐다.
+///
+/// **등록 가능한 티켓 목록만 마켓 밖에서 온다.** 그 경로가 없어 예매 목록으로
+/// 대신하는데, 거기서 나오는 번호는 등록이 받는 티켓 번호가 아니다
+/// ([ListableTicket] 주석). 그래서 이 구현으로는 등록이 서버에서 거절된다 —
+/// 앱 기본값이 목인 이유다.
+///
+/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
+/// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
+/// [ApiException] 이 맡는다.
+///
+/// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
+class HttpResaleApi implements ResaleApi {
+  HttpResaleApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
+
+  static const basePath = '/api/v0/market';
+
+  /// 등록 가능한 티켓을 대신 읽는 곳. 내 티켓 화면이 쓰는 주소와 같다.
+  static const reservationsPath = '/api/v1/reservations';
+
+  /// 예매 목록에서 손에 있는 티켓만 고르는 기준. 서버 `ReservationStatus` 값이다.
+  static const paidStatus = 'PAID';
+
+  final Dio _dio;
+
+  @override
+  Future<List<MarketConcert>> fetchConcerts() async {
+    final content = await _content('$basePath/concerts');
+    return content.map(MarketConcert.fromJson).toList();
+  }
+
+  @override
+  Future<List<Listing>> fetchListings(int concertId) async {
+    final content = await _content('$basePath/concerts/$concertId/listings');
+    return content.map(Listing.fromJson).toList();
+  }
+
+  @override
+  Future<ListingDetail> fetchListing(int listingId) async {
+    final response = await _guard(
+      () => _dio.get<dynamic>('$basePath/listings/$listingId'),
+    );
+    return ListingDetail.fromJson(_body(response));
+  }
+
+  @override
+  Future<PurchasedTrade> purchase({
+    required int listingId,
+    required int expectedPrice,
+    required String idempotencyKey,
+  }) async {
+    final response = await _guard(
+      () => _dio.post<dynamic>(
+        '$basePath/listings/$listingId/purchase',
+        data: {'expectedPrice': expectedPrice},
+        options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+      ),
+    );
+    return PurchasedTrade.fromJson(_body(response));
+  }
+
+  /// 내 거래 내역에서 같은 체결 번호를 찾아 상태만 꺼낸다.
+  ///
+  /// 목록 전체를 모델로 옮기지 않는 이유: 이 값을 보는 화면(결제 완료)이
+  /// 필요로 하는 것은 상태 하나뿐이고, 거래 내역 화면은 아직 없다. 그 화면이
+  /// 생기면 목록 모델을 만들고 이 메서드는 그 위에서 상태만 골라낸다.
+  ///
+  /// 목록에 아직 없으면(반영 전) 진행 중으로 본다. 없다는 것은 실패했다는
+  /// 뜻이 아니라 아직 모른다는 뜻이다.
+  @override
+  Future<TradeStatus> fetchTradeStatus(int tradeId) async {
+    final content = await _content('$basePath/listings/me');
+    for (final trade in content) {
+      if ((trade['tradeId'] as num?)?.toInt() == tradeId) {
+        return TradeStatus.fromWire(trade['status']);
+      }
+    }
+    return TradeStatus.pending;
+  }
+
+  @override
+  Future<List<ListableTicket>> fetchListableTickets() async {
+    final content = await _content(reservationsPath);
+    return content
+        .where((json) => json['status'] == paidStatus)
+        .map(ListableTicket.fromReservationJson)
+        .toList();
+  }
+
+  @override
+  Future<ListingDetail> createListing({
+    required int ticketId,
+    required int price,
+  }) async {
+    final response = await _guard(
+      () => _dio.post<dynamic>(
+        '$basePath/listings',
+        data: {'ticketId': ticketId, 'price': price},
+      ),
+    );
+    return ListingDetail.fromJson(_body(response));
+  }
+
+  /// 목록 응답은 Spring 의 `PagedModel` 이라 항목이 `content` 안에 있다.
+  /// 한 번에 다 받으므로([ResaleMetrics.pageSize]) `page` 정보는 읽지 않는다.
+  Future<List<Map<String, dynamic>>> _content(String path) async {
+    final response = await _guard(
+      () => _dio.get<dynamic>(
+        path,
+        queryParameters: {'size': ResaleMetrics.pageSize},
+      ),
+    );
+    final content = _body(response)['content'];
+    if (content is! List) throw _unreadable(response);
+    return content.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
+  ///
+  /// `HttpAuthApi` · `HttpHomeApi` · `HttpTicketApi` 와 같은 코드다. 네 곳이
+  /// 같은 것을 들고 있으니 `core/network` 로 올릴 때가 됐다 — 이 작업(화면
+  /// 구현)에서 네 도메인의 API 구현을 함께 건드리지 않으려고 미뤄 둔다.
+  Future<T> _guard<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on DioException catch (e) {
+      throw ApiException.from(e);
+    }
+  }
+
+  /// 성공 응답 본문. JSON 객체가 아니면(프록시가 HTML 을 준 경우 등) 화면용
+  /// 예외로 바꿔서, 화면이 형 변환 오류 대신 안내 문구를 받게 한다.
+  Map<String, dynamic> _body(Response<dynamic> response) {
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    throw _unreadable(response);
+  }
+
+  ApiException _unreadable(Response<dynamic> response) => ApiException(
+    ResaleStrings.unreadableResponse,
+    status: response.statusCode,
+  );
+}

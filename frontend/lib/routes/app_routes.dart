@@ -22,6 +22,13 @@ import '../features/ticket/screens/my_tickets_screen.dart';
 import '../features/show/screens/show_detail_screen.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
+import '../features/resale/models/market_concert.dart';
+import '../features/resale/models/purchased_trade.dart';
+import '../features/resale/screens/listing_purchase_complete_screen.dart';
+import '../features/resale/screens/listing_purchase_screen.dart';
+import '../features/resale/screens/listing_register_screen.dart';
+import '../features/resale/screens/market_concerts_screen.dart';
+import '../features/resale/screens/market_listings_screen.dart';
 
 /// 화면 라우트 등록부.
 /// 새 화면을 만들면 1) 이름 상수 추가, 2) routes 맵에 builder 등록.
@@ -59,6 +66,23 @@ class AppRoutes {
 
   static const payment = '/payment';
   static const paymentComplete = '/payment/complete';
+
+  /// 양도마켓. 빠른 메뉴에서 들어온다. 마켓이 닫혀 있으면 같은 라우트가
+  /// 다음 오픈까지 남은 시간을 보여 준다 — 닫힘은 다른 화면이 아니라 이
+  /// 화면의 한 상태다.
+  static const resaleMarket = '/resale';
+
+  /// 공연 하나의 매물 목록. 고른 공연([MarketConcert])을 arguments 로 받는다.
+  static const resaleListings = '/resale/listings';
+
+  /// 양도 티켓 구매 확인. 매물 번호를 arguments 로 받는다.
+  static const resalePurchase = '/resale/purchase';
+
+  /// 양도 결제 완료. 체결 결과와 포스터([PurchaseResult])를 arguments 로 받는다.
+  static const resalePurchaseComplete = '/resale/purchase/complete';
+
+  /// 양도 등록. 등록에 성공하면 결과로 true 를 넘기며 이전 화면으로 돌아간다.
+  static const resaleRegister = '/resale/register';
 
   /// 로그인. 성공하면 결과로 true 를 넘기며 이전 화면으로 돌아간다.
   static const login = '/login';
@@ -113,6 +137,19 @@ class AppRoutes {
     ),
     paymentComplete: (context) =>
         PaymentCompleteScreen(order: ticketOrderOrSample(context)),
+    resaleMarket: (_) => const MarketConcertsScreen(),
+    // 매물 목록은 고른 공연을 통째로 받는다. 매물 응답에 공연 정보가 없어
+    // 제목과 회차를 그 값에서 가져온다.
+    resaleListings: (context) => MarketListingsScreen(
+      concert: ModalRoute.of(context)!.settings.arguments! as MarketConcert,
+    ),
+    resalePurchase: (context) => ListingPurchaseScreen(
+      listingId: ModalRoute.of(context)!.settings.arguments! as int,
+    ),
+    resalePurchaseComplete: (context) => ListingPurchaseCompleteScreen(
+      result: ModalRoute.of(context)!.settings.arguments! as PurchaseResult,
+    ),
+    resaleRegister: (_) => const ListingRegisterScreen(),
     login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
     signupUsername: (context) =>
