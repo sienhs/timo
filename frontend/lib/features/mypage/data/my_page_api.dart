@@ -15,4 +15,13 @@ abstract class MyPageApi {
 
   /// 잔액과 최근 거래 내역.
   Future<WalletSummary> fetchWallet();
+
+  /// [amount] MSR 을 충전하고 충전 뒤의 지갑을 돌려준다.
+  ///
+  /// 응답으로 새 지갑을 받으므로 충전 화면은 곧바로 새 잔액을 그릴 수 있고,
+  /// 부른 쪽이 [fetchWallet] 을 한 번 더 부를 필요가 없다.
+  ///
+  /// 금액이 얼마까지 되는지는 화면(`ChargeAmount`)이 먼저 거른다. 서버가 그
+  /// 한도를 되돌려주면 `ApiException` 으로 온다.
+  Future<WalletSummary> charge(int amount);
 }

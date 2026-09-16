@@ -12,13 +12,15 @@ class MushroomBalanceCard extends StatelessWidget {
   const MushroomBalanceCard({
     super.key,
     required this.balance,
-    required this.onChargePressed,
+    this.onChargePressed,
   });
 
   /// 사용 가능 잔액(MSR).
   final int balance;
 
-  final VoidCallback onChargePressed;
+  /// 충전하기 버튼. null 이면 버튼 없이 잔액만 그린다 — 충전 화면은 이미
+  /// 충전하러 들어온 자리라 카드 안에 또 입구를 둘 이유가 없다(시안도 없다).
+  final VoidCallback? onChargePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -69,25 +71,27 @@ class MushroomBalanceCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: MyPageMetrics.chargeButtonTopGap),
-          SizedBox(
-            width: double.infinity,
-            height: MyPageMetrics.chargeButtonHeight,
-            child: FilledButton(
-              onPressed: onChargePressed,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                textStyle: textTheme.labelLarge,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    MyPageMetrics.chargeButtonRadius,
+          if (onChargePressed != null) ...[
+            const SizedBox(height: MyPageMetrics.chargeButtonTopGap),
+            SizedBox(
+              width: double.infinity,
+              height: MyPageMetrics.chargeButtonHeight,
+              child: FilledButton(
+                onPressed: onChargePressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  textStyle: textTheme.labelLarge,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      MyPageMetrics.chargeButtonRadius,
+                    ),
                   ),
                 ),
+                child: const Text(MyPageStrings.charge),
               ),
-              child: const Text(MyPageStrings.charge),
             ),
-          ),
+          ],
         ],
       ),
     );

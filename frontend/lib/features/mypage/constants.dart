@@ -54,6 +54,47 @@ class MyPageMetrics {
   /// 로그아웃 버튼과 위 카드 사이 간격.
   static const logoutTopGap = 28.0;
 
+  // 버섯 충전 화면
+  /// 상단 바 아래 첫 카드까지의 여백. 마이페이지 인사말 자리와 같은 값이다.
+  static const chargeTopGap = 20.0;
+
+  /// 금액 칸 격자. 시안이 2열 × 3행이다.
+  static const presetColumns = 2;
+  static const presetGap = 12.0;
+  static const presetHeight = 48.0;
+  static const presetRadius = 8.0;
+
+  /// 선택된 칸의 체크와 금액 사이 간격. 둘은 한 덩어리로 가운데 정렬되므로,
+  /// 고르면 금액이 이 간격과 체크 폭의 절반만큼 왼쪽으로 밀린다.
+  static const presetCheckSize = 18.0;
+  static const presetCheckGap = 6.0;
+
+  /// 칸 안쪽 좌우 여백. 체크가 테두리에 붙지 않게 띄운다.
+  static const presetHorizontalPadding = 12.0;
+
+  /// 고를 때 테두리·배경이 바뀌고 체크가 자리를 넓히며 나타나는 시간.
+  /// 더 길면 다음 칸을 고를 때 앞 칸이 아직 접히는 중이라 굼떠 보인다.
+  static const presetSelectTransition = Duration(milliseconds: 180);
+
+  /// 카드 제목 → 안내 한 줄 → 금액 격자 순서의 간격.
+  static const chargeGuideTopGap = 6.0;
+  static const presetGridTopGap = 14.0;
+
+  /// 금액 격자 → '직접 입력' 라벨 → 입력칸.
+  static const directInputTopGap = 16.0;
+  static const directInputLabelGap = 8.0;
+
+  /// 입력칸 안 `MSR` 앞의 세로 구분선.
+  static const unitDividerHeight = 16.0;
+  static const unitDividerGap = 10.0;
+
+  /// 입력칸 → 구분선 → 요약 두 줄.
+  static const chargeSummaryTopGap = 16.0;
+  static const chargeSummaryRowGap = 10.0;
+
+  /// 하단 고정 버튼 둘레 여백.
+  static const chargeSubmitPadding = 16.0;
+
   /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태가 보인다.
   static const mockLatency = Duration(milliseconds: 600);
 }
@@ -79,6 +120,39 @@ class MyPageStrings {
   static const exchangeRate = '1MSR = 1원';
 
   static const charge = '충전하기';
+
+  // 버섯 충전 화면
+  /// 화면 제목·버튼은 시안 문구를 그대로 쓴다. 앱은 코인을 `Mushroom`·`MSR`
+  /// 로, 빠른 메뉴는 `코인 충전` 으로 부르고 있어 한 서비스에 이름이 셋이지만,
+  /// 용어를 하나로 맞추는 일은 화면 하나가 정할 게 아니라 따로 뺐다.
+  static const chargeTitle = '버섯 충전';
+  static const chargeSubmit = '버섯 충전하기';
+
+  static const chargeAmountTitle = '충전할 금액';
+  static const chargeAmountGuide = '추가할 금액을 선택해 주세요.';
+  static const directInput = '직접 입력';
+
+  /// 아무것도 안 친 입력칸에 흐리게 뜨는 글자.
+  static const chargeAmountHint = '0';
+
+  static const chargeAmountLabel = '추가할 금액';
+  static const balanceAfterCharge = '추가 후 잔액';
+
+  /// 금액 + 단위. (예: `10,000 MSR`)
+  static String withUnit(String formatted) => '$formatted $currencyUnit';
+
+  /// 보낼 수 없는 금액일 때 입력칸 아래 문구.
+  static String chargeBelowMin(String formatted) =>
+      '최소 ${withUnit(formatted)} 부터 충전할 수 있어요.';
+  static String chargeAboveMax(String formatted) =>
+      '한 번에 최대 ${withUnit(formatted)} 까지 충전할 수 있어요.';
+
+  /// 충전에 성공했을 때. 돌아가는 화면에서 뜬다.
+  static String chargeSucceeded(String formatted) =>
+      '${withUnit(formatted)} 을 충전했어요.';
+
+  /// 로그인 안 한 채로 충전 화면에 들어왔을 때.
+  static const chargeLoginPrompt = '로그인하고 버섯을 충전해 보세요.';
 
   static const historyTitle = '사용 내역';
   static const seeAllHistory = '전체 내역 보기';

@@ -5,7 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/member_profile.dart';
 import '../models/wallet_summary.dart';
-import 'mock_my_page_data.dart';
+import 'mock_wallet_ledger.dart';
 import 'my_page_api.dart';
 
 /// 백엔드 회원 API(`/api/v1/members`)에 실제로 요청하는 [MyPageApi].
@@ -22,6 +22,10 @@ class HttpMyPageApi implements MyPageApi {
 
   final Dio _dio;
 
+  /// 지갑 API 가 생기기 전까지 잔액·충전을 대신 맡는 메모리 원장. 서버가
+  /// 생기면 이 필드와 아래 두 메서드의 목 본문을 함께 지운다.
+  final _ledger = MockWalletLedger();
+
   /// 응답에 실명·전화번호가 들어 있다. 여기서는 화면에 필요한 것만 모델에
   /// 담고 나머지는 바로 버린다 — 찍어 두거나 들고 다니지 않는다.
   @override
@@ -31,10 +35,17 @@ class HttpMyPageApi implements MyPageApi {
   }
 
   /// 지갑(잔액·거래 내역) API 는 백엔드에 아직 없다. 그때까지 목업을
-  /// 돌려준다. API 가 생기면 이 본문만 `GET` 으로 바꾸고 [MockMyPageData.wallet]
-  /// 을 지운다 — 시그니처가 같으니 화면과 [MyPageApi] 는 손대지 않는다.
+  /// 돌려준다. API 가 생기면 이 본문만 `GET` 으로 바꾸고 [MockWalletLedger] 를
+  /// 지운다 — 시그니처가 같으니 화면과 [MyPageApi] 는 손대지 않는다.
   @override
-  Future<WalletSummary> fetchWallet() => Future.value(MockMyPageData.wallet);
+  Future<WalletSummary> fetchWallet() => Future.value(_ledger.wallet);
+
+  /// 충전 API 도 아직 없다(요구사항 #21 은 PG 모의 연동이다). 원장에 쌓아 두면
+  /// 앱을 켜 둔 동안은 마이페이지 잔액과 사용 내역에 충전이 반영된다.
+  /// API 가 생기면 이 본문만 `POST` 로 바꾼다.
+  @override
+  Future<WalletSummary> charge(int amount) =>
+      Future.value(_ledger.charge(amount));
 
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
   Future<T> _guard<T>(Future<T> Function() request) async {
