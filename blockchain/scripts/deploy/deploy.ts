@@ -63,10 +63,21 @@ export async function deployContracts(
     await (await ticketNFT.grantRole(await ticketNFT.MARKETPLACE_ROLE(), marketplaceAddress)).wait();
     await (await ticketVault.grantRole(await ticketVault.MARKETPLACE_ROLE(), marketplaceAddress)).wait();
     console.log("Granted MARKETPLACE_ROLE to Marketplace on TicketNFT + TicketVault");
+
+    // The backend signs every routine call (registerShow/mintTicket/chargeForBooking/deposit/
+    // refund/revoke) as this same admin address. DEFAULT_ADMIN_ROLE (set on admin by each
+    // contract's constructor) only lets it manage other roles - it doesn't satisfy onlyRole
+    // checks for ORGANIZER_ROLE/OPERATOR_ROLE, so those have to be granted explicitly too.
+    await (await showRegistry.grantRole(await showRegistry.ORGANIZER_ROLE(), admin)).wait();
+    await (await showRegistry.grantRole(await showRegistry.OPERATOR_ROLE(), admin)).wait();
+    await (await ticketNFT.grantRole(await ticketNFT.ORGANIZER_ROLE(), admin)).wait();
+    await (await ticketNFT.grantRole(await ticketNFT.OPERATOR_ROLE(), admin)).wait();
+    await (await ticketVault.grantRole(await ticketVault.OPERATOR_ROLE(), admin)).wait();
+    console.log("Granted ORGANIZER_ROLE/OPERATOR_ROLE to admin on ShowRegistry, TicketNFT, TicketVault");
   } else {
     console.log(
       `admin (${admin}) is not the deploying account - grant MARKETPLACE_ROLE to ${await marketplace.getAddress()} ` +
-        "on TicketNFT and TicketVault manually before Marketplace.buy will work"
+        "on TicketNFT and TicketVault, and ORGANIZER_ROLE/OPERATOR_ROLE to admin, manually before the backend will work"
     );
   }
 
