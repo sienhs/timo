@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:timo/core/utils/formatters.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/resale/data/mock_resale_api.dart';
+import 'package:timo/features/resale/data/resale_api.dart';
+import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
+import 'package:timo/features/ticket/widgets/listing_card.dart';
 import 'package:timo/features/ticket/widgets/past_ticket_card.dart';
 import 'package:timo/features/ticket/widgets/ticket_list_skeleton.dart';
 import 'package:timo/features/ticket/widgets/ticket_tab_bar.dart';
@@ -31,10 +36,15 @@ void main() {
   ///
   /// 화면이 로그인 세션을 보고 목록을 부르므로 기본은 로그인 상태다. 충전 화면
   /// 테스트와 같은 방식으로 세션을 만든다.
+  ///
+  /// 양도 목록 탭은 마켓 목을 본다. 시안 데이터는 판매중인 내 매물 하나와 팔린
+  /// 내 매물 하나다. 예매 목과 시나리오를 따로 받아, 한쪽만 실패하는 경우를 본다.
   Future<void> pumpScreen(
     WidgetTester tester, {
     TicketApi? api,
     TicketMockScenario scenario = TicketMockScenario.design,
+    ResaleApi? resaleApi,
+    ResaleMockScenario resaleScenario = ResaleMockScenario.design,
     bool loggedIn = true,
   }) async {
     final session = AuthSession(storage: InMemoryTokenStorage());
@@ -51,7 +61,16 @@ void main() {
                 scenario: scenario,
                 clock: now,
               ),
-          child: MaterialApp(home: MyTicketsScreen(clock: now)),
+          child: ResaleApiScope(
+            api:
+                resaleApi ??
+                MockResaleApi(
+                  latency: Duration.zero,
+                  scenario: resaleScenario,
+                  clock: now,
+                ),
+            child: MaterialApp(home: MyTicketsScreen(clock: now)),
+          ),
         ),
       ),
     );
@@ -107,20 +126,87 @@ void main() {
       expect(find.byType(UpcomingTicketCard), findsNothing);
       expect(find.text('2025 블랙핑크'), findsOneWidget);
     });
+  });
 
-    // 양도 탭은 자리만 있다. 양도마켓 작업이 붙기 전까지 빈 안내만 보이고,
-    // 세어 본 데이터가 없으니 이름 옆에 숫자도 붙지 않는다.
-    testWidgets('양도 목록 탭은 숫자 없이 빈 안내만 보인다', (tester) async {
+  group('양도 목록 탭', () {
+    /// 양도 목록 탭으로 간다. 이름 옆 숫자가 시나리오마다 달라 이름으로 찾는다.
+    Future<void> openListings(WidgetTester tester) async {
+      await tester.tap(find.textContaining(TicketStrings.tabListings));
+      await tester.pumpAndSettle();
+    }
+
+    // 마켓 목의 시안 데이터는 판매중인 내 매물 하나와 팔린 내 매물 하나다.
+    testWidgets('판매중인 매물 수만 붙고, 팔린 매물도 카드로 남는다', (tester) async {
       await pumpScreen(tester);
       await tester.pumpAndSettle();
 
-      expect(find.text(TicketStrings.tabListings), findsOneWidget);
-      await tester.tap(find.text(TicketStrings.tabListings));
-      await tester.pumpAndSettle();
+      expect(find.text('${TicketStrings.tabListings} 1'), findsOneWidget);
+      await openListings(tester);
 
-      expect(find.text(TicketStrings.emptyListings), findsOneWidget);
+      expect(find.byType(ListingCard), findsNWidgets(2));
+      expect(find.text(TicketStrings.listingBadge), findsOneWidget);
+      expect(find.text(TicketStrings.soldBadge), findsOneWidget);
+      expect(find.text(TicketStrings.soldNotice), findsOneWidget);
+      // 버튼은 판매중 카드에만 있다.
+      expect(find.text(TicketStrings.editPrice), findsOneWidget);
+      expect(find.text(TicketStrings.delist), findsOneWidget);
       expect(find.byType(UpcomingTicketCard), findsNothing);
       expect(find.byType(PastTicketCard), findsNothing);
+    });
+
+    testWidgets('등록가는 코인 단위로, 하루 넘게 남은 마감은 일시로 찍힌다', (tester) async {
+      await pumpScreen(tester);
+      await tester.pumpAndSettle();
+      await openListings(tester);
+
+      expect(
+        find.text(TicketStrings.listedPrice(formatMsr(132000))),
+        findsOneWidget,
+      );
+      // 목의 판매중 매물은 96일 뒤 공연이다.
+      expect(
+        find.text(TicketStrings.deadlineAt('2026.12.20 14:00')),
+        findsOneWidget,
+      );
+    });
+
+    // 가격 수정 API 가 아직 없다. 버튼은 시안대로 두되 누르면 안내만 띄운다.
+    testWidgets('가격 수정을 누르면 준비 중 안내가 뜬다', (tester) async {
+      await pumpScreen(tester);
+      await tester.pumpAndSettle();
+      await openListings(tester);
+
+      await tester.tap(find.text(TicketStrings.editPrice));
+      await tester.pump();
+
+      expect(
+        find.text(TicketStrings.notReady(TicketStrings.editPrice)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('올린 매물이 없으면 0 과 빈 안내가 나온다', (tester) async {
+      await pumpScreen(tester, resaleScenario: ResaleMockScenario.empty);
+      await tester.pumpAndSettle();
+
+      expect(find.text('${TicketStrings.tabListings} 0'), findsOneWidget);
+      await openListings(tester);
+
+      expect(find.text(TicketStrings.emptyListings), findsOneWidget);
+    });
+
+    // 마켓과 예매는 다른 조회다. 마켓이 안 돼도 내 티켓은 보여야 한다.
+    testWidgets('마켓이 실패해도 예정 공연은 보이고, 양도 탭만 다시 시도를 낸다', (tester) async {
+      await pumpScreen(tester, resaleScenario: ResaleMockScenario.error);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(UpcomingTicketCard), findsNWidgets(2));
+      // 세어 본 게 없으니 숫자가 없다.
+      expect(find.text(TicketStrings.tabListings), findsOneWidget);
+      await openListings(tester);
+
+      expect(find.text('양도마켓을 불러오지 못했어요.'), findsOneWidget);
+      expect(find.text('다시 시도'), findsOneWidget);
     });
   });
 

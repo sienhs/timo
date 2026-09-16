@@ -124,3 +124,7 @@ ResponseBody problemResponse({
     Headers.contentTypeHeader: ['application/problem+json'],
   },
 );
+
+/// 본문 없는 성공 응답(204). 등록 취소처럼 결과가 "됐다" 하나뿐인 요청이 받는다.
+ResponseBody emptyResponse({int status = 204}) =>
+    ResponseBody.fromString('', status);

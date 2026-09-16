@@ -5,13 +5,16 @@ import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/listing_status.dart';
 import '../models/market_concert.dart';
+import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
 import 'resale_api.dart';
 
 /// 가짜 [ResaleApi] 가 무엇을 돌려줄지.
 enum ResaleMockScenario {
-  /// 시안 그대로. 공연 넷 · 매물 여덟 · 등록할 수 있는 내 티켓 둘.
+  /// 시안 그대로. 공연 넷 · 매물 여덟 · 등록할 수 있는 내 티켓 둘. 여기에
+  /// 내 티켓의 양도 목록 탭에서 '판매 완료' 카드를 보려고 팔린 내 매물 하나를
+  /// 더 둔다 — 마켓 화면에는 나오지 않는다.
   design,
 
   /// 공연 목록도 내 티켓도 비어 있다. 빈 화면 문구를 볼 때.
@@ -136,7 +139,11 @@ class MockResaleApi implements ResaleApi {
     listing.closedAt = now;
 
     final concert = _concertOf(listing.concertId);
-    final trade = _MockTrade(id: _nextTradeId++, tradedAt: now);
+    final trade = _MockTrade(
+      id: _nextTradeId++,
+      listingId: listing.listingId,
+      tradedAt: now,
+    );
     _trades[trade.id] = trade;
 
     return PurchasedTrade(
@@ -154,17 +161,19 @@ class MockResaleApi implements ResaleApi {
     );
   }
 
-  /// 체결한 지 [confirmAfter] 가 지났으면 끝난 것으로 본다. 실제 서버에서
-  /// 온체인 전송이 끝나는 것을 시간으로 흉내 낸 것이다.
   @override
   Future<TradeStatus> fetchTradeStatus(int tradeId) async {
     await _respond();
     final trade = _trades[tradeId];
-    if (trade == null) return TradeStatus.pending;
-    return clock().difference(trade.tradedAt) >= confirmAfter
-        ? TradeStatus.confirmed
-        : TradeStatus.pending;
+    return trade == null ? TradeStatus.pending : _tradeStatusOf(trade);
   }
+
+  /// 체결한 지 [confirmAfter] 가 지났으면 끝난 것으로 본다. 실제 서버에서
+  /// 온체인 전송이 끝나는 것을 시간으로 흉내 낸 것이다.
+  TradeStatus _tradeStatusOf(_MockTrade trade) =>
+      clock().difference(trade.tradedAt) >= confirmAfter
+      ? TradeStatus.confirmed
+      : TradeStatus.pending;
 
   @override
   Future<List<ListableTicket>> fetchListableTickets() async {
@@ -204,10 +213,66 @@ class MockResaleApi implements ResaleApi {
       faceValue: ticket.facePrice,
       mine: true,
       listedAt: clock(),
+      ticket: ticket,
     );
     (_listings ??= _initialListings()).add(listing);
 
     return listing.toDetail(concert);
+  }
+
+  /// 내가 올린 매물 전부(팔린 것·내린 것 포함)와 내가 산 체결을 한 목록으로.
+  /// 최근 것부터다 — 화면이 위에서부터 읽는 순서다.
+  @override
+  Future<List<MyTrade>> fetchMyTrades() async {
+    await _respond();
+    if (scenario == ResaleMockScenario.empty) return const [];
+
+    final trades = [
+      for (final listing in _listings ??= _initialListings())
+        if (listing.mine)
+          listing.toMyTrade(
+            _concertOf(listing.concertId),
+            type: MyTradeType.sale,
+            status: MyTradeStatus.fromWire(listing.status.wireName),
+            occurredAt: listing.listedAt,
+          ),
+      for (final trade in _trades.values) _purchaseOf(trade),
+    ];
+    trades.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    return trades;
+  }
+
+  /// 내가 산 체결 하나를 내 거래 내역 항목으로. 공연·좌석·가격은 산 매물의 것,
+  /// 상태는 체결 시각으로 만든다([_tradeStatusOf]).
+  MyTrade _purchaseOf(_MockTrade trade) {
+    final listing = _find(trade.listingId);
+    return listing.toMyTrade(
+      _concertOf(listing.concertId),
+      type: MyTradeType.purchase,
+      status: MyTradeStatus.fromWire(_tradeStatusOf(trade).wireName),
+      occurredAt: trade.tradedAt,
+      tradeId: trade.id,
+    );
+  }
+
+  @override
+  Future<void> cancelListing(int listingId) async {
+    await _respond();
+    final listing = _find(listingId);
+    // 서버와 같은 판정이다. 남의 매물은 403, 이미 닫힌 매물은 409.
+    if (!listing.mine) {
+      throw const ApiException('내가 등록한 매물이 아니에요.', status: 403);
+    }
+    if (listing.status != ListingStatus.listed) {
+      throw const ApiException('이미 팔렸거나 내려간 매물이에요.', status: 409);
+    }
+
+    listing.status = ListingStatus.canceled;
+    listing.closedAt = clock();
+    // 내리면 티켓은 다시 내 손으로 돌아온다. 등록 화면 목록에 다시 나와야
+    // 재등록이 된다 — 등록할 때 뺐던 것을 되돌리는 것이다.
+    final ticket = listing.ticket;
+    if (ticket != null) (_tickets ??= _initialTickets()).add(ticket);
   }
 
   Iterable<_MockListing> get _openListings => (_listings ??= _initialListings())
@@ -372,6 +437,20 @@ class MockResaleApi implements ResaleApi {
         mine: true,
         listedAt: listedAt.add(const Duration(hours: 4)),
       ),
+      // 팔린 내 매물. 마켓에는 안 나오고 내 티켓의 양도 목록 탭에서만 보인다.
+      _MockListing(
+          listingId: 9,
+          concertId: 1,
+          sectionName: 'S구역',
+          seatRow: 5,
+          seatNumber: 8,
+          price: 170000,
+          faceValue: 186000,
+          mine: true,
+          listedAt: listedAt.add(const Duration(minutes: 30)),
+        )
+        ..status = ListingStatus.sold
+        ..closedAt = listedAt.add(const Duration(hours: 3)),
     ];
   }
 
@@ -438,6 +517,7 @@ class _MockListing {
     required this.faceValue,
     required this.listedAt,
     this.mine = false,
+    this.ticket,
   });
 
   final int listingId;
@@ -452,6 +532,10 @@ class _MockListing {
   final int faceValue;
   final bool mine;
   final DateTime listedAt;
+
+  /// 이 매물이 된 내 티켓. 등록 화면에서 올린 매물에만 있다 — 내리면 그 티켓이
+  /// 등록 화면 목록으로 돌아가야 재등록이 된다. 처음부터 있던 내 매물은 null.
+  final ListableTicket? ticket;
 
   ListingStatus status = ListingStatus.listed;
   DateTime? closedAt;
@@ -490,12 +574,47 @@ class _MockListing {
     startAt: concert.startAt,
     closedAt: closedAt,
   );
+
+  /// 내 거래 내역 항목으로. 판매면 등록 시각을, 구매면 체결 번호와 체결 시각을
+  /// 받는다 — 서버가 두 종류를 한 모양으로 내보내는 것과 같다.
+  MyTrade toMyTrade(
+    _MockConcert concert, {
+    required MyTradeType type,
+    required MyTradeStatus status,
+    required DateTime occurredAt,
+    int? tradeId,
+  }) => MyTrade(
+    type: type,
+    tradeId: tradeId,
+    listingId: listingId,
+    status: status,
+    concertId: concert.concertId,
+    concertTitle: concert.title,
+    venueName: concert.venueName,
+    sectionName: sectionName,
+    seatRow: seatRow,
+    seatNumber: seatNumber,
+    price: price,
+    faceValue: faceValue,
+    occurredAt: occurredAt,
+    posterImageUrl: concert.posterImageUrl,
+    startAt: concert.startAt,
+  );
 }
 
-/// 목이 들고 있는 체결 하나. 언제 샀는지만 알면 상태를 시간으로 만들 수 있다.
+/// 목이 들고 있는 체결 하나. 언제 무엇을 샀는지만 알면 상태는 시간으로,
+/// 나머지는 매물에서 만들 수 있다.
 class _MockTrade {
-  const _MockTrade({required this.id, required this.tradedAt});
+  const _MockTrade({
+    required this.id,
+    required this.listingId,
+    required this.tradedAt,
+  });
 
   final int id;
+
+  /// 산 매물. 내 거래 내역이 공연·좌석·가격을 여기서 가져온다.
+  final int listingId;
+
   final DateTime tradedAt;
 }

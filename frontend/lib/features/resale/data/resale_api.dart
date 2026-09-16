@@ -2,6 +2,7 @@ import '../models/listable_ticket.dart';
 import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/market_concert.dart';
+import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
 
@@ -24,9 +25,10 @@ import '../models/trade_status.dart';
 /// 다르다([ListableTicket] 주석). 조회·구매만 볼 때는 실행 인자로 실제 서버에
 /// 붙인다 — `flutter run --dart-define=RESALE_API=http`.
 ///
-/// **등록 취소(`POST /listings/{id}/cancel`)는 여기 없다.** 내가 올린 매물을
-/// 내리는 자리는 내 티켓 화면의 `양도 목록` 탭이고, 그 탭은 이 작업 범위가
-/// 아니다. 붙일 때 이 인터페이스에 메서드를 하나 더 얹는다.
+/// **내 거래 내역([fetchMyTrades])과 등록 취소([cancelListing])는 마켓 화면이
+/// 아니라 내 티켓 화면의 `양도 목록` 탭이 쓴다.** 내 매물을 관리하는 자리가
+/// 그쪽이라(시안) 화면은 저기 있고, 요청은 같은 마켓 API 로 나가므로 여기에
+/// 함께 둔다.
 abstract class ResaleApi {
   /// 매물이 올라와 있는 공연 목록. 임박한 공연부터 온다.
   ///
@@ -68,6 +70,21 @@ abstract class ResaleApi {
   /// (백엔드 `PurchaseResponseDto` 주석). 그 목록에 없으면(아직 반영 전)
   /// 진행 중으로 본다.
   Future<TradeStatus> fetchTradeStatus(int tradeId);
+
+  /// 내 거래 내역. 내가 올린 매물(판매)과 내가 산 티켓(구매)이 같은 모양으로
+  /// 한 목록에 섞여 온다. 정렬 기준은 [MyTrade.occurredAt] 이다.
+  ///
+  /// 팔렸거나 내린 매물도 함께 온다. 무엇을 그릴지는 화면이 [MyTrade.type] ·
+  /// [MyTrade.status] 로 고른다 — 내 티켓의 양도 목록 탭은 판매만 그린다.
+  Future<List<MyTrade>> fetchMyTrades();
+
+  /// 내가 올린 매물을 내린다. 티켓은 다시 내 손으로 돌아와 취소·입장·재등록이
+  /// 된다.
+  ///
+  /// 이미 팔렸거나 내린 매물이면 409, 내 매물이 아니면 403 을 `ApiException`
+  /// 으로 받는다. 화면이 미리 걸러도 시점 차이로 통과할 수 있어 최종 판정은
+  /// 서버 몫이다 — 예매 취소와 같은 규칙이다.
+  Future<void> cancelListing(int listingId);
 
   /// 내가 양도 등록할 수 있는 티켓 목록.
   ///
