@@ -166,8 +166,10 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         String buyerAddress = walletService.getAddress(memberId);
+        String organizerAddress = walletService.getAddress(concert.getOrganizer().getId());
         ticketNftClient.revoke(ticket.getTokenId());
-        ticketVaultClient.refund(buyerAddress, concert.getFacePrice(), ContractClient.keccak256(refundRefId(reservation)));
+        ticketVaultClient.refund(
+                buyerAddress, organizerAddress, concert.getFacePrice(), ContractClient.keccak256(refundRefId(reservation)));
 
         ticket.revoke();
         reservation.cancel(now);

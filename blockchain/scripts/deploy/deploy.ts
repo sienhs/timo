@@ -117,7 +117,7 @@ async function writeDeploymentInfo(contracts: DeployedContracts): Promise<void> 
  * we control ourselves. Falls back to Hardhat's first default account when
  * unset, so quick local experiments still work with zero setup.
  */
-async function resolveDeployer(): Promise<Signer> {
+export async function resolveDeployer(): Promise<Signer> {
   const adminPrivateKey = process.env.ADMIN_PRIVATE_KEY;
   if (!adminPrivateKey) {
     return (await ethers.getSigners())[0];

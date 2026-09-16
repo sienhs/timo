@@ -3,7 +3,7 @@ package com.ssafy.timo.domain.blockchain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -35,11 +35,6 @@ import org.web3j.tx.RawTransactionManager;
 class BookingOnChainFlowSpikeTest {
 
     private static final String RPC_URL = "http://network.ticketmoa.site:8545";
-    private static final BlockchainProperties PROPERTIES = new BlockchainProperties(
-            RPC_URL, null,
-            "0xdD118811921b1B04E23aBFEe9f86572dD2C92774",
-            "0x24f51CdB47EC392b88700C474c72A7b258d050Fc",
-            "0x2D9a37f3E2e963882740cd385bd31f24694dA6eF");
 
     @Test
     void bookingPipeline_registersShowChargesAndMints() throws Exception {
@@ -52,13 +47,17 @@ class BookingOnChainFlowSpikeTest {
         RawTransactionManager txManager = new RawTransactionManager(web3j, admin, 31337L);
         String adminAddress = admin.getAddress();
 
-        ensureRole(web3j, txManager, PROPERTIES.ticketVaultAddress(), "OPERATOR_ROLE", adminAddress);
-        ensureRole(web3j, txManager, PROPERTIES.showRegistryAddress(), "ORGANIZER_ROLE", adminAddress);
-        ensureRole(web3j, txManager, PROPERTIES.ticketNftAddress(), "ORGANIZER_ROLE", adminAddress);
+        // DeployedContractAddresses가 컨트랙트 주소를 이 admin 키로부터 계산하므로(하드코딩 없음),
+        // 이 스파이크 테스트가 통과한다는 것 자체가 그 계산이 실제 체인 위 배포와 맞다는 증거다.
+        DeployedContractAddresses addresses = new DeployedContractAddresses(admin);
 
-        ShowRegistryClient showRegistry = new ShowRegistryClient(web3j, txManager, PROPERTIES);
-        TicketVaultClient ticketVault = new TicketVaultClient(web3j, txManager, PROPERTIES);
-        TicketNftClient ticketNft = new TicketNftClient(web3j, txManager, PROPERTIES);
+        ensureRole(web3j, txManager, addresses.ticketVaultAddress(), "OPERATOR_ROLE", adminAddress);
+        ensureRole(web3j, txManager, addresses.showRegistryAddress(), "ORGANIZER_ROLE", adminAddress);
+        ensureRole(web3j, txManager, addresses.ticketNftAddress(), "ORGANIZER_ROLE", adminAddress);
+
+        ShowRegistryClient showRegistry = new ShowRegistryClient(web3j, txManager, addresses);
+        TicketVaultClient ticketVault = new TicketVaultClient(web3j, txManager, addresses);
+        TicketNftClient ticketNft = new TicketNftClient(web3j, txManager, addresses);
 
         // 조직자는 admin 지갑이 대신 등록하지만, 온체인 organizer 기록 자체는 admin 주소로 남는다.
         BigInteger facePrice = BigInteger.valueOf(50_000);

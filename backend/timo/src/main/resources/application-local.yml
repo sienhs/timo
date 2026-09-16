@@ -33,8 +33,6 @@ api:
 wallet:
   master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
 
-# 실제 체인에 트랜잭션을 보내려면 blockchain/.env 의 ADMIN_PRIVATE_KEY 를 환경변수로 내보내야 한다.
-# 안 내보내면 형식만 유효한 더미 키로 뜬다 - 앱은 정상 기동하고, 실제 전송을 시도하는 기능만 막힌다
-# (EC2 방화벽이 지정 IP만 허용하므로 이 키가 있어도 방화벽 허용 없인 어차피 막힌다).
-blockchain:
-  admin-private-key: ${ADMIN_PRIVATE_KEY:0x1111111111111111111111111111111111111111111111111111111111111111}
+# 실제 체인에 트랜잭션을 보내려면 blockchain/.env 의 ADMIN_PRIVATE_KEY 를 환경변수로 내보내야 한다
+# (기본값은 application.yml 공통 설정 참고). 안 내보내면 앱은 정상 기동하고 실제 전송을 시도하는
+# 기능만 막힌다 (EC2 방화벽이 지정 IP만 허용하므로 이 키가 있어도 방화벽 허용 없인 어차피 막힌다).

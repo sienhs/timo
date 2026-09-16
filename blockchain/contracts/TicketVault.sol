@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
- * Internal ledger for TIMO's deposited balance ("코인"). This is
- * deliberately NOT an ERC-20: nothing here is ever transferable by a user,
- * never leaves the contract, and can't be cashed out - it only exists to
- * account for purchasing power. A PG charges real money off-chain and the
- * backend (OPERATOR_ROLE) mirrors that as a deposit here; every later
- * balance movement (primary sale, secondary market, succession) reads and
- * writes this same mapping, which is exactly what guarantees a balance can
- * never be double-spent across the two layers.
+ * Internal ledger for TIMO's deposited balance ("코인"), exposed as an
+ * ERC-20 so wallets/explorers can read balances and Transfer events with
+ * real amounts - but every public mutator (transfer/transferFrom/approve)
+ * is disabled, same pattern as TicketNFT.approve/setApprovalForAll. Balance
+ * can only move through the OPERATOR_ROLE/MARKETPLACE_ROLE functions below,
+ * which call ERC20's internal _mint/_transfer/_burn directly - so it's
+ * still never cashed out or moved by a user action, just now inspectable
+ * as a real token instead of a private mapping.
+ *
+ * A PG charges real money off-chain and the backend (OPERATOR_ROLE) mirrors
+ * that as a deposit here; every later balance movement (primary sale,
+ * secondary market, succession) reads and writes the same ERC-20 balance,
+ * which is exactly what guarantees a balance can never be double-spent
+ * across the two layers.
  *
  * Every state-changing call takes a caller-supplied bytes32 ref/id and
  * refuses to process the same one twice. That's the on-chain half of "동일
@@ -19,7 +26,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
  * fast path, this is the belt-and-suspenders replay guard on the ledger
  * that actually owns the money.
  */
-contract TicketVault is AccessControl {
+contract TicketVault is ERC20, AccessControl {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant MARKETPLACE_ROLE = keccak256("MARKETPLACE_ROLE");
 
@@ -29,13 +36,10 @@ contract TicketVault is AccessControl {
         bool active;
     }
 
-    /// Usable balance - spendable on a booking, a waitlist lock, or received
-    /// as sale/settlement proceeds.
-    mapping(address => uint256) public balanceOf;
-
     /// Balance currently locked against an active succession waitlist entry.
-    /// Not part of balanceOf, so it can't be double-spent elsewhere while
-    /// locked.
+    /// Burned out of the ERC-20 balance while locked (see lockForWaitlist),
+    /// so it can't be double-spent elsewhere and isn't part of balanceOf/
+    /// totalSupply during the lock.
     mapping(address => uint256) public lockedOf;
 
     mapping(bytes32 => WaitlistLock) public waitlistLocks;
@@ -46,7 +50,7 @@ contract TicketVault is AccessControl {
 
     event Deposited(address indexed user, uint256 amount, bytes32 indexed refId);
     event ChargedForBooking(address indexed buyer, address indexed organizer, uint256 amount, bytes32 indexed orderId);
-    event Refunded(address indexed user, uint256 amount, bytes32 indexed refId);
+    event Refunded(address indexed user, address indexed organizer, uint256 amount, bytes32 indexed refId);
     event TransferSettled(address indexed seller, address indexed buyer, uint256 price, bytes32 indexed tradeId);
     event WaitlistLocked(address indexed user, bytes32 indexed waitlistId, uint256 amount);
     event WaitlistUnlocked(address indexed user, bytes32 indexed waitlistId, uint256 amount);
@@ -58,12 +62,12 @@ contract TicketVault is AccessControl {
     error ZeroAmount();
     error ZeroRefId();
     error DuplicateOperation(bytes32 refId);
-    error InsufficientBalance(address user, uint256 balance, uint256 requested);
     error WaitlistLockAlreadyActive(bytes32 waitlistId);
     error WaitlistLockNotActive(bytes32 waitlistId);
     error ActualPriceExceedsLocked(bytes32 waitlistId, uint256 locked, uint256 actualPrice);
+    error TransferDisabled();
 
-    constructor(address admin) {
+    constructor(address admin) ERC20("Mushroom", "MSR") {
         if (admin == address(0)) revert ZeroAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
@@ -78,7 +82,7 @@ contract TicketVault is AccessControl {
         if (amount == 0) revert ZeroAmount();
         _consumeRef(refId);
 
-        balanceOf[user] += amount;
+        _mint(user, amount);
         emit Deposited(user, amount, refId);
     }
 
@@ -96,22 +100,29 @@ contract TicketVault is AccessControl {
         if (amount == 0) revert ZeroAmount();
         _consumeRef(orderId);
 
-        _debit(buyer, amount);
-        balanceOf[organizer] += amount;
+        _transfer(buyer, organizer, amount);
         emit ChargedForBooking(buyer, organizer, amount, orderId);
     }
 
-    /// Credits usable balance back with no fee deducted - used for both a
-    /// cancellation refund and a minting-failure compensating transaction.
-    /// There's no separate withdraw/cash-out path; this only ever returns
-    /// value to the same internal ledger.
-    function refund(address user, uint256 amount, bytes32 refId) external onlyRole(OPERATOR_ROLE) {
-        if (user == address(0)) revert ZeroAddress();
+    /**
+     * Claws the amount back out of the organizer's balance and returns it
+     * to the buyer - a real reversal of a previous chargeForBooking, not
+     * newly minted money. Used for both a cancellation refund and a
+     * minting-failure compensating transaction; both callers already know
+     * which organizer's balance chargeForBooking credited for this same
+     * order/reservation (same facePrice, same show), since that's what
+     * they're reversing. If the organizer's balance is short (already
+     * spent elsewhere as a buyer themselves), this reverts with the
+     * standard ERC-20 insufficient-balance error same as any other
+     * transfer - there's no separate float this draws from.
+     */
+    function refund(address user, address organizer, uint256 amount, bytes32 refId) external onlyRole(OPERATOR_ROLE) {
+        if (user == address(0) || organizer == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         _consumeRef(refId);
 
-        balanceOf[user] += amount;
-        emit Refunded(user, amount, refId);
+        _transfer(organizer, user, amount);
+        emit Refunded(user, organizer, amount, refId);
     }
 
     // ------------------------------------------------------------------
@@ -128,8 +139,7 @@ contract TicketVault is AccessControl {
         if (price == 0) revert ZeroAmount();
         _consumeRef(tradeId);
 
-        _debit(buyer, price);
-        balanceOf[seller] += price;
+        _transfer(buyer, seller, price);
         emit TransferSettled(seller, buyer, price, tradeId);
     }
 
@@ -147,7 +157,7 @@ contract TicketVault is AccessControl {
         if (amount == 0) revert ZeroAmount();
         if (waitlistLocks[waitlistId].user != address(0)) revert WaitlistLockAlreadyActive(waitlistId);
 
-        _debit(user, amount);
+        _burn(user, amount);
         lockedOf[user] += amount;
         waitlistLocks[waitlistId] = WaitlistLock({user: user, amount: amount, active: true});
 
@@ -163,7 +173,7 @@ contract TicketVault is AccessControl {
 
         lock.active = false;
         lockedOf[lock.user] -= lock.amount;
-        balanceOf[lock.user] += lock.amount;
+        _mint(lock.user, lock.amount);
 
         emit WaitlistUnlocked(lock.user, waitlistId, lock.amount);
     }
@@ -186,22 +196,39 @@ contract TicketVault is AccessControl {
 
         lockedOf[lock.user] -= lock.amount;
         if (refundToBalance > 0) {
-            balanceOf[lock.user] += refundToBalance;
+            _mint(lock.user, refundToBalance);
         }
-        balanceOf[organizer] += actualPrice;
+        _mint(organizer, actualPrice);
 
         emit WaitlistClaimed(lock.user, organizer, waitlistId, actualPrice, refundToBalance);
     }
 
     // ------------------------------------------------------------------
-    // Internal helpers
+    // ERC-20 surface stays standard (balanceOf/totalSupply/Transfer events)
+    // so wallets and explorers can read this like any token - but every
+    // user-facing mutator is disabled outright, not just left unreachable.
+    // Only the role-gated functions above (which call _mint/_transfer/
+    // _burn directly, bypassing these) can ever move balance. Same pattern
+    // as TicketNFT.approve/setApprovalForAll being disabled for the same
+    // reason: an approved-looking balance would misleadingly suggest a
+    // user could move or spend it themselves.
     // ------------------------------------------------------------------
 
-    function _debit(address user, uint256 amount) private {
-        uint256 bal = balanceOf[user];
-        if (bal < amount) revert InsufficientBalance(user, bal, amount);
-        balanceOf[user] = bal - amount;
+    function transfer(address, uint256) public pure override returns (bool) {
+        revert TransferDisabled();
     }
+
+    function approve(address, uint256) public pure override returns (bool) {
+        revert TransferDisabled();
+    }
+
+    function transferFrom(address, address, uint256) public pure override returns (bool) {
+        revert TransferDisabled();
+    }
+
+    // ------------------------------------------------------------------
+    // Internal helpers
+    // ------------------------------------------------------------------
 
     function _consumeRef(bytes32 refId) private {
         if (refId == bytes32(0)) revert ZeroRefId();

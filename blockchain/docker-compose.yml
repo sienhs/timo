@@ -1,0 +1,34 @@
+services:
+  hardhat:
+    build: .
+    image: timo-hardhat
+    container_name: timo-hardhat
+    restart: unless-stopped
+    # ADMIN_PRIVATE_KEY / ADMIN_ADDRESS / CUSTODY_VAULT_ADDRESS live here -
+    # see .env.example. ADMIN_PRIVATE_KEY in particular must be a dedicated
+    # wallet, not left unset: the RPC port is reachable from the internet,
+    # and an unset ADMIN_PRIVATE_KEY falls back to deploying as (and
+    # granting admin to) one of Hardhat's 20 well-known accounts, which
+    # anyone who can reach this port can already sign as.
+    env_file:
+      - .env
+    ports:
+      - "8545:8545"
+    # The chain itself logs every eth_call/tx - cap it so a long-running
+    # node doesn't slowly fill the instance's disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_chainId',params:[]})}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

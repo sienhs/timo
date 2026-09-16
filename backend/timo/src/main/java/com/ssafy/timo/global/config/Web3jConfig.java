@@ -1,10 +1,12 @@
 package com.ssafy.timo.global.config;
 
+import java.security.GeneralSecurityException;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.web3j.crypto.Credentials;
+import org.web3j.crypto.Keys;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.RawTransactionManager;
@@ -30,14 +32,19 @@ public class Web3jConfig {
         return Web3j.build(new HttpService(properties.rpcUrl()));
     }
 
+    /**
+     * {@code ADMIN_PRIVATE_KEY}가 없는 로컬/테스트 기동에서는 매 기동마다 새로 생성한 키페어를
+     * 쓴다 - 어차피 {@link BlockchainProperties#hasRealAdminPrivateKey()}가 false인 동안은
+     * 호출부가 실제 체인 호출 자체를 건너뛰므로 이 키로 서명이 실제로 나갈 일이 없다. yml마다
+     * 형식만 유효한 더미 문자열을 복붙해 둘 필요가 없어지고, 그 문자열이 서로 어긋날 걱정도 없다.
+     */
     @Bean
-    public Credentials adminCredentials(BlockchainProperties properties) {
-        String privateKey = properties.adminPrivateKey();
-        if (privateKey == null || privateKey.isBlank()) {
-            throw new IllegalStateException(
-                    "blockchain.admin-private-key 가 설정되지 않았습니다. blockchain/.env 의 ADMIN_PRIVATE_KEY 값을 "
-                            + "ADMIN_PRIVATE_KEY 환경변수로 내보내세요.");
+    public Credentials adminCredentials(BlockchainProperties properties) throws GeneralSecurityException {
+        if (!properties.hasRealAdminPrivateKey()) {
+            return Credentials.create(Keys.createEcKeyPair());
         }
+
+        String privateKey = properties.adminPrivateKey();
         if (!PRIVATE_KEY_FORMAT.matcher(privateKey).matches()) {
             throw new IllegalStateException("blockchain.admin-private-key 는 0x 접두 64자리 16진수여야 합니다.");
         }

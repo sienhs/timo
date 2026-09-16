@@ -71,15 +71,16 @@ class ReservationSettlementRunner {
             ticket.markMinted(minted.tokenId(), minted.transactionHash());
         } catch (ContractCallException e) {
             log.error("차감은 됐는데 민팅 실패, 환불 시도함 (reservationId={})", reservationId, e);
-            refundOrElseMarkFailed(reservation, buyerAddress, reservationId, concert.getFacePrice(), ticket, e.getMessage());
+            refundOrElseMarkFailed(
+                    reservation, buyerAddress, organizerAddress, reservationId, concert.getFacePrice(), ticket, e.getMessage());
         }
     }
 
-    private void refundOrElseMarkFailed(Reservation reservation, String buyerAddress, Long reservationId,
+    private void refundOrElseMarkFailed(Reservation reservation, String buyerAddress, String organizerAddress, Long reservationId,
                                         BigInteger facePrice, Ticket ticket, String mintFailureReason) {
         byte[] refundRefId = ContractClient.keccak256("reservation-" + reservationId + ":refund");
         try {
-            ticketVaultClient.refund(buyerAddress, facePrice, refundRefId);
+            ticketVaultClient.refund(buyerAddress, organizerAddress, facePrice, refundRefId);
             ticket.markRefunded(mintFailureReason);
             // 환불까지 끝나 돈은 원래대로다 - 위와 같은 이유로 주문도 취소해 다시 시도할 수 있게 한다.
             reservation.cancel(LocalDateTime.now(clock));
