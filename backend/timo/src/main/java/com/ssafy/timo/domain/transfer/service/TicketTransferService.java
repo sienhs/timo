@@ -21,6 +21,12 @@ package com.ssafy.timo.domain.transfer.service;
  *   <li>{@code TicketVault} 가 소비한 {@code tradeId}(bytes32)를 기록해 재사용을 막는다.
  *       HTTP 의 {@code Idempotency-Key} 와 어떻게 맞출지는 미정이다.</li>
  *   <li>DB 에서 매물을 {@code SOLD} 로 넘긴 뒤 온체인 호출이 revert 하는 경우의 보상 흐름이 없다.</li>
+ *   <li><b>DB 에는 소유자를 옮길 자리가 없다.</b> {@code Ticket} 은 소유자 컬럼 없이
+ *       {@code reservation.member} 로 소유자를 말하고, 체결해도 예매 행은 판매자 것으로 남는다.
+ *       구매자가 "내 티켓"으로 보게 하려면 온체인 {@code ownerOf} 를 읽든 미러 컬럼을 만들든
+ *       티켓 도메인 쪽 결정이 필요하다. 그전까지 <b>체결은 매물·거래 이력만 남기고 끝난다.</b></li>
+ *   <li>{@code Ticket} 에 {@code OWNED -> LISTED} 전이 메서드가 없어 등록해도 티켓 상태가 따라오지
+ *       않는다. 티켓 도메인 담당에게 요청해 둔 사항이다.</li>
  * </ul>
  *
  * <p>자세한 내용은 {@code others_docs/MARKET_DEFERRED.md} 1 절에 있다.
@@ -37,7 +43,7 @@ public interface TicketTransferService {
      * @param ticketId     양도 대상 티켓
      * @param fromMemberId 판매자
      * @param toMemberId   구매자
-     * @param price        체결가
+     * @param price        체결가. 단위가 확정되지 않아 {@code long} 이다({@code TicketListing.faceValue} 주석)
      */
-    TransferResult transfer(long ticketId, long fromMemberId, long toMemberId, int price);
+    TransferResult transfer(long ticketId, long fromMemberId, long toMemberId, long price);
 }

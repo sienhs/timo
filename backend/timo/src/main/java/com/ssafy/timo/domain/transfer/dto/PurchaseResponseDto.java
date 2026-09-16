@@ -29,7 +29,7 @@ public record PurchaseResponseDto(
         Long tradeId,
         Long listingId,
         TradeStatus status,
-        int price,
+        long price,
         String concertTitle,
         LocalDateTime startDate,
         String venueName,

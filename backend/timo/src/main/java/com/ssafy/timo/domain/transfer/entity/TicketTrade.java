@@ -84,9 +84,9 @@ public class TicketTrade extends BaseEntity {
     @Column(name = "buyer_member_id", nullable = false)
     private Long buyerMemberId;
 
-    /** 체결가 스냅샷. 등록가와 같다. */
+    /** 체결가 스냅샷. 등록가와 같다. {@code long} 인 이유는 {@code TicketListing.faceValue} 주석을 본다. */
     @Column(name = "price", nullable = false)
-    private int price;
+    private long price;
 
     @Column(name = "traded_at", nullable = false)
     private LocalDateTime tradedAt;
@@ -100,7 +100,7 @@ public class TicketTrade extends BaseEntity {
                         Long ticketId,
                         Long sellerMemberId,
                         Long buyerMemberId,
-                        int price,
+                        long price,
                         LocalDateTime tradedAt) {
         this.listing = listing;
         this.ticketId = ticketId;

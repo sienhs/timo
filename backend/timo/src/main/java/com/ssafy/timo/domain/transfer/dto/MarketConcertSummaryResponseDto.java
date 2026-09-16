@@ -22,6 +22,6 @@ public record MarketConcertSummaryResponseDto(
         LocalDateTime endDate,
         String venueName,
         long listingCount,
-        int lowestPrice
+        long lowestPrice
 ) {
 }

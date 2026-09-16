@@ -8,6 +8,7 @@ import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.global.security.CurrentMember;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -31,7 +32,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * 여러 번 등록될 수 있으므로 매물마다 새 식별자가 생기는 편이 익명성에도 맞다.
  *
  * <p>모든 경로가 인증을 요구한다. {@code mine} 판정에 요청자가 필요하고, 요청자의 근거는
- * 서명된 토큰의 {@code sub} 하나뿐이다 — 경로·본문으로 회원 식별자를 받지 않는다.
+ * 서명된 토큰의 {@code sub} 하나뿐이다 — 경로·본문으로 회원 식별자를 받지 않는다. 그래서 요청자는
+ * {@link CurrentMember} 로만 받는다({@code SeatApi} 와 같다).
  *
  * <p>메서드 매핑과 요청 검증 애노테이션은 여기에만 둔다. 구현체(v1 실제 컨트롤러, v0 스텁)는
  * 클래스 레벨 {@code @RequestMapping} 으로 버전 경로만 정하고 이 메서드들을 그대로 오버라이드한다.
@@ -40,6 +42,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * <p>v1 실제 구현은 아직 없다. 온체인 연동(등록은 {@code TicketNFT.listForTransfer},
  * 취소는 {@code delist}, 체결은 {@code Marketplace.buy})은 방식이 정해지지 않아
  * {@code TicketTransferService} 인터페이스 뒤로 미뤄 두었다.
+ *
+ * <p>금액 필드({@code price} · {@code faceValue} · {@code expectedPrice} · {@code lowestPrice})는
+ * 모두 JSON 정수이며 서버에서 {@code long} 이다. 단위는 <b>아직 확정되지 않았다</b> — 컨트랙트는
+ * wei, 백엔드 구역 가격은 원화 정수라 예매 API 도 같은 상태다. 앱은 이 값을 32비트 정수로
+ * 받지 않는다.
  */
 public interface MarketApi {
 
@@ -54,7 +61,8 @@ public interface MarketApi {
      */
     @GetMapping("/concerts")
     ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
-            @Valid @ModelAttribute MarketListRequestDto request);
+            @Valid @ModelAttribute MarketListRequestDto request,
+            @CurrentMember Long memberId);
 
     /**
      * 공연 하나의 매물 목록. 낮은 가격순이다.
@@ -70,7 +78,8 @@ public interface MarketApi {
     @GetMapping("/concerts/{concertId}/listings")
     ResponseEntity<PagedModel<ListingSummaryResponseDto>> findListings(
             @PathVariable Long concertId,
-            @Valid @ModelAttribute MarketListRequestDto request);
+            @Valid @ModelAttribute MarketListRequestDto request,
+            @CurrentMember Long memberId);
 
     /**
      * 매물 한 건의 상세.
@@ -79,7 +88,8 @@ public interface MarketApi {
      * 그때 404 를 주면 화면이 "없는 매물"로 오해한다. 구매 가능 여부는 {@code status} 로 판단한다.
      */
     @GetMapping("/listings/{listingId}")
-    ResponseEntity<ListingDetailResponseDto> findListing(@PathVariable Long listingId);
+    ResponseEntity<ListingDetailResponseDto> findListing(@PathVariable Long listingId,
+                                                        @CurrentMember Long memberId);
 
     /**
      * 내 거래 내역. 판매와 구매를 한 목록에 섞어 최신순으로 준다.
@@ -89,19 +99,22 @@ public interface MarketApi {
      */
     @GetMapping("/listings/me")
     ResponseEntity<PagedModel<MyTradeSummaryResponseDto>> findMyTrades(
-            @Valid @ModelAttribute MarketListRequestDto request);
+            @Valid @ModelAttribute MarketListRequestDto request,
+            @CurrentMember Long memberId);
 
     /**
      * 내 티켓을 양도 매물로 등록한다. 201 이다.
      *
-     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 정가 기준은 현재 구역 가격이 아니라
-     * 예매 시점 정가 스냅샷({@code ticket.face_value}) 이다. 등록되면 티켓은 {@code LISTED} 가 되어
-     * 취소·회수·입장이 막힌다.
+     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 정가 기준은 구역 가격이 아니라 공연 정가
+     * ({@code Concert.facePrice}) 이며, 등록 시점의 값이 매물에 스냅샷으로 남는다. 등록되면 티켓은
+     * {@code LISTED} 가 되어 취소·회수·입장이 막힌다 — 예매 취소는 이미 티켓이 {@code OWNED} 일
+     * 때만 성립하므로({@code ReservationServiceImpl.cancel}) 등록 중인 티켓은 취소되지 않는다.
      *
      * <p>남의 티켓이면 403, 정가 초과면 400, 이미 등록 중이면 409 다.
      */
     @PostMapping("/listings")
-    ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request);
+    ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request,
+                                                  @CurrentMember Long memberId);
 
     /**
      * 등록을 취소한다. 티켓은 다시 보유 상태로 돌아간다. 204 다.
@@ -113,7 +126,8 @@ public interface MarketApi {
      * 차감하게 되고 응답이 204 가 아니게 될 수 있다.
      */
     @PostMapping("/listings/{listingId}/cancel")
-    ResponseEntity<Void> cancel(@PathVariable Long listingId);
+    ResponseEntity<Void> cancel(@PathVariable Long listingId,
+                                @CurrentMember Long memberId);
 
     /**
      * 매물을 구매한다. 선착순이며 응모·추첨·가격제안은 없다. <b>202</b> 다.
@@ -134,5 +148,6 @@ public interface MarketApi {
             @NotBlank(message = "멱등키는 필수입니다.")
             @Size(max = 100, message = "멱등키는 100자 이하여야 합니다.")
             String idempotencyKey,
-            @Valid @RequestBody PurchaseRequestDto request);
+            @Valid @RequestBody PurchaseRequestDto request,
+            @CurrentMember Long memberId);
 }

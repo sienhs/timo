@@ -17,6 +17,6 @@ public record PurchaseRequestDto(
 
         @NotNull(message = "예상 결제 금액은 필수입니다.")
         @Positive(message = "예상 결제 금액은 1 이상이어야 합니다.")
-        Integer expectedPrice
+        Long expectedPrice
 ) {
 }

@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatus;
  * 양도 마켓 에러 코드.
  *
  * <p>{@code TICKET_NOT_FOUND}·{@code NOT_TICKET_OWNER}·{@code TICKET_NOT_LISTABLE} 은 원래 티켓 도메인의
- * 것이다. 티켓 도메인이 아직 없어 여기 두었다. <b>TODO</b>: 티켓 도메인이 생기면 그쪽으로 옮긴다.
+ * 것이다. 티켓 도메인이 없던 시절 여기 두었고, 지금은 도메인이 생겼지만 그쪽에 에러 코드 enum 이
+ * 아직 없다. <b>TODO</b>: 티켓 도메인 담당과 합의해 옮긴다 — 남의 도메인 파일이라 임의로 만들지 않는다.
  *
  * <p>"이미 이 공연의 티켓을 보유하고 있습니다"(1인 1매)는 예매와 같은 규칙이라 예매 도메인의
  * {@code AlreadyReservedException} 을 그대로 쓴다. 같은 규칙이 두 코드로 갈리면 앱이 분기를 두 번 짜야 한다.
@@ -26,7 +27,14 @@ public enum TransferErrorCode implements BaseErrorCode {
     TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 티켓입니다."),
     /** 온체인 {@code NotTicketOwner}. */
     NOT_TICKET_OWNER(HttpStatus.FORBIDDEN, "본인이 보유한 티켓이 아닙니다."),
-    /** 온체인 {@code UnexpectedStatus(required=OWNED)}. 이미 등록 중이거나 입장·회수된 티켓. */
+    /**
+     * 온체인 {@code UnexpectedStatus(required=OWNED)}.
+     *
+     * <p>DB 로는 {@code ticket.status != OWNED} 인 경우가 전부 여기로 걸린다 — 이미 등록 중
+     * ({@code LISTED}), 입장 완료({@code USED}), 회수됨({@code REVOKED}) 뿐 아니라 <b>아직 발행되지
+     * 않은 티켓</b>({@code PENDING_MINT} · {@code MINT_FAILED} · {@code REFUNDED})도 포함한다.
+     * 발행 전 티켓은 {@code tokenId} 가 없어 온체인에 올릴 대상 자체가 없다.
+     */
     TICKET_NOT_LISTABLE(HttpStatus.CONFLICT, "양도 등록할 수 있는 상태의 티켓이 아닙니다."),
     /** 온체인 {@code ListPriceExceedsFacePrice}. "등록가가 정가 이하일 때에만 등록이 성립한다." */
     LIST_PRICE_EXCEEDS_FACE_PRICE(HttpStatus.BAD_REQUEST, "등록가는 정가를 초과할 수 없습니다."),
@@ -47,7 +55,7 @@ public enum TransferErrorCode implements BaseErrorCode {
     /**
      * 체결 시점 정가 재검증 실패.
      *
-     * <p>{@code face_value} 는 예매 시점 스냅샷이라 불변이므로 정상 경로에서는 발생하지 않는다.
+     * <p>{@code face_value} 는 등록 시점 스냅샷이라 불변이므로 정상 경로에서는 발생하지 않는다.
      * 데이터가 손상됐을 때만 걸리는 방어선이다. 그래도 검증을 두는 것은 정가 초과 판매 차단이
      * 이 서비스의 존재 이유이기 때문이다.
      */
