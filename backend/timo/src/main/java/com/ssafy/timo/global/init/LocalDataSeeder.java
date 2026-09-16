@@ -4,6 +4,9 @@ import com.ssafy.timo.domain.artist.entity.Artist;
 import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.auth.entity.LoginInfo;
 import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
+import com.ssafy.timo.domain.blockchain.ContractCallException;
+import com.ssafy.timo.domain.blockchain.ShowRegistryClient;
+import com.ssafy.timo.global.config.BlockchainProperties;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
@@ -29,6 +32,7 @@ import com.ssafy.timo.domain.venue.dto.CommandVenueRequestDto;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.domain.venue.service.VenueService;
+import com.ssafy.timo.domain.wallet.service.WalletService;
 
 import jakarta.persistence.EntityManager;
 
@@ -42,6 +46,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -73,6 +78,20 @@ import java.util.stream.Collectors;
  * 걸리지 않는 것이다. 컨텍스트가 다 뜬 뒤에 도는 러너에는 두 문제가 모두 없다.
  *
  * <p>{@code local} 프로필에서만 등록된다. 운영에서 이 빈이 뜨면 기동할 때마다 가짜 공연이 쌓인다.
+ *
+ * <p><b>{@code ON_SALE} 공연은 실제 체인에도 등록한다.</b> {@code ReservationService}가 예매를
+ * 받으려면 {@code Concert.isReadyForBooking()}(주최자·정가·온체인 showId)이 갖춰져 있어야 하는데,
+ * 이걸 만드는 API가 따로 없다(주최사용 플랫폼을 만들 계획이 없어서다) - 그래서 더미데이터를 만드는
+ * 이 시더가 유일한 소스가 되어, 좌석까지 다 만든 뒤 그 자리에서 {@code ShowRegistry.registerShow}를
+ * 호출하고 받은 showId를 그대로 저장한다. 이 클래스는 {@link #run}이 공연 하나도 없을 때만 도는
+ * 만큼(위 참고) 이 체인 호출도 <b>DB가 빈 최초 1회</b>뿐이고, 이후 재기동에는 없다.
+ *
+ * <p>체인에 접근할 수 없는 환경(방화벽·{@code ADMIN_PRIVATE_KEY} 없음)에서도 로컬 기동 자체는
+ * 실패하면 안 된다 - 블록체인과 무관한 화면 작업을 하는 사람까지 막을 이유가 없다. 그래서 공연별로
+ * 실패를 잡아 경고 로그만 남기고, 그 공연은 {@code SCHEDULED}로 되돌린다. {@code ON_SALE}인데
+ * {@code isReadyForBooking()}이 false인 상태를 남기면 {@code ReservationServiceImpl.create()}가
+ * 그걸 불변식 위반(500)으로 보고 던지기 때문에, "체인 미등록"은 항상 "아직 판매 전"(409)으로
+ * 보여야 한다.
  */
 @Slf4j
 @Component
@@ -127,6 +146,24 @@ public class LocalDataSeeder implements ApplicationRunner {
      */
     private static final String SEED_MEMBER_PHONE_PREFIX = "0109900";
     private static final String SEED_MEMBER_NICKNAME_PREFIX = "시드";
+
+    /**
+     * 온체인 등록에 쓰는 주최자 계정. 좌석을 붙드는 시드 회원 풀({@code SEED_MEMBER_PHONE_PREFIX})과
+     * 접두를 다르게 둬서 번호·닉네임이 겹치지 않는다.
+     *
+     * <p>지갑까지 만든다({@link WalletService#createWallet}) - {@code chargeForBooking}이 주최자
+     * 지갑 주소로 대금을 적립하므로, 좌석 시드용 회원과 달리 지갑이 반드시 있어야 한다.
+     */
+    private static final String SEED_ORGANIZER_PHONE = "01099019999";
+    private static final String SEED_ORGANIZER_NICKNAME = "시드주최";
+    private static final String SEED_ORGANIZER_NAME = "시드주최사";
+
+    /**
+     * 전 좌석 단일 정가(wei)로 체인에 등록할 값. 실제 구역별 가격({@code SECTION_SEEDS})과는
+     * 별개다 - 컨트랙트가 아직 좌석 등급별 가격 차등을 지원하지 않아, 가장 비싼 구역 가격을 그대로
+     * 온체인 정가로 쓴다.
+     */
+    private static final BigInteger CHAIN_FACE_PRICE = BigInteger.valueOf(150_000);
 
     /**
      * 시드 회원의 로그인 정보. <b>로컬 전용이다.</b>
@@ -251,6 +288,9 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final ShowRegistryClient showRegistryClient;
+    private final WalletService walletService;
+    private final BlockchainProperties blockchainProperties;
 
     /**
      * 공연이 하나라도 있으면 아무것도 하지 않는다.
@@ -274,18 +314,91 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         // 좌석 상태는 예매 중인 공연에만 넣는다. 오픈 전이거나 끝난 공연에 팔린 자리가 있으면
         // 상태와 배치도가 어긋나, 화면을 보는 쪽이 어느 쪽을 믿어야 할지 알 수 없다.
-        List<Long> onSaleConcertIds = new ArrayList<>();
+        List<OnSaleConcert> onSaleConcerts = new ArrayList<>();
         for (ConcertSeed seed : CONCERT_SEEDS) {
             Long concertId = seedConcert(seed, venueId, artistIds);
             if (seed.status() == ConcertStatus.ON_SALE) {
-                onSaleConcertIds.add(concertId);
+                onSaleConcerts.add(new OnSaleConcert(concertId, seed));
             }
         }
 
         // 좌석 상태는 공연이 생긴 뒤에 입힌다. 선점·판매가 공연별 행이라 공연 없이는 만들 수 없다.
+        List<Long> onSaleConcertIds = onSaleConcerts.stream().map(OnSaleConcert::id).toList();
         markSomeSeatsTaken(venueId, onSaleConcertIds);
 
+        // 좌석 배치까지 끝난 뒤에 체인 등록을 한다 - 실패해도 이미 넣은 시드 데이터에는 영향이 없다.
+        int totalSeats = SECTION_SEEDS.size() * SEATS_PER_SECTION;
+        registerOnChain(onSaleConcerts, totalSeats);
+
         log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", CONCERT_SEEDS.size(), venueId);
+    }
+
+    /** {@code registerOnChain}에 필요한 최소 정보 - 공연 id와 그 시드(정가·시각 계산용). */
+    private record OnSaleConcert(Long id, ConcertSeed seed) {
+    }
+
+    /**
+     * {@code ON_SALE} 공연을 실제 체인에 등록해 예매를 받을 수 있는 상태로 만든다.
+     *
+     * <p>공연마다 독립적으로 실패를 잡는다. 한 공연의 체인 등록이 실패해도 나머지 공연과 이미 넣은
+     * 시드 데이터는 그대로 살아 있어야 한다 - 로컬 기동 자체가 체인 접근 여부에 좌우되면 안 된다.
+     */
+    private void registerOnChain(List<OnSaleConcert> onSaleConcerts, int totalSeats) {
+        if (onSaleConcerts.isEmpty()) {
+            return;
+        }
+        if (!blockchainProperties.hasRealAdminPrivateKey()) {
+            // 더미 키로는 시도해 봐야 실패한다 - 방화벽 타임아웃까지 기다리지 않고 곧바로 건너뛴다.
+            // ADMIN_PRIVATE_KEY 를 export 하지 않은 로컬 개발자와 test/securitytest 프로필(항상
+            // 더미 키)이 여기 해당한다.
+            log.info("blockchain.admin-private-key 가 더미 값이라 온체인 등록을 건너뛴다.");
+            return;
+        }
+
+        Member organizer = seedOrganizer();
+        BigInteger totalSeatsWei = BigInteger.valueOf(totalSeats);
+        int registered = 0;
+
+        for (OnSaleConcert onSale : onSaleConcerts) {
+            ConcertSeed seed = onSale.seed();
+            try {
+                long saleOpenTime = seed.openAt().atZone(clock.getZone()).toEpochSecond();
+                long showTime = seed.startDate().atZone(clock.getZone()).toEpochSecond();
+
+                BigInteger showId = showRegistryClient.registerShow(
+                        CHAIN_FACE_PRICE, totalSeatsWei, saleOpenTime, showTime, "local-seed:" + seed.title());
+
+                Concert concert = concertRepository.getReferenceById(onSale.id());
+                concert.prepareForSale(organizer, CHAIN_FACE_PRICE);
+                concert.confirmRegistered(showId);
+                registered++;
+            } catch (ContractCallException e) {
+                // 방화벽·ADMIN_PRIVATE_KEY 미설정 등으로 체인에 닿지 못하는 로컬 환경을 위한 방어다.
+                // 등록을 못 했으니 SCHEDULED 로 남겨, "판매 중인데 예매가 막히는" 어긋난 상태를 피한다.
+                log.warn("공연 '{}' 온체인 등록 실패, SCHEDULED 로 되돌린다 - 체인 접근(방화벽·키)을 확인하라", seed.title(), e);
+                applySeedState(onSale.id(), new ConcertSeed(
+                        seed.title(), seed.genre(), seed.posterImageKey(), seed.imageKeys(), seed.description(),
+                        seed.ageRating(), ConcertStatus.SCHEDULED, seed.viewCount(),
+                        seed.startDate(), seed.endDate(), seed.openAt(), seed.artistNames()));
+            }
+        }
+
+        log.info("로컬 시드: 공연 {}/{}건을 체인에 등록했다.", registered, onSaleConcerts.size());
+    }
+
+    /**
+     * 온체인 등록을 대신 서명하는 admin 지갑과는 별개로, {@code chargeForBooking} 이 예매 대금을
+     * 적립할 실제 지갑 주소가 필요해 회원+지갑을 만든다. 좌석을 붙드는 시드 회원과 달리 지갑이
+     * 반드시 있어야 한다.
+     */
+    private Member seedOrganizer() {
+        Member organizer = memberRepository.save(Member.builder()
+                .phoneNumber(SEED_ORGANIZER_PHONE)
+                .name(SEED_ORGANIZER_NAME)
+                .nickname(SEED_ORGANIZER_NICKNAME)
+                .build());
+        walletService.createWallet(organizer);
+        return organizer;
     }
 
     /**

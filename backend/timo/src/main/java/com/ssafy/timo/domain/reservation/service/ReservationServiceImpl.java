@@ -28,7 +28,6 @@ import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.wallet.service.WalletService;
-import com.ssafy.timo.global.security.CurrentMemberProvider;
 import com.ssafy.timo.global.storage.ImageStorage;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -59,7 +58,6 @@ public class ReservationServiceImpl implements ReservationService {
 
     private static final int CANCELLATION_CUTOFF_HOURS = 24;
 
-    private final CurrentMemberProvider currentMemberProvider;
     private final MemberRepository memberRepository;
     private final ConcertRepository concertRepository;
     private final SeatHoldRepository seatHoldRepository;
@@ -73,8 +71,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final Clock clock;
 
     @Override
-    public ReservationDetailResponseDto create(CreateReservationRequestDto request) {
-        Long memberId = currentMemberProvider.currentMemberId();
+    public ReservationDetailResponseDto create(Long memberId, CreateReservationRequestDto request) {
         Long concertId = request.concertId();
         Long seatId = request.seatId();
         LocalDateTime now = LocalDateTime.now(clock);
@@ -124,9 +121,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     @Override
     @Transactional(readOnly = true)
-    public PagedModel<ReservationSummaryResponseDto> findAll(ReservationListRequestDto request) {
-        Long memberId = currentMemberProvider.currentMemberId();
-
+    public PagedModel<ReservationSummaryResponseDto> findAll(Long memberId, ReservationListRequestDto request) {
         return new PagedModel<>(reservationRepository
                 .findPageByMemberId(memberId, request.status(), request.toPageable())
                 .map(reservation -> ReservationSummaryResponseDto.from(reservation, imageStorage)));
@@ -134,8 +129,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     @Override
     @Transactional(readOnly = true)
-    public ReservationDetailResponseDto find(Long reservationId) {
-        Long memberId = currentMemberProvider.currentMemberId();
+    public ReservationDetailResponseDto find(Long memberId, Long reservationId) {
         Reservation reservation = findOwnedOrThrow(reservationId, memberId);
         Ticket ticket = ticketOf(reservationId);
 
@@ -152,8 +146,7 @@ public class ReservationServiceImpl implements ReservationService {
      * <p>승계 대기자 자동 재발급은 아직 없다 - 지금은 회수해서 미판매로 남기는 것까지만 한다.
      */
     @Override
-    public ReservationDetailResponseDto cancel(Long reservationId) {
-        Long memberId = currentMemberProvider.currentMemberId();
+    public ReservationDetailResponseDto cancel(Long memberId, Long reservationId) {
         Reservation reservation = findOwnedOrThrow(reservationId, memberId);
 
         if (!reservation.isPaid()) {

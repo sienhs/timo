@@ -28,24 +28,24 @@ public class ReservationController implements ReservationApi {
     private final ReservationService reservationService;
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> create(CreateReservationRequestDto request) {
-        ReservationDetailResponseDto response = reservationService.create(request);
+    public ResponseEntity<ReservationDetailResponseDto> create(CreateReservationRequestDto request, Long memberId) {
+        ReservationDetailResponseDto response = reservationService.create(memberId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Override
-    public ResponseEntity<PagedModel<ReservationSummaryResponseDto>> findAll(ReservationListRequestDto request) {
-        return ResponseEntity.ok(reservationService.findAll(request));
+    public ResponseEntity<PagedModel<ReservationSummaryResponseDto>> findAll(ReservationListRequestDto request, Long memberId) {
+        return ResponseEntity.ok(reservationService.findAll(memberId, request));
     }
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> find(Long reservationId) {
-        return ResponseEntity.ok(reservationService.find(reservationId));
+    public ResponseEntity<ReservationDetailResponseDto> find(Long reservationId, Long memberId) {
+        return ResponseEntity.ok(reservationService.find(memberId, reservationId));
     }
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> cancel(Long reservationId) {
-        return ResponseEntity.ok(reservationService.cancel(reservationId));
+    public ResponseEntity<ReservationDetailResponseDto> cancel(Long reservationId, Long memberId) {
+        return ResponseEntity.ok(reservationService.cancel(memberId, reservationId));
     }
 }

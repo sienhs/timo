@@ -86,7 +86,7 @@ public class ReservationStubController implements ReservationApi {
     }
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> create(CreateReservationRequestDto request) {
+    public ResponseEntity<ReservationDetailResponseDto> create(CreateReservationRequestDto request, Long memberId) {
         ConcertFixture concert = concertStore.find(request.concertId())
                 .orElseThrow(() -> new ConcertNotFoundException(request.concertId()));
         if (concert.status() != ConcertStatus.ON_SALE) {
@@ -117,7 +117,7 @@ public class ReservationStubController implements ReservationApi {
     }
 
     @Override
-    public ResponseEntity<PagedModel<ReservationSummaryResponseDto>> findAll(ReservationListRequestDto request) {
+    public ResponseEntity<PagedModel<ReservationSummaryResponseDto>> findAll(ReservationListRequestDto request, Long memberId) {
         List<Order> matched = orders.values().stream()
                 .filter(order -> request.status() == null || statusOf(order) == request.status())
                 .sorted(Comparator.comparing(Order::createdAt).thenComparingLong(Order::id).reversed())
@@ -134,12 +134,12 @@ public class ReservationStubController implements ReservationApi {
     }
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> find(Long reservationId) {
+    public ResponseEntity<ReservationDetailResponseDto> find(Long reservationId, Long memberId) {
         return ResponseEntity.ok(toDetail(requireOrder(reservationId)));
     }
 
     @Override
-    public ResponseEntity<ReservationDetailResponseDto> cancel(Long reservationId) {
+    public ResponseEntity<ReservationDetailResponseDto> cancel(Long reservationId, Long memberId) {
         Order order = requireOrder(reservationId);
         ReservationStatus status = statusOf(order);
         if (status != ReservationStatus.PAID) {

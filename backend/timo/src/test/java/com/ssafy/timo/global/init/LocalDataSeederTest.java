@@ -122,6 +122,15 @@ class LocalDataSeederTest {
     @Autowired
     private Clock clock;
 
+    @Autowired
+    private com.ssafy.timo.domain.blockchain.ShowRegistryClient showRegistryClient;
+
+    @Autowired
+    private com.ssafy.timo.domain.wallet.service.WalletService walletService;
+
+    @Autowired
+    private com.ssafy.timo.global.config.BlockchainProperties blockchainProperties;
+
     private LocalDataSeeder seeder;
 
     @BeforeEach
@@ -366,7 +375,10 @@ class LocalDataSeederTest {
                 reservationRepository,
                 passwordEncoder,
                 em,
-                clock);
+                clock,
+                showRegistryClient,
+                walletService,
+                blockchainProperties);
     }
 
     /** 좌석 상태가 들어간 공연들. 예매 중인 것만이라 상태로 고른다. */

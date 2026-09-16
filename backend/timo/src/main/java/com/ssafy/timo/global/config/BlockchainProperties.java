@@ -24,4 +24,17 @@ public record BlockchainProperties(
         String ticketVaultAddress,
         String ticketNftAddress,
         String showRegistryAddress) {
+
+    /**
+     * {@code local}·{@code test}·{@code securitytest} 프로필이 {@code ADMIN_PRIVATE_KEY}를
+     * 내보내지 않았을 때 쓰는, 형식만 유효한 더미 키(application*.yml 참고). 실제 체인 접근 전에
+     * 이 값인지 먼저 확인하면, 어차피 실패할 네트워크 호출을 시도하다 타임아웃으로 느려지는 대신
+     * 곧바로 건너뛸 수 있다.
+     */
+    public static final String LOCAL_DUMMY_ADMIN_PRIVATE_KEY =
+            "0x1111111111111111111111111111111111111111111111111111111111111111";
+
+    public boolean hasRealAdminPrivateKey() {
+        return adminPrivateKey != null && !adminPrivateKey.equals(LOCAL_DUMMY_ADMIN_PRIVATE_KEY);
+    }
 }
