@@ -5,6 +5,8 @@ import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/resale/data/mock_resale_api.dart';
+import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
@@ -23,7 +25,12 @@ void main() {
         session: session,
         child: TicketApiScope(
           api: api ?? MockTicketApi(latency: Duration.zero),
-          child: const MaterialApp(home: MyTicketsScreen()),
+          // 화면이 양도 목록 탭 때문에 마켓 API 도 부른다. 이 테스트는 그 탭을
+          // 안 보지만 스코프가 없으면 화면이 서지 않는다.
+          child: ResaleApiScope(
+            api: MockResaleApi(latency: Duration.zero),
+            child: const MaterialApp(home: MyTicketsScreen()),
+          ),
         ),
       ),
     );
@@ -62,7 +69,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(TicketStrings.cancelTooLate), findsOneWidget);
-      final tile = tester.widget<ListTile>(find.byType(ListTile));
+      // 시트에 양도 등록 항목도 있으므로 취소 항목만 집어 본다.
+      final tile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, TicketStrings.cancelReservation),
+      );
       expect(tile.enabled, isFalse);
     });
   });

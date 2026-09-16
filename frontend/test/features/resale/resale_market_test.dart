@@ -15,6 +15,7 @@ import 'package:timo/features/resale/models/listing.dart';
 import 'package:timo/features/resale/models/listing_detail.dart';
 import 'package:timo/features/resale/models/market_concert.dart';
 import 'package:timo/features/resale/models/market_hours.dart';
+import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/models/purchased_trade.dart';
 import 'package:timo/features/resale/models/trade_status.dart';
 import 'package:timo/features/resale/screens/listing_purchase_complete_screen.dart';
@@ -406,4 +407,11 @@ class _CountingResaleApi implements ResaleApi {
     required int ticketId,
     required int price,
   }) => _delegate.createListing(ticketId: ticketId, price: price);
+
+  @override
+  Future<List<MyTrade>> fetchMyTrades() => _delegate.fetchMyTrades();
+
+  @override
+  Future<void> cancelListing(int listingId) =>
+      _delegate.cancelListing(listingId);
 }

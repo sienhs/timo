@@ -7,6 +7,7 @@ import '../models/listable_ticket.dart';
 import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/market_concert.dart';
+import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
 import 'resale_api.dart';
@@ -79,21 +80,35 @@ class HttpResaleApi implements ResaleApi {
 
   /// 내 거래 내역에서 같은 체결 번호를 찾아 상태만 꺼낸다.
   ///
-  /// 목록 전체를 모델로 옮기지 않는 이유: 이 값을 보는 화면(결제 완료)이
-  /// 필요로 하는 것은 상태 하나뿐이고, 거래 내역 화면은 아직 없다. 그 화면이
-  /// 생기면 목록 모델을 만들고 이 메서드는 그 위에서 상태만 골라낸다.
+  /// 폴링 전용 주소가 따로 없어 [fetchMyTrades] 위에서 골라낸다. 두 상태 값은
+  /// 서버가 같은 이름을 쓰므로 이름으로 옮긴다.
   ///
   /// 목록에 아직 없으면(반영 전) 진행 중으로 본다. 없다는 것은 실패했다는
   /// 뜻이 아니라 아직 모른다는 뜻이다.
   @override
   Future<TradeStatus> fetchTradeStatus(int tradeId) async {
-    final content = await _content('$basePath/listings/me');
-    for (final trade in content) {
-      if ((trade['tradeId'] as num?)?.toInt() == tradeId) {
-        return TradeStatus.fromWire(trade['status']);
+    final trades = await fetchMyTrades();
+    for (final trade in trades) {
+      if (trade.tradeId == tradeId) {
+        return TradeStatus.fromWire(trade.status.wireName);
       }
     }
     return TradeStatus.pending;
+  }
+
+  @override
+  Future<List<MyTrade>> fetchMyTrades() async {
+    final content = await _content('$basePath/listings/me');
+    return content.map(MyTrade.fromJson).toList();
+  }
+
+  /// 성공은 204 로 본문이 없다. 읽을 것이 없으니 실패만 [ApiException] 으로
+  /// 바꾼다.
+  @override
+  Future<void> cancelListing(int listingId) async {
+    await _guard(
+      () => _dio.post<dynamic>('$basePath/listings/$listingId/cancel'),
+    );
   }
 
   @override

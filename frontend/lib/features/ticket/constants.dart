@@ -112,8 +112,7 @@ class TicketStrings {
   static const emptyUpcomingAction = '공연 보러 가기';
   static const emptyPast = '아직 다녀온 공연이 없어요';
 
-  /// 양도 목록 탭. 지금은 자리만 있어 늘 이 문구다. 양도마켓 작업이 붙으면
-  /// 진짜 "등록한 게 없을 때" 만 보이게 된다.
+  /// 양도 목록 탭. 내가 올린 매물이 하나도 없을 때 — 팔린 것·내린 것까지 없을 때다.
   static const emptyListings = '등록한 양도 매물이 없어요';
 
   /// 로그인 안 한 채로 들어왔을 때. 마이페이지·충전 화면의 안내와 같은 꼴이다.
@@ -140,7 +139,11 @@ class TicketStrings {
   static const qrSeat = '좌석';
   static const qrVenue = '장소';
 
-  // 예매 취소. 시안에 자리가 없어 카드 오른쪽 위 더보기로 뺐다.
+  // 카드 더보기(⋮). 시안에 자리가 없어 카드 오른쪽 위로 뺐다.
+
+  /// 양도마켓의 등록 화면으로 간다. 마켓 첫 화면 아래 버튼과 같은 문구다.
+  static const registerListing = '양도 등록하기';
+
   static const cancelReservation = '예매 취소하기';
   static const cancelConfirmTitle = '예매를 취소할까요?';
   // "같은 자리를 다시 잡을 수는 없어요" 는 뺐다(사용자 결정). 팝업이 길어지고,
@@ -154,4 +157,43 @@ class TicketStrings {
 
   /// 환불 금액. 수수료 없이 정가 전액이다.
   static String refundAmount(String price) => '환불 금액 $price';
+
+  // 양도 목록 카드. 내가 마켓에 올린 매물 하나다.
+  static const listingBadge = '판매중';
+  static const soldBadge = '판매 완료';
+  static const editPrice = '가격 수정';
+  static const delist = '등록 취소';
+
+  /// 등록가 줄. 결제 수단이 코인이라 단위는 `MSR` 이다(`formatMsr`).
+  static String listedPrice(String price) => '$price 등록';
+
+  /// 양도 마감(공연 시작)까지 하루 안쪽일 때. `마감까지 07:31` 처럼 시:분이다.
+  ///
+  /// 초는 찍지 않는다. 이 화면은 새로 고칠 때만 시각을 다시 재므로 초까지
+  /// 찍으면 멈춘 숫자가 된다.
+  static String deadlineIn(Duration remaining) {
+    final hours = remaining.inHours.toString().padLeft(2, '0');
+    final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
+    return '마감까지 $hours:$minutes';
+  }
+
+  /// 하루 넘게 남았으면 마감 일시를 그대로. 양도 마감은 공연 시작이라 보통
+  /// 며칠 남는데, 늘 카운트다운으로 찍으면 `172:31` 처럼 읽히지 않는 숫자가 된다.
+  static String deadlineAt(String dateTime) => '양도 마감 $dateTime';
+
+  /// 공연이 이미 시작했거나 일정이 미정이라 더 팔 수 없을 때.
+  static const deadlinePassed = '양도 마감';
+
+  // 닫힌 매물. 버튼 자리에 사정을 적는다. 예매 취소한 티켓 카드와 같은 꼴이다.
+  static const soldNotice = '판매가 완료됐어요.';
+  static const delistedNotice = '등록을 취소했어요.';
+
+  // 양도 등록 취소 팝업. 예매 취소와 같은 틀이라 '그대로 둘게요' 는 함께 쓴다.
+  static const delistConfirmTitle = '양도 등록을 취소할까요?';
+  // 폰 폭(375)에서 한 줄에 들어가는 길이다. 길면 "돌아와 / 요." 로 꺾인다.
+  static const delistConfirmBody = '취소하면 매물이 내려가고 티켓은 다시 내 것으로 돌아와요.';
+  static const delistConfirmAgree = '등록 취소하기';
+
+  /// 팝업의 금액 줄. 내리는 것이라 돌아오는 돈은 없고, 얼마에 올려 뒀는지만 짚는다.
+  static String listedPriceLabel(String price) => '등록가 $price';
 }

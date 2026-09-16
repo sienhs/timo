@@ -7,6 +7,8 @@ import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/constants.dart';
 import '../../auth/state/auth_session_scope.dart';
+import '../../resale/models/my_trade.dart';
+import '../../resale/state/resale_api_scope.dart';
 import '../../shell/constants.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
@@ -15,6 +17,8 @@ import '../constants.dart';
 import '../models/my_ticket.dart';
 import '../state/ticket_api_scope.dart';
 import '../widgets/cancel_reservation_dialog.dart';
+import '../widgets/delist_listing_dialog.dart';
+import '../widgets/listing_card.dart';
 import '../widgets/past_ticket_card.dart';
 import '../widgets/ticket_more_sheet.dart';
 import '../widgets/ticket_empty_view.dart';
@@ -28,7 +32,9 @@ import '../widgets/upcoming_ticket_card.dart';
 /// 예정과 지난은 **같은 응답**을 공연 날짜로 가른다. 서버에 그 필터가 없어서
 /// 한 번 받아 화면이 나눈다.
 ///
-/// 양도 목록은 자리만 있고 비어 있다. 이유는 [TicketTabBar] 주석 참고.
+/// 양도 목록은 **다른 조회**다. 마켓 API 의 내 거래 내역에서 내가 올린 매물만
+/// 골라 그린다. 예매 목록과 따로 받는 이유는 한쪽이 실패해도 다른 쪽은 보여야
+/// 해서다 — 마켓이 안 되는데 내 티켓까지 안 보이면 안 된다.
 class MyTicketsScreen extends StatefulWidget {
   const MyTicketsScreen({super.key, this.clock = DateTime.now});
 
@@ -47,6 +53,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 주문만 주므로 비로그인으로는 부를 이유가 없고, 부르면 401 만 받는다.
   Future<_MyTicketsData>? _data;
 
+  /// 양도 목록 탭의 조회. 시작하고 버리는 조건은 [_data] 와 같다.
+  Future<List<MyTrade>>? _trades;
+
   final _searchController = TextEditingController();
   int _tabIndex = 0;
   String _query = '';
@@ -54,6 +63,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 개수를 탭에 띄우려면 본문 밖에서도 결과가 필요하다. [AsyncBoundary] 는
   /// 데이터를 안에 들고 있어 꺼낼 수 없으므로 여기에도 한 벌 기억해 둔다.
   _MyTicketsData? _loaded;
+
+  /// 양도 목록 탭의 개수용. [_loaded] 와 같은 이유로 한 벌 기억해 둔다.
+  List<MyTrade>? _sales;
 
   /// 목록을 그리는 기준 시각. D-day 와 QR 창이 이 값을 본다.
   ///
@@ -79,9 +91,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     super.didChangeDependencies();
     if (_isLoggedIn) {
       _data ??= _load();
+      _trades ??= _loadTrades();
     } else {
       _data = null;
       _loaded = null;
+      _trades = null;
+      _sales = null;
     }
   }
 
@@ -100,10 +115,22 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     return data;
   }
 
+  /// 내 거래 내역에서 판매만 남긴다. 구매(양도로 산 티켓)는 이 탭 것이 아니다 —
+  /// 시안이 그렇고, 산 티켓은 "내 티켓" 이라 예정 공연 탭이 맞다(지금 서버가
+  /// 못 주는 사정은 [MyTrade] 주석). 팔린 것·내린 것은 남긴다. 지우면 결과가
+  /// 안 보인다.
+  Future<List<MyTrade>> _loadTrades() async {
+    final trades = await ResaleApiScope.of(context).fetchMyTrades();
+    final sales = trades.where((trade) => trade.isSale).toList();
+    if (mounted) setState(() => _sales = sales);
+    return sales;
+  }
+
   void _reload() {
     setState(() {
       _now = widget.clock();
       _data = _load();
+      _trades = _loadTrades();
     });
   }
 
@@ -126,9 +153,29 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     );
     if (action == null || !mounted) return;
     switch (action) {
+      case TicketMoreAction.registerListing:
+        await _openRegister();
       case TicketMoreAction.cancelReservation:
         await _cancelReservation(ticket);
     }
+  }
+
+  /// 양도마켓의 등록 화면으로 간다. 등록하고 돌아왔으면 목록을 다시 받는다 —
+  /// 양도 목록 탭에 새 매물이 보여야 한다.
+  ///
+  /// 누른 티켓을 미리 골라 두지 않는다. 등록이 받는 티켓 번호와 예매 번호가
+  /// 다른 값이라(`ListableTicket` 주석) 지금은 이어 줄 수 없다. 서버가 예매
+  /// 응답에 티켓 번호를 실어 주면 그때 등록 화면에 인자를 얹는다.
+  ///
+  /// 결과 타입을 `pushNamed<bool>` 로 못 박지 않는다. 라우트 등록부가 만드는
+  /// 라우트는 `Route<dynamic>` 이라 타입을 지정하면 실기기에서 캐스팅 예외로
+  /// 눌러도 아무 일이 안 일어난다(마켓 첫 화면과 같은 사정).
+  Future<void> _openRegister() async {
+    final registered = await Navigator.pushNamed(
+      context,
+      AppRoutes.resaleRegister,
+    );
+    if (registered == true && mounted) _reload();
   }
 
   /// 예매를 취소한다.
@@ -162,6 +209,29 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     _reload();
   }
 
+  /// 양도 등록을 취소한다(매물을 내린다). 예매 취소와 같은 흐름이다.
+  ///
+  /// 확인을 받고 서버에 보낸 뒤 목록을 **다시 받는다.** 카드 하나만 바꿔치기하지
+  /// 않는 이유도 같다 — 그 사이 팔렸을 수 있고, 실패했다면 아무것도 바뀌지
+  /// 않아야 한다. 서버가 거절하면(그새 팔렸거나 이미 내려감) 그 문구를 그대로
+  /// 띄운다. 성공 안내는 따로 없다. 다시 받은 목록에 "등록을 취소했어요" 회색
+  /// 카드가 남는다.
+  Future<void> _delist(MyTrade trade) async {
+    final confirmed = await showDelistListingDialog(context, trade: trade);
+    if (!confirmed || !mounted) return;
+
+    final api = ResaleApiScope.of(context);
+    try {
+      await api.cancelListing(trade.listingId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, e.message);
+      return;
+    }
+    if (!mounted) return;
+    _reload();
+  }
+
   /// 하단 바의 홈·마이페이지로 간다.
   ///
   /// 이 화면은 빠른 메뉴에서 얹힌 것이라 아래에 셸이 깔려 있다. 그런데
@@ -185,6 +255,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   Widget build(BuildContext context) {
     final loaded = _loaded;
     final data = _data;
+    final trades = _trades;
 
     return Scaffold(
       appBar: AppBar(
@@ -200,29 +271,47 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       ),
       body: SafeArea(
         top: false,
-        // 조회가 없다 = 로그인 상태가 아니다([didChangeDependencies]).
-        child: data == null
+        // 조회가 없다 = 로그인 상태가 아니다([didChangeDependencies]). 두 조회는
+        // 함께 시작하고 함께 버려지므로 하나만 봐도 되지만, 타입을 좁히려고 둘 다 본다.
+        child: data == null || trades == null
             ? _loginPrompt()
             : Column(
                 children: [
                   TicketTabBar(
                     selectedIndex: _tabIndex,
-                    // 양도 목록은 아직 셀 데이터가 없어 null — 숫자 없이 이름만.
                     counts: loaded == null
                         ? null
                         : [
                             loaded.upcoming(_now).length,
                             loaded.past(_now).length,
-                            null,
+                            // 판매중인 것만 센다. 팔렸거나 내린 매물은 "지금
+                            // 올라가 있는 매물" 이 아니다. 아직 안 도착했으면
+                            // 숫자 없이 이름만.
+                            _sales?.where((trade) => trade.isOnSale).length,
                           ],
                     onSelected: (index) => setState(() => _tabIndex = index),
                   ),
                   Expanded(
-                    child: AsyncBoundary<_MyTicketsData>(
-                      future: data,
-                      onRetry: _reload,
-                      loading: const TicketListSkeleton(),
-                      builder: (context, data) => _body(data),
+                    // 두 조회를 각각 기다린다. 둘 다 살려 두고 하나만 보이는
+                    // 이유는, 탭을 오갈 때마다 경계 위젯을 새로 세우면 이미
+                    // 받아 둔 결과인데도 뼈대 카드가 한 프레임 스치기 때문이다.
+                    child: IndexedStack(
+                      index: _tabIndex == _listingsTab ? 1 : 0,
+                      sizing: StackFit.expand,
+                      children: [
+                        AsyncBoundary<_MyTicketsData>(
+                          future: data,
+                          onRetry: _reload,
+                          loading: const TicketListSkeleton(),
+                          builder: (context, data) => _body(data),
+                        ),
+                        AsyncBoundary<List<MyTrade>>(
+                          future: trades,
+                          onRetry: _reload,
+                          loading: const TicketListSkeleton(),
+                          builder: (context, sales) => _listingList(sales),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -284,10 +373,38 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
               _notify(TicketStrings.notReady(TicketStrings.createCollectible)),
         ),
       ),
-      // 양도 목록. 자리만 두고 내용은 양도마켓 작업에서 채운다([TicketTabBar]
-      // 주석). 그래서 이 화면의 조회 결과([_MyTicketsData])와 아직 무관하다.
-      _ => const TicketEmptyView(message: TicketStrings.emptyListings),
+      // 양도 목록은 다른 조회가 그린다([_listingList]). 이 경계는 그때 가려져
+      // 있으므로 빈 상자만 둔다.
+      _ => const SizedBox.shrink(),
     };
+  }
+
+  /// 양도 목록 탭. 내가 올린 매물 카드. 검색 칸은 없다 — 올린 매물이 걸러 볼
+  /// 만큼 쌓이는 일이 없다.
+  Widget _listingList(List<MyTrade> sales) {
+    if (sales.isEmpty) {
+      return const TicketEmptyView(message: TicketStrings.emptyListings);
+    }
+    return RefreshIndicator(
+      onRefresh: () async => _reload(),
+      color: AppColors.primary,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(
+          horizontal: TicketMetrics.horizontalPadding,
+          vertical: TicketMetrics.cardGap,
+        ),
+        itemCount: sales.length,
+        itemBuilder: (_, index) => ListingCard(
+          trade: sales[index],
+          now: _now,
+          // 가격 수정 API 가 아직 없다. 버튼은 시안대로 두고 안내만 띄운다 —
+          // 상세정보 보기·소장품 만들기와 같은 처리다.
+          onEditPrice: () =>
+              _notify(TicketStrings.notReady(TicketStrings.editPrice)),
+          onDelist: () => _delist(sales[index]),
+        ),
+      ),
+    );
   }
 
   /// 예정·지난 탭. 검색 칸은 걸러 볼 만큼 쌓였을 때만 낸다.
@@ -354,6 +471,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
 
 /// 안내 스낵바와 하단 바(원형 버튼 포함) 사이 틈.
 const _snackBarGap = 12.0;
+
+/// 양도 목록 탭의 자리. [TicketTabBar.labels] 순서다.
+const _listingsTab = 2;
 
 /// 두 탭이 나눠 쓰는 한 번의 조회 결과.
 class _MyTicketsData {
