@@ -21,6 +21,15 @@ import 'features/home/data/http_home_api.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/home/state/home_api_scope.dart';
 import 'features/home/state/recent_search_scope.dart';
+import 'features/memory/data/memory_concert_api.dart';
+import 'features/memory/data/ticket_store.dart';
+import 'features/memory/motion/ambient_motion.dart';
+import 'features/memory/motion/motion_tokens.dart';
+import 'features/memory/state/creation_job.dart';
+import 'features/memory/state/creation_job_scope.dart';
+import 'features/memory/state/memory_concert_api_scope.dart';
+import 'features/memory/state/ticket_store_scope.dart';
+import 'features/memory/widgets/creation_notification_host.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
 import 'features/mypage/state/my_page_api_scope.dart';
@@ -44,6 +53,8 @@ class App extends StatefulWidget {
     this.bookingApi,
     this.recentSearchStore,
     this.showApi,
+    this.ticketStore,
+    this.memoryConcertApi,
   });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
@@ -72,6 +83,15 @@ class App extends StatefulWidget {
 
   /// 공연 상세 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는 목을 넣는다.
   final ShowApi? showApi;
+
+  /// 소장품(메모리 티켓) 저장소. main 이 기기 저장소 구현을 넘긴다. 안 넘기면
+  /// (위젯 테스트, 또는 기기 저장소를 못 연 실행) 앱을 끄면 사라지는 구현으로
+  /// 시작한다.
+  final TicketStore? ticketStore;
+
+  /// 소장품을 만들 수 있는 공연 카탈로그 API. 안 넘기면 목을 쓴다 — 아직
+  /// 백엔드에 이 주소가 없다([MemoryConcertApi] 주석).
+  final MemoryConcertApi? memoryConcertApi;
 
   @override
   State<App> createState() => _AppState();
@@ -178,6 +198,23 @@ class _AppState extends State<App> {
   late final RecentSearchStore _recentSearchStore =
       widget.recentSearchStore ?? InMemoryRecentSearchStore();
 
+  /// 소장품 저장소. API 들과 같은 이유로 앱에 하나만 두고 [TicketStoreScope] 로
+  /// 내려준다.
+  late final TicketStore _ticketStore =
+      widget.ticketStore ?? InMemoryTicketStore();
+
+  late final MemoryConcertApi _memoryConcertApi =
+      widget.memoryConcertApi ?? MockMemoryConcertApi();
+
+  /// '제작중' job. 제작 화면이 시작하고, 완료 배너가 결과를 받는다. 둘이 서로
+  /// 다른 라우트라 라우트보다 위에서 만들어 [CreationJobScope] 로 내려준다.
+  /// 예매 컨트롤러를 여기서 만드는 것과 같은 이유다.
+  late final CreationJob _creationJob = CreationJob(store: _ticketStore);
+
+  /// 완료 배너가 소장품을 여는 데 쓴다. 배너는 [MaterialApp.builder] 자리에
+  /// 있어서 그 아래의 Navigator 를 context 로는 못 찾는다.
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -189,6 +226,10 @@ class _AppState extends State<App> {
   void dispose() {
     ApiClient.dio.interceptors.remove(_authInterceptor);
     _bookingController.dispose();
+    _creationJob.dispose();
+    // 저장소는 우리가 만든 것(테스트·실패 대비 기본값)만 정리한다. main 이
+    // 넘긴 것은 앱과 수명이 같다. 세션을 다루는 방식과 같다.
+    if (widget.ticketStore == null) _ticketStore.dispose();
     // 세션은 우리가 만든 것(테스트용 기본값)만 정리한다. main 이 넘긴 것은
     // 앱과 수명이 같아 따로 정리할 일이 없다.
     if (widget.session == null) _session.dispose();
@@ -215,13 +256,37 @@ class _AppState extends State<App> {
                     controller: _bookingController,
                     child: RecentSearchScope(
                       store: _recentSearchStore,
-                      child: MaterialApp(
-                        title: 'TIMO',
-                        theme: AppTheme.light,
-                        // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                        // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                        initialRoute: AppRoutes.home,
-                        routes: AppRoutes.routes,
+                      child: TicketStoreScope(
+                        store: _ticketStore,
+                        child: MemoryConcertApiScope(
+                          api: _memoryConcertApi,
+                          child: CreationJobScope(
+                            job: _creationJob,
+                            child: MaterialApp(
+                              title: 'TIMO',
+                              theme: AppTheme.light,
+                              navigatorKey: _navigatorKey,
+                              // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                              // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                              initialRoute: AppRoutes.home,
+                              routes: AppRoutes.routes,
+                              // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                              // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                              // 라우트가 아니라 앱 전체를 감싼다.
+                              //
+                              // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                              // 애니메이션 채널도 같이 멈춘다.
+                              builder: (context, child) {
+                                AmbientMotion.instance.enabled =
+                                    !Motion.reduced(context);
+                                return CreationNotificationHost(
+                                  navigatorKey: _navigatorKey,
+                                  child: child!,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

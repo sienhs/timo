@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
 import 'features/auth/data/device_id.dart';
 import 'features/auth/data/token_storage.dart';
 import 'features/auth/state/auth_session.dart';
 import 'features/home/data/recent_search_store.dart';
+import 'features/memory/data/ticket_store.dart';
 
 Future<void> main() async {
   // 기기 저장소(플러그인)를 runApp 전에 쓰려면 먼저 엔진과 연결해야 한다.
@@ -29,11 +31,32 @@ Future<void> main() async {
     );
   }
 
+  // 소장품(메모리 티켓) 저장소. 컬렉션 화면이 열리자마자 목록을 그려야 해서
+  // 상자를 여기서 미리 연다. 여는 데 실패하면 소장품 기능만 빼고 앱은 켠다 —
+  // 예매·티켓은 이 상자와 아무 상관이 없다.
+  TicketStore? ticketStore;
+  try {
+    await Hive.initFlutter();
+    ticketStore = HiveTicketStore(
+      await Hive.openBox<String>(HiveTicketStore.boxName),
+    );
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'timo memory',
+        context: ErrorDescription('소장품 저장소를 여는 중'),
+      ),
+    );
+  }
+
   runApp(
     App(
       session: session,
       // 최근 검색어는 검색 화면이 열릴 때 읽으므로 여기서 기다리지 않는다.
       recentSearchStore: SharedPreferencesRecentSearchStore(),
+      ticketStore: ticketStore,
     ),
   );
 }

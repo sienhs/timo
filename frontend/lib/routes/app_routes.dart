@@ -13,6 +13,7 @@ import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/booking_scope.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/home/screens/show_search_screen.dart';
+import '../features/memory/screens/collection_screen.dart';
 import '../features/mypage/screens/coin_charge_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
 import '../features/ticket/models/my_ticket.dart';
@@ -46,6 +47,10 @@ class AppRoutes {
   /// 입장 QR. 내 티켓의 예정 공연 카드에서 티켓([MyTicket])을 받아 연다.
   static const entryQr = '/tickets/qr';
 
+  /// 소장품(메모리 티켓) 컬렉션. 빠른 메뉴에서 들어온다. 제작·뷰어는 이
+  /// 화면에서 이어지는 흐름이라 라우트로 따로 내놓지 않는다.
+  static const collection = '/collection';
+
   /// 구역 배치도(좌석 선택 시작)
   static const zoneSelection = '/booking/zones';
 
@@ -77,6 +82,7 @@ class AppRoutes {
     showSearch: (_) => const ShowSearchScreen(),
     myTickets: (_) => const MyTicketsScreen(),
     coinCharge: (_) => const CoinChargeScreen(),
+    collection: (_) => const CollectionScreen(),
     // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
     // 조회하면 입장 직전에 네트워크를 한 번 더 타게 된다.
     entryQr: (context) => EntryQrScreen(

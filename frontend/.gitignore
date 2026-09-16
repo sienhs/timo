@@ -46,3 +46,15 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# 깊이 모델 FP32 원본. 배포에는 INT8 만 싣는다(android/app/build.gradle.kts).
+# 이 파일은 tools/quantize_depth.py 를 다시 돌릴 때만 로컬에 두면 된다.
+assets/models/depth_anything_v2_vits.onnx
+assets/models/depth_anything_v2_vits.json
+
+# 아웃페인팅 API 키. --dart-define-from-file=.env 로 읽는다.
+.env
+
+# 통합 테스트가 기기에서 뽑는 검증 이미지. 수치와 결론은
+# docs/memory/verification/ 의 REPORT.md·json 에 남긴다.
+verification/

@@ -1,0 +1,23 @@
+{
+  "model": "Depth Anything V2 Small (ViT-S), dynamic INT8",
+  "source": {
+    "file": "depth_anything_v2_vits.onnx",
+    "sha256": "afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c",
+    "export": "onnx-community/depth-anything-v2-small, FP32"
+  },
+  "quantization": {
+    "method": "onnxruntime.quantization.quantize_dynamic",
+    "op_types": [
+      "MatMul"
+    ],
+    "weight_type": "QInt8",
+    "per_channel": true,
+    "activations": "uint8 (DynamicQuantizeLinear)"
+  },
+  "tool": "tools/quantize_depth.py, onnxruntime 1.23.2",
+  "sha256": "f7b132de541137c0dc2acc818543b8351cbe7961f69cb84fa08c44f36dd6591d",
+  "bytes": 35615956,
+  "runtime": "ONNX Runtime >= 1.23.2 CPU execution provider",
+  "license": "Apache-2.0",
+  "upstream": "https://github.com/DepthAnything/Depth-Anything-V2"
+}

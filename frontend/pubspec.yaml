@@ -39,8 +39,21 @@ dependencies:
   qr_flutter: ^4.1.0
   shared_preferences: ^2.5.5
 
+  # 메모리 티켓(소장품). 사진을 골라 온디바이스로 처리하고, 만든 소장품을
+  # 기기에 두고, 기울이기·영상 재생으로 본다.
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  image_picker: ^1.2.3
+  path_provider: ^2.1.6
+  sensors_plus: ^7.1.0
+  video_player: ^2.14.0
+
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+
+  # 메모리 티켓의 온디바이스 처리는 실기기에서만 검증된다(integration_test/).
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -63,6 +76,25 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/demo/
+    - assets/videos/
+
+  # 메모리 티켓 효과. 런타임에 ShaderCache 가 이름으로 찾는다.
+  #
+  # assets/models/ 는 여기 없다 — 추론 모델은 네이티브가 AssetManager 로 직접
+  # 열고(android/app/build.gradle.kts 의 sync 태스크) Flutter 에셋으로도 올리면
+  # 같은 수십 MB 가 APK 에 두 번 들어간다.
+  shaders:
+    - shaders/aurora.frag
+    - shaders/depth_parallax.frag
+    - shaders/person_depth.frag
+    - shaders/person_layers.frag
+    - shaders/holo_foil.frag
+    - shaders/smog.frag
+    - shaders/particles.frag
+    - shaders/volumetric.frag
+    - shaders/god_rays.frag
+    - shaders/rim_light.frag
 
   # To add assets to your application, add an assets section, like this:
   # assets:

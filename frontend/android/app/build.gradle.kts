@@ -19,7 +19,9 @@ android {
         applicationId = "com.ssafy.timo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // ML Kit selfie segmentation + ONNX Runtime 이 요구하는 하한. 메모리
+        // 티켓의 온디바이스 처리가 들어오면서 올렸다.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -34,6 +36,13 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Flutter 의 Gradle 플러그인이 릴리스에 R8 을 이미 켜 둔다. 규칙이
+            // 없으면 ML Kit·MediaPipe·ONNX Runtime 의 리플렉션/JNI 진입점이
+            // 지워져 추론이 ClassNotFoundException 으로 죽는다.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -47,3 +56,34 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// --- 메모리 티켓 온디바이스 처리 ---------------------------------------------
+dependencies {
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("com.google.mediapipe:tasks-vision:0.10.32")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
+}
+
+// 추론 모델은 Flutter 에셋이 아니라 Android 에셋으로 들어가야 한다 — 네이티브
+// 쪽(DepthProcessor·PortraitMatting)이 AssetManager 로 직접 연다. pubspec 에
+// 올리면 같은 파일이 APK 에 두 번 들어간다.
+//
+// 배포에는 INT8 만 싣는다. FP32 원본은 레포에 없고(.gitignore), 양자화 도구
+// (tools/quantize_depth.py)를 돌릴 때만 로컬에 둔다.
+val syncDepthModel by tasks.registering(Sync::class) {
+    from("../../assets/models") {
+        include("depth_anything_v2_vits_int8.onnx", "depth_anything_v2_vits_int8.json", "DEPTH_ANYTHING_LICENSE.txt")
+    }
+    into(layout.buildDirectory.dir("generated/depthAssets/models"))
+}
+val syncMattingModel by tasks.registering(Sync::class) {
+    from("../../assets/models") {
+        include("modnet_photographic_portrait_matting.onnx", "modnet_photographic_portrait_matting.json", "MODNET_LICENSE.txt")
+    }
+    into(layout.buildDirectory.dir("generated/mattingAssets/models"))
+}
+android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/depthAssets").get().asFile)
+android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/mattingAssets").get().asFile)
+tasks.named("preBuild") { dependsOn(syncDepthModel, syncMattingModel) }
