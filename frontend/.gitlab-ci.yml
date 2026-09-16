@@ -38,8 +38,25 @@ frontend_test:
 frontend_build:
   stage: build
   image: ghcr.io/cirruslabs/flutter:stable
+  # A cold container has to install Android SDK/NDK/CMake before assembling
+  # the release APK; the project-wide 10-minute default terminates Gradle.
+  timeout: 30 minutes
 
   before_script:
+    # The runner checkout can leave LFS objects as pointer files because this
+    # image does not ship with git-lfs.  Fetch them explicitly before Gradle
+    # copies the on-device models into the release APK.
+    - apt-get update && apt-get install -y --no-install-recommends git-lfs
+    - git lfs install --local
+    - git lfs pull --include="frontend/assets/models/*.onnx,frontend/android/app/src/main/assets/models/*.task"
+    - |
+      for model in \
+        frontend/assets/models/depth_anything_v2_vits_int8.onnx \
+        frontend/assets/models/modnet_photographic_portrait_matting.onnx \
+        frontend/android/app/src/main/assets/models/pose_landmarker_lite.task
+      do
+        ! head -n 1 "$model" | grep -qx 'version https://git-lfs.github.com/spec/v1'
+      done
     - cd frontend
     - flutter pub get
 
