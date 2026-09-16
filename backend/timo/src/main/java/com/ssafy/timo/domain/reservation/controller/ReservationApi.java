@@ -4,6 +4,7 @@ import com.ssafy.timo.domain.reservation.dto.CreateReservationRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationDetailResponseDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationListRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationSummaryResponseDto;
+import com.ssafy.timo.global.security.CurrentMember;
 import jakarta.validation.Valid;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
@@ -38,12 +39,13 @@ public interface ReservationApi {
      * 공연이 예매 진행 중이 아니면 409({@code ConcertNotOnSaleException}) 다.
      */
     @PostMapping
-    ResponseEntity<ReservationDetailResponseDto> create(@Valid @RequestBody CreateReservationRequestDto request);
+    ResponseEntity<ReservationDetailResponseDto> create(@Valid @RequestBody CreateReservationRequestDto request,
+                                                        @CurrentMember Long memberId);
 
     /** 내 주문 목록. 최근 주문순. {@code status} 로 걸러 볼 수 있다. */
     @GetMapping
     ResponseEntity<PagedModel<ReservationSummaryResponseDto>> findAll(
-            @Valid @ModelAttribute ReservationListRequestDto request);
+            @Valid @ModelAttribute ReservationListRequestDto request, @CurrentMember Long memberId);
 
     /**
      * 주문 상세와 발행 진행 상태. "회원은 발행 진행 상태를 조회할 수 있다" 가 이 엔드포인트다.
@@ -51,7 +53,7 @@ public interface ReservationApi {
      * <p>남의 주문은 존재를 알리지 않고 404 다.
      */
     @GetMapping("/{reservationId}")
-    ResponseEntity<ReservationDetailResponseDto> find(@PathVariable Long reservationId);
+    ResponseEntity<ReservationDetailResponseDto> find(@PathVariable Long reservationId, @CurrentMember Long memberId);
 
     /**
      * 예매를 취소한다. 티켓은 회수({@code REVOKED})되고 정가가 전액 포인트로 환원된다. 수수료는 없다.
@@ -63,5 +65,5 @@ public interface ReservationApi {
      * 없으면 주최사가 재오픈할 때까지 미판매로 남는다.
      */
     @DeleteMapping("/{reservationId}")
-    ResponseEntity<ReservationDetailResponseDto> cancel(@PathVariable Long reservationId);
+    ResponseEntity<ReservationDetailResponseDto> cancel(@PathVariable Long reservationId, @CurrentMember Long memberId);
 }

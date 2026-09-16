@@ -8,11 +8,11 @@ import org.springframework.data.web.PagedModel;
 
 public interface ReservationService {
 
-    ReservationDetailResponseDto create(CreateReservationRequestDto request);
+    ReservationDetailResponseDto create(Long memberId, CreateReservationRequestDto request);
 
-    PagedModel<ReservationSummaryResponseDto> findAll(ReservationListRequestDto request);
+    PagedModel<ReservationSummaryResponseDto> findAll(Long memberId, ReservationListRequestDto request);
 
-    ReservationDetailResponseDto find(Long reservationId);
+    ReservationDetailResponseDto find(Long memberId, Long reservationId);
 
-    ReservationDetailResponseDto cancel(Long reservationId);
+    ReservationDetailResponseDto cancel(Long memberId, Long reservationId);
 }
