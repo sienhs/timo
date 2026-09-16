@@ -38,6 +38,8 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -51,9 +53,13 @@ import java.util.Optional;
 /**
  * 공식 양도 마켓 API 스텁 (v0).
  *
- * <p>티켓 도메인이 아직 없어 필요한 최소한의 티켓 상태를 이 컨트롤러가 직접 들고 있다
- * ({@link MarketTicket}). <b>TODO</b>: 티켓 도메인이 생기면 이 상태를 그쪽 미러 테이블로 옮기고
- * 여기서는 조회만 한다.
+ * <p>필요한 최소한의 티켓 상태를 이 컨트롤러가 직접 들고 있다({@link MarketTicket}). 티켓 도메인
+ * ({@code Ticket})이 생긴 뒤에도 그대로 둔다 - 스텁은 DB 없이 혼자 도는 것이 목적이고, 실제 티켓을
+ * 읽기 시작하면 예매부터 만들어야 매물이 생겨 FE 가 화면을 볼 수 없다.
+ *
+ * <p>다만 <b>정가의 출처가 v1 과 다르다.</b> 여기서는 구역 가격({@code section.price})을 정가로 쓰는데
+ * 실제 구현은 공연 정가({@code Concert.facePrice})다. 스텁 고정 데이터에는 공연 정가가 없고, 계약
+ * (정가 이하로만 등록된다)을 재현하는 데는 어느 쪽이든 상관없어 그대로 둔다.
  *
  * <p>매물({@link StubListing})과 체결({@link StubTrade})을 티켓과 따로 들고 있다. 실제 구조가
  * {@code ticket} · {@code ticket_listing} · {@code ticket_trade} 세 테이블이고, 한 티켓이 여러 번
@@ -72,6 +78,11 @@ import java.util.Optional;
  * <p>재현하지 않는 것: 포인트 차감·판매 대금 정산(지갑 도메인), 티켓 이력·입장(티켓 도메인),
  * 잔액 부족 거절, 1인 1매(온체인 {@code AlreadyHoldsShowTicket} 이 맡는다).
  * {@code Idempotency-Key} 는 형식만 검증하고 저장하지 않는다.
+ *
+ * <p><b>요청자({@code memberId})를 받지만 쓰지 않는다.</b> 스텁의 "내 것" 판정은 고정 데이터가
+ * 정하기 때문이다({@code mine} 플래그). 파라미터가 있는 이유는 규약({@code MarketApi})이 모든 경로에
+ * 요청자를 요구해서이고, 그 덕에 <b>토큰 없이 부르면 v0 도 401</b> 이다 - v1 과 같은 지점에서 막히는
+ * 편이 FE 가 나중에 놀라지 않는다.
  */
 @StubController
 @RequestMapping(MarketStubController.BASE_PATH)
@@ -103,14 +114,14 @@ public class MarketStubController implements MarketApi {
             tickets.put(ticketId, ticket);
 
             if (fixture.listPrice() != null) {
-                openListing(ticket, Math.toIntExact(fixture.listPrice()), StubFixtures.FIXTURE_LISTED_AT);
+                openListing(ticket, fixture.listPrice(), StubFixtures.FIXTURE_LISTED_AT);
             }
         }
     }
 
     @Override
     public synchronized ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
-            MarketListRequestDto request) {
+            MarketListRequestDto request, Long memberId) {
         settle();
 
         // 공연마다 매물 수와 최저가만 모은다. 실제 구현은 group by 한 번이다.
@@ -124,7 +135,7 @@ public class MarketStubController implements MarketApi {
         List<MarketConcertSummaryResponseDto> matched = byConcert.entrySet().stream()
                 .map(entry -> {
                     ConcertFixture concert = concertStore.find(entry.getKey()).orElseThrow();
-                    int lowest = entry.getValue().stream().mapToInt(listing -> listing.price).min().orElseThrow();
+                    long lowest = entry.getValue().stream().mapToLong(listing -> listing.price).min().orElseThrow();
                     return new MarketConcertSummaryResponseDto(
                             concert.id(),
                             concert.title(),
@@ -147,7 +158,7 @@ public class MarketStubController implements MarketApi {
 
     @Override
     public synchronized ResponseEntity<PagedModel<ListingSummaryResponseDto>> findListings(
-            Long concertId, MarketListRequestDto request) {
+            Long concertId, MarketListRequestDto request, Long memberId) {
         settle();
         concertStore.find(concertId).orElseThrow(() -> new ConcertNotFoundException(concertId));
 
@@ -155,7 +166,7 @@ public class MarketStubController implements MarketApi {
                 .filter(listing -> listing.status == ListingStatus.LISTED)
                 .filter(listing -> listing.ticket.concertId == concertId)
                 // 낮은 가격순. 동가는 listingId 오름차순으로 고정해 페이지를 넘길 때 같은 매물이 두 번 나오지 않게 한다.
-                .sorted(Comparator.comparingInt((StubListing listing) -> listing.price)
+                .sorted(Comparator.comparingLong((StubListing listing) -> listing.price)
                         .thenComparingLong(listing -> listing.listingId))
                 .map(this::toSummary)
                 .toList();
@@ -164,7 +175,7 @@ public class MarketStubController implements MarketApi {
     }
 
     @Override
-    public synchronized ResponseEntity<ListingDetailResponseDto> findListing(Long listingId) {
+    public synchronized ResponseEntity<ListingDetailResponseDto> findListing(Long listingId, Long memberId) {
         settle();
         // 팔렸거나 취소된 매물도 조회된다. 상세로 들어가는 사이에 팔릴 수 있기 때문이다.
         StubListing listing = Optional.ofNullable(listings.get(listingId))
@@ -175,7 +186,7 @@ public class MarketStubController implements MarketApi {
 
     @Override
     public synchronized ResponseEntity<PagedModel<MyTradeSummaryResponseDto>> findMyTrades(
-            MarketListRequestDto request) {
+            MarketListRequestDto request, Long memberId) {
         settle();
         List<MyTradeSummaryResponseDto> matched = new ArrayList<>();
 
@@ -199,7 +210,8 @@ public class MarketStubController implements MarketApi {
     }
 
     @Override
-    public synchronized ResponseEntity<ListingDetailResponseDto> list(CreateListingRequestDto request) {
+    public synchronized ResponseEntity<ListingDetailResponseDto> list(CreateListingRequestDto request,
+                                                                      Long memberId) {
         settle();
         MarketTicket ticket = tickets.get(request.ticketId());
         if (ticket == null) {
@@ -223,7 +235,7 @@ public class MarketStubController implements MarketApi {
     }
 
     @Override
-    public synchronized ResponseEntity<Void> cancel(Long listingId) {
+    public synchronized ResponseEntity<Void> cancel(Long listingId, Long memberId) {
         settle();
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
@@ -243,7 +255,7 @@ public class MarketStubController implements MarketApi {
 
     @Override
     public synchronized ResponseEntity<PurchaseResponseDto> purchase(
-            Long listingId, String idempotencyKey, PurchaseRequestDto request) {
+            Long listingId, String idempotencyKey, PurchaseRequestDto request, Long memberId) {
         settle();
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
@@ -282,7 +294,7 @@ public class MarketStubController implements MarketApi {
                 trade.tradedAt));
     }
 
-    private StubListing openListing(MarketTicket ticket, int price, LocalDateTime listedAt) {
+    private StubListing openListing(MarketTicket ticket, long price, LocalDateTime listedAt) {
         StubListing listing = new StubListing(listingSequence++, ticket, price, ticket.mine, listedAt);
         listings.put(listing.listingId, listing);
         ticket.currentListingId = listing.listingId;
@@ -392,11 +404,15 @@ public class MarketStubController implements MarketApi {
     }
 
     private int discountRate(StubListing listing) {
-        int faceValue = listing.ticket.faceValue;
+        long faceValue = listing.ticket.faceValue;
         if (faceValue <= 0) {
             return 0;
         }
-        return (int) ((faceValue - (long) listing.price) * 100L / faceValue);
+        // 계산 방식은 TicketListing.discountRate 와 같다 - 금액 단위가 wei 면 long 곱셈이 넘친다.
+        return BigDecimal.valueOf(faceValue - listing.price)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(faceValue), 0, RoundingMode.FLOOR)
+                .intValue();
     }
 
     private ConcertFixture concertOf(MarketTicket ticket) {
@@ -406,18 +422,20 @@ public class MarketStubController implements MarketApi {
     /**
      * 마켓이 아는 티켓 하나. 소유자와 등록 여부가 바뀌므로 가변이다.
      *
-     * <p>티켓 도메인이 생기면 이 클래스는 사라지고 그쪽 미러 테이블을 읽는다. 그래서 밖으로 노출하지 않는다.
+     * <p>실제 {@code Ticket} 과 모양이 다르다 - 그쪽은 소유자·공연·좌석을 직접 들지 않고
+     * {@code reservation} 을 거치며, 소유자 컬럼 자체가 없다. 여기서는 스텁이 소유자를 바꿔야 해서
+     * {@code mine} 을 직접 든다. 밖으로 노출하지 않는 이유이기도 하다.
      */
     private static final class MarketTicket {
 
         private final long ticketId;
         private final long concertId;
         private final SeatFixture seat;
-        private final int faceValue;
+        private final long faceValue;
         private boolean mine;
         private Long currentListingId;
 
-        MarketTicket(long ticketId, long concertId, SeatFixture seat, int faceValue, boolean mine) {
+        MarketTicket(long ticketId, long concertId, SeatFixture seat, long faceValue, boolean mine) {
             this.ticketId = ticketId;
             this.concertId = concertId;
             this.seat = seat;
@@ -435,14 +453,14 @@ public class MarketStubController implements MarketApi {
 
         private final long listingId;
         private final MarketTicket ticket;
-        private final int price;
+        private final long price;
         /** 등록한 사람이 나인가. 티켓의 소유자는 바뀌지만 이 값은 등록 시점에 고정된다. */
         private final boolean listedByMe;
         private final LocalDateTime listedAt;
         private ListingStatus status = ListingStatus.LISTED;
         private LocalDateTime closedAt;
 
-        StubListing(long listingId, MarketTicket ticket, int price, boolean listedByMe, LocalDateTime listedAt) {
+        StubListing(long listingId, MarketTicket ticket, long price, boolean listedByMe, LocalDateTime listedAt) {
             this.listingId = listingId;
             this.ticket = ticket;
             this.price = price;

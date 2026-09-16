@@ -35,8 +35,8 @@ public record MyTradeSummaryResponseDto(
         String venueName,
         String sectionName,
         SeatGrade grade,
-        int price,
-        int faceValue,
+        long price,
+        long faceValue,
         LocalDateTime occurredAt
 ) {
 

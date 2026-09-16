@@ -1,7 +1,11 @@
 package com.ssafy.timo.domain.transfer.repository;
 
+import com.ssafy.timo.domain.transfer.dto.MarketConcertRow;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -9,9 +13,81 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Repository
 public interface TicketListingRepository extends JpaRepository<TicketListing, Long> {
+
+    /**
+     * 양도 매물이 올라와 있는 공연 목록. 공연마다 매물 수와 최저가만 모은다.
+     *
+     * <p>집계는 {@code group by} 한 번이다. 공연을 먼저 뽑고 공연마다 개수를 세면 N+1 이 된다.
+     *
+     * <p>{@code LISTED} 매물이 하나도 없는 공연은 애초에 결과에 나오지 않는다 —
+     * {@code TicketListing} 에서 출발해 공연으로 조인하기 때문이다. 매물이 0 인 행을 내보내면
+     * 사용자가 들어가 봐야 빈 화면이다.
+     *
+     * <p>{@code startDate} 가 비어 있는 공연도 함께 빠진다. 일정이 없으면 "임박한 순" 이라는 정렬에
+     * 자리를 줄 수 없고, 티켓을 살 시점도 판단할 수 없다.
+     *
+     * <p><b>{@code Pageable} 의 정렬은 비워서 넘긴다.</b> 정렬이 쿼리 안에 박혀 있어, 넘기면 뒤에
+     * 덧붙어 중복된다. 순서가 하나뿐이라 호출하는 쪽이 고를 것도 없다.
+     */
+    @Query(value = """
+            select c.id as concertId,
+                   c.title as title,
+                   c.posterImageKey as posterImageKey,
+                   c.startDate as startDate,
+                   c.endDate as endDate,
+                   v.name as venueName,
+                   count(l.id) as listingCount,
+                   min(l.price) as lowestPrice
+              from TicketListing l
+              join l.concert c
+              join c.venue v
+             where l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and c.startDate > :now
+             group by c.id, c.title, c.posterImageKey, c.startDate, c.endDate, v.name
+             order by c.startDate asc, c.id asc
+            """,
+            countQuery = """
+            select count(distinct c.id)
+              from TicketListing l
+              join l.concert c
+             where l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and c.startDate > :now
+            """)
+    Page<MarketConcertRow> findConcertSummaries(@Param("now") LocalDateTime now, Pageable pageable);
+
+    /**
+     * 공연 하나의 구매 가능한 매물 목록.
+     *
+     * <p>정렬(낮은 가격순, 동가는 {@code listingId} 오름차순)은 {@code Pageable} 로 받는다.
+     * 동가에 유일 키를 덧붙이지 않으면 페이지를 넘길 때 같은 매물이 두 번 나오거나 건너뛴다.
+     *
+     * <p>{@code section} 을 함께 읽는다. 목록이 구역명·등급을 쓰는데 지연 로딩으로 두면 매물 수만큼
+     * 추가 쿼리가 나간다. 다대일이라 페이징과 함께 써도 안전하다.
+     */
+    @EntityGraph(attributePaths = "section")
+    Page<TicketListing> findByConcertIdAndStatus(Long concertId, ListingStatus status, Pageable pageable);
+
+    /**
+     * 매물 상세.
+     *
+     * <p>상세는 공연·공연장·구역을 한 번에 쓰므로 미리 함께 읽는다.
+     *
+     * <p><b>상태로 거르지 않는다.</b> 팔렸거나 취소된 매물도 조회된다 — 목록에서 상세로 들어가는
+     * 사이에 팔릴 수 있고, 그때 404 를 주면 화면이 "없는 매물" 로 오해한다.
+     */
+    @Query("""
+            select l
+              from TicketListing l
+              join fetch l.concert c
+              join fetch c.venue
+              join fetch l.section
+             where l.id = :listingId
+            """)
+    Optional<TicketListing> findDetailById(@Param("listingId") Long listingId);
 
     /**
      * 매물을 체결 상태로 넘긴다. <b>이 메서드가 동시 구매 방어의 전부다.</b>
@@ -70,10 +146,14 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
     /**
      * 이 티켓에 진행 중인 등록이 있는지 본다.
      *
-     * <p>MySQL 에 부분 유니크 인덱스가 없어 "티켓당 진행 중 등록은 하나"를 DB 제약으로 걸 수 없다.
-     * 실제 보장은 {@code ticket.status} 를 {@code ISSUED -> LISTED} 로 바꾸는 조건부 UPDATE 가 하고,
-     * 이 메서드는 <b>안내용 선검사와 점검에만</b> 쓴다. 이것만으로 막으려 하면 확인과 등록 사이에
-     * 다른 요청이 끼어든다.
+     * <p><b>안내용 선검사다.</b> 흔한 경우를 친절한 메시지로 걸러낼 뿐이고, 이것만으로 막으려 하면
+     * 확인과 등록 사이에 다른 요청이 끼어든다.
+     *
+     * <p>실제 보장은 {@code uk_listing_ticket_active} 가 한다 — {@code status='LISTED'} 일 때만 값을
+     * 갖는 생성 칼럼에 건 유니크 제약이다({@code TicketListing} 주석). {@code ticket.status} 를
+     * {@code OWNED -> LISTED} 로 바꾸는 조건부 UPDATE 를 쓰지 않는 이유는 두 가지다 — {@code Ticket} 에
+     * {@code LISTED} 로 가는 전이 메서드가 없고(티켓 도메인은 이쪽 소관이 아니다), 매물의 유일성은
+     * 매물 테이블 자신이 지키는 편이 더 강하다. 티켓 상태가 어떻든 뚫리지 않는다.
      */
     boolean existsByTicketIdAndStatus(Long ticketId, ListingStatus status);
 }

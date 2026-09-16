@@ -29,8 +29,8 @@ public record ListingSummaryResponseDto(
         Long listingId,
         String sectionName,
         SeatGrade grade,
-        int price,
-        int faceValue,
+        long price,
+        long faceValue,
         int discountRate,
         boolean mine,
         LocalDateTime listedAt

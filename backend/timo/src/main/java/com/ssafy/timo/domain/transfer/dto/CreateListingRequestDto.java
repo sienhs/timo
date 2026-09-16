@@ -10,8 +10,12 @@ import jakarta.validation.constraints.Positive;
  * 식별자를 이미 알고 있고, 남의 것을 넣어도 소유자 검증에서 막힌다. 역추적 위험은 "남의 매물
  * 응답에서 그 매물의 티켓이 무엇인지 알게 되는 것"이라 요청 방향과는 무관하다.
  *
- * <p>{@code price} 가 정가 이하인지는 형식 검증이 아니라 티켓의 정가를 알아야 해서 서비스가
- * 판단한다({@code ListPriceExceedsFacePriceException}). 0 은 무상 전송이라 성립하지 않는다.
+ * <p>{@code price} 가 정가 이하인지는 형식 검증이 아니라 그 티켓이 걸린 공연의 정가
+ * ({@code Concert.facePrice})를 알아야 해서 서비스가 판단한다
+ * ({@code ListPriceExceedsFacePriceException}). 0 은 무상 전송이라 성립하지 않는다.
+ *
+ * <p>{@code price} 가 {@code Long} 인 이유는 {@code TicketListing.faceValue} 주석을 본다 —
+ * 정가의 단위가 미확정이라 wei 가 들어와도 받을 수 있어야 한다.
  */
 public record CreateListingRequestDto(
 
@@ -21,6 +25,6 @@ public record CreateListingRequestDto(
 
         @NotNull(message = "등록가는 필수입니다.")
         @Positive(message = "등록가는 1 이상이어야 합니다.")
-        Integer price
+        Long price
 ) {
 }
