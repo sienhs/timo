@@ -114,3 +114,63 @@ flutter run                                         # 기본값. 실제 서버(v
   - 재발급까지 실패하면 로그아웃 상태가 된다.
   - 동시에 여러 요청이 만료로 막혀도 재발급은 한 번만 나가고, 나머지는 그 결과를 같이 받는다.
   - 만료 직전에 미리 받아 두는 방식은 아직 없다. 필요해지면 얹는다.
+
+## 메모리 티켓(소장품)
+
+빠른 메뉴 → **컬렉션**. 공연 사진을 골라 기기 안에서 인물을 떼어내고 깊이를 추론해
+입체 티켓으로 만든다. 만든 소장품은 서버가 아니라 기기(Hive)에 남는다.
+
+### 받은 뒤 한 번만
+
+추론 모델(약 60MB)이 **Git LFS** 로 들어 있다. LFS 없이 클론하면 `.onnx` 자리에
+포인터 텍스트만 받아져 빌드는 되지만 실행 중에 모델 로드가 실패한다.
+
+```bash
+git lfs install
+git lfs pull
+```
+
+### 실행
+
+```bash
+flutter run                                   # AI 배경 확장 없이. 나머지는 전부 동작
+flutter run --dart-define-from-file=.env      # AI 배경 확장까지 (.env.example 참고)
+```
+
+`.env` 는 커밋하지 않는다(`.gitignore`). 키가 없으면 '쓰기'(AI 배경 확장) 버튼만
+비활성이고 제작 흐름은 그대로 돈다.
+
+### 알아둘 것
+
+- **minSdk 24.** ML Kit 셀피 분할과 ONNX Runtime 의 하한이다.
+- **APK 가 커진다.** 모델 60MB + ONNX Runtime 네이티브 라이브러리가 들어간다.
+  배포용은 반드시 **`flutter build apk --release --split-per-abi`** 로 뽑는다
+  (arm64 약 129MB). `--target-platform android-arm64` 만으로는 ONNX·MediaPipe·
+  ML Kit 이 3개 ABI 를 다 싣기 때문에 215MB 가 된다.
+- **릴리스는 R8 을 탄다.** `android/app/proguard-rules.pro` 가 ML Kit·MediaPipe·
+  ONNX Runtime 의 리플렉션/JNI 진입점과 flogger 를 지켜 준다. 이 규칙이 없으면
+  빌드가 아예 안 되거나, 되더라도 실행 중 포즈 추정에서 프로세스가 죽는다.
+- **모델은 Flutter 에셋이 아니다.** 네이티브(`DepthProcessor`·`PortraitMatting`)가
+  AssetManager 로 직접 여는 Android 에셋이라, `android/app/build.gradle.kts` 의
+  sync 태스크가 빌드 때 복사한다. pubspec 에 또 올리면 APK 에 두 번 들어간다.
+- **FP32 깊이 모델(95MB)은 레포에 없다.** 배포에는 INT8 만 싣는다. 다시 양자화할
+  일이 있으면 `tools/download_depth.py` → `tools/export_depth.py` →
+  `tools/quantize_depth.py` 순서로 로컬에 만든다.
+
+### 폴더
+
+```
+lib/features/memory/
+├── constants.dart      # 문구·치수·처리 상수 (영역별 클래스)
+├── data/               # 네이티브 채널(timo/image_pipeline)·저장소·공연 API
+├── models/             # 소장품·공연·효과·프레이밍
+├── state/              # TicketStore / CreationJob / 공연 API 스코프
+├── screens/            # 컬렉션·제작·뷰어
+├── widgets/            # collection · creator · viewer · ui
+├── effects/            # 셰이더 패스·블룸·볼류메트릭
+├── motion/             # 앰비언트 모션·전환 토큰
+└── theme/              # 소장품 전용 팔레트와 어두운 무대 테마
+```
+
+모델을 왜 이걸 골랐는지, 인물 깊이 레이어와 빛줄기를 어떻게 만드는지는
+`docs/memory/` 에 있다.

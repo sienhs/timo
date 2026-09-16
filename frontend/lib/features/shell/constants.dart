@@ -62,7 +62,11 @@ const quickMenuItems = <QuickMenuItem>[
     label: '마이 티켓',
     routeName: AppRoutes.myTickets,
   ),
-  QuickMenuItem(icon: Icons.collections_bookmark_outlined, label: '컬렉션'),
+  QuickMenuItem(
+    icon: Icons.collections_bookmark_outlined,
+    label: '컬렉션',
+    routeName: AppRoutes.collection,
+  ),
   QuickMenuItem(icon: Icons.favorite_border, label: '찜'),
   QuickMenuItem(
     icon: Icons.savings_outlined,
