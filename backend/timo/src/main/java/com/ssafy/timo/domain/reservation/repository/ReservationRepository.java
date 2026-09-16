@@ -1,6 +1,9 @@
 package com.ssafy.timo.domain.reservation.repository;
 
 import com.ssafy.timo.domain.reservation.entity.Reservation;
+import com.ssafy.timo.domain.reservation.entity.ReservationStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -57,4 +60,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             """)
     Optional<Reservation> findPaidOfMember(@Param("concertId") Long concertId,
                                            @Param("memberId") Long memberId);
+
+    /** 내 주문 목록. 카드에 필요한 연관을 함께 읽는다 - status가 null이면 전체를 본다. */
+    @Query(value = """
+            select r from Reservation r
+            join fetch r.concert c
+            join fetch c.venue
+            join fetch r.seat s
+            join fetch s.section
+            where r.member.id = :memberId
+              and (:status is null or r.status = :status)
+            """,
+            countQuery = """
+            select count(r) from Reservation r
+            where r.member.id = :memberId
+              and (:status is null or r.status = :status)
+            """)
+    Page<Reservation> findPageByMemberId(@Param("memberId") Long memberId, @Param("status") ReservationStatus status, Pageable pageable);
 }
