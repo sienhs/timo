@@ -37,9 +37,12 @@ class TicketMetrics {
   static const cardPadding = 14.0;
   static const cardGap = 12.0;
 
-  /// 카드 왼쪽 포스터. 시안의 세로 비율(3:4)을 따른다.
+  /// 카드 왼쪽 포스터. 폭은 고정이고 **높이는 오른쪽 글 묶음(제목 + 정보 줄)에
+  /// 맞춰 늘어난다**(사용자 피드백 — 아래가 좌석 줄과 나란해야 한다). 그래서
+  /// [posterHeight] 는 실제 카드가 아니라 뼈대 카드(`TicketListSkeleton`)가 쓰는
+  /// 대표값이다. 제목이 한 줄일 때의 글 묶음 높이에 맞췄다.
   static const posterWidth = 68.0;
-  static const posterHeight = 90.0;
+  static const posterHeight = 102.0;
   static const posterRadius = 8.0;
 
   /// 입장 QR 화면 오른쪽 위 포스터. 목록 카드보다 조금 크다.
@@ -72,6 +75,7 @@ class TicketStrings {
 
   static const tabUpcoming = '예정 공연';
   static const tabPast = '지난 공연';
+  static const tabListings = '양도 목록';
 
   static const enterQr = '입장 QR 보기';
   static const showDetail = '상세정보 보기';
@@ -94,18 +98,27 @@ class TicketStrings {
   /// 넣어도 배치는 그대로다.
   static const createCollectible = 'NFT 소장품 만들기';
 
-  // 발행 상태. 시안에 없는 카드들이다. 결제 직후에는 티켓이 아직 안 나와서
-  // 입장도 양도도 안 되는데, 그 사정을 알려 줄 자리가 시안에 없었다.
-  static const issuingBadge = 'NFT 발행 중';
-  static const issuingNotice = '티켓을 만들고 있어요. 잠시 후 다시 확인해주세요.';
-  static const mintFailedNotice = '발행에 실패했어요. 환불이 진행 중이에요.';
-  static const refundedNotice = '환불됐어요.';
+  // 티켓이 손에 없는 카드. 시안에 없다. 버튼을 지우고 그 자리에 사정을 적는다.
   static const cancelledNotice = '예매를 취소했어요.';
+
+  /// 앱이 모르는 상태가 왔을 때. 서버에 상태가 하나 늘면 나온다.
+  ///
+  /// 무슨 일인지 단정하지 않는다. 취소인지 다른 무엇인지 앱이 모르는 상황이라,
+  /// 아는 만큼만 — 지금 할 수 있는 게 없다는 것만 — 말한다.
+  static const unknownStatusNotice = '지금은 이용할 수 없어요.';
 
   // 빈 목록. 탭마다 할 말이 다르다.
   static const emptyUpcoming = '예정된 공연이 없어요';
   static const emptyUpcomingAction = '공연 보러 가기';
   static const emptyPast = '아직 다녀온 공연이 없어요';
+
+  /// 양도 목록 탭. 지금은 자리만 있어 늘 이 문구다. 양도마켓 작업이 붙으면
+  /// 진짜 "등록한 게 없을 때" 만 보이게 된다.
+  static const emptyListings = '등록한 양도 매물이 없어요';
+
+  /// 로그인 안 한 채로 들어왔을 때. 마이페이지·충전 화면의 안내와 같은 꼴이다.
+  /// 내 티켓은 서버가 로그인한 회원의 주문만 주므로 로그인 없이는 보여줄 게 없다.
+  static const loginPrompt = '로그인하고 내 티켓을 확인해 보세요.';
 
   /// 검색 결과가 없을 때.
   static String searchEmpty(String keyword) => '\'$keyword\' 와 맞는 공연이 없어요';
@@ -130,8 +143,9 @@ class TicketStrings {
   // 예매 취소. 시안에 자리가 없어 카드 오른쪽 위 더보기로 뺐다.
   static const cancelReservation = '예매 취소하기';
   static const cancelConfirmTitle = '예매를 취소할까요?';
-  static const cancelConfirmBody =
-      '취소하면 티켓이 회수되고 결제 금액이 전액 환원돼요.\n같은 자리를 다시 잡을 수는 없어요.';
+  // "같은 자리를 다시 잡을 수는 없어요" 는 뺐다(사용자 결정). 팝업이 길어지고,
+  // 취소를 망설이게 하는 정보라기보다 취소 뒤의 사정이라 여기서 할 말이 아니다.
+  static const cancelConfirmBody = '취소하면 티켓이 회수되고 결제 금액이 전액 환불돼요.';
   static const cancelConfirmAgree = '예매 취소하기';
   static const cancelConfirmKeep = '그대로 둘게요';
 

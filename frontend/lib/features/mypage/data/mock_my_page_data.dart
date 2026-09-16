@@ -14,7 +14,7 @@ class MockMyPageData {
 
   /// 충전 내역 한 줄의 이름과 결제 경로. 시안의 사용 내역에 있는 문구 그대로다.
   /// [MockWalletLedger] 가 새 충전을 이 이름으로 쌓는다.
-  static const chargeTitle = '머쉬룸 충전';
+  static const chargeTitle = '버섯 충전';
   static const chargeSource = '카카오페이';
 
   static final wallet = WalletSummary(

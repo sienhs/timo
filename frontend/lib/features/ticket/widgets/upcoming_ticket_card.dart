@@ -93,18 +93,15 @@ class UpcomingTicketCard extends StatelessWidget {
     );
   }
 
-  Widget? _badge(int? days) => switch (ticket.status) {
-    TicketStatus.pendingMint => const TicketBadge(
-      label: TicketStrings.issuingBadge,
-      muted: true,
-    ),
-    // 회수된 티켓에는 남은 날을 붙이지 않는다. 이미 못 가는 공연이다.
-    _ when ticket.status.isVoided => null,
-    _ when days != null && days >= 0 => TicketBadge(
-      label: TicketStrings.dday(days),
-    ),
-    _ => null,
-  };
+  /// 남은 날 배지.
+  ///
+  /// 회수된 티켓에는 붙이지 않는다. 이미 못 가는 공연이라 남은 날을 세는 게
+  /// 의미가 없다.
+  Widget? _badge(int? days) {
+    if (ticket.status.isVoided) return null;
+    if (days == null || days < 0) return null;
+    return TicketBadge(label: TicketStrings.dday(days));
+  }
 
   Widget _footer(BuildContext context) {
     final status = ticket.status;
@@ -114,22 +111,10 @@ class UpcomingTicketCard extends StatelessWidget {
         icon: Icons.block_outlined,
       );
     }
-    if (status == TicketStatus.refunded) {
+    if (status == TicketStatus.unknown) {
       return const TicketCardNotice(
-        text: TicketStrings.refundedNotice,
-        icon: Icons.undo_outlined,
-      );
-    }
-    if (status.isFailed) {
-      return const TicketCardNotice(
-        text: TicketStrings.mintFailedNotice,
-        icon: Icons.error_outline,
-      );
-    }
-    if (status.isIssuing) {
-      return const TicketCardNotice(
-        text: TicketStrings.issuingNotice,
-        icon: Icons.hourglass_empty,
+        text: TicketStrings.unknownStatusNotice,
+        icon: Icons.help_outline,
       );
     }
     if (ticket.canEnter(now)) {

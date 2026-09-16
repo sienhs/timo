@@ -6,14 +6,17 @@ import 'ticket_api.dart';
 
 /// 가짜 [TicketApi] 가 무엇을 돌려줄지.
 ///
-/// 서버로는 만들 수 없는 상황을 골라 볼 수 있게 나눠 뒀다. v0 스텁으로는
-/// 티켓을 한 장밖에 못 만들고 지난 공연은 아예 못 만든다
-/// ([HttpTicketApi] 주석 참고).
+/// 서버로는 만들 수 없는 상황을 골라 볼 수 있게 나눠 뒀다. 앱이 모르는 주문
+/// 상태는 서버에 없고, 시안 그대로의 목록(예정 2 · 지난 2)도 서버 시드와는
+/// 다르다([HttpTicketApi] 주석 참고).
 enum TicketMockScenario {
   /// 시안 그대로. 예정 2장 · 지난 2장.
   design,
 
-  /// 발행 중 · 발행 실패 · 환불됨 · 예매 취소됨. 시안에 없는 상태들이다.
+  /// 예매 취소됨 · 앱이 모르는 상태. 시안에 없는 카드들이다.
+  ///
+  /// 앱이 모르는 상태는 서버로 만들 수 없다. 서버에 주문 상태가 하나 늘어야
+  /// 나오는 카드라, 그 상황을 미리 보려면 여기서 꾸며야 한다.
   states,
 
   /// 두 탭 모두 빈 목록.
@@ -153,7 +156,7 @@ class MockTicketApi implements TicketApi {
         facePrice: 154000,
         startsIn: const Duration(days: 9),
         posterImageUrl: _posters[0],
-        status: TicketStatus.pendingMint,
+        status: TicketStatus.cancelled,
       ),
       _ticket(
         reservationId: 12,
@@ -166,33 +169,7 @@ class MockTicketApi implements TicketApi {
         facePrice: 198000,
         startsIn: const Duration(days: 14),
         posterImageUrl: _posters[1],
-        status: TicketStatus.mintFailed,
-      ),
-      _ticket(
-        reservationId: 13,
-        concertId: 13,
-        title: '2026 검정치마 단독 공연',
-        venueName: '올림픽홀',
-        sectionName: 'S석',
-        seatRow: 3,
-        seatNumber: 7,
-        facePrice: 99000,
-        startsIn: const Duration(days: 21),
-        posterImageUrl: _posters[2],
-        status: TicketStatus.refunded,
-      ),
-      _ticket(
-        reservationId: 14,
-        concertId: 14,
-        title: '2026 박보검 팬미팅',
-        venueName: '고척돔',
-        sectionName: 'A석',
-        seatRow: 20,
-        seatNumber: 2,
-        facePrice: 88000,
-        startsIn: const Duration(days: 30),
-        posterImageUrl: _posters[3],
-        status: TicketStatus.cancelled,
+        status: TicketStatus.unknown,
       ),
     ],
   };
@@ -208,7 +185,7 @@ class MockTicketApi implements TicketApi {
     required int facePrice,
     required Duration startsIn,
     String? posterImageUrl,
-    TicketStatus status = TicketStatus.minted,
+    TicketStatus status = TicketStatus.paid,
   }) {
     final now = clock();
     return MyTicket(

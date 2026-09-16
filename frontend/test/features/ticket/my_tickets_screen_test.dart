@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:timo/features/auth/constants.dart';
+import 'package:timo/features/auth/data/mock_auth_api.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
@@ -8,6 +13,7 @@ import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
 import 'package:timo/features/ticket/widgets/past_ticket_card.dart';
 import 'package:timo/features/ticket/widgets/ticket_list_skeleton.dart';
+import 'package:timo/features/ticket/widgets/ticket_tab_bar.dart';
 import 'package:timo/features/ticket/widgets/upcoming_ticket_card.dart';
 
 void main() {
@@ -22,24 +28,53 @@ void main() {
   ///
   /// 화면과 목이 **같은 시각**을 봐야 한다. 한쪽만 고정하면 목이 만든 날짜와
   /// 화면이 재는 기준이 어긋나 배지가 다시 흔들린다.
+  ///
+  /// 화면이 로그인 세션을 보고 목록을 부르므로 기본은 로그인 상태다. 충전 화면
+  /// 테스트와 같은 방식으로 세션을 만든다.
   Future<void> pumpScreen(
     WidgetTester tester, {
     TicketApi? api,
     TicketMockScenario scenario = TicketMockScenario.design,
+    bool loggedIn = true,
   }) async {
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    if (loggedIn) await session.signIn(MockAuthApi.tokens);
+    addTearDown(session.dispose);
     await tester.pumpWidget(
-      TicketApiScope(
-        api:
-            api ??
-            MockTicketApi(
-              latency: Duration.zero,
-              scenario: scenario,
-              clock: now,
-            ),
-        child: MaterialApp(home: MyTicketsScreen(clock: now)),
+      AuthSessionScope(
+        session: session,
+        child: TicketApiScope(
+          api:
+              api ??
+              MockTicketApi(
+                latency: Duration.zero,
+                scenario: scenario,
+                clock: now,
+              ),
+          child: MaterialApp(home: MyTicketsScreen(clock: now)),
+        ),
       ),
     );
   }
+
+  group('로그인', () {
+    // 서버가 로그인한 회원의 주문만 주므로 비로그인으로 부르면 401 뿐이다.
+    // 부르지 않고 안내를 낸다. 목을 '실패' 시나리오로 두어, 만약 불렀다면 오류
+    // 문구가 떠서 들키게 한다.
+    testWidgets('비로그인이면 목록을 부르지 않고 로그인 안내를 낸다', (tester) async {
+      await pumpScreen(
+        tester,
+        scenario: TicketMockScenario.error,
+        loggedIn: false,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.loginPrompt), findsOneWidget);
+      expect(find.text(AuthStrings.login), findsOneWidget);
+      expect(find.byType(TicketTabBar), findsNothing);
+      expect(find.text('인터넷 연결을 확인해주세요.'), findsNothing);
+    });
+  });
 
   group('탭과 목록', () {
     testWidgets('예정 탭이 먼저 열리고 예정 공연만 나온다', (tester) async {
@@ -72,6 +107,21 @@ void main() {
       expect(find.byType(UpcomingTicketCard), findsNothing);
       expect(find.text('2025 블랙핑크'), findsOneWidget);
     });
+
+    // 양도 탭은 자리만 있다. 양도마켓 작업이 붙기 전까지 빈 안내만 보이고,
+    // 세어 본 데이터가 없으니 이름 옆에 숫자도 붙지 않는다.
+    testWidgets('양도 목록 탭은 숫자 없이 빈 안내만 보인다', (tester) async {
+      await pumpScreen(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.tabListings), findsOneWidget);
+      await tester.tap(find.text(TicketStrings.tabListings));
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.emptyListings), findsOneWidget);
+      expect(find.byType(UpcomingTicketCard), findsNothing);
+      expect(find.byType(PastTicketCard), findsNothing);
+    });
   });
 
   group('예정 카드의 버튼', () {
@@ -96,41 +146,33 @@ void main() {
     });
   });
 
-  group('발행 상태', () {
-    testWidgets('발행 중·실패·환불·취소가 버튼 대신 안내로 나온다', (tester) async {
+  group('티켓이 손에 없는 상태', () {
+    testWidgets('취소됨·알 수 없음이 버튼 대신 안내로 나온다', (tester) async {
       await pumpScreen(tester, scenario: TicketMockScenario.states);
       await tester.pumpAndSettle();
 
-      expect(find.text(TicketStrings.issuingNotice), findsOneWidget);
-      expect(find.text(TicketStrings.mintFailedNotice), findsOneWidget);
-
-      // 카드 넷이 한 화면에 안 들어가 뒤쪽은 아직 안 그려졌다. 끌어 내려서 본다.
-      for (final notice in [
-        TicketStrings.refundedNotice,
-        TicketStrings.cancelledNotice,
-      ]) {
-        await tester.scrollUntilVisible(find.text(notice), 200);
-        expect(find.text(notice), findsOneWidget);
-      }
+      expect(find.text(TicketStrings.cancelledNotice), findsOneWidget);
+      expect(find.text(TicketStrings.unknownStatusNotice), findsOneWidget);
 
       // 이 상태들에서는 입장도 상세도 눌릴 자리가 없다.
       expect(find.text(TicketStrings.enterQr), findsNothing);
       expect(find.text(TicketStrings.showDetail), findsNothing);
     });
 
-    testWidgets('발행 중 배지가 붙는다', (tester) async {
+    // 남은 날을 세는 게 의미가 없다. 이미 못 가는 공연이다.
+    testWidgets('취소된 티켓에는 D-day 배지가 없다', (tester) async {
       await pumpScreen(tester, scenario: TicketMockScenario.states);
       await tester.pumpAndSettle();
 
-      expect(find.text(TicketStrings.issuingBadge), findsOneWidget);
+      expect(find.text('D-9'), findsNothing);
     });
 
     // 회수된 티켓은 예정 탭에 남는다. 지난 공연 탭에 섞이면 다녀온 공연으로 읽힌다.
-    testWidgets('취소·환불된 티켓은 지난 공연 탭에 안 간다', (tester) async {
+    testWidgets('취소된 티켓은 지난 공연 탭에 안 간다', (tester) async {
       await pumpScreen(tester, scenario: TicketMockScenario.states);
       await tester.pumpAndSettle();
 
-      expect(find.text('${TicketStrings.tabUpcoming} 4'), findsOneWidget);
+      expect(find.text('${TicketStrings.tabUpcoming} 2'), findsOneWidget);
       expect(find.text('${TicketStrings.tabPast} 0'), findsOneWidget);
     });
   });

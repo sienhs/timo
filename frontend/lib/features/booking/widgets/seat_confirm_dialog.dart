@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_dialog_frame.dart';
 
 /// 결제로 넘어가기 직전의 좌석 확인 다이얼로그.
 ///
@@ -32,72 +33,59 @@ class _SeatConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Dialog(
-      // 시안의 다이얼로그는 얇은 그린 테두리를 가진다.
-      // Material 의 shape.side 로는 테두리가 그려지지 않아(골든에서 확인)
-      // 배경을 비우고 테두리를 직접 그린다.
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      // 24 보다 좁히면 '다시 돌아오려고 하면...' 이 두 줄로 갈리며
-      // '요!' 만 다음 줄에 남는다.
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: const BorderRadius.all(Radius.circular(14)),
-          border: Border.all(color: AppColors.primary),
-        ),
-        padding: const EdgeInsets.fromLTRB(18, 24, 18, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(text: '선택한 좌석이\n'),
-                  TextSpan(
-                    text: seatLabel,
-                    style: const TextStyle(color: AppColors.accent),
-                  ),
-                  const TextSpan(text: '이 맞나요?'),
-                ],
-              ),
-              textAlign: TextAlign.center,
-              style: textTheme.titleSmall?.copyWith(height: 1.5),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '다시 돌아오려고 하면 빈 자리가 없을 수도 있어요!',
-              textAlign: TextAlign.center,
-              style: textTheme.labelSmall,
-            ),
-            const SizedBox(height: 20),
-            Row(
+    // 시안의 다이얼로그는 얇은 그린 테두리를 가진다. 그리는 방법과 두께는 앱
+    // 팝업 공통([AppDialogFrame])을 따른다.
+    return AppDialogFrame(
+      padding: const EdgeInsets.fromLTRB(18, 24, 18, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text.rich(
+            TextSpan(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    // 다이얼로그 버튼은 화면 하단 버튼보다 낮게 둔다.
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                    ),
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('아니요'),
-                  ),
+                const TextSpan(text: '선택한 좌석이\n'),
+                TextSpan(
+                  text: seatLabel,
+                  style: const TextStyle(color: AppColors.accent),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                    ),
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('예'),
-                  ),
-                ),
+                const TextSpan(text: '이 맞나요?'),
               ],
             ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+            style: textTheme.titleSmall?.copyWith(height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '다시 돌아오려고 하면 빈 자리가 없을 수도 있어요!',
+            textAlign: TextAlign.center,
+            style: textTheme.labelSmall,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  // 다이얼로그 버튼은 화면 하단 버튼보다 낮게 둔다.
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('아니요'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('예'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

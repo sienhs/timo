@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/app_dialog_frame.dart';
 import '../constants.dart';
 import '../models/my_ticket.dart';
 
@@ -11,8 +12,9 @@ import '../models/my_ticket.dart';
 /// 무엇을 취소하는지(공연·좌석)와 얼마가 돌아오는지를 함께 보여준다 — "정말
 /// 취소할까요?" 만 띄우면 어느 티켓인지 모른 채 누르게 된다.
 ///
-/// 모양은 아이디 확정 팝업과 같은 얇은 테두리다. 다만 되돌릴 수 없는
-/// 행동이라 테두리와 확인 버튼을 강조색(코랄)으로 둔다.
+/// 틀은 다른 팝업과 같되 테두리는 없다(사용자 결정). 되돌릴 수 없는 행동임은
+/// 확인 버튼의 강조색(코랄)으로만 알리고, '그대로 둘게요' 는 같은 크기의 흰
+/// 바탕·초록 테두리 버튼으로 나란히 둔다. 금액은 원이 아니라 코인(MSR)이다.
 ///
 /// 취소하기로 했으면 true, 아니면 false.
 Future<bool> showCancelReservationDialog(
@@ -36,55 +38,54 @@ class _CancelReservationDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Dialog(
-      // Material 의 shape.side 로는 테두리가 그려지지 않아 배경을 비우고
-      // 테두리를 직접 그린다. 아이디 확정 팝업과 같은 이유다.
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: const BorderRadius.all(Radius.circular(14)),
-          border: Border.all(color: AppColors.accent),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              TicketStrings.cancelConfirmTitle,
-              textAlign: TextAlign.center,
-              style: textTheme.titleSmall?.copyWith(height: 1.4),
+    // 모서리·여백은 앱 팝업 공통([AppDialogFrame])을 따르되 테두리는 그리지
+    // 않는다(사용자 결정). 되돌릴 수 없는 행동임은 확인 버튼의 강조색으로만 알린다.
+    return AppDialogFrame(
+      borderColor: null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            TicketStrings.cancelConfirmTitle,
+            textAlign: TextAlign.center,
+            style: textTheme.titleSmall?.copyWith(height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          _TicketSummary(ticket: ticket),
+          const SizedBox(height: 12),
+          Text(
+            TicketStrings.cancelConfirmBody,
+            textAlign: TextAlign.center,
+            style: textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.5,
             ),
-            const SizedBox(height: 12),
-            _TicketSummary(ticket: ticket),
-            const SizedBox(height: 12),
-            Text(
-              TicketStrings.cancelConfirmBody,
-              textAlign: TextAlign.center,
-              style: textTheme.labelSmall?.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
+          ),
+          // 안내문이 한 줄이 되면서 20 은 아래가 비어 보였다(사용자 피드백).
+          const SizedBox(height: 12),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: AppColors.accent,
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                backgroundColor: AppColors.accent,
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text(TicketStrings.cancelConfirmAgree),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(TicketStrings.cancelConfirmAgree),
+          ),
+          const SizedBox(height: 8),
+          // 취소 버튼과 같은 크기의 흰 바탕·초록 테두리 버튼(사용자 결정). 글자만
+          // 있는 버튼이면 두 선택지의 무게가 달라 보인다.
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text(TicketStrings.cancelConfirmKeep),
-            ),
-          ],
-        ),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(TicketStrings.cancelConfirmKeep),
+          ),
+        ],
       ),
     );
   }
@@ -123,7 +124,8 @@ class _TicketSummary extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            TicketStrings.refundAmount(formatWon(ticket.facePrice)),
+            // 원이 아니라 MSR 이다(사용자 결정). 결제도 환불도 코인으로 오간다.
+            TicketStrings.refundAmount(formatMsr(ticket.facePrice)),
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: AppColors.primaryPressed,

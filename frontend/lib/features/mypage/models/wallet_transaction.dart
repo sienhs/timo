@@ -13,7 +13,7 @@ class WalletTransaction {
     required this.source,
   });
 
-  /// 무엇에 쓰였는지. (예: `2026 아이유 콘서트 구매`, `머쉬룸 충전`)
+  /// 무엇에 쓰였는지. (예: `2026 아이유 콘서트 구매`, `버섯 충전`)
   final String title;
 
   /// 부호가 있는 변동액.
