@@ -97,6 +97,16 @@ class _MemberViewState extends State<_MemberView> {
     });
   }
 
+  /// 충전 화면으로 보내고, 충전하고 돌아왔으면 지갑을 다시 받아 온다.
+  ///
+  /// 충전 화면이 새 잔액을 넘겨줄 수도 있지만 그러지 않는다 — 충전과 함께
+  /// 사용 내역도 한 줄 늘어서, 지갑 전체를 다시 받는 쪽이 화면과 서버가
+  /// 어긋나지 않는다.
+  Future<void> _openCharge() async {
+    final charged = await Navigator.pushNamed(context, AppRoutes.coinCharge);
+    if (charged == true && mounted) _reloadWallet();
+  }
+
   /// 로그아웃. 기기 토큰을 먼저 지우고, 서버에는 알려만 준다.
   ///
   /// 순서가 중요하다. 세션을 비우면 리프레시 토큰이 사라지므로 서버에 보낼 값을
@@ -151,8 +161,7 @@ class _MemberViewState extends State<_MemberView> {
             children: [
               MushroomBalanceCard(
                 balance: wallet.balance,
-                onChargePressed: () =>
-                    _notifyNotReady(context, MyPageStrings.charge),
+                onChargePressed: _openCharge,
               ),
               const SizedBox(height: MyPageMetrics.cardGap),
               TransactionHistoryCard(

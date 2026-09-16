@@ -12,6 +12,11 @@ class MockMyPageData {
 
   static const profile = MemberProfile(memberId: 1, nickname: '엥간한 닉네임');
 
+  /// 충전 내역 한 줄의 이름과 결제 경로. 시안의 사용 내역에 있는 문구 그대로다.
+  /// [MockWalletLedger] 가 새 충전을 이 이름으로 쌓는다.
+  static const chargeTitle = '머쉬룸 충전';
+  static const chargeSource = '카카오페이';
+
   static final wallet = WalletSummary(
     balance: 123000,
     transactions: [
@@ -23,11 +28,11 @@ class MockMyPageData {
         source: '양도 마켓',
       ),
       WalletTransaction(
-        title: '머쉬룸 충전',
+        title: chargeTitle,
         amount: 150000,
         balanceAfter: 199400,
         occurredAt: DateTime(2026, 9, 12, 19, 30),
-        source: '카카오페이',
+        source: chargeSource,
       ),
       WalletTransaction(
         title: '2026 아이유 콘서트 구매',

@@ -64,7 +64,11 @@ const quickMenuItems = <QuickMenuItem>[
   ),
   QuickMenuItem(icon: Icons.collections_bookmark_outlined, label: '컬렉션'),
   QuickMenuItem(icon: Icons.favorite_border, label: '찜'),
-  QuickMenuItem(icon: Icons.savings_outlined, label: '코인 충전'),
+  QuickMenuItem(
+    icon: Icons.savings_outlined,
+    label: '코인 충전',
+    routeName: AppRoutes.coinCharge,
+  ),
   QuickMenuItem(icon: Icons.storefront_outlined, label: '양도마켓'),
   QuickMenuItem(icon: Icons.menu, label: '카테고리'),
   QuickMenuItem(icon: Icons.settings_outlined, label: '환경 설정'),

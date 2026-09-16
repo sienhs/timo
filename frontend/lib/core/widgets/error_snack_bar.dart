@@ -23,8 +23,21 @@ void showErrorSnackBar(BuildContext context, String message) {
 }
 
 /// 성공 안내도 오류 안내와 같은 위치와 모양으로 보여주되 브랜드색 테두리를 쓴다.
-void showSuccessSnackBar(BuildContext context, String message) {
-  _showOutlinedSnackBar(context, message, borderColor: AppColors.primary);
+///
+/// [fitContent] 를 주면 상자가 화면 폭을 다 쓰지 않고 글자만큼만 넓어진다.
+/// 짧은 한 줄 안내가 카드 위에 뜰 때 쓴다 — 카드와 같은 폭의 흰 상자는 안내가
+/// 아니라 카드가 하나 더 생긴 것처럼 보인다.
+void showSuccessSnackBar(
+  BuildContext context,
+  String message, {
+  bool fitContent = false,
+}) {
+  _showOutlinedSnackBar(
+    context,
+    message,
+    borderColor: AppColors.primary,
+    fitContent: fitContent,
+  );
 }
 
 /// 잘되지도 잘못되지도 않은 안내. "아직 준비 중인 화면" 같은 것.
@@ -39,12 +52,14 @@ void showInfoSnackBar(
   BuildContext context,
   String message, {
   double? bottomMargin,
+  bool fitContent = false,
 }) {
   _showOutlinedSnackBar(
     context,
     message,
     borderColor: AppColors.textDisabled,
     bottomMargin: bottomMargin,
+    fitContent: fitContent,
   );
 }
 
@@ -53,6 +68,7 @@ void _showOutlinedSnackBar(
   String message, {
   required Color borderColor,
   double? bottomMargin,
+  bool fitContent = false,
 }) {
   final textTheme = Theme.of(context).textTheme;
 
@@ -72,28 +88,32 @@ void _showOutlinedSnackBar(
           20,
           bottomMargin ?? _aboveBottomButton,
         ),
-        content: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderColor),
-            // 흰 배경 위의 흰 상자라 테두리만으로는 떠 있는 느낌이 없어 옅은
-            // 그림자를 깐다.
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1F000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
+        content: Align(
+          child: Container(
+            width: fitContent ? null : double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: borderColor),
+              // 흰 배경 위의 흰 상자라 테두리만으로는 떠 있는 느낌이 없어 옅은
+              // 그림자를 깐다.
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1F000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              softWrap: true,
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textPrimary,
               ),
-            ],
-          ),
-          child: Text(
-            message,
-            textAlign: TextAlign.center,
-            softWrap: true,
-            style: textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+            ),
           ),
         ),
       ),

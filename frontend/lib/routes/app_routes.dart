@@ -13,6 +13,7 @@ import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/booking_scope.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/home/screens/show_search_screen.dart';
+import '../features/mypage/screens/coin_charge_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
 import '../features/ticket/models/my_ticket.dart';
 import '../features/ticket/screens/entry_qr_screen.dart';
@@ -37,6 +38,10 @@ class AppRoutes {
 
   /// 내 티켓. 빠른 메뉴에서 들어온다.
   static const myTickets = '/tickets';
+
+  /// 버섯 충전. 마이페이지의 충전하기와 빠른 메뉴에서 들어온다. 충전에
+  /// 성공하면 결과로 true 를 넘기며 이전 화면으로 돌아간다.
+  static const coinCharge = '/mypage/charge';
 
   /// 입장 QR. 내 티켓의 예정 공연 카드에서 티켓([MyTicket])을 받아 연다.
   static const entryQr = '/tickets/qr';
@@ -71,6 +76,7 @@ class AppRoutes {
     showDetail: (context) => ShowDetailScreen(showId: _showIdArg(context)),
     showSearch: (_) => const ShowSearchScreen(),
     myTickets: (_) => const MyTicketsScreen(),
+    coinCharge: (_) => const CoinChargeScreen(),
     // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
     // 조회하면 입장 직전에 네트워크를 한 번 더 타게 된다.
     entryQr: (context) => EntryQrScreen(

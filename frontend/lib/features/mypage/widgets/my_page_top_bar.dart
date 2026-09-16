@@ -8,13 +8,19 @@ import '../constants.dart';
 ///
 /// [hasUnreadNotifications] 가 참이면 알림 아이콘에 점을 찍는다. 알림 API 가
 /// 아직 없어 지금은 화면이 늘 거짓을 넘긴다.
+///
+/// 충전 화면도 같은 상단 바를 쓴다(시안이 같은 모양이다). 제목만 다르므로
+/// [title] 로 받고 기본값은 마이페이지다.
 class MyPageTopBar extends StatelessWidget {
   const MyPageTopBar({
     super.key,
     required this.onBackPressed,
     required this.onNotificationsPressed,
+    this.title = MyPageStrings.title,
     this.hasUnreadNotifications = false,
   });
+
+  final String title;
 
   final VoidCallback onBackPressed;
   final VoidCallback onNotificationsPressed;
@@ -35,7 +41,7 @@ class MyPageTopBar extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              MyPageStrings.title,
+              title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),

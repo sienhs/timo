@@ -15,9 +15,11 @@ import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/mypage/constants.dart';
 import 'package:timo/features/mypage/data/mock_my_page_api.dart';
 import 'package:timo/features/mypage/data/mock_my_page_data.dart';
+import 'package:timo/features/mypage/data/mock_wallet_ledger.dart';
 import 'package:timo/features/mypage/data/my_page_api.dart';
 import 'package:timo/features/mypage/models/member_profile.dart';
 import 'package:timo/features/mypage/models/wallet_summary.dart';
+import 'package:timo/features/mypage/screens/coin_charge_screen.dart';
 import 'package:timo/features/mypage/screens/my_page_screen.dart';
 import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/features/mypage/widgets/transaction_tile.dart';
@@ -64,6 +66,10 @@ class _FlakyMyPageApi implements MyPageApi {
     }
     return Future.value(MockMyPageData.wallet);
   }
+
+  /// 이 목은 조회 실패만 흉내 낸다. 충전은 쓰지 않는다.
+  @override
+  Future<WalletSummary> charge(int amount) => throw UnimplementedError();
 }
 
 void main() {
@@ -269,17 +275,44 @@ void main() {
       );
     });
 
-    testWidgets('충전하기를 누르면 준비 중 안내가 뜬다', (tester) async {
+    testWidgets('충전하기를 누르면 충전 화면이 열린다', (tester) async {
       await pumpMyPage(tester, loggedIn: true);
       await settle(tester);
 
       await tester.tap(find.text(MyPageStrings.charge));
       await tester.pumpAndSettle();
 
+      expect(find.byType(CoinChargeScreen), findsOneWidget);
+      expect(find.text(MyPageStrings.chargeTitle), findsOneWidget);
+    });
+
+    testWidgets('충전하고 돌아오면 잔액이 다시 받아져 늘어 있다', (tester) async {
+      // 원장을 넘긴 목이라 충전이 다음 조회에도 남는다(앱의 목 서버와 같다).
+      final ledger = MockWalletLedger();
+      await pumpMyPage(
+        tester,
+        loggedIn: true,
+        api: MockMyPageApi(latency: Duration.zero, ledger: ledger),
+      );
+      await settle(tester);
+      expect(find.text('123,000'), findsOneWidget);
+
+      await tester.tap(find.text(MyPageStrings.charge));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(MyPageStrings.withUnit('10,000')));
+      await tester.pump();
+      await tester.tap(find.text(MyPageStrings.chargeSubmit));
+      await tester.pumpAndSettle();
+
+      // 충전 화면은 닫히고, 성공 안내와 함께 새 잔액이 보인다.
+      expect(find.byType(CoinChargeScreen), findsNothing);
       expect(
-        find.text(MyPageStrings.notReady(MyPageStrings.charge)),
+        find.text(MyPageStrings.chargeSucceeded('10,000')),
         findsOneWidget,
       );
+      expect(find.text('133,000'), findsOneWidget);
+      expect(find.text('123,000'), findsNothing);
     });
 
     testWidgets('전체 내역 보기를 누르면 준비 중 안내가 뜬다', (tester) async {
@@ -372,4 +405,8 @@ class _OnlyDebitsApi implements MyPageApi {
           .toList(),
     ),
   );
+
+  /// 이 목은 필터의 빈 상태만 본다. 충전은 쓰지 않는다.
+  @override
+  Future<WalletSummary> charge(int amount) => throw UnimplementedError();
 }
