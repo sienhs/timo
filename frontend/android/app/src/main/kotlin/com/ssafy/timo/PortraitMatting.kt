@@ -15,15 +15,21 @@ import kotlin.math.*
  */
 class PortraitMatting(private val context: Context) {
     companion object {
-        const val MODEL = "models/modnet_photographic_portrait_matting.onnx"
-        const val SHA256 = "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9"
-        const val MODEL_BYTES = 25888640L
+        // INT8 weights rebuilt in-graph as Cast+Mul, built by tools/quantize_matting.py from the
+        // pinned FP32 export: 6.7 MB instead of 25.9 MB. ONNX Runtime constant-folds the weights
+        // at session creation, so compute and the tensor contract are unchanged.
+        const val MODEL = "models/modnet_photographic_portrait_matting_int8.onnx"
+        const val SHA256 = "e8c0a9ca88df6724a93ffc160ad53604e85a4bb81b7ba9eefd37e3bca7da9e6d"
+        const val MODEL_BYTES = 6656860L
+        private const val FP32_SHA256 = "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9"
     }
     /** Timings of the last [alpha] call, read by the benchmark channel only. */
     var lastSessionMs = 0L
     var lastInferMs = 0L
 
     private fun modelPath(): String {
+        // Drop the 25.9 MB FP32 cache left by earlier installs.
+        listOf(".onnx", ".part").forEach { File(context.cacheDir, "modnet_$FP32_SHA256$it").delete() }
         val target = File(context.cacheDir, "modnet_$SHA256.onnx")
         if (!target.isFile || target.length() != MODEL_BYTES) {
             val partial = File(context.cacheDir, "modnet_$SHA256.part")

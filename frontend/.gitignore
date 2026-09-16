@@ -58,3 +58,7 @@ assets/models/depth_anything_v2_vits.json
 # 통합 테스트가 기기에서 뽑는 검증 이미지. 수치와 결론은
 # docs/memory/verification/ 의 REPORT.md·json 에 남긴다.
 verification/
+
+# 누끼 모델 FP32 원본. 배포에는 INT8 가중치판만 싣는다.
+# tools/download_matting.py 로 받고 tools/quantize_matting.py 를 돌릴 때만 로컬에 둔다.
+assets/models/modnet_photographic_portrait_matting.onnx
