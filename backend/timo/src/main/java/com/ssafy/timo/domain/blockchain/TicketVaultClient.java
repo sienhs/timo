@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.blockchain;
 
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.List;
@@ -20,8 +20,8 @@ import org.web3j.tx.RawTransactionManager;
 @Component
 public class TicketVaultClient extends ContractClient {
 
-    public TicketVaultClient(Web3j web3j, RawTransactionManager adminTransactionManager, BlockchainProperties properties) {
-        super(web3j, adminTransactionManager, properties.ticketVaultAddress());
+    public TicketVaultClient(Web3j web3j, RawTransactionManager adminTransactionManager, DeployedContractAddresses addresses) {
+        super(web3j, adminTransactionManager, addresses.ticketVaultAddress());
     }
 
     /** PG 충전을 온체인 잔액으로 미러링한다. */
@@ -38,10 +38,10 @@ public class TicketVaultClient extends ContractClient {
                 Collections.emptyList()));
     }
 
-    /** 취소·민팅 실패 보상 등으로 잔액을 되돌린다. */
-    public void refund(String userAddress, BigInteger amount, byte[] refId) {
+    /** 취소·민팅 실패 보상 등으로, 앞서 chargeForBooking이 적립했던 주최사 잔액에서 그만큼 되찾아 구매자에게 돌려준다. */
+    public void refund(String userAddress, String organizerAddress, BigInteger amount, byte[] refId) {
         sendAndWait(new Function("refund",
-                List.of(new Address(userAddress), new Uint256(amount), new Bytes32(refId)),
+                List.of(new Address(userAddress), new Address(organizerAddress), new Uint256(amount), new Bytes32(refId)),
                 Collections.emptyList()));
     }
 

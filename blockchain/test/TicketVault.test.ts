@@ -78,7 +78,7 @@ describe("TicketVault", () => {
     it("rejects insufficient balance", async () => {
       await expect(
         vault.connect(operator).chargeForBooking(alice.address, organizer.address, ONE * 2n, ref("order-2"))
-      ).to.be.revertedWithCustomError(vault, "InsufficientBalance");
+      ).to.be.revertedWithCustomError(vault, "ERC20InsufficientBalance");
     });
 
     it("a retried orderId is a no-op failure, not a double charge", async () => {
@@ -91,11 +91,25 @@ describe("TicketVault", () => {
   });
 
   describe("refund", () => {
-    it("credits the user with no fee deducted", async () => {
-      await expect(vault.connect(operator).refund(alice.address, ONE, ref("refund-1")))
+    beforeEach(async () => {
+      // refund claws money back out of the organizer, so the organizer
+      // needs a prior balance to claw back from - exactly what a real
+      // refund reverses.
+      await vault.connect(operator).deposit(organizer.address, ONE, ref("pg-organizer"));
+    });
+
+    it("claws the amount back from the organizer and credits the user, with no fee deducted", async () => {
+      await expect(vault.connect(operator).refund(alice.address, organizer.address, ONE, ref("refund-1")))
         .to.emit(vault, "Refunded")
-        .withArgs(alice.address, ONE, ref("refund-1"));
+        .withArgs(alice.address, organizer.address, ONE, ref("refund-1"));
       expect(await vault.balanceOf(alice.address)).to.equal(ONE);
+      expect(await vault.balanceOf(organizer.address)).to.equal(0);
+    });
+
+    it("rejects a refund the organizer's balance can't cover", async () => {
+      await expect(
+        vault.connect(operator).refund(alice.address, organizer.address, ONE * 2n, ref("refund-2"))
+      ).to.be.revertedWithCustomError(vault, "ERC20InsufficientBalance");
     });
   });
 
@@ -131,7 +145,7 @@ describe("TicketVault", () => {
       await vault.connect(marketplace).settleTransfer(alice.address, bob.address, ONE, ref("trade-4"));
       await expect(
         vault.connect(operator).chargeForBooking(bob.address, organizer.address, ONE, ref("order-after-trade"))
-      ).to.be.revertedWithCustomError(vault, "InsufficientBalance");
+      ).to.be.revertedWithCustomError(vault, "ERC20InsufficientBalance");
     });
   });
 
@@ -153,7 +167,7 @@ describe("TicketVault", () => {
       await vault.connect(operator).lockForWaitlist(alice.address, ONE, ref("wl-2"));
       await expect(
         vault.connect(operator).chargeForBooking(alice.address, organizer.address, ONE, ref("order-x"))
-      ).to.be.revertedWithCustomError(vault, "InsufficientBalance");
+      ).to.be.revertedWithCustomError(vault, "ERC20InsufficientBalance");
     });
 
     it("cannot lock the same waitlistId twice", async () => {

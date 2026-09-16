@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.blockchain;
 
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.List;
@@ -21,8 +21,8 @@ import org.web3j.tx.RawTransactionManager;
 @Component
 public class TicketNftClient extends ContractClient {
 
-    public TicketNftClient(Web3j web3j, RawTransactionManager adminTransactionManager, BlockchainProperties properties) {
-        super(web3j, adminTransactionManager, properties.ticketNftAddress());
+    public TicketNftClient(Web3j web3j, RawTransactionManager adminTransactionManager, DeployedContractAddresses addresses) {
+        super(web3j, adminTransactionManager, addresses.ticketNftAddress());
     }
 
     /**

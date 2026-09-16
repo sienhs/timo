@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { randomBytes } from "crypto";
 import { createCustodialWallet, loadCustodialWallet } from "../../src/wallet/custodialWallet";
-import { deployContracts } from "../deploy/deploy";
+import { deployContracts, resolveDeployer } from "../deploy/deploy";
 import dummyShowsData from "../../seed-data/dummy-shows.json";
 
 /**
@@ -43,11 +43,18 @@ const DUMMY_ORGANIZERS: DummyOrganizer[] = dummyShowsData.organizers;
 const ORGANIZER_FUNDING = ethers.parseEther("0.02");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  // Same ADMIN_PRIVATE_KEY/ADMIN_ADDRESS/CUSTODY_VAULT_ADDRESS resolution as
+  // deploy.ts's own main() - this script deploys just as much as deploy.ts
+  // does, so it needs the same "don't deploy as a well-known Hardhat account
+  // when the RPC is reachable over a network" guard.
+  const deployer = await resolveDeployer();
+  const deployerAddress = await deployer.getAddress();
+  const admin = process.env.ADMIN_ADDRESS ?? deployerAddress;
+  const custodyVaultAddress = process.env.CUSTODY_VAULT_ADDRESS ?? admin;
   process.env.WALLET_MASTER_KEY ??= randomBytes(32).toString("hex");
 
   console.log("Deploying contracts...");
-  const { showRegistry, ticketNFT, ticketVault, marketplace } = await deployContracts(deployer.address, deployer.address);
+  const { showRegistry, ticketNFT, ticketVault, marketplace } = await deployContracts(admin, custodyVaultAddress, deployer);
   console.log("  ShowRegistry:", await showRegistry.getAddress());
   console.log("  TicketNFT:   ", await ticketNFT.getAddress());
   console.log("  TicketVault: ", await ticketVault.getAddress());

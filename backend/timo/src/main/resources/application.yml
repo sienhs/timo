@@ -23,13 +23,14 @@ api:
 jwt:
   access-token-ttl: 30m
 
-# SSAFY EC2에 올린 persistent Hardhat 노드. 컨트랙트 주소는 비밀이 아니라 여기(공통)에 둔다.
-# admin-private-key만 프로필별(application-{profile}.yml)로 다르게 준다.
+# SSAFY EC2에 올린 persistent Hardhat 노드. 컨트랙트 주소는 여기 없다 - admin-private-key로부터
+# 결정적으로 계산된다(DeployedContractAddresses 참고). admin-private-key 기본값은 빈 문자열 -
+# 로컬/테스트에서 없어도 그냥 비어 있는 채로 뜬다(Web3jConfig가 그동안 쓸 더미 키를 알아서
+# 생성함). prod는 이 기본값을 못 쓰게 application-prod.yml이 자체적으로 덮어써서 값이 없으면
+# 기동 자체가 실패하게 한다.
 blockchain:
   rpc-url: http://network.ticketmoa.site:8545
-  ticket-vault-address: "0xdD118811921b1B04E23aBFEe9f86572dD2C92774"
-  ticket-nft-address: "0x24f51CdB47EC392b88700C474c72A7b258d050Fc"
-  show-registry-address: "0x2D9a37f3E2e963882740cd385bd31f24694dA6eF"
+  admin-private-key: ${ADMIN_PRIVATE_KEY:}
 
 management:
   endpoints:

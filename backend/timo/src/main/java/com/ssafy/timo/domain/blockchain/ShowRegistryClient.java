@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.blockchain;
 
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -24,8 +24,8 @@ public class ShowRegistryClient extends ContractClient {
     private static final String SHOW_REGISTERED_EVENT =
             "ShowRegistered(uint256,address,uint256,uint256,uint256,uint256)";
 
-    public ShowRegistryClient(Web3j web3j, RawTransactionManager adminTransactionManager, BlockchainProperties properties) {
-        super(web3j, adminTransactionManager, properties.showRegistryAddress());
+    public ShowRegistryClient(Web3j web3j, RawTransactionManager adminTransactionManager, DeployedContractAddresses addresses) {
+        super(web3j, adminTransactionManager, addresses.showRegistryAddress());
     }
 
     /**

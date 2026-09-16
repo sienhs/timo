@@ -27,14 +27,10 @@ jwt:
 wallet:
   master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
 
-# 형식만 유효한 더미 키. 컨텍스트 기동만 통과시키고, 실제 체인 호출은 개별 스파이크 테스트에서
-# ADMIN_PRIVATE_KEY 환경변수가 있을 때만 (assumeTrue로) 실행한다.
+# admin-private-key는 안 정해줌 - application.yml 공통 기본값(빈 문자열)을 그대로 씀. 실제 체인
+# 호출은 개별 스파이크 테스트에서 ADMIN_PRIVATE_KEY 환경변수가 있을 때만 (assumeTrue로) 실행한다.
 blockchain:
   rpc-url: http://network.ticketmoa.site:8545
-  admin-private-key: ${ADMIN_PRIVATE_KEY:0x1111111111111111111111111111111111111111111111111111111111111111}
-  ticket-vault-address: "0xdD118811921b1B04E23aBFEe9f86572dD2C92774"
-  ticket-nft-address: "0x24f51CdB47EC392b88700C474c72A7b258d050Fc"
-  show-registry-address: "0x2D9a37f3E2e963882740cd385bd31f24694dA6eF"
 
 # 최신 develop의 이미지 URL 변환 테스트 설정을 보존한다.
 app:

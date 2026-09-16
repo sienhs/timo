@@ -96,7 +96,7 @@ describe("Marketplace", () => {
 
       await expect(marketplace.connect(operator).buy(tokenId, bob.address, ref("trade-3"))).to.be.revertedWithCustomError(
         vault,
-        "InsufficientBalance"
+        "ERC20InsufficientBalance"
       );
 
 
