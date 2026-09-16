@@ -47,7 +47,6 @@ frontend_build:
     # image does not ship with git-lfs.  Fetch them explicitly before Gradle
     # copies the on-device models into the release APK.
     - apt-get update && apt-get install -y --no-install-recommends git-lfs
-    - git lfs install --local
     - git lfs pull --include="frontend/assets/models/*.onnx,frontend/android/app/src/main/assets/models/*.task"
     - |
       for model in \
