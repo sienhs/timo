@@ -43,6 +43,9 @@ api:
 wallet:
   master-key: ${WALLET_MASTER_KEY}
 
+blockchain:
+  admin-private-key: ${ADMIN_PRIVATE_KEY}
+
 solapi:
   api-key: ${SOLAPI_API_KEY}
   api-secret: ${SOLAPI_API_SECRET}

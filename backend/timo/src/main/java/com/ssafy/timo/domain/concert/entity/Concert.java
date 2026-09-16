@@ -1,6 +1,7 @@
 package com.ssafy.timo.domain.concert.entity;
 
 import com.ssafy.timo.domain.artist.entity.Artist;
+import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.global.entity.BaseEntity;
 import jakarta.persistence.CascadeType;
@@ -22,6 +23,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -88,6 +90,26 @@ public class Concert extends BaseEntity {
     @JoinColumn(name = "venue_id", nullable = false)
     private Venue venue;
 
+    /**
+     * 이 공연을 주최하는 회원({@link com.ssafy.timo.domain.member.entity.Role#ORGANIZER}).
+     * 생성 시점엔 비어 있을 수 있다 - 누가 주최하는지는 온체인 판매 준비 단계({@link #prepareForSale})에서
+     * 정해진다. 예매를 열려면 이 값과 {@link #facePrice}가 채워져 있어야 한다.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organizer_id")
+    private Member organizer;
+
+    /**
+     * 전 좌석 단일 정가(wei). {@code ShowRegistry.registerShow}에 그대로 실려 올라간다.
+     * 좌석 등급별 가격 차등은 아직 온체인이 지원하지 않아, 지금은 이 값 하나로 통일한다.
+     */
+    @Column(name = "face_price")
+    private BigInteger facePrice;
+
+    /** {@code ShowRegistry}의 showId. 온체인 등록 전엔 null이다({@link #confirmRegistered}). */
+    @Column(name = "show_id")
+    private BigInteger showId;
+
     @OneToMany(mappedBy = "concert", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ConcertArtist> concertArtists = new ArrayList<>();
 
@@ -122,6 +144,22 @@ public class Concert extends BaseEntity {
         this.endDate = endDate;
         this.openAt = openAt;
         this.venue = venue;
+    }
+
+    /** 주최자와 정가를 정해 온체인 판매 준비를 시작한다. {@link #confirmRegistered}가 뒤따라야 실제로 예매를 열 수 있다. */
+    public void prepareForSale(Member organizer, BigInteger facePrice) {
+        this.organizer = organizer;
+        this.facePrice = facePrice;
+    }
+
+    /** {@code ShowRegistry.registerShow} 트랜잭션이 확정된 뒤, 발급된 showId를 채운다. */
+    public void confirmRegistered(BigInteger showId) {
+        this.showId = showId;
+    }
+
+    /** 예매(민팅)를 열 수 있는 상태인지 - 주최자·정가·온체인 showId가 모두 갖춰졌는지. */
+    public boolean isReadyForBooking() {
+        return organizer != null && facePrice != null && showId != null;
     }
 
     /** 출연 아티스트를 추가한다. 중복 여부는 호출 쪽에서 걸러 온다고 보고 여기서는 검사하지 않는다. */

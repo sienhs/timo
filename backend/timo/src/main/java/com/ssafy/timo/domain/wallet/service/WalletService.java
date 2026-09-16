@@ -33,4 +33,12 @@ public class WalletService {
                 .wrappedDek(material.wrappedDek())
                 .build());
     }
+
+    /** 회원의 온체인 주소. 회원가입 때 지갑을 함께 만들므로 없으면 데이터가 어긋난 것이다. */
+    @Transactional(readOnly = true)
+    public String getAddress(Long memberId) {
+        return walletRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalStateException("회원의 지갑이 없습니다 (memberId=" + memberId + ")"))
+                .getAddress();
+    }
 }

@@ -1,6 +1,10 @@
 package com.ssafy.timo.domain.reservation.dto;
 
+import com.ssafy.timo.domain.concert.entity.Concert;
+import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.entity.ReservationStatus;
+import com.ssafy.timo.domain.seat.entity.Seat;
+import com.ssafy.timo.global.storage.ImageStorage;
 
 import java.time.LocalDateTime;
 
@@ -23,4 +27,22 @@ public record ReservationSummaryResponseDto(
         ReservationStatus status,
         LocalDateTime createdAt
 ) {
+    public static ReservationSummaryResponseDto from(Reservation reservation, ImageStorage imageStorage) {
+        Concert concert = reservation.getConcert();
+        Seat seat = reservation.getSeat();
+
+        return new ReservationSummaryResponseDto(
+                reservation.getId(),
+                concert.getId(),
+                concert.getTitle(),
+                imageStorage.getUrl(concert.getPosterImageKey()),
+                concert.getStartDate(),
+                concert.getVenue().getName(),
+                seat.getSection().getName(),
+                seat.getSeatNo(),
+                seat.getSeatCol(),
+                concert.getFacePrice().longValueExact(),
+                reservation.getStatus(),
+                reservation.getCreatedAt());
+    }
 }
