@@ -54,7 +54,9 @@ frontend_build:
     # Firebase distribution runs here as well: the universal APK exceeds this
     # GitLab instance's artifact-size limit, so it cannot be handed to another
     # job as an artifact.
-    - apt-get update && apt-get install -y --no-install-recommends git-lfs nodejs npm
+    - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git-lfs
+    - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    - apt-get install -y --no-install-recommends nodejs
     - npm install -g firebase-tools
     - git lfs pull --include="frontend/assets/models/*.onnx,frontend/android/app/src/main/assets/models/*.task"
     - |
