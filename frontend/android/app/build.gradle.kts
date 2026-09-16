@@ -43,6 +43,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // 배포 APK 는 arm64 실기기 전용. ONNX Runtime·MediaPipe·Flutter 네이티브
+            // 라이브러리가 ABI 3개분 들어가면 254MB 가 되어 GitLab artifact 한도를
+            // 넘고 테스터 설치도 무겁다. ndk.abiFilters 는 Flutter Gradle 플러그인이
+            // 자기 타깃 3개를 합집합으로 덧붙여 효과가 없으므로 패키징에서 뺀다.
+            // debug 는 그대로 두어 x86_64 에뮬레이터 개발이 계속 된다.
+            packaging {
+                jniLibs {
+                    excludes += listOf("lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**")
+                }
+            }
         }
     }
 }
