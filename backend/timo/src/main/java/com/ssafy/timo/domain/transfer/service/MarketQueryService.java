@@ -142,6 +142,8 @@ public class MarketQueryService {
                 row.getVenueName(),
                 row.getSectionName(),
                 SeatGrade.valueOf(row.getGrade()),
+                row.getSeatNo(),
+                row.getSeatCol(),
                 row.getPrice(),
                 row.getFaceValue(),
                 row.getOccurredAt());

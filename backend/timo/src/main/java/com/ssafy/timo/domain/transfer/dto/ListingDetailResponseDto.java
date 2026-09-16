@@ -12,8 +12,9 @@ import java.time.LocalDateTime;
  * 매물 한 건의 상세. 등록 응답도 같은 모양이다.
  *
  * <p>목록({@link ListingSummaryResponseDto})에 공연 정보와 {@code status} · {@code closedAt} 이
- * 더해진 것이다. 담지 않는 값의 기준은 목록과 똑같다 — <b>좌석번호 · 판매자 식별자 ·
- * {@code ticketId} · {@code tokenId} 는 상세라고 해서 예외를 두지 않는다.</b>
+ * 더해진 것이다. 담지 않는 값의 기준은 목록과 똑같다 — <b>판매자 식별자와
+ * {@code ticketId}, {@code tokenId} 는 상세라고 해서 예외를 두지 않는다.</b> 좌석번호는 목록과 마찬가지로
+ * 공개한다.
  *
  * <p>{@code status} 가 {@link ListingStatus#LISTED} 가 아닌 매물도 이 응답으로 조회된다.
  * 목록에서 상세로 들어가는 사이에 팔릴 수 있고, 그때 404 를 주면 화면이 "없는 매물"로 오해한다.
@@ -31,6 +32,8 @@ public record ListingDetailResponseDto(
         String venueName,
         String sectionName,
         SeatGrade grade,
+        int seatNo,
+        int seatCol,
         long price,
         long faceValue,
         int discountRate,
@@ -54,6 +57,8 @@ public record ListingDetailResponseDto(
                 concert.getVenue().getName(),
                 listing.getSection().getName(),
                 listing.getSection().getGrade(),
+                listing.getSeatNo(),
+                listing.getSeatCol(),
                 listing.getPrice(),
                 listing.getFaceValue(),
                 listing.discountRate(),

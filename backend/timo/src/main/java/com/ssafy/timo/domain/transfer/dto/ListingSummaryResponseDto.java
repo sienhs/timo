@@ -8,9 +8,9 @@ import java.time.LocalDateTime;
 /**
  * 매물 목록의 항목 하나.
  *
- * <p><b>체결 전이라 좌석번호를 담지 않는다.</b> 구역명·등급까지만 공개한다. 좌석이 특정되면
- * 그 좌석의 예매자를 역추적할 수 있다. 조인해 두고 여기서 필드만 빼는 방식은 쓰지 않는다 —
- * 조회가 아예 {@code seat} 를 거치지 않도록 {@code ticket_listing.section_id} 로 직행한다.
+ * <p><b>좌석번호를 함께 공개한다</b>(2026-09-16 변경). 공식 마켓에서의 양도를 권장하는 플랫폼이라
+ * 구매자가 목록에서 자리를 보고 고를 수 있어야 한다. 값은 매물이 등록 시점에 복사해 둔 것이라
+ * 조회가 여전히 {@code seat} 테이블을 거치지 않는다.
  *
  * <p><b>판매자를 가리키는 값도 담지 않는다.</b> 회원 식별자는 물론 지갑 주소도 마찬가지다.
  * 지갑 주소는 온체인에 공개돼 있어 그 주소의 매물·거래가 전부 묶인다.
@@ -29,6 +29,8 @@ public record ListingSummaryResponseDto(
         Long listingId,
         String sectionName,
         SeatGrade grade,
+        int seatNo,
+        int seatCol,
         long price,
         long faceValue,
         int discountRate,
@@ -41,6 +43,8 @@ public record ListingSummaryResponseDto(
                 listing.getId(),
                 listing.getSection().getName(),
                 listing.getSection().getGrade(),
+                listing.getSeatNo(),
+                listing.getSeatCol(),
                 listing.getPrice(),
                 listing.getFaceValue(),
                 listing.discountRate(),

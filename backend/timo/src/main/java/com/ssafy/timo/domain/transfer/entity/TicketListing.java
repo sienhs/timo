@@ -33,11 +33,15 @@ import java.time.LocalDateTime;
  * {@code sellerMemberId} 도 마찬가지다 — 양방향 익명 거래라 판매자·구매자는 서로를 알 수 없다.
  * 내부에 남기는 이유는 정산·CS·이중양도 추적에 필요해서지, 내보내기 위함이 아니다.
  *
- * <p>{@link #concert} · {@link #section} · {@link #faceValue} 는 등록 시점에 복사해 오는 비정규화
- * 값이다. 셋 다 티켓이 만들어진 뒤 바뀌지 않아 정합성 위험이 없다. 성능 때문이 아니라 <b>노출 경계를
- * 스키마로 긋기 위해</b> 둔다 — 매물 조회가 {@code ticket} 과 {@code seat} 를 아예 경유하지 않게 되어
- * 좌석번호 유출 경로가 원천 차단된다. 조인해 두고 DTO 에서 필드를 빼는 방식은 쓰지 않는다.
- * 나중에 필드를 추가하다 새어 나간다.
+ * <p>{@link #concert}, {@link #section}, {@link #seatNo}, {@link #seatCol}, {@link #faceValue} 는 등록
+ * 시점에 복사해 오는 비정규화 값이다. 전부 예매가 확정된 뒤 바뀌지 않아 정합성 위험이 없다.
+ * 덕분에 매물 조회가 {@code ticket} 과 {@code seat} 를 아예 경유하지 않는다. 목록 한 번에 티켓과
+ * 예매와 좌석을 3단으로 조인하면 매물이 늘수록 그대로 비용이 된다.
+ *
+ * <p><b>좌석번호는 체결 전에도 공개한다</b>(2026-09-16 변경). 원래는 좌석이 특정되면 그 자리의
+ * 예매자를 역추적할 수 있다고 보아 구역까지만 열었으나, 공식 마켓에서의 양도를 권장하는 플랫폼이라
+ * 구매자가 자리를 보고 고를 수 있어야 한다는 판단이 앞선다. 판매자 식별자와 지갑 주소는 <b>그대로
+ * 비공개다</b> - 그쪽은 익명 거래의 전제라 이번 변경과 무관하다.
  *
  * <h2>어디서 복사해 오는가</h2>
  *
@@ -47,6 +51,7 @@ import java.time.LocalDateTime;
  * <ul>
  *   <li>{@link #concert} ← {@code ticket.reservation.concert}</li>
  *   <li>{@link #section} ← {@code ticket.reservation.seat.section}</li>
+ *   <li>{@link #seatNo}, {@link #seatCol} ← {@code ticket.reservation.seat}</li>
  *   <li>{@link #faceValue} ← {@code ticket.reservation.concert.facePrice}</li>
  *   <li>{@link #sellerMemberId} ← {@code ticket.reservation.member} (티켓에 소유자 컬럼이 없다)</li>
  * </ul>
@@ -129,12 +134,25 @@ public class TicketListing extends BaseEntity {
     /**
      * 티켓 좌석이 속한 구역.
      *
-     * <p>체결 전에 공개하는 범위가 여기까지다. 구역명·등급까지만 보여 주고 좌석번호는 내리지 않는다.
-     * {@code seat} 를 거치지 않으려고 좌석이 아니라 구역을 들고 있다.
+     * <p>구역명과 등급 표기에 쓴다. {@code seat} 를 거치지 않으려고 좌석이 아니라 구역을 직접 들고
+     * 있고, 좌석번호는 아래 두 값으로 따로 복사해 둔다.
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "section_id", nullable = false)
     private Section section;
+
+    /**
+     * 좌석 열. 예매 확정 후 바뀌지 않아 복사해 둔다.
+     *
+     * <p>좌석 자체를 연관관계로 걸지 않는 이유는 {@code seat} 를 경유하지 않기 위해서다. 매물 목록은
+     * 이 두 값만 있으면 되고, 좌석 행을 통째로 들고 오면 공연장 배치 정보까지 딸려 온다.
+     */
+    @Column(name = "seat_no", nullable = false)
+    private int seatNo;
+
+    /** 좌석 번호. {@link #seatNo} 와 같은 이유로 복사해 둔다. */
+    @Column(name = "seat_col", nullable = false)
+    private int seatCol;
 
     /**
      * 등록가. {@link #faceValue} 이하만 허용한다. 등록 후 바뀌지 않는다.
@@ -191,6 +209,8 @@ public class TicketListing extends BaseEntity {
                           Long sellerMemberId,
                           Concert concert,
                           Section section,
+                          int seatNo,
+                          int seatCol,
                           long price,
                           long faceValue,
                           LocalDateTime listedAt) {
@@ -198,6 +218,8 @@ public class TicketListing extends BaseEntity {
         this.sellerMemberId = sellerMemberId;
         this.concert = concert;
         this.section = section;
+        this.seatNo = seatNo;
+        this.seatCol = seatCol;
         this.price = price;
         this.faceValue = faceValue;
         this.status = ListingStatus.LISTED;
@@ -214,6 +236,8 @@ public class TicketListing extends BaseEntity {
                                      Long sellerMemberId,
                                      Concert concert,
                                      Section section,
+                                     int seatNo,
+                                     int seatCol,
                                      long price,
                                      long faceValue,
                                      LocalDateTime listedAt) {
@@ -222,6 +246,8 @@ public class TicketListing extends BaseEntity {
                 .sellerMemberId(sellerMemberId)
                 .concert(concert)
                 .section(section)
+                .seatNo(seatNo)
+                .seatCol(seatCol)
                 .price(price)
                 .faceValue(faceValue)
                 .listedAt(listedAt)

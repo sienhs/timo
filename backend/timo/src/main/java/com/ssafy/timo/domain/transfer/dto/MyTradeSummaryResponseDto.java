@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * 내 거래 내역의 항목 하나. 판매와 구매가 같은 모양으로 섞여 있다.
  *
  * <p><b>거래 상대는 어느 쪽에서도 드러나지 않는다.</b> 판매 내역에 누가 샀는지, 구매 내역에
- * 누가 팔았는지 나오지 않는다. 좌석번호 · {@code ticketId} · {@code tokenId} 도 없다.
+ * 누가 팔았는지 나오지 않는다. {@code ticketId} 와 {@code tokenId} 도 없다.
  *
  * <p>{@code tradeId} 는 {@link MyTradeType#PURCHASE} 에만 값이 있다. 판매는 아직 팔리지 않았을
  * 수 있어 체결 자체가 없다.
@@ -35,6 +35,8 @@ public record MyTradeSummaryResponseDto(
         String venueName,
         String sectionName,
         SeatGrade grade,
+        int seatNo,
+        int seatCol,
         long price,
         long faceValue,
         LocalDateTime occurredAt
@@ -56,6 +58,8 @@ public record MyTradeSummaryResponseDto(
                 concert.getVenue().getName(),
                 listing.getSection().getName(),
                 listing.getSection().getGrade(),
+                listing.getSeatNo(),
+                listing.getSeatCol(),
                 listing.getPrice(),
                 listing.getFaceValue(),
                 listing.getListedAt());
@@ -78,6 +82,8 @@ public record MyTradeSummaryResponseDto(
                 concert.getVenue().getName(),
                 listing.getSection().getName(),
                 listing.getSection().getGrade(),
+                listing.getSeatNo(),
+                listing.getSeatCol(),
                 trade.getPrice(),
                 listing.getFaceValue(),
                 trade.getTradedAt());

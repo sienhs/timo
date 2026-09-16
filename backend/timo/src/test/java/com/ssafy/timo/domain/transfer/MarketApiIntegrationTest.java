@@ -39,6 +39,8 @@ import java.util.stream.IntStream;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -54,8 +56,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <ul>
  *   <li>내 거래 내역의 <b>네이티브 {@code UNION ALL} 쿼리</b> — JPQL 과 달리 기동 시점에 검증되지
  *       않아, 실제로 호출해 봐야 컬럼명·별칭이 맞는지 알 수 있다</li>
- *   <li>응답에 <b>{@code ticketId} · {@code tokenId} · 좌석번호 · 판매자 식별자가 새지 않는지</b> —
- *       DTO 를 눈으로 확인하는 것과 실제 JSON 을 보는 것은 다르다</li>
+ *   <li>응답에 <b>{@code ticketId} 와 {@code tokenId}, 판매자 식별자가 새지 않는지</b> —
+ *       DTO 를 눈으로 확인하는 것과 실제 JSON 을 보는 것은 다르다. 좌석번호는 2026-09-16 부터
+ *       공개 대상이라 반대로 <b>나오는지</b>를 본다</li>
  * </ul>
  *
  * <p>요청자는 {@link Authenticated} 가 홀더에 직접 넣는다. {@code addFilters = false} 라 필터가
@@ -168,10 +171,13 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.discountRate").value(10))
                     .andExpect(jsonPath("$.mine").value(true))
                     .andExpect(jsonPath("$.closedAt").doesNotExist())
-                    // 노출 경계 - 상세라고 예외를 두지 않는다.
+                    // 좌석번호는 공개한다. 구매자가 자리를 보고 골라야 하기 때문이다.
+                    .andExpect(jsonPath("$.sectionName").value("1층 A블록"))
+                    .andExpect(jsonPath("$.seatNo").value(myTicket.getReservation().getSeat().getSeatNo()))
+                    .andExpect(jsonPath("$.seatCol").value(myTicket.getReservation().getSeat().getSeatCol()))
+                    // 노출 경계 - 판매자와 티켓 식별자는 그대로 비공개다.
                     .andExpect(jsonPath("$.ticketId").doesNotExist())
                     .andExpect(jsonPath("$.tokenId").doesNotExist())
-                    .andExpect(jsonPath("$.seatNo").doesNotExist())
                     .andExpect(jsonPath("$.sellerMemberId").doesNotExist());
         }
 
@@ -279,8 +285,9 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.content[1].price").value(LIST_PRICE))
                     .andExpect(jsonPath("$.content[1].mine").value(true))
                     .andExpect(jsonPath("$.content[0].mine").value(false))
-                    // 체결 전이라 좌석번호를 내리지 않는다.
-                    .andExpect(jsonPath("$.content[0].seatNo").doesNotExist())
+                    // 목록에서도 좌석번호를 준다.
+                    .andExpect(jsonPath("$.content[0].seatNo").exists())
+                    .andExpect(jsonPath("$.content[0].seatCol").exists())
                     .andExpect(jsonPath("$.content[0].ticketId").doesNotExist());
         }
 
@@ -336,6 +343,7 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].status", contains("LISTED")))
                     .andExpect(jsonPath("$.content[?(@.type == 'PURCHASE')].status", contains("PENDING")))
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].tradeId", contains((Object) null)))
+                    .andExpect(jsonPath("$.content[*].seatNo", everyItem(notNullValue())))
                     // 거래 상대도 티켓 식별자도 드러나지 않는다.
                     .andExpect(jsonPath("$.content[0].ticketId").doesNotExist())
                     .andExpect(jsonPath("$.content[0].sellerMemberId").doesNotExist())
@@ -413,6 +421,8 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.status").value("PENDING"))
                     .andExpect(jsonPath("$.price").value(LIST_PRICE))
                     .andExpect(jsonPath("$.tradeId").exists())
+                    .andExpect(jsonPath("$.seatNo").value(othersTicket.getReservation().getSeat().getSeatNo()))
+                    .andExpect(jsonPath("$.seatCol").value(othersTicket.getReservation().getSeat().getSeatCol()))
                     .andExpect(jsonPath("$.txHash").doesNotExist())
                     .andExpect(jsonPath("$.ticketId").doesNotExist());
         }
@@ -494,6 +504,8 @@ class MarketApiIntegrationTest {
                 ticket.getReservation().getMember().getId(),
                 ticket.getReservation().getConcert(),
                 ticket.getReservation().getSeat().getSection(),
+                ticket.getReservation().getSeat().getSeatNo(),
+                ticket.getReservation().getSeat().getSeatCol(),
                 price,
                 FACE_PRICE,
                 LocalDateTime.now()));

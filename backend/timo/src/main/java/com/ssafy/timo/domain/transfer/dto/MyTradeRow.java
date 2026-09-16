@@ -41,6 +41,10 @@ public interface MyTradeRow {
 
     String getSectionName();
 
+    int getSeatNo();
+
+    int getSeatCol();
+
     /** {@code SeatGrade} 의 이름. */
     String getGrade();
 
