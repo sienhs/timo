@@ -73,7 +73,11 @@ const quickMenuItems = <QuickMenuItem>[
     label: '버섯 충전',
     routeName: AppRoutes.coinCharge,
   ),
-  QuickMenuItem(icon: Icons.storefront_outlined, label: '양도마켓'),
+  QuickMenuItem(
+    icon: Icons.storefront_outlined,
+    label: '양도마켓',
+    routeName: AppRoutes.resaleMarket,
+  ),
   QuickMenuItem(icon: Icons.menu, label: '카테고리'),
   QuickMenuItem(icon: Icons.settings_outlined, label: '환경 설정'),
 ];
