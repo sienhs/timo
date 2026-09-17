@@ -63,7 +63,7 @@ public class MarketTicketStore {
      * <p>내 예매라서 언제나 내 티켓이다 - 스텁에는 요청자 개념이 없고, 주문을 넣은 쪽이 곧 나다.
      *
      * <p>정가는 마켓 스텁의 다른 티켓과 같은 기준인 구역 가격을 쓴다. 실제 구현도 정가 판정에
-     * {@code Section.price} 를 본다({@code ListingService.faceValueOf}).
+     * {@code Section.price} 를 본다({@code ListingService.sectionPriceOf}).
      *
      * <p>같은 번호가 다시 들어오는 일은 없다 - 주문마다 새 번호를 센다. 혹시 들어오더라도 먼저 넣은
      * 티켓을 지키고 무시한다. 덮어쓰면 그 티켓으로 열려 있던 매물이 주인 없는 상태가 된다.
