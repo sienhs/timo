@@ -28,6 +28,14 @@ jwt:
 entry-pass:
   ttl: 30s
 
+# 양도 마켓 운영 시간(매일, 양 끝 포함). 등록·가격 수정·구매는 이 창 안에서만 받고 판정은 서버
+# 시계로 한다. 환경마다 다르면 "로컬은 되는데 배포하면 409" 가 나므로 여기 한 곳에만 둔다.
+# 예외는 test 프로파일뿐 - 통합 테스트가 실행 시각에 좌우되지 않도록 종일 열어 둔다.
+market:
+  hours:
+    open-at: "20:00:00"
+    close-at: "23:59:59"
+
 # SSAFY EC2에 올린 persistent Hardhat 노드. 컨트랙트 주소는 여기 없다 - admin-private-key로부터
 # 결정적으로 계산된다(DeployedContractAddresses 참고). admin-private-key 기본값은 빈 문자열 -
 # 로컬/테스트에서 없어도 그냥 비어 있는 채로 뜬다(Web3jConfig가 그동안 쓸 더미 키를 알아서

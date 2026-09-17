@@ -27,6 +27,13 @@ jwt:
 entry-pass:
   secret: local-dev-only-entry-pass-secret-please-change-in-prod-0123456789
 
+# 통합 테스트는 Clock 빈을 갈아 끼울 수 없어(IntegrationTest 규약) 운영 시간을 종일로 연다.
+# 창 경계 판정은 MarketHoursServiceTest 가 고정 시계로 본다.
+market:
+  hours:
+    open-at: "00:00:00"
+    close-at: "23:59:59"
+
 wallet:
   master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
 

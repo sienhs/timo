@@ -59,7 +59,14 @@ public enum TransferErrorCode implements BaseErrorCode {
      * 데이터가 손상됐을 때만 걸리는 방어선이다. 그래도 검증을 두는 것은 정가 초과 판매 차단이
      * 이 서비스의 존재 이유이기 때문이다.
      */
-    TRADE_PRICE_EXCEEDS_FACE_VALUE(HttpStatus.UNPROCESSABLE_CONTENT, "정가를 초과한 매물은 체결할 수 없습니다.");
+    TRADE_PRICE_EXCEEDS_FACE_VALUE(HttpStatus.UNPROCESSABLE_CONTENT, "정가를 초과한 매물은 체결할 수 없습니다."),
+    /**
+     * 운영 시간 밖에 등록·가격 수정·구매를 시도한 경우. 판정은 서버 시계다.
+     *
+     * <p>403 이 아닌 이유는 요청자의 권한 문제가 아니라 시각이라는 상태의 문제이고, 기다리면
+     * 같은 요청이 그대로 통과하기 때문이다. 취소와 조회는 시간과 무관하게 받는다.
+     */
+    MARKET_CLOSED(HttpStatus.CONFLICT, "양도 마켓 운영 시간이 아닙니다.");
 
     private final HttpStatus status;
     private final String message;

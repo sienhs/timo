@@ -4,12 +4,14 @@ import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.ListingSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketConcertSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.MarketHoursResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
 import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.service.ListingService;
+import com.ssafy.timo.domain.transfer.service.MarketHoursService;
 import com.ssafy.timo.domain.transfer.service.MarketQueryService;
 import com.ssafy.timo.domain.transfer.service.PurchaseService;
 import lombok.RequiredArgsConstructor;
@@ -40,9 +42,15 @@ public class MarketController implements MarketApi {
     /** Location 헤더를 만들 때도 재사용하도록 상수로 둔다. */
     static final String BASE_PATH = "/api/v1/market";
 
+    private final MarketHoursService marketHoursService;
     private final MarketQueryService marketQueryService;
     private final ListingService listingService;
     private final PurchaseService purchaseService;
+
+    @Override
+    public ResponseEntity<MarketHoursResponseDto> hours(Long memberId) {
+        return ResponseEntity.ok(marketHoursService.status());
+    }
 
     @Override
     public ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(

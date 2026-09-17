@@ -70,6 +70,7 @@ public class ListingService {
     private final TicketListingRepository ticketListingRepository;
     private final TicketTradeRepository ticketTradeRepository;
     private final ImageStorage imageStorage;
+    private final MarketHoursService marketHoursService;
     private final Clock clock;
 
     /**
@@ -78,6 +79,7 @@ public class ListingService {
      * <p>검사 순서는 먼저 걸리는 것 하나만 응답한다.
      *
      * <ol>
+     *   <li>운영 시간인가 → 409. 닫혀 있으면 아래는 전부 무의미하므로 티켓을 읽기 전에 본다</li>
      *   <li>티켓이 있는가 → 404</li>
      *   <li>내가 현재 소유자인가 → 403</li>
      *   <li>티켓이 발행 완료 상태인가 → 409</li>
@@ -85,11 +87,13 @@ public class ListingService {
      *   <li>등록가가 정가 이하인가 → 400</li>
      * </ol>
      *
-     * <p>4번을 5번보다 먼저 보는 이유는, 이미 등록된 티켓에 대해 "가격이 잘못됐다"고 답하면
+     * <p>5번을 6번보다 먼저 보는 이유는, 이미 등록된 티켓에 대해 "가격이 잘못됐다"고 답하면
      * 사용자가 가격을 고쳐 다시 시도하게 되기 때문이다. 고쳐도 결과는 같다.
      */
     @Transactional
     public ListingDetailResponseDto register(CreateListingRequestDto request, Long memberId) {
+        marketHoursService.requireOpen();
+
         Long ticketId = request.ticketId();
 
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -139,6 +143,7 @@ public class ListingService {
      * <p>검사 순서는 먼저 걸리는 것 하나만 응답한다.
      *
      * <ol>
+     *   <li>운영 시간인가 → 409. 등록과 같은 규칙이다 — 닫힌 마켓의 매물 가격이 바뀌면 안 된다</li>
      *   <li>매물이 있는가 → 404</li>
      *   <li>내가 올린 매물인가 → 403</li>
      *   <li>새 가격이 정가 이하인가 → 400</li>
@@ -154,9 +159,9 @@ public class ListingService {
      * {@code Section.price} 가 아니다. 매물이 열린 뒤 구역 가격이 바뀌어도 그 매물의 판정 기준은
      * 흔들리지 않아야 한다({@code TicketListing} 주석). 그래서 여기서는 구역을 읽지도 않는다.
      *
-     * <p>3번을 4번보다 앞에 두는 이유는 등록({@link #register})과 반대로 보이지만 사정이 다르다.
-     * 등록의 409("이미 등록 중")는 가격을 고쳐도 결과가 같아 먼저 알려야 하는 것이고, 여기 3번은
-     * 판매자 확인을 위해 이미 읽어 둔 행만으로 끝나는 검사다. 4번은 경쟁 상태라 UPDATE 를
+     * <p>4번을 5번보다 앞에 두는 이유는 등록({@link #register})과 반대로 보이지만 사정이 다르다.
+     * 등록의 409("이미 등록 중")는 가격을 고쳐도 결과가 같아 먼저 알려야 하는 것이고, 여기 4번은
+     * 판매자 확인을 위해 이미 읽어 둔 행만으로 끝나는 검사다. 5번은 경쟁 상태라 UPDATE 를
      * 돌려 봐야만 알 수 있으므로 순서를 바꿀 여지가 없다.
      *
      * <p>바뀐 값이 없어도(같은 가격을 다시 보내도) 그대로 UPDATE 한다. 재시도가 안전해야 해서
@@ -169,6 +174,8 @@ public class ListingService {
     public ListingDetailResponseDto updatePrice(Long listingId,
                                                 UpdateListingPriceRequestDto request,
                                                 Long memberId) {
+        marketHoursService.requireOpen();
+
         TicketListing listing = ticketListingRepository.findById(listingId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
         if (!listing.isSeller(memberId)) {
@@ -203,6 +210,9 @@ public class ListingService {
      * <p>검사는 404(없는 매물) → 403(남의 매물) → 409(이미 종료) 순이다. <b>마지막 판정은 조회가
      * 아니라 전이의 결과로 한다</b> — 상태를 읽어 확인한 뒤 UPDATE 하면, 취소하려는 찰나에 팔린
      * 경우 둘 다 통과한다. 영향 행이 0 이면 남이 먼저 샀거나 이미 취소된 것이다.
+     *
+     * <p><b>운영 시간을 보지 않는다.</b> 내 매물을 내리는 것은 언제든 가능해야 한다 — 닫힌 마켓에
+     * 매물이 남아 있는 상태를 판매자가 다음 창까지 풀 수 없으면 안 된다.
      *
      * <p><b>취소 페널티는 없다.</b> 차감 규칙(D-7 100% / 하루 전 80% / 당일 10%)이 기획 미확정이라
      * 넣지 않았다. 정해지면 이 메서드가 잔액을 건드리게 되고 응답이 204 가 아니게 된다.

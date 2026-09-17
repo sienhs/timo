@@ -43,6 +43,7 @@ public class PurchaseService {
 
     private final TicketListingRepository ticketListingRepository;
     private final TicketTradeRepository ticketTradeRepository;
+    private final MarketHoursService marketHoursService;
     private final Clock clock;
 
     /**
@@ -51,6 +52,7 @@ public class PurchaseService {
      * <p>처리 순서가 규약의 핵심이다.
      *
      * <ol>
+     *   <li>운영 시간인가 → 409. 닫힌 마켓에서 자리를 먼저 잡는 일이 없도록 UPDATE 앞에 둔다</li>
      *   <li>매물이 있는가 → 404</li>
      *   <li>{@code LISTED} 인 행만 {@code SOLD} 로 조건부 UPDATE. 영향 행 0 이면 → 409</li>
      *   <li>{@code expectedPrice} 가 등록가와 같은가 → 409</li>
@@ -59,19 +61,21 @@ public class PurchaseService {
      *   <li>체결 기록 INSERT. 상태는 {@code PENDING}</li>
      * </ol>
      *
-     * <p><b>2번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
+     * <p><b>3번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
      * 요청이 같은 매물을 통과한다. 확인과 전이가 한 문장 안에서 일어나야 선착순이 성립한다.
      *
-     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 3~5 번에서
+     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~6 번에서
      * 예외가 나면 트랜잭션이 통째로 되돌아가 {@code SOLD} 도 함께 풀린다. 먼저 자리를 잡고 나서
      * 따지는 쪽이, 따지는 동안 남에게 자리를 빼앗기는 것보다 낫다.
      *
-     * <p>1 번을 따로 두는 이유는 <b>404 와 409 를 구분하기 위해서다.</b> 없는 매물도 조건부 UPDATE 의
+     * <p>2 번을 따로 두는 이유는 <b>404 와 409 를 구분하기 위해서다.</b> 없는 매물도 조건부 UPDATE 의
      * 영향 행은 0 이라, 존재 확인을 건너뛰면 "없는 매물" 이 "이미 팔린 매물" 로 보인다. 앱은 둘을
      * 다르게 안내해야 한다.
      */
     @Transactional
     public PurchaseResponseDto purchase(Long listingId, PurchaseRequestDto request, Long buyerId) {
+        marketHoursService.requireOpen();
+
         LocalDateTime now = LocalDateTime.now(clock);
 
         if (!ticketListingRepository.existsById(listingId)) {

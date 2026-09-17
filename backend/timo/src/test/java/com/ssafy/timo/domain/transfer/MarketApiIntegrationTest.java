@@ -39,6 +39,7 @@ import java.util.stream.IntStream;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -152,6 +153,23 @@ class MarketApiIntegrationTest {
     @AfterEach
     void clearRequester() {
         Authenticated.clear();
+    }
+
+    @Nested
+    @DisplayName("운영 시간")
+    class Hours {
+
+        @Test
+        @DisplayName("열림 여부와 창의 시각, 서버 시각을 준다 - test 프로파일은 종일 열려 있다")
+        void hours() throws Exception {
+            // 창의 날짜는 서버 시각의 날짜와 같아야 한다. 자정 부근에 돌아도 둘은 같은 now 에서 나온다.
+            mvc.perform(get(MARKET_PATH + "/hours"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.open").value(true))
+                    .andExpect(jsonPath("$.serverTime").isString())
+                    .andExpect(jsonPath("$.opensAt").value(endsWith("T00:00:00")))
+                    .andExpect(jsonPath("$.closesAt").value(endsWith("T23:59:59")));
+        }
     }
 
     @Nested
