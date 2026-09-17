@@ -13,6 +13,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -82,6 +84,8 @@ dependencies {
     implementation("com.google.mediapipe:tasks-vision:0.10.32")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 // 추론 모델은 Flutter 에셋이 아니라 Android 에셋으로 들어가야 한다 — 네이티브
