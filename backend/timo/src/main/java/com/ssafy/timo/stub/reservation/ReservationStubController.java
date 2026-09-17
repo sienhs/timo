@@ -24,6 +24,7 @@ import com.ssafy.timo.stub.StubFixtures.SeatFixture;
 import com.ssafy.timo.stub.StubHashes;
 import com.ssafy.timo.stub.concert.ConcertStore;
 import com.ssafy.timo.stub.seat.SeatStateStore;
+import com.ssafy.timo.stub.transfer.MarketTicketStore;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
@@ -69,18 +70,36 @@ public class ReservationStubController implements ReservationApi {
 
     private final SeatStateStore seatStateStore;
     private final ConcertStore concertStore;
+
+    /**
+     * 주문으로 생긴 티켓을 넣어 둘 곳. 마켓 스텁이 같은 저장소를 본다.
+     *
+     * <p>넣지 않으면 앱이 예매 응답으로 받은 {@code ticketId} 로 양도 등록을 걸었을 때 마켓이 그
+     * 번호를 몰라 404 가 난다 - v0 에서 "예매 → 양도 등록" 이 이어지지 않던 원인이다.
+     */
+    private final MarketTicketStore ticketStore;
     private final ImageStorage imageStorage;
     private final Clock clock;
     private final AtomicLong idSequence = new AtomicLong(StubFixtures.CREATED_ID_START);
+
+    /**
+     * 주문마다 붙는 티켓 번호. 주문 번호와 <b>다른 대역</b>에서 센다.
+     *
+     * <p>실제 구현은 주문과 티켓이 각자 시퀀스를 갖는 별개 테이블이라 두 번호가 다르다. 스텁이
+     * 주문 번호를 그대로 티켓 번호로 쓰면 앱이 둘을 혼동해도 드러나지 않는다 - 지금 양도 등록이
+     * 막혀 있는 원인이 정확히 그 혼동이라, 스텁에서도 갈라 둔다.
+     */
+    private final AtomicLong ticketIdSequence = new AtomicLong(StubFixtures.ORDER_TICKET_ID_START);
     private final Map<Long, Order> orders = new ConcurrentHashMap<>();
 
     /** 회원이 취소한 주문과 그 시각. 취소는 시간이 아니라 요청으로 일어나므로 따로 기억한다. */
     private final Map<Long, LocalDateTime> cancelled = new ConcurrentHashMap<>();
 
     public ReservationStubController(SeatStateStore seatStateStore, ConcertStore concertStore,
-                                     ImageStorage imageStorage, Clock clock) {
+                                     MarketTicketStore ticketStore, ImageStorage imageStorage, Clock clock) {
         this.seatStateStore = seatStateStore;
         this.concertStore = concertStore;
+        this.ticketStore = ticketStore;
         this.imageStorage = imageStorage;
         this.clock = clock;
     }
@@ -108,8 +127,11 @@ public class ReservationStubController implements ReservationApi {
 
         // 좌석 배정 + 주문 생성. 실제라면 잔액 차감까지 DB 단일 트랜잭션이다.
         seatStateStore.occupy(seat);
-        Order order = new Order(idSequence.getAndIncrement(), concert, seat, LocalDateTime.now(clock));
+        Order order = new Order(idSequence.getAndIncrement(), ticketIdSequence.getAndIncrement(),
+                concert, seat, LocalDateTime.now(clock));
         orders.put(order.id(), order);
+        // 마켓이 이 티켓을 알아야 응답으로 나간 ticketId 로 양도 등록이 걸린다.
+        ticketStore.register(order.ticketId(), concert.id(), seat);
 
         return ResponseEntity
                 .created(URI.create(BASE_PATH + "/" + order.id()))
@@ -211,6 +233,7 @@ public class ReservationStubController implements ReservationApi {
                 order.seat().seatCol(),
                 order.seat().section().price(),
                 status,
+                order.ticketId(),
                 // 발행 추적 값은 스텁이 흉내 내지 않는다. 주문 상태에서 발행 진행이 빠졌고,
                 // 티켓 발행은 티켓 도메인이 생길 때 그쪽에서 재현한다.
                 null,
@@ -234,6 +257,7 @@ public class ReservationStubController implements ReservationApi {
                 order.seat().seatCol(),
                 order.seat().section().price(),
                 statusOf(order),
+                order.ticketId(),
                 order.createdAt());
     }
 
@@ -242,6 +266,13 @@ public class ReservationStubController implements ReservationApi {
         return StubHashes.of("order:" + reservationId);
     }
 
-    private record Order(long id, ConcertFixture concert, SeatFixture seat, LocalDateTime createdAt) {
+    /**
+     * 주문 하나.
+     *
+     * <p>{@code ticketId}는 이 주문으로 발행된 티켓의 번호다. 실제 구현에서 주문과 티켓이 별개
+     * 테이블인 것을 따라 {@code id}와 다른 값을 쓴다 - 양도 등록이 받는 것은 이쪽이다.
+     */
+    private record Order(long id, long ticketId, ConcertFixture concert, SeatFixture seat,
+                         LocalDateTime createdAt) {
     }
 }

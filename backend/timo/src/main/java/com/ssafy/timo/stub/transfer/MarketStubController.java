@@ -30,7 +30,7 @@ import com.ssafy.timo.stub.StubController;
 import com.ssafy.timo.stub.StubFixtures;
 import com.ssafy.timo.stub.StubFixtures.ConcertFixture;
 import com.ssafy.timo.stub.StubFixtures.MarketTicketFixture;
-import com.ssafy.timo.stub.StubFixtures.SeatFixture;
+import com.ssafy.timo.stub.transfer.MarketTicketStore.MarketTicket;
 import com.ssafy.timo.stub.concert.ConcertStore;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -54,9 +54,12 @@ import java.util.Optional;
 /**
  * 공식 양도 마켓 API 스텁 (v0).
  *
- * <p>필요한 최소한의 티켓 상태를 이 컨트롤러가 직접 들고 있다({@link MarketTicket}). 티켓 도메인
- * ({@code Ticket})이 생긴 뒤에도 그대로 둔다 - 스텁은 DB 없이 혼자 도는 것이 목적이고, 실제 티켓을
- * 읽기 시작하면 예매부터 만들어야 매물이 생겨 FE 가 화면을 볼 수 없다.
+ * <p>티켓은 {@link MarketTicketStore} 가 들고 있다. 예매 스텁이 주문을 만들며 넣은 티켓을 이쪽이
+ * 읽어야 <b>앱이 "예매 → 내 티켓 목록 → 양도 등록" 을 끝까지 눌러 볼 수 있기 때문이다</b>
+ * (2026-09-17 변경). 그 전에는 이 컨트롤러가 고정 티켓 6장을 혼자 들고 있어서, 예매로 받은 번호로
+ * 등록하면 404 가 났다.
+ *
+ * <p>고정 티켓은 그대로 남아 있다. 앱이 예매를 하지 않아도 마켓 화면에 볼 것이 있어야 한다.
  *
  * <p>다만 <b>정가의 출처가 v1 과 다르다.</b> 여기서는 구역 가격({@code section.price})을 정가로 쓰는데
  * 실제 구현은 공연 정가({@code Concert.facePrice})다. 스텁 고정 데이터에는 공연 정가가 없고, 계약
@@ -67,7 +70,8 @@ import java.util.Optional;
  * 등록될 수 있어 매물마다 {@code listingId} 가 새로 생기기 때문이다. <b>외부로 나가는 식별자는
  * {@code listingId} 하나뿐이며 {@code ticketId} 는 이 클래스 밖으로 나가지 않는다.</b>
  *
- * <p>고정 데이터는 남의 매물 5개와 내 보유 티켓 1장({@link StubFixtures#MY_TICKET_TOKEN_ID})이다.
+ * <p>고정 데이터는 남의 매물 5개와 내 보유 티켓 1장({@link StubFixtures#MY_TICKET_TOKEN_ID})이고,
+ * 여기에 예매로 생긴 티켓이 더해진다.
  * 구매하면 남의 매물이 내 티켓이 되고, 내 티켓을 등록하면 매물이 되며,
  * 등록 뒤 {@link StubFixtures#LISTING_SOLD_AFTER_SECONDS} 초가 지나면 남이 사 간 것으로 보인다.
  * 그 전이는 조회할 때마다 {@link #settle()} 로 따라잡는다. 스케줄러가 없어도 시간이 흐르면 상태가
@@ -94,29 +98,27 @@ public class MarketStubController implements MarketApi {
     private final ConcertStore concertStore;
     private final ImageStorage imageStorage;
     private final Clock clock;
-    private final Map<Long, MarketTicket> tickets = new LinkedHashMap<>();
+    private final MarketTicketStore ticketStore;
     private final Map<Long, StubListing> listings = new LinkedHashMap<>();
     private final List<StubTrade> trades = new ArrayList<>();
 
     private long listingSequence = 1L;
     private long tradeSequence = 1L;
 
-    public MarketStubController(ConcertStore concertStore, ImageStorage imageStorage, Clock clock) {
+    public MarketStubController(MarketTicketStore ticketStore, ConcertStore concertStore,
+                                ImageStorage imageStorage, Clock clock) {
+        this.ticketStore = ticketStore;
         this.concertStore = concertStore;
         this.imageStorage = imageStorage;
         this.clock = clock;
 
+        // 고정 티켓 중 가격이 정해진 것만 처음부터 매물로 열어 둔다. 티켓 자체는 저장소가 들고 있다.
         for (MarketTicketFixture fixture : StubFixtures.MARKET_TICKETS) {
-            SeatFixture seat = StubFixtures.findSeat(fixture.seatId()).orElseThrow();
-            // 고정 데이터의 tokenId 는 십진 문자열이라 그대로 ticketId 로 쓴다.
-            long ticketId = Long.parseLong(fixture.tokenId());
-            MarketTicket ticket = new MarketTicket(
-                    ticketId, fixture.concertId(), seat, seat.section().price(), fixture.mine());
-            tickets.put(ticketId, ticket);
-
-            if (fixture.listPrice() != null) {
-                openListing(ticket, fixture.listPrice(), StubFixtures.FIXTURE_LISTED_AT);
+            if (fixture.listPrice() == null) {
+                continue;
             }
+            MarketTicket ticket = ticketStore.find(Long.parseLong(fixture.tokenId())).orElseThrow();
+            openListing(ticket, fixture.listPrice(), StubFixtures.FIXTURE_LISTED_AT);
         }
     }
 
@@ -129,7 +131,7 @@ public class MarketStubController implements MarketApi {
         Map<Long, List<StubListing>> byConcert = new LinkedHashMap<>();
         for (StubListing listing : listings.values()) {
             if (listing.status == ListingStatus.LISTED) {
-                byConcert.computeIfAbsent(listing.ticket.concertId, id -> new ArrayList<>()).add(listing);
+                byConcert.computeIfAbsent(listing.ticket.concertId(), id -> new ArrayList<>()).add(listing);
             }
         }
 
@@ -165,7 +167,7 @@ public class MarketStubController implements MarketApi {
 
         List<ListingSummaryResponseDto> matched = listings.values().stream()
                 .filter(listing -> listing.status == ListingStatus.LISTED)
-                .filter(listing -> listing.ticket.concertId == concertId)
+                .filter(listing -> listing.ticket.concertId() == concertId)
                 // 낮은 가격순. 동가는 listingId 오름차순으로 고정해 페이지를 넘길 때 같은 매물이 두 번 나오지 않게 한다.
                 .sorted(Comparator.comparingLong((StubListing listing) -> listing.price)
                         .thenComparingLong(listing -> listing.listingId))
@@ -214,18 +216,16 @@ public class MarketStubController implements MarketApi {
     public synchronized ResponseEntity<ListingDetailResponseDto> list(CreateListingRequestDto request,
                                                                       Long memberId) {
         settle();
-        MarketTicket ticket = tickets.get(request.ticketId());
-        if (ticket == null) {
-            throw new TicketNotFoundException(request.ticketId());
-        }
-        if (!ticket.mine) {
-            throw new NotTicketOwnerException(ticket.ticketId);
+        MarketTicket ticket = ticketStore.find(request.ticketId())
+                .orElseThrow(() -> new TicketNotFoundException(request.ticketId()));
+        if (!ticket.mine()) {
+            throw new NotTicketOwnerException(ticket.ticketId());
         }
         if (ticket.listed()) {
-            throw new TicketNotListableException(ticket.ticketId, "이미 등록 중");
+            throw new TicketNotListableException(ticket.ticketId(), "이미 등록 중");
         }
-        if (request.price() > ticket.faceValue) {
-            throw new ListPriceExceedsFacePriceException(request.price(), ticket.faceValue);
+        if (request.price() > ticket.faceValue()) {
+            throw new ListPriceExceedsFacePriceException(request.price(), ticket.faceValue());
         }
 
         StubListing listing = openListing(ticket, request.price(), LocalDateTime.now(clock));
@@ -245,8 +245,8 @@ public class MarketStubController implements MarketApi {
         if (!listing.listedByMe) {
             throw new NotListingSellerException(listingId);
         }
-        if (request.price() > listing.ticket.faceValue) {
-            throw new ListPriceExceedsFacePriceException(request.price(), listing.ticket.faceValue);
+        if (request.price() > listing.ticket.faceValue()) {
+            throw new ListPriceExceedsFacePriceException(request.price(), listing.ticket.faceValue());
         }
         if (listing.status != ListingStatus.LISTED) {
             throw new ListingAlreadyClosedException(listingId);
@@ -271,7 +271,7 @@ public class MarketStubController implements MarketApi {
         }
 
         close(listing, ListingStatus.CANCELED);
-        listing.ticket.currentListingId = null;
+        listing.ticket.currentListingId(null);
 
         return ResponseEntity.noContent().build();
     }
@@ -298,8 +298,8 @@ public class MarketStubController implements MarketApi {
         close(listing, ListingStatus.SOLD);
 
         // 소유자 교체는 온체인이 정본이라 실제 구현에서는 보류돼 있다. 스텁은 화면 흐름을 위해 바꾼다.
-        listing.ticket.mine = true;
-        listing.ticket.currentListingId = null;
+        listing.ticket.changeOwnerToMe(true);
+        listing.ticket.currentListingId(null);
 
         StubTrade trade = new StubTrade(tradeSequence++, listing, now);
         trades.add(trade);
@@ -313,16 +313,16 @@ public class MarketStubController implements MarketApi {
                 concert.title(),
                 concert.startDate(),
                 concert.venueName(),
-                listing.ticket.seat.section().name(),
-                listing.ticket.seat.seatNo(),
-                listing.ticket.seat.seatCol(),
+                listing.ticket.seat().section().name(),
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
                 trade.tradedAt));
     }
 
     private StubListing openListing(MarketTicket ticket, long price, LocalDateTime listedAt) {
-        StubListing listing = new StubListing(listingSequence++, ticket, price, ticket.mine, listedAt);
+        StubListing listing = new StubListing(listingSequence++, ticket, price, ticket.mine(), listedAt);
         listings.put(listing.listingId, listing);
-        ticket.currentListingId = listing.listingId;
+        ticket.currentListingId(listing.listingId);
         return listing;
     }
 
@@ -340,8 +340,8 @@ public class MarketStubController implements MarketApi {
                     && !listing.listedAt.plusSeconds(StubFixtures.LISTING_SOLD_AFTER_SECONDS).isAfter(now)) {
                 listing.status = ListingStatus.SOLD;
                 listing.closedAt = now;
-                listing.ticket.mine = false;
-                listing.ticket.currentListingId = null;
+                listing.ticket.changeOwnerToMe(false);
+                listing.ticket.currentListingId(null);
             }
         }
     }
@@ -357,12 +357,12 @@ public class MarketStubController implements MarketApi {
     private ListingSummaryResponseDto toSummary(StubListing listing) {
         return new ListingSummaryResponseDto(
                 listing.listingId,
-                listing.ticket.seat.section().name(),
+                listing.ticket.seat().section().name(),
                 SeatGrade.COMMON,
-                listing.ticket.seat.seatNo(),
-                listing.ticket.seat.seatCol(),
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
                 listing.price,
-                listing.ticket.faceValue,
+                listing.ticket.faceValue(),
                 discountRate(listing),
                 listing.listedByMe,
                 listing.listedAt);
@@ -379,12 +379,12 @@ public class MarketStubController implements MarketApi {
                 imageStorage.getUrl(concert.posterImageKey()),
                 concert.startDate(),
                 concert.venueName(),
-                listing.ticket.seat.section().name(),
+                listing.ticket.seat().section().name(),
                 SeatGrade.COMMON,
-                listing.ticket.seat.seatNo(),
-                listing.ticket.seat.seatCol(),
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
                 listing.price,
-                listing.ticket.faceValue,
+                listing.ticket.faceValue(),
                 discountRate(listing),
                 listing.listedByMe,
                 listing.listedAt,
@@ -404,12 +404,12 @@ public class MarketStubController implements MarketApi {
                 imageStorage.getUrl(concert.posterImageKey()),
                 concert.startDate(),
                 concert.venueName(),
-                listing.ticket.seat.section().name(),
+                listing.ticket.seat().section().name(),
                 SeatGrade.COMMON,
-                listing.ticket.seat.seatNo(),
-                listing.ticket.seat.seatCol(),
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
                 listing.price,
-                listing.ticket.faceValue,
+                listing.ticket.faceValue(),
                 listing.listedAt);
     }
 
@@ -427,17 +427,17 @@ public class MarketStubController implements MarketApi {
                 imageStorage.getUrl(concert.posterImageKey()),
                 concert.startDate(),
                 concert.venueName(),
-                listing.ticket.seat.section().name(),
+                listing.ticket.seat().section().name(),
                 SeatGrade.COMMON,
-                listing.ticket.seat.seatNo(),
-                listing.ticket.seat.seatCol(),
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
                 listing.price,
-                listing.ticket.faceValue,
+                listing.ticket.faceValue(),
                 trade.tradedAt);
     }
 
     private int discountRate(StubListing listing) {
-        long faceValue = listing.ticket.faceValue;
+        long faceValue = listing.ticket.faceValue();
         if (faceValue <= 0) {
             return 0;
         }
@@ -449,37 +449,9 @@ public class MarketStubController implements MarketApi {
     }
 
     private ConcertFixture concertOf(MarketTicket ticket) {
-        return concertStore.find(ticket.concertId).orElseThrow();
+        return concertStore.find(ticket.concertId()).orElseThrow();
     }
 
-    /**
-     * 마켓이 아는 티켓 하나. 소유자와 등록 여부가 바뀌므로 가변이다.
-     *
-     * <p>실제 {@code Ticket} 과 모양이 다르다 - 그쪽은 소유자·공연·좌석을 직접 들지 않고
-     * {@code reservation} 을 거치며, 소유자 컬럼 자체가 없다. 여기서는 스텁이 소유자를 바꿔야 해서
-     * {@code mine} 을 직접 든다. 밖으로 노출하지 않는 이유이기도 하다.
-     */
-    private static final class MarketTicket {
-
-        private final long ticketId;
-        private final long concertId;
-        private final SeatFixture seat;
-        private final long faceValue;
-        private boolean mine;
-        private Long currentListingId;
-
-        MarketTicket(long ticketId, long concertId, SeatFixture seat, long faceValue, boolean mine) {
-            this.ticketId = ticketId;
-            this.concertId = concertId;
-            this.seat = seat;
-            this.faceValue = faceValue;
-            this.mine = mine;
-        }
-
-        boolean listed() {
-            return currentListingId != null;
-        }
-    }
 
     /** 매물 하나. 한 티켓이 여러 번 등록될 수 있어 티켓과 따로 둔다. */
     private static final class StubListing {

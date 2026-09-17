@@ -55,6 +55,15 @@ public final class StubFixtures {
     /** 스텁이 새로 만드는 리소스의 시작 id. 고정 데이터 id(1~) 와 겹치지 않게 띄운다. */
     public static final long CREATED_ID_START = 100L;
 
+    /**
+     * 예매 스텁이 주문을 만들 때 함께 붙이는 티켓 번호의 시작값.
+     *
+     * <p>고정 마켓 티켓({@link #MARKET_TICKETS}의 1~5, 101)과 겹치지 않는 대역이다. 주문 번호
+     * ({@link #CREATED_ID_START})와도 일부러 다른 값에서 시작한다 - 둘이 같은 숫자면 앱이 주문
+     * 번호를 티켓 번호로 잘못 보내도 우연히 통과해, 실제 서버에서만 터지는 차이가 스텁에서 가려진다.
+     */
+    public static final long ORDER_TICKET_ID_START = 201L;
+
     // ---- 공연장 ---------------------------------------------------------------------------------
 
     public static final long VENUE_ID = 1L;

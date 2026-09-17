@@ -32,10 +32,14 @@ import com.ssafy.timo.global.storage.ImageStorage;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
 import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -120,12 +124,46 @@ public class ReservationServiceImpl implements ReservationService {
         return ReservationDetailResponseDto.from(reservation, ticket, imageStorage);
     }
 
+    /**
+     * 내 주문 목록.
+     *
+     * <p>티켓 식별자는 <b>페이지를 다 읽은 뒤 한 번에</b> 모아 온다. {@link Reservation}은 티켓을
+     * 가리키지 않아(연관이 {@code Ticket -> Reservation} 단방향) 목록 쿼리에 조인해 올 수 없고,
+     * 주문마다 따로 읽으면 페이지 크기만큼 쿼리가 나간다. 그래서 목록 1회 + 티켓 1회로 끝낸다.
+     *
+     * <p>{@code Reservation}에 역방향 연관을 걸지 않은 이유는
+     * {@link TicketRepository#findTicketIdsByReservationIds} 주석을 본다.
+     */
     @Override
     @Transactional(readOnly = true)
     public PagedModel<ReservationSummaryResponseDto> findAll(Long memberId, ReservationListRequestDto request) {
-        return new PagedModel<>(reservationRepository
-                .findPageByMemberId(memberId, request.status(), request.toPageable())
-                .map(reservation -> ReservationSummaryResponseDto.from(reservation, imageStorage)));
+        Page<Reservation> page = reservationRepository
+                .findPageByMemberId(memberId, request.status(), request.toPageable());
+        Map<Long, Long> ticketIds = ticketIdsOf(page.getContent());
+
+        return new PagedModel<>(page.map(reservation ->
+                ReservationSummaryResponseDto.from(reservation, ticketIds.get(reservation.getId()), imageStorage)));
+    }
+
+    /**
+     * 이 주문들의 티켓 식별자를 {@code 주문 id -> 티켓 id} 로 모은다.
+     *
+     * <p>티켓이 없는 주문은 지도에 자리가 없어 {@code null} 이 실린다. 정상 경로에서는 생기지 않는다 -
+     * {@link #create}가 주문과 티켓을 같은 트랜잭션에서 만들기 때문이다. 다만 그 경로를 거치지 않고
+     * 들어온 주문(로컬 시드 데이터 등)이 있을 수 있어, 목록 전체를 실패시키는 대신 그 항목만 비워 둔다 -
+     * 목록은 "내가 뭘 예매했는지" 를 보여주는 화면이라 티켓 한 장 때문에 통째로 막히면 안 된다.
+     */
+    private Map<Long, Long> ticketIdsOf(List<Reservation> reservations) {
+        if (reservations.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> reservationIds = reservations.stream().map(Reservation::getId).toList();
+
+        return ticketRepository.findTicketIdsByReservationIds(reservationIds).stream()
+                .collect(Collectors.toMap(
+                        TicketRepository.ReservationTicketId::getReservationId,
+                        TicketRepository.ReservationTicketId::getTicketId));
     }
 
     @Override

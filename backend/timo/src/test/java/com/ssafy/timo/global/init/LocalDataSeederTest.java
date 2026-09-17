@@ -10,6 +10,9 @@ import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.concert.service.ConcertService;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
+import com.ssafy.timo.domain.ticket.entity.Ticket;
+import com.ssafy.timo.domain.ticket.entity.TicketStatus;
+import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionListResponseDto.SectionSummary;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
@@ -112,6 +115,9 @@ class LocalDataSeederTest {
 
     @Autowired
     private ReservationRepository reservationRepository;
+
+    @Autowired
+    private TicketRepository ticketRepository;
 
     @Autowired
     private SeatHoldRepository seatHoldRepository;
@@ -228,6 +234,29 @@ class LocalDataSeederTest {
         assertThat(seatHoldRepository.findAll())
                 .isNotEmpty()
                 .allSatisfy(hold -> assertThat(hold.getExpiresAt()).isAfter(fiveMinutesLater));
+    }
+
+    @Test
+    @DisplayName("시드 예매마다 발행 완료된 티켓이 한 장씩 생긴다 - 없으면 상세 조회도 양도 등록도 막힌다")
+    void seedsOneMintedTicketPerReservation() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        List<Ticket> tickets = ticketRepository.findAll();
+
+        // 주문 하나에 티켓 하나다(uk_ticket_reservation).
+        assertThat(tickets).hasSize((int) reservationRepository.count());
+
+        // OWNED 여야 한다. PENDING_MINT 면 ListingService 가 "발행 전 티켓" 으로 거절해
+        // 로컬에서 양도 등록을 만져 볼 수 없다.
+        assertThat(tickets).allSatisfy(ticket ->
+                assertThat(ticket.getStatus()).isEqualTo(TicketStatus.OWNED));
+
+        // tokenId 는 uk_ticket_token_id 가 걸려 있어 주문마다 달라야 한다.
+        assertThat(tickets).extracting(Ticket::getTokenId).doesNotContainNull().doesNotHaveDuplicates();
+        // 해시 컬럼이 66자(0x + 64)라 형식이 어긋나면 저장 단계에서 잘린다.
+        assertThat(tickets).allSatisfy(ticket ->
+                assertThat(ticket.getMintTxHash()).hasSize(66).startsWith("0x"));
     }
 
     @Test
@@ -373,6 +402,7 @@ class LocalDataSeederTest {
                 memberRepository,
                 loginInfoRepository,
                 reservationRepository,
+                ticketRepository,
                 passwordEncoder,
                 em,
                 clock,
