@@ -159,13 +159,6 @@ public class LocalDataSeeder implements ApplicationRunner {
     private static final String SEED_ORGANIZER_NAME = "시드주최사";
 
     /**
-     * 전 좌석 단일 정가(wei)로 체인에 등록할 값. 실제 구역별 가격({@code SECTION_SEEDS})과는
-     * 별개다 - 컨트랙트가 아직 좌석 등급별 가격 차등을 지원하지 않아, 가장 비싼 구역 가격을 그대로
-     * 온체인 정가로 쓴다.
-     */
-    private static final BigInteger CHAIN_FACE_PRICE = BigInteger.valueOf(150_000);
-
-    /**
      * 시드 회원의 로그인 정보. <b>로컬 전용이다.</b>
      *
      * <p>아이디는 {@code seed001} 부터, 비밀번호는 전원 같다. 가입 API 가 요구하는 형식
@@ -328,7 +321,7 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         // 좌석 배치까지 끝난 뒤에 체인 등록을 한다 - 실패해도 이미 넣은 시드 데이터에는 영향이 없다.
         int totalSeats = SECTION_SEEDS.size() * SEATS_PER_SECTION;
-        registerOnChain(onSaleConcerts, totalSeats);
+        registerOnChain(onSaleConcerts, totalSeats, venueId);
 
         log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", CONCERT_SEEDS.size(), venueId);
     }
@@ -343,7 +336,7 @@ public class LocalDataSeeder implements ApplicationRunner {
      * <p>공연마다 독립적으로 실패를 잡는다. 한 공연의 체인 등록이 실패해도 나머지 공연과 이미 넣은
      * 시드 데이터는 그대로 살아 있어야 한다 - 로컬 기동 자체가 체인 접근 여부에 좌우되면 안 된다.
      */
-    private void registerOnChain(List<OnSaleConcert> onSaleConcerts, int totalSeats) {
+    private void registerOnChain(List<OnSaleConcert> onSaleConcerts, int totalSeats, Long venueId) {
         if (onSaleConcerts.isEmpty()) {
             return;
         }
@@ -357,6 +350,12 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         Member organizer = seedOrganizer();
         BigInteger totalSeatsWei = BigInteger.valueOf(totalSeats);
+        // ShowRegistry.SECTION_COUNT(5)개 구역 가격을, 실제 Section 행이 갖고 있는 값 그대로,
+        // ReservationSettlementRunner가 나중에 같은 순서(findAllByVenueIdOrderByIdAsc)로 인덱스를
+        // 구하는 것과 어긋나지 않게 이 순서 그대로 온체인에 싣는다.
+        List<BigInteger> sectionPrices = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId).stream()
+                .map(section -> BigInteger.valueOf(section.getPrice()))
+                .toList();
         int registered = 0;
 
         for (OnSaleConcert onSale : onSaleConcerts) {
@@ -366,10 +365,10 @@ public class LocalDataSeeder implements ApplicationRunner {
                 long showTime = seed.startDate().atZone(clock.getZone()).toEpochSecond();
 
                 BigInteger showId = showRegistryClient.registerShow(
-                        CHAIN_FACE_PRICE, totalSeatsWei, saleOpenTime, showTime, "local-seed:" + seed.title());
+                        sectionPrices, totalSeatsWei, saleOpenTime, showTime, "local-seed:" + seed.title());
 
                 Concert concert = concertRepository.getReferenceById(onSale.id());
-                concert.prepareForSale(organizer, CHAIN_FACE_PRICE);
+                concert.prepareForSale(organizer);
                 concert.confirmRegistered(showId);
                 registered++;
             } catch (ContractCallException e) {

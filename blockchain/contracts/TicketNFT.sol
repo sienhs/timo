@@ -122,14 +122,22 @@ contract TicketNFT is ERC721, AccessControl {
      * Mints the ticket for one seat. facePrice comes from ShowRegistry, not
      * a caller-supplied argument, so there's no path to mint at the wrong
      * price - and minting is blocked outright before the show's registered
-     * sale window opens.
+     * sale window opens. sectionIndex only selects *which* of the show's
+     * already-registered section prices applies (0-4) - the caller can't
+     * inject an arbitrary price, only pick among the five ShowRegistry
+     * already has on file.
      */
-    function mintTicket(address to, uint256 showId, uint256 seatId) external onlyRole(ORGANIZER_ROLE) returns (uint256 tokenId) {
+    function mintTicket(address to, uint256 showId, uint256 seatId, uint8 sectionIndex)
+        external
+        onlyRole(ORGANIZER_ROLE)
+        returns (uint256 tokenId)
+    {
         bytes32 seat = seatKey(showId, seatId);
         if (seatTokenId[seat] != 0) revert SeatAlreadyMinted(showId, seatId);
         if (holdsShow[to][showId]) revert AlreadyHoldsShowTicket(to, showId);
 
-        uint256 facePrice = showRegistry.facePriceOf(showId); // reverts ShowDoesNotExist for a bad showId
+        // reverts ShowDoesNotExist for a bad showId, InvalidSectionIndex for a bad sectionIndex
+        uint256 facePrice = showRegistry.facePriceOf(showId, sectionIndex);
         if (!showRegistry.isSaleOpen(showId)) revert SaleNotOpen(showId);
 
         tokenId = _nextTokenId++;

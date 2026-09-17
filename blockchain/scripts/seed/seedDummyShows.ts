@@ -79,10 +79,14 @@ async function main() {
     console.log(`\n${org.label}: ${orgWallet.address}`);
 
     for (const show of org.shows) {
+      // Legacy demo data only has one price per show (facePriceEth) - repeat
+      // it across all 5 sections rather than inventing per-section demo
+      // numbers this file was never designed to carry.
+      const price = ethers.parseEther(show.facePriceEth);
       await (
         await showRegistry
           .connect(orgWallet)
-          .registerShow(ethers.parseEther(show.facePriceEth), show.totalSeats, saleOpenTime, showTime, show.metadataURI)
+          .registerShow([price, price, price, price, price], show.totalSeats, saleOpenTime, showTime, show.metadataURI)
       ).wait();
       console.log(`  showId ${nextShowId}: ${show.metadataURI} (${show.facePriceEth} ETH, ${show.totalSeats} seats)`);
       nextShowId++;

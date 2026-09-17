@@ -23,14 +23,23 @@ async function main() {
 
   const now = (await ethers.provider.getBlock("latest"))!.timestamp;
   const facePrice = ethers.parseEther("0.05");
+  const sectionIndex = 0;
   await (
-    await showRegistry.connect(organizer).registerShow(facePrice, 100, now - 60, now + 30 * 24 * 3600, "dummy://샘플 공연")
+    await showRegistry
+      .connect(organizer)
+      .registerShow(
+        [facePrice, facePrice, facePrice, facePrice, facePrice],
+        100,
+        now - 60,
+        now + 30 * 24 * 3600,
+        "dummy://샘플 공연"
+      )
   ).wait();
   const showId = 1;
   console.log(`Registered show ${showId} (facePrice ${ethers.formatEther(facePrice)} ETH, sale already open)`);
 
   const seatId = 12;
-  await (await ticketNFT.connect(organizer).mintTicket(buyer.address, showId, seatId)).wait();
+  await (await ticketNFT.connect(organizer).mintTicket(buyer.address, showId, seatId, sectionIndex)).wait();
   console.log(`\nMinted seat ${seatId} to ${buyer.address} (Hardhat account #2)`);
 
   const tokenId = await ticketNFT.seatTokenId(await ticketNFT.seatKey(showId, seatId));

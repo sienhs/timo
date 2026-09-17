@@ -29,8 +29,8 @@ import lombok.NoArgsConstructor;
  * 함께 만들어지고, 비동기 정산({@code ReservationSettlementService})이 그 뒤를 이어받는다.
  *
  * <p>누가/어느 공연/어느 좌석인지는 다시 들고 있지 않는다 - {@link #getReservation()}을 거친다.
- * 정가도 마찬가지로 {@code Concert.facePrice}를 그때그때 읽는다(발행 이후 정가는 바뀌지 않는다는
- * 전제).
+ * 정가도 마찬가지로 {@code Reservation.getSeat().getSection().getPrice()}를 그때그때 읽는다
+ * (발행 이후 정가는 바뀌지 않는다는 전제).
  *
  * <p>{@code tokenId}가 있다고 그대로 믿고 온체인 트랜잭션(입장 처리, 재판매 등)을 보내면 안 된다.
  * DB가 우연히 또는 의도적으로 틀렸을 가능성을 배제할 수 없는 캐시일 뿐이라, 실제 영향이 있는 액션

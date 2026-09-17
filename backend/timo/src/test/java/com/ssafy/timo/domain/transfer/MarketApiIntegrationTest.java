@@ -137,7 +137,7 @@ class MarketApiIntegrationTest {
 
         concert = saveConcert(venue, "아이유 콘서트", 20);
         // 정가가 없으면 등록이 성립하지 않는다. 예매 결제·환불이 이 값으로 이루어진다.
-        concert.prepareForSale(seller, BigInteger.valueOf(FACE_PRICE));
+        concert.prepareForSale(seller);
 
         myTicket = saveOwnedTicket(concert, seats.get(0), seller);
         othersTicket = saveOwnedTicket(concert, seats.get(1), buyer);
@@ -685,7 +685,7 @@ class MarketApiIntegrationTest {
 
         Section saved = sectionRepository.save(Section.builder()
                 .name("1층 A블록")
-                .price(150000)
+                .price((int) FACE_PRICE)
                 .rowCount(3)
                 .seatPerRow(2)
                 .venue(venue)

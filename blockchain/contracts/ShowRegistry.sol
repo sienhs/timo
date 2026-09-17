@@ -4,21 +4,29 @@ pragma solidity ^0.8.24;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
- * Pre-sale catalog of shows: one face price per show (single-price, no
- * seat grading - see blockchain/README.md for the spec ambiguity this
- * resolves), a seat count, and the sale/show timing that gates when
- * tickets may be minted.
+ * Pre-sale catalog of shows: a face price *per section* (every venue in
+ * this system is seeded with exactly SECTION_COUNT sections - see
+ * LocalDataSeeder.SECTION_SEEDS on the backend), a seat count, and the
+ * sale/show timing that gates when tickets may be minted.
  *
  * This contract only manages the *catalog*. It doesn't track individual
  * seats or how many have been minted (TicketNFT does, via seatTokenId) and
  * it doesn't touch money (TicketVault does) - keeping those concerns apart
  * is what lets each contract stay simple and independently auditable.
- * Wiring TicketNFT.mintTicket to actually read facePrice/timing from here
- * is a follow-up (see README) - right now this is a standalone catalog.
+ *
+ * Section index is a caller-supplied uint8 in [0, SECTION_COUNT) - this
+ * contract doesn't know or care what a section is *named*, only that
+ * whichever off-chain section a seat belongs to maps to a stable index
+ * (the backend derives this from Section rows ordered by id, which is
+ * guaranteed stable - see SectionRepository.findAllByVenueIdOrderByIdAsc).
  */
 contract ShowRegistry is AccessControl {
     bytes32 public constant ORGANIZER_ROLE = keccak256("ORGANIZER_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    /// Every venue in this system has exactly this many seating sections -
+    /// not a general-purpose "up to N grades" limit, a fixed shape.
+    uint8 public constant SECTION_COUNT = 5;
 
     enum Status {
         REGISTERED,
@@ -28,7 +36,7 @@ contract ShowRegistry is AccessControl {
 
     struct Show {
         address organizer;
-        uint256 facePrice; // one price for every seat
+        uint256[SECTION_COUNT] sectionPrices; // index-aligned with the show's off-chain section order
         uint256 totalSeats;
         uint256 saleOpenTime; // unix seconds; booking/minting gated on this
         uint256 showTime; // unix seconds; when the performance itself happens
@@ -37,7 +45,10 @@ contract ShowRegistry is AccessControl {
     }
 
     /// showId => show. Public so anyone can independently verify a show's
-    /// published price/timing without a mirror table.
+    /// published prices/timing without a mirror table. Note: Solidity's
+    /// auto-generated getter omits the sectionPrices array (structs with
+    /// array members drop them from the implicit getter's return tuple) -
+    /// use facePriceOf(showId, sectionIndex) to read a price.
     mapping(uint256 => Show) public shows;
 
     uint256 private _nextShowId = 1;
@@ -46,9 +57,16 @@ contract ShowRegistry is AccessControl {
     uint256 public constant CANCELLATION_DEADLINE = 7 days;
 
     event ShowRegistered(
-        uint256 indexed showId, address indexed organizer, uint256 facePrice, uint256 totalSeats, uint256 saleOpenTime, uint256 showTime
+        uint256 indexed showId,
+        address indexed organizer,
+        uint256[SECTION_COUNT] sectionPrices,
+        uint256 totalSeats,
+        uint256 saleOpenTime,
+        uint256 showTime
     );
-    event ShowUpdated(uint256 indexed showId, uint256 facePrice, uint256 totalSeats, uint256 saleOpenTime, uint256 showTime);
+    event ShowUpdated(
+        uint256 indexed showId, uint256[SECTION_COUNT] sectionPrices, uint256 totalSeats, uint256 saleOpenTime, uint256 showTime
+    );
     event ShowCancelled(uint256 indexed showId);
     event ShowEnded(uint256 indexed showId);
 
@@ -56,6 +74,7 @@ contract ShowRegistry is AccessControl {
     error InvalidPrice();
     error InvalidSeatCount();
     error InvalidTiming();
+    error InvalidSectionIndex(uint8 sectionIndex);
     error ShowDoesNotExist(uint256 showId);
     error NotShowOrganizer(uint256 showId);
     error ShowNotEditable(uint256 showId, Status status);
@@ -68,27 +87,28 @@ contract ShowRegistry is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
 
-    function registerShow(uint256 facePrice, uint256 totalSeats, uint256 saleOpenTime, uint256 showTime, string calldata metadataURI)
-        external
-        onlyRole(ORGANIZER_ROLE)
-        returns (uint256 showId)
-    {
-        if (facePrice == 0) revert InvalidPrice();
+    function registerShow(
+        uint256[SECTION_COUNT] calldata sectionPrices,
+        uint256 totalSeats,
+        uint256 saleOpenTime,
+        uint256 showTime,
+        string calldata metadataURI
+    ) external onlyRole(ORGANIZER_ROLE) returns (uint256 showId) {
+        _requireAllPricesNonZero(sectionPrices);
         if (totalSeats == 0) revert InvalidSeatCount();
         if (saleOpenTime >= showTime) revert InvalidTiming();
 
         showId = _nextShowId++;
-        shows[showId] = Show({
-            organizer: msg.sender,
-            facePrice: facePrice,
-            totalSeats: totalSeats,
-            saleOpenTime: saleOpenTime,
-            showTime: showTime,
-            metadataURI: metadataURI,
-            status: Status.REGISTERED
-        });
+        Show storage s = shows[showId];
+        s.organizer = msg.sender;
+        s.sectionPrices = sectionPrices;
+        s.totalSeats = totalSeats;
+        s.saleOpenTime = saleOpenTime;
+        s.showTime = showTime;
+        s.metadataURI = metadataURI;
+        s.status = Status.REGISTERED;
 
-        emit ShowRegistered(showId, msg.sender, facePrice, totalSeats, saleOpenTime, showTime);
+        emit ShowRegistered(showId, msg.sender, sectionPrices, totalSeats, saleOpenTime, showTime);
     }
 
     /**
@@ -100,7 +120,7 @@ contract ShowRegistry is AccessControl {
      */
     function updateShow(
         uint256 showId,
-        uint256 facePrice,
+        uint256[SECTION_COUNT] calldata sectionPrices,
         uint256 totalSeats,
         uint256 saleOpenTime,
         uint256 showTime,
@@ -109,17 +129,17 @@ contract ShowRegistry is AccessControl {
         Show storage s = _requireOrganizer(showId);
         if (s.status != Status.REGISTERED) revert ShowNotEditable(showId, s.status);
         if (block.timestamp >= s.saleOpenTime) revert SaleAlreadyOpen(showId);
-        if (facePrice == 0) revert InvalidPrice();
+        _requireAllPricesNonZero(sectionPrices);
         if (totalSeats == 0) revert InvalidSeatCount();
         if (saleOpenTime >= showTime) revert InvalidTiming();
 
-        s.facePrice = facePrice;
+        s.sectionPrices = sectionPrices;
         s.totalSeats = totalSeats;
         s.saleOpenTime = saleOpenTime;
         s.showTime = showTime;
         s.metadataURI = metadataURI;
 
-        emit ShowUpdated(showId, facePrice, totalSeats, saleOpenTime, showTime);
+        emit ShowUpdated(showId, sectionPrices, totalSeats, saleOpenTime, showTime);
     }
 
     /**
@@ -162,8 +182,22 @@ contract ShowRegistry is AccessControl {
 
     /// Cheap, single-purpose lookup for TicketNFT.mintTicket instead of
     /// pulling the whole Show (including metadataURI) across the call.
-    function facePriceOf(uint256 showId) external view returns (uint256) {
-        return _showOrRevert(showId).facePrice;
+    function facePriceOf(uint256 showId, uint8 sectionIndex) external view returns (uint256) {
+        Show storage s = _showOrRevert(showId);
+        if (sectionIndex >= SECTION_COUNT) revert InvalidSectionIndex(sectionIndex);
+        return s.sectionPrices[sectionIndex];
+    }
+
+    /// All SECTION_COUNT prices for a show in one call - the off-chain seat
+    /// map screen wants the whole price table, not one section at a time.
+    function sectionPricesOf(uint256 showId) external view returns (uint256[SECTION_COUNT] memory) {
+        return _showOrRevert(showId).sectionPrices;
+    }
+
+    function _requireAllPricesNonZero(uint256[SECTION_COUNT] calldata sectionPrices) private pure {
+        for (uint8 i = 0; i < SECTION_COUNT; i++) {
+            if (sectionPrices[i] == 0) revert InvalidPrice();
+        }
     }
 
     function _showOrRevert(uint256 showId) private view returns (Show storage) {

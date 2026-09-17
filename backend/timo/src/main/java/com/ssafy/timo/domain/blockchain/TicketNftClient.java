@@ -10,6 +10,7 @@ import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.RawTransactionManager;
@@ -26,14 +27,15 @@ public class TicketNftClient extends ContractClient {
     }
 
     /**
-     * 좌석 하나를 발행한다. facePrice는 {@code ShowRegistry}에서 컨트랙트가 직접 읽으므로 여기서
-     * 넘기지 않는다.
+     * 좌석 하나를 발행한다. facePrice는 넘기지 않는다 - {@code ShowRegistry}에 이미 등록된
+     * {@code sectionIndex}(0-4)번 구역 가격을 컨트랙트가 직접 읽는다. 호출자가 고를 수 있는 건
+     * "어느 구역이냐"뿐이고, 그 구역의 가격 자체를 조작할 방법은 없다.
      *
      * @return 발급된 tokenId와 트랜잭션 해시. tokenId는 영수증에 없어 {@code seatTokenId} 매핑을 다시 읽어 얻는다.
      */
-    public MintResult mintTicket(String toAddress, BigInteger showId, BigInteger seatId) {
+    public MintResult mintTicket(String toAddress, BigInteger showId, BigInteger seatId, int sectionIndex) {
         TransactionReceipt receipt = sendAndWait(new Function("mintTicket",
-                List.of(new Address(toAddress), new Uint256(showId), new Uint256(seatId)),
+                List.of(new Address(toAddress), new Uint256(showId), new Uint256(seatId), new Uint8(sectionIndex)),
                 Collections.emptyList()));
         return new MintResult(seatTokenId(showId, seatId), receipt.getTransactionHash());
     }

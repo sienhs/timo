@@ -7,6 +7,8 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 const SHOW_ID = 1;
 const SEAT_ID = 101;
 const FACE_PRICE = ethers.parseEther("1");
+const SECTION_PRICES: [bigint, bigint, bigint, bigint, bigint] = [FACE_PRICE, FACE_PRICE, FACE_PRICE, FACE_PRICE, FACE_PRICE];
+const SECTION_INDEX = 0;
 const TOTAL_SEATS = 100;
 const Status = { NONE: 0, OWNED: 1, LISTED: 2, REVOKED: 3, USED: 4, SOUVENIR: 5 };
 
@@ -48,8 +50,8 @@ describe("Marketplace", () => {
     // their sale window already open, so mintTicket below needs no extra
     // timing setup.
     const now = await time.latest();
-    await showRegistry.connect(organizer).registerShow(FACE_PRICE, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show-1");
-    await showRegistry.connect(organizer).registerShow(FACE_PRICE, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show-2");
+    await showRegistry.connect(organizer).registerShow(SECTION_PRICES, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show-1");
+    await showRegistry.connect(organizer).registerShow(SECTION_PRICES, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show-2");
 
     // Grant the Marketplace *contract* MARKETPLACE_ROLE on both underlying
     // contracts - this is the deployment-time wiring the README describes.
@@ -60,7 +62,7 @@ describe("Marketplace", () => {
   });
 
   async function mintAndListToAlice(seatId: number = SEAT_ID) {
-    await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID, seatId);
+    await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID, seatId, SECTION_INDEX);
     const tokenId = await ticketNFT.seatTokenId(await ticketNFT.seatKey(SHOW_ID, seatId));
     await ticketNFT.connect(alice).listForTransfer(tokenId, FACE_PRICE);
     return tokenId;
@@ -106,7 +108,7 @@ describe("Marketplace", () => {
 
     it("a buyer who already holds a ticket for the show is rejected before any balance moves", async () => {
       const tokenId = await mintAndListToAlice();
-      await ticketNFT.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1); // bob already has a seat
+      await ticketNFT.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX); // bob already has a seat
       await vault.connect(admin).grantRole(await vault.OPERATOR_ROLE(), operator.address);
       await vault.connect(operator).deposit(bob.address, FACE_PRICE, ref("pg-bob-2"));
 
@@ -133,7 +135,7 @@ describe("Marketplace", () => {
 
       // bob can't hold a second ticket for the same show, so list a second
       // show's seat to a different seller instead.
-      await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID + 1, SEAT_ID);
+      await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID + 1, SEAT_ID, SECTION_INDEX);
       const tokenId2 = await ticketNFT.seatTokenId(await ticketNFT.seatKey(SHOW_ID + 1, SEAT_ID));
       await ticketNFT.connect(alice).listForTransfer(tokenId2, FACE_PRICE);
 

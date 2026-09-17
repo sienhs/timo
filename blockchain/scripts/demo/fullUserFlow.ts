@@ -37,9 +37,18 @@ async function main() {
   console.log("\n=== 1. 공연 등록 (주최사) ===");
   const now = (await ethers.provider.getBlock("latest"))!.timestamp;
   const facePrice = ethers.parseEther("0.05");
+  const sectionIndex = 0;
   const showId = 1;
   await (
-    await showRegistry.connect(organizer).registerShow(facePrice, 100, now - 60, now + 30 * 24 * 3600, "dummy://데모 공연")
+    await showRegistry
+      .connect(organizer)
+      .registerShow(
+        [facePrice, facePrice, facePrice, facePrice, facePrice],
+        100,
+        now - 60,
+        now + 30 * 24 * 3600,
+        "dummy://데모 공연"
+      )
   ).wait();
   console.log(`  showId ${showId} 등록 완료 (정가 ${ethers.formatEther(facePrice)} ETH, 예매 오픈됨)`);
 
@@ -59,7 +68,7 @@ async function main() {
 
   console.log("\n=== 4. 예매 (좌석 발행 + 대금 차감/주최사 정산) ===");
   const seatId = 7;
-  await (await ticketNFT.connect(organizer).mintTicket(wallet.address, showId, seatId)).wait();
+  await (await ticketNFT.connect(organizer).mintTicket(wallet.address, showId, seatId, sectionIndex)).wait();
   await (
     await ticketVault.connect(admin).chargeForBooking(wallet.address, organizer.address, facePrice, ethers.id("order-demo-1"))
   ).wait();

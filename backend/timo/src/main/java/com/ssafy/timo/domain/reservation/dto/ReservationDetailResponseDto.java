@@ -18,8 +18,10 @@ import java.time.LocalDateTime;
  * {@code mintAttemptCount}·{@code failureReason}로 따로 드러난다 - 전부 연결된
  * {@link Ticket}에서 가져온다.
  *
- * <p>{@code facePrice}의 단위는 아직 미확정이다. 컨트랙트는 wei, 현재 백엔드 구역 가격은 원화 정수라
- * 둘을 맞추는 결정이 남아 있다. 결정 전까지는 공연 정가(wei)를 그대로 싣는다.
+ * <p>{@code facePrice}는 이 좌석이 속한 {@link Section#getPrice()}다(구역마다 다름, 공연 전체
+ * 단일가 아님). 단위는 아직 미확정이다 - 컨트랙트(={@code ShowRegistry}에 실리는 값)는 wei,
+ * 여기 구역 가격은 원화 정수라 둘을 맞추는 결정이 남아 있다. 결정 전까지는 구역 정가를 원 단위
+ * 그대로 싣는다.
  */
 public record ReservationDetailResponseDto(
         Long id,
@@ -61,7 +63,7 @@ public record ReservationDetailResponseDto(
                 section.getName(),
                 seat.getSeatNo(),
                 seat.getSeatCol(),
-                concert.getFacePrice().longValueExact(),
+                section.getPrice(),
                 reservation.getStatus(),
                 ticket.getTokenId() == null ? null : ticket.getTokenId().toString(),
                 ticket.getMintTxHash(),
