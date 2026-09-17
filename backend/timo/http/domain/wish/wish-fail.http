@@ -1,0 +1,37 @@
+###############################################################################
+# 공연 찜 - 실패 케이스
+#
+# wish-common.http 를 먼저 실행해 {{token}} 을 채워 둬야 한다.
+# 도메인 예외 응답에는 errorCode 가 없고 exception 이 실린다(GlobalExceptionHandler).
+###############################################################################
+
+### 없는 공연을 찜하면 404
+PUT {{baseUrl}}/api/v1/wishes/999999
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("404 ConcertNotFoundException", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "ConcertNotFoundException", "exception: " + response.body.exception);
+    });
+%}
+
+### 페이지 크기 상한은 100
+GET {{baseUrl}}/api/v1/wishes/me?size=101
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("400", function () {
+        client.assert(response.status === 400, "status: " + response.status);
+    });
+%}
+
+### 토큰이 없으면 401
+GET {{baseUrl}}/api/v1/wishes/me
+
+> {%
+    client.test("401 TOKEN_INVALID", function () {
+        client.assert(response.status === 401, "status: " + response.status);
+        client.assert(response.body.errorCode === "TOKEN_INVALID", "errorCode: " + response.body.errorCode);
+    });
+%}

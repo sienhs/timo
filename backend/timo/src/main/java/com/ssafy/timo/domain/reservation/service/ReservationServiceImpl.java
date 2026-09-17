@@ -9,6 +9,7 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.offer.service.CancelOfferService;
 import com.ssafy.timo.domain.reservation.dto.CreateReservationRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationDetailResponseDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationListRequestDto;
@@ -73,6 +74,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final TicketRepository ticketRepository;
     private final TicketTradeRepository ticketTradeRepository;
     private final TicketListingRepository ticketListingRepository;
+    private final CancelOfferService cancelOfferService;
     private final WalletService walletService;
     private final TicketVaultClient ticketVaultClient;
     private final TicketNftClient ticketNftClient;
@@ -123,6 +125,9 @@ public class ReservationServiceImpl implements ReservationService {
         Ticket ticket = ticketRepository.save(Ticket.builder()
                 .reservation(reservation)
                 .build());
+
+        // 취소표 구매 기회를 쓴 결제면 기회를 닫는다. 기한이 지난 뒤의 결제는 영향 행 0 이라 일반 예매다.
+        cancelOfferService.acceptIfActive(concertId, seatId, memberId, reservation.getId());
 
         eventPublisher.publishEvent(new ReservationCreatedEvent(reservation.getId()));
 
@@ -192,7 +197,9 @@ public class ReservationServiceImpl implements ReservationService {
      * 받는다. 등록 중인 티켓도 막는다. 회수된 티켓이 매물로 남으면 그걸 사는 사람이 생긴다.
      * 두 검사는 온체인 호출보다 앞에 둔다.
      *
-     * <p>승계 대기자 자동 재발급은 아직 없다 - 지금은 회수해서 미판매로 남기는 것까지만 한다.
+     * <p>회수한 자리는 곧바로 취소표가 된다. 이 공연을 찜한 회원 중 한 명을 뽑아 1시간 구매 기회를
+     * 주고({@link CancelOfferService#offerRevokedSeat}), 뽑을 사람이 없거나 기한이 지나면 자리는 누구나
+     * 예매할 수 있게 열린다. 추첨은 같은 트랜잭션이라 취소가 롤백되면 기회도 함께 사라진다.
      */
     @Override
     public ReservationDetailResponseDto cancel(Long memberId, Long reservationId) {
@@ -228,6 +235,8 @@ public class ReservationServiceImpl implements ReservationService {
 
         ticket.revoke();
         reservation.cancel(now);
+
+        cancelOfferService.offerRevokedSeat(concert.getId(), reservation.getSeat().getId(), reservationId, memberId);
 
         return ReservationDetailResponseDto.from(reservation, ticket, imageStorage);
     }

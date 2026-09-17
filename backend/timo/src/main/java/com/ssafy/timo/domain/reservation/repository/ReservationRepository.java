@@ -30,23 +30,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     boolean existsPaidSeat(@Param("concertId") Long concertId, @Param("seatId") Long seatId);
 
     /**
-     * 이 공연에서 이 좌석이 취소된 적이 있는지("회수됨").
-     *
-     * <p>취소는 자리를 곧바로 예매 가능으로 되돌리지 않는다. 재오픈 절차(스토리 35)가 생기기 전에는
-     * 이 판정이 영구적이라, 취소된 적이 있으면 선점도 막는다 — {@code SeatWithStatus} 가 조회에서
-     * 회수됨으로 보여주는 것과 같은 규칙을 여기서도 지켜야, 화면엔 안 보이는 자리를 API 로 직접
-     * 잡는 통로가 남지 않는다.
-     */
-    @Query("""
-            select count(r) > 0
-            from Reservation r
-            where r.concert.id = :concertId
-              and r.seat.id = :seatId
-              and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.CANCELLED
-            """)
-    boolean existsRevokedSeat(@Param("concertId") Long concertId, @Param("seatId") Long seatId);
-
-    /**
      * 이 공연에서 이 회원의 유효한 주문. "한 계정 한 공연 1매" 판정에 쓴다.
      *
      * <p>{@code uk_rsv_member} 가 최종 방어선이므로 최대 한 건이다.

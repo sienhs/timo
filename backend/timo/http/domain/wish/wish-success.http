@@ -1,0 +1,82 @@
+###############################################################################
+# 공연 찜 - 성공 케이스
+#
+# wish-common.http 를 먼저 실행해 토큰과 {{concertA}}, {{concertB}} 를 채워 둬야 한다.
+# 등록과 해제는 멱등이라 둘 다 204 다. 두 번 찜해도 한 건, 없던 찜을 풀어도 204.
+###############################################################################
+
+### 찜한다 - 204
+PUT {{baseUrl}}/api/v1/wishes/{{concertA}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "status: " + response.status);
+    });
+%}
+
+### 하나 더 찜한다
+PUT {{baseUrl}}/api/v1/wishes/{{concertB}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "status: " + response.status);
+    });
+%}
+
+### 같은 공연을 다시 찜해도 204 - 연타와 재시도가 안전해야 한다
+PUT {{baseUrl}}/api/v1/wishes/{{concertA}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "status: " + response.status);
+    });
+%}
+
+### 내 찜 목록 - 최근 찜한 순, 공연 목록과 같은 요약 모양
+GET {{baseUrl}}/api/v1/wishes/me
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("두 건이고 최근 찜한 B 가 앞이다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.totalElements === 2, "totalElements: " + response.body.page.totalElements);
+        client.assert(response.body.content[0].id === client.global.get("concertB"), "첫 항목: " + response.body.content[0].id);
+        client.assert(response.body.content[0].venueName !== undefined, "venueName 이 없다");
+        client.assert(response.body.content[0].startDate !== undefined, "startDate 가 없다");
+    });
+%}
+
+### 찜을 푼다 - 204
+DELETE {{baseUrl}}/api/v1/wishes/{{concertA}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "status: " + response.status);
+    });
+%}
+
+### 없던 찜을 풀어도 204
+DELETE {{baseUrl}}/api/v1/wishes/{{concertA}}
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "status: " + response.status);
+    });
+%}
+
+### 목록에서 빠졌다
+GET {{baseUrl}}/api/v1/wishes/me
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("B 만 남았다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page.totalElements === 1, "totalElements: " + response.body.page.totalElements);
+        client.assert(response.body.content[0].id === client.global.get("concertB"), "남은 항목: " + response.body.content[0].id);
+    });
+%}
