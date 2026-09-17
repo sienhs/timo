@@ -337,6 +337,41 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("다른 좌석·회원의 만료 선점은 새 선점 요청에서 정리하지 않는다")
+    void hold_doesNotExpireUnrelatedHold() throws Exception {
+        Long unrelatedSeatId = seatIdAt(1, 1);
+        Long requestedSeatId = seatIdAt(1, 2);
+
+        mvc.perform(holdBy(someoneElse, concertA, unrelatedSeatId)).andExpect(status().isOk());
+        Long unrelatedHoldId = activeHold(concertA, unrelatedSeatId).getId();
+        expireHold(concertA, unrelatedSeatId);
+
+        mvc.perform(holdBy(me, concertA, requestedSeatId)).andExpect(status().isOk());
+        flushAndClear();
+
+        assertThat(seatHoldRepository.findById(unrelatedHoldId).orElseThrow().getStatus())
+                .isEqualTo(SeatHoldStatus.HELD);
+    }
+
+    @Test
+    @DisplayName("같은 회원의 다른 좌석 만료 선점은 새 선점 전에 정리한다")
+    void hold_expiresRequestMembersStaleHold() throws Exception {
+        Long expiredSeatId = seatIdAt(1, 1);
+        Long requestedSeatId = seatIdAt(1, 2);
+
+        mvc.perform(holdBy(me, concertA, expiredSeatId)).andExpect(status().isOk());
+        Long expiredHoldId = activeHold(concertA, expiredSeatId).getId();
+        expireHold(concertA, expiredSeatId);
+
+        mvc.perform(holdBy(me, concertA, requestedSeatId)).andExpect(status().isOk());
+        flushAndClear();
+
+        assertThat(seatHoldRepository.findById(expiredHoldId).orElseThrow().getStatus())
+                .isEqualTo(SeatHoldStatus.EXPIRED);
+        assertThat(activeHold(concertA, requestedSeatId).getMember().getId()).isEqualTo(me);
+    }
+
+    @Test
     @DisplayName("만료된 선점은 좌석 목록에서 예매 가능으로 보인다")
     void expiredHold_readsAsAvailableInSeatList() throws Exception {
         Long seatId = seatIdAt(1, 1);

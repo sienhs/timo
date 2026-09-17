@@ -150,6 +150,11 @@ public class SeatServiceImpl implements SeatService {
     public SeatHoldResponseDto hold(Long memberId, Long concertId, Long seatId) {
         LocalDateTime now = LocalDateTime.now(clock);
 
+        // 새 선점의 유니크 제약에 충돌할 수 있는 행만 정리한다. 공연 전체의 만료 선점을 여기서
+        // 매번 갱신하면 동시 선점이 몰릴 때 불필요한 전역 UPDATE와 DB 커넥션 점유가 생긴다.
+        seatHoldRepository.expireStaleForSeat(concertId, seatId, now);
+        seatHoldRepository.expireStaleForMember(concertId, memberId, now);
+
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
         if (concert.getStatus() != ConcertStatus.ON_SALE) {
@@ -161,8 +166,6 @@ public class SeatServiceImpl implements SeatService {
         Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new SeatNotFoundException(seatId));
         verifySectionBelongsTo(concert, seat.getSection());
-
-        seatHoldRepository.expireAllStale(now);
 
         // 팔린 자리는 선점 유니크에 걸리지 않으므로 따로 막는다.
         if (reservationRepository.existsPaidSeat(concertId, seatId)) {
@@ -215,13 +218,14 @@ public class SeatServiceImpl implements SeatService {
     public SeatHoldCancelResponseDto cancelHold(Long memberId, Long concertId, Long seatId) {
         LocalDateTime now = LocalDateTime.now(clock);
 
+        // 취소 판단에는 이 좌석의 유효한 선점만 필요하다. 다른 좌석의 만료 선점까지 갱신하지 않는다.
+        seatHoldRepository.expireStaleForSeat(concertId, seatId, now);
+
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
         Seat seat = seatRepository.findById(seatId)
                 .orElseThrow(() -> new SeatNotFoundException(seatId));
         verifySectionBelongsTo(concert, seat.getSection());
-
-        seatHoldRepository.expireAllStale(now);
 
         Optional<SeatHold> active = seatHoldRepository.findActive(concertId, seatId, now);
         if (active.isPresent()) {
