@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/network/server_errors.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/features/booking/data/booking_api.dart';
 import 'package:timo/features/booking/models/performance.dart';
@@ -266,6 +267,44 @@ void main() {
       expect(find.text('이미 선점된 좌석입니다.'), findsOneWidget);
       expect(controller.selectedSeat, isNull);
       expect(api.fetchCount, 2);
+      expect(find.text('결제 화면'), findsNothing);
+    });
+
+    // 아래 둘은 자리가 아니라 계정·공연이 막은 경우다. 서버가 같은 409 로
+    // 주기 때문에 예외 이름으로 갈라야 하고, 가르지 않으면 어느 칸을 눌러도
+    // "이미 선점된 좌석입니다" 만 떠서 전 좌석이 선점중인 것처럼 보인다.
+    testWidgets('이 공연 티켓이 이미 있으면 자리가 아니라 그 사실을 알린다', (tester) async {
+      await pumpSeats(tester);
+      api.holdError = const ApiException(
+        '이미 이 공연의 티켓을 보유하고 있습니다. (concertId=3)',
+        status: 409,
+        exceptionName: BookingServerErrors.alreadyReserved,
+      );
+
+      await checkout(tester);
+
+      expect(find.textContaining('한 공연에 한 장만'), findsOneWidget);
+      expect(find.text('이미 선점된 좌석입니다.'), findsNothing);
+      // 다른 자리를 골라도 결과가 같다. 배치도를 다시 받을 것도, 고른 자리를
+      // 풀 것도 없다.
+      expect(api.fetchCount, 1);
+      expect(controller.selectedSeat?.id, 11);
+      expect(find.text('결제 화면'), findsNothing);
+    });
+
+    testWidgets('예매 중인 공연이 아니면 그 사실을 알린다', (tester) async {
+      await pumpSeats(tester);
+      api.holdError = const ApiException(
+        '예매 중인 공연이 아닙니다. (concertId=1, status=CLOSED)',
+        status: 409,
+        exceptionName: BookingServerErrors.concertNotOnSale,
+      );
+
+      await checkout(tester);
+
+      expect(find.text('지금은 예매할 수 있는 공연이 아니에요.'), findsOneWidget);
+      expect(api.fetchCount, 1);
+      expect(controller.selectedSeat?.id, 11);
       expect(find.text('결제 화면'), findsNothing);
     });
 

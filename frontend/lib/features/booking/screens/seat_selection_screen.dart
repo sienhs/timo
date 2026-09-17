@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/server_errors.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../routes/app_routes.dart';
@@ -145,23 +146,47 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     if (mounted) _refresh();
   }
 
+  /// 자리를 잡지 못했다. 이유에 따라 알려 줄 말과 할 일이 다르다.
+  ///
+  /// **409 를 한 덩어리로 보면 안 된다.** 서버는 자리를 뺏긴 것, 이 공연 티켓을
+  /// 이미 가진 것(1인 1매), 판매 중이 아닌 공연을 전부 409 로 준다. 뒤의 둘은
+  /// 자리와 무관해서 어느 칸을 눌러도 똑같이 막히는데, 한 문구로 뭉치면
+  /// **전 좌석이 선점중인 것처럼 보인다.**
   void _onHoldFailed(ApiException e) {
-    switch (e.status) {
-      case 401:
-        // 서버가 요청자를 알아야 자리를 잡아 준다. 로그인 화면은 성공하면
-        // 홈으로 가며 예매 화면을 걷어내므로, 공연 상세에서 예매를 다시 시작한다.
-        // 상세에서 로그인을 먼저 확인하기 때문에 여기 오는 일은 세션이 도중에
-        // 끊긴 경우뿐이다.
-        _showMessage(BookingStrings.loginRequired);
-        Navigator.pushNamed(context, AppRoutes.login);
-      case 409:
-        // 고르는 사이에 남이 가져갔다. 지금 배치도는 이미 낡았으므로 다시 받는다.
-        _showMessage(BookingStrings.seatTaken);
-        _controller.clearSelection();
-        _refresh();
-      default:
-        _showMessage(e.message);
+    if (e.status == 401) {
+      // 서버가 요청자를 알아야 자리를 잡아 준다. 로그인 화면은 성공하면
+      // 홈으로 가며 예매 화면을 걷어내므로, 공연 상세에서 예매를 다시 시작한다.
+      // 상세에서 로그인을 먼저 확인하기 때문에 여기 오는 일은 세션이 도중에
+      // 끊긴 경우뿐이다.
+      _showMessage(BookingStrings.loginRequired);
+      Navigator.pushNamed(context, AppRoutes.login);
+      return;
     }
+
+    // 자리 자체가 막힌 게 아니라면 고른 자리를 풀지도, 배치도를 다시 받지도
+    // 않는다. 배치도는 달라질 게 없고, 선택이 저절로 풀리면 사용자는 자기가
+    // 뭘 잘못 눌렀나 싶어 같은 일을 반복하게 된다.
+    switch (e.exceptionName) {
+      case BookingServerErrors.alreadyReserved:
+        _showMessage(BookingStrings.alreadyReserved);
+        return;
+      case BookingServerErrors.concertNotOnSale:
+        _showMessage(BookingStrings.concertNotOnSale);
+        return;
+    }
+
+    if (e.status != 409) {
+      _showMessage(e.message);
+      return;
+    }
+
+    // 고르는 사이에 남이 가져갔다. 지금 배치도는 이미 낡았으므로 다시 받는다.
+    //
+    // 예외 이름이 없거나 모르는 값인 409 도 여기로 온다. 자리 경쟁이 409 중
+    // 가장 흔하고, 새로고침은 해가 없다.
+    _showMessage(BookingStrings.seatTaken);
+    _controller.clearSelection();
+    _refresh();
   }
 
   /// 좌석 응답이 함께 준 구역 정보로 [Zone] 을 만든다.
