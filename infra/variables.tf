@@ -122,6 +122,17 @@ variable "jwt_secret" {
   }
 }
 
+variable "entry_pass_secret" {
+  description = "QR entry-pass signing secret."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.entry_pass_secret) >= 32 && !startswith(var.entry_pass_secret, "REPLACE_WITH_")
+    error_message = "Set entry_pass_secret to a random value of at least 32 characters; do not leave the example value."
+  }
+}
+
 variable "wallet_master_key" {
   description = "Backend wallet encryption master key (32 bytes encoded as 64 hexadecimal characters)."
   type        = string
