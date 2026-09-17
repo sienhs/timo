@@ -346,4 +346,268 @@ SELECT
 FROM `member`
 WHERE `member_id` BETWEEN 1 AND 1000;
 
+-- 로컬 LocalDataSeeder와 같은 화면 확인용 데모 데이터.
+-- 부하 테스트용 단일 공연장/공연과 섞이지 않도록 별도 공연장과 좌석을 만든다.
+-- 이 블록은 DB 행만 초기화한다. 실제 ShowRegistry 등록과 지갑 생성은 수행하지 않으므로
+-- 시드 티켓의 token_id/mint_tx_hash는 LocalDataSeeder와 마찬가지로 체인에 없는 더미 값이다.
+
+INSERT INTO `artist` (`artist_name`, `profile_image`, `created_at`, `updated_at`)
+VALUES ('김필', 'artist/artist_kim_feel.jpg', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+SET @demo_artist_kim_feel_id = LAST_INSERT_ID();
+
+INSERT INTO `artist` (`artist_name`, `profile_image`, `created_at`, `updated_at`)
+VALUES ('이승기', 'artist/artist_lee_s.jpg', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+SET @demo_artist_lee_id = LAST_INSERT_ID();
+
+INSERT INTO `artist` (`artist_name`, `profile_image`, `created_at`, `updated_at`)
+VALUES ('로이킴', 'artist/artist_roykim.jpg', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+SET @demo_artist_roy_id = LAST_INSERT_ID();
+
+INSERT INTO `artist` (`artist_name`, `profile_image`, `created_at`, `updated_at`)
+VALUES ('Bruno Mars', 'artist/artist_bruno_mars.jpg', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+SET @demo_artist_mars_id = LAST_INSERT_ID();
+
+INSERT INTO `venue` (
+    `venue_name`, `venue_address`, `total_seat_count`, `created_at`, `updated_at`
+) VALUES (
+    '고척돔', '서울시 구로구 경인로 430', 1000, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_venue_id = LAST_INSERT_ID();
+
+INSERT INTO `section` (
+    `name`, `grade`, `price`, `seat_count`, `row_count`, `seat_per_row`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    'A구역', 'COMMON', 150000, 200, 10, 20, @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_section_a_id = LAST_INSERT_ID();
+
+INSERT INTO `section` (
+    `name`, `grade`, `price`, `seat_count`, `row_count`, `seat_per_row`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    'B구역', 'COMMON', 150000, 200, 10, 20, @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_section_b_id = LAST_INSERT_ID();
+
+INSERT INTO `section` (
+    `name`, `grade`, `price`, `seat_count`, `row_count`, `seat_per_row`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    'C구역', 'COMMON', 120000, 200, 10, 20, @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_section_c_id = LAST_INSERT_ID();
+
+INSERT INTO `section` (
+    `name`, `grade`, `price`, `seat_count`, `row_count`, `seat_per_row`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    '2층 D구역', 'COMMON', 120000, 200, 10, 20, @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_section_d_id = LAST_INSERT_ID();
+
+INSERT INTO `section` (
+    `name`, `grade`, `price`, `seat_count`, `row_count`, `seat_per_row`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    '2층 E구역', 'COMMON', 99000, 200, 10, 20, @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_section_e_id = LAST_INSERT_ID();
+
+CREATE TEMPORARY TABLE `demo_seed_number` (
+    `n` INT NOT NULL,
+    PRIMARY KEY (`n`)
+);
+
+INSERT INTO `demo_seed_number` (`n`)
+SELECT
+    ones.digit + tens.digit * 10 + hundreds.digit * 100 + 1
+FROM
+    (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+     UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS ones
+CROSS JOIN
+    (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+     UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS tens
+CROSS JOIN
+    (SELECT 0 AS digit UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+     UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) AS hundreds;
+
+INSERT INTO `seat` (`seat_no`, `seat_col`, `section_id`, `created_at`, `updated_at`)
+SELECT
+    FLOOR((numbers.n - 1) / 20) + 1,
+    MOD(numbers.n - 1, 20) + 1,
+    sections.section_id,
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM `demo_seed_number` AS numbers
+CROSS JOIN (
+    SELECT @demo_section_a_id AS section_id
+    UNION ALL SELECT @demo_section_b_id
+    UNION ALL SELECT @demo_section_c_id
+    UNION ALL SELECT @demo_section_d_id
+    UNION ALL SELECT @demo_section_e_id
+) AS sections
+WHERE numbers.n <= 200;
+
+INSERT INTO `concert` (
+    `title`, `genre`, `poster_image_key`, `description`, `age_rating`, `status`, `view_count`,
+    `start_date`, `end_date`, `open_at`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    '김필 단독 콘서트', 'CONCERT', 'poster/poster_main_kim_feel.gif', '김필 단독 콘서트',
+    'AGE_7', 'CLOSED', 1203, '2026-07-10 19:00:00', '2026-07-10 21:00:00',
+    '2026-06-01 20:00:00', @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_concert_kim_feel_id = LAST_INSERT_ID();
+
+INSERT INTO `concert` (
+    `title`, `genre`, `poster_image_key`, `description`, `age_rating`, `status`, `view_count`,
+    `start_date`, `end_date`, `open_at`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    '이승기 콘서트', 'CONCERT', 'poster/poster_main_lee.gif', '이승기 단독 콘서트',
+    'ALL', 'SCHEDULED', 512, '2026-11-21 18:00:00', '2026-11-21 21:00:00',
+    '2026-10-15 20:00:00', @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_concert_lee_id = LAST_INSERT_ID();
+
+INSERT INTO `concert` (
+    `title`, `genre`, `poster_image_key`, `description`, `age_rating`, `status`, `view_count`,
+    `start_date`, `end_date`, `open_at`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    '로이킴 콘서트', 'CONCERT', 'poster/poster_main_roykim.jpg', '로이킴 단독 콘서트',
+    'AGE_7', 'ON_SALE', 3300, '2026-09-20 19:30:00', '2026-09-20 21:30:00',
+    '2026-08-01 14:00:00', @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_concert_roy_id = LAST_INSERT_ID();
+
+INSERT INTO `concert` (
+    `title`, `genre`, `poster_image_key`, `description`, `age_rating`, `status`, `view_count`,
+    `start_date`, `end_date`, `open_at`, `venue_id`, `created_at`, `updated_at`
+) VALUES (
+    'Bruno Mars 내한공연', 'CONCERT', 'poster/poster_main_mars.gif', 'Bruno Mars 내한 단독 공연',
+    'ALL', 'ON_SALE', 87, '2026-12-05 19:00:00', '2026-12-05 21:00:00',
+    '2026-09-01 20:00:00', @demo_venue_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+);
+SET @demo_concert_mars_id = LAST_INSERT_ID();
+
+INSERT INTO `concert_artist` (`concert_id`, `artist_id`, `created_at`, `updated_at`)
+VALUES
+    (@demo_concert_kim_feel_id, @demo_artist_kim_feel_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
+    (@demo_concert_lee_id, @demo_artist_lee_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
+    (@demo_concert_roy_id, @demo_artist_roy_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
+    (@demo_concert_mars_id, @demo_artist_mars_id, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+
+INSERT INTO `concert_image` (`concert_id`, `image_key`, `sort_order`, `created_at`, `updated_at`)
+VALUES
+    (@demo_concert_kim_feel_id, 'detail/poster_detail_kim.jpg', 0, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
+    (@demo_concert_lee_id, 'detail/poster_detail_lee.jpg', 0, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
+    (@demo_concert_mars_id, 'detail/poster_detail_mars.jpg', 0, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6));
+
+-- 전체 회원 수 100,000명을 유지하기 위해 로그인 정보가 없는 부하 테스트 회원 1001~1180을
+-- 공연별 판매 110석과 선점 70석에 공통으로 사용할 데모 회원으로 바꾼다.
+UPDATE `member` AS members
+JOIN `demo_seed_number` AS numbers ON members.member_id = 1000 + numbers.n
+SET
+    members.phone_number = CONCAT('0109900', LPAD(numbers.n, 4, '0')),
+    members.name = CONCAT('시드회원', numbers.n),
+    members.nickname = CONCAT('시드', numbers.n),
+    members.updated_at = CURRENT_TIMESTAMP(6)
+WHERE numbers.n <= 180;
+
+-- BCrypt 검증값은 "timo1234!"다. LocalDataSeeder와 동일하게 모든 시드 계정이 해시를 공유한다.
+INSERT INTO `login_info` (`member_id`, `username`, `password_hash`, `created_at`, `updated_at`)
+SELECT
+    members.member_id,
+    CONCAT('seed', LPAD(numbers.n, 3, '0')),
+    '$2a$10$fvasJOTd65D.oq4VoAw7duO/eCXCjSSsHBLzskVAY2I.EspGeCQeS',
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM `demo_seed_number` AS numbers
+JOIN `member` AS members ON members.member_id = 1000 + numbers.n
+WHERE numbers.n <= 180;
+
+-- 구역 안에서 9번째마다 판매 완료로 둔다. 각 공연에서 22석 x 5구역 = 110석이다.
+INSERT INTO `reservation` (
+    `concert_id`, `member_id`, `seat_id`, `cancelled_at`, `status`, `created_at`, `updated_at`
+)
+SELECT
+    concerts.concert_id,
+    members.member_id,
+    seats.seat_id,
+    NULL,
+    'PAID',
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM (
+    SELECT @demo_concert_roy_id AS concert_id
+    UNION ALL SELECT @demo_concert_mars_id
+) AS concerts
+CROSS JOIN (
+    SELECT @demo_section_a_id AS section_id, 0 AS section_index
+    UNION ALL SELECT @demo_section_b_id, 1
+    UNION ALL SELECT @demo_section_c_id, 2
+    UNION ALL SELECT @demo_section_d_id, 3
+    UNION ALL SELECT @demo_section_e_id, 4
+) AS sections
+JOIN `seat` AS seats ON seats.section_id = sections.section_id
+JOIN `member` AS members
+  ON members.phone_number = CONCAT(
+      '0109900',
+      LPAD(sections.section_index * 22 + FLOOR(((seats.seat_no - 1) * 20 + seats.seat_col) / 9), 4, '0')
+  )
+WHERE MOD((seats.seat_no - 1) * 20 + seats.seat_col, 9) = 0;
+
+-- 판매 완료 주문에는 LocalDataSeeder와 같은 규칙으로 가짜 발행 완료 티켓을 붙인다.
+INSERT INTO `ticket` (
+    `reservation_id`, `token_id`, `mint_tx_hash`, `mint_attempt_count`, `failure_reason`, `status`,
+    `created_at`, `updated_at`
+)
+SELECT
+    reservations.reservation_id,
+    1000000000 + reservations.reservation_id,
+    CONCAT('0x', LPAD(LOWER(HEX(reservations.reservation_id)), 64, '0')),
+    1,
+    NULL,
+    'OWNED',
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM `reservation` AS reservations
+WHERE reservations.concert_id IN (@demo_concert_roy_id, @demo_concert_mars_id);
+
+-- 13번째 자리 중 9번째 자리와 겹치지 않는 곳을 하루 동안 선점한다.
+-- 각 공연에서 14석 x 5구역 = 70석이며 회원 seed111~seed180이 사용된다.
+INSERT INTO `seat_hold` (
+    `concert_id`, `seat_id`, `member_id`, `expires_at`, `released_at`, `status`, `created_at`, `updated_at`
+)
+SELECT
+    concerts.concert_id,
+    seats.seat_id,
+    members.member_id,
+    DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 1 DAY),
+    NULL,
+    'HELD',
+    CURRENT_TIMESTAMP(6),
+    CURRENT_TIMESTAMP(6)
+FROM (
+    SELECT @demo_concert_roy_id AS concert_id
+    UNION ALL SELECT @demo_concert_mars_id
+) AS concerts
+CROSS JOIN (
+    SELECT @demo_section_a_id AS section_id, 0 AS section_index
+    UNION ALL SELECT @demo_section_b_id, 1
+    UNION ALL SELECT @demo_section_c_id, 2
+    UNION ALL SELECT @demo_section_d_id, 3
+    UNION ALL SELECT @demo_section_e_id, 4
+) AS sections
+JOIN `seat` AS seats ON seats.section_id = sections.section_id
+JOIN `member` AS members
+  ON members.phone_number = CONCAT(
+      '0109900',
+      LPAD(
+          110 + sections.section_index * 14
+              + FLOOR(((seats.seat_no - 1) * 20 + seats.seat_col) / 13)
+              - IF(((seats.seat_no - 1) * 20 + seats.seat_col) > 117, 1, 0),
+          4,
+          '0'
+      )
+  )
+WHERE MOD((seats.seat_no - 1) * 20 + seats.seat_col, 13) = 0
+  AND MOD((seats.seat_no - 1) * 20 + seats.seat_col, 9) <> 0;
+
+DROP TEMPORARY TABLE `demo_seed_number`;
+
 

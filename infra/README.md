@@ -44,7 +44,9 @@ terraform '-chdir=infra' apply 'changes.tfplan'
 
 `terraform apply`는 RDS와 애플리케이션 EC2가 준비된 뒤 SSM 명령으로
 `infra/bootstrap/rds-load-test-init.sql`을 실행합니다. 이 파일은 현재 JPA
-엔티티 스키마, 좌석 선점용 공연장·구역·좌석 1,000건, 부하 테스트용 회원 100,000건을 만듭니다.
+엔티티 스키마, 좌석 선점용 공연장·구역·좌석 1,000건, 부하 테스트용 회원 100,000건과
+`LocalDataSeeder` 기반 화면 확인용 공연·좌석·예약·티켓을 만듭니다. 데모 로그인 계정은
+`seed001`부터 `seed180`까지이며 비밀번호는 모두 `timo1234!`입니다.
 SQL 파일의 내용이 바뀌면 Terraform이 SSM association을 교체하므로, 다음 `terraform apply`에서
 반드시 RDS 초기화가 다시 실행됩니다. SQL이 바뀌지 않은 apply는 초기화를 재실행하지 않습니다.
 
