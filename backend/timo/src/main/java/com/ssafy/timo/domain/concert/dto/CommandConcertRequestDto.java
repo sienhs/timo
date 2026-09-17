@@ -16,8 +16,12 @@ import java.util.List;
  * <p>상태와 조회수는 서버가 정하므로 받지 않는다. 일정(공연 기간, 예매 오픈)은 선택값이고,
  * 값이 들어온 경우의 선후 관계는 서비스 계층에서 검증한다.
  *
- * <p>이미지는 URL 이 아니라 저장소 key 로 받는다. 파일 자체는 이 API 가 아니라 업로드 경로로 올라가고,
- * 여기에는 이미 올라간 객체의 key 만 넘어온다.
+ * <p>이미지는 URL 이 아니라 저장소 key 로 갖고 있다. 실제 HTTP 엔드포인트({@code ConcertController})는
+ * multipart 요청을 받아 이 DTO 는 JSON 파트(메타 정보)로만 바인딩하고, 포스터·상세 이미지는 별도
+ * 파일 파트로 받아 업로드한 뒤 {@link #withImages} 로 key 를 채운 새 인스턴스를 만들어 쓴다 - 그래서
+ * 클라이언트가 이 두 필드를 채워 보내도 무시되고 업로드 결과로 덮어써진다.
+ * {@link com.ssafy.timo.domain.concert.service.ConcertService#create} 를 직접 호출하는
+ * 내부 호출(로컬 시드 등)만 이 두 필드를 그대로 쓴다.
  */
 public record CommandConcertRequestDto(
 
@@ -56,5 +60,11 @@ public record CommandConcertRequestDto(
     /** 넘어오지 않은 이미지 목록은 빈 목록으로 다룬다. */
     public List<String> imageKeysOrEmpty() {
         return imageKeys == null ? List.of() : imageKeys;
+    }
+
+    /** 이미지 key 만 다른 새 요청을 만든다. 업로드를 끝낸 뒤 그 결과로 key 를 채울 때 쓴다. */
+    public CommandConcertRequestDto withImages(String posterImageKey, List<String> imageKeys) {
+        return new CommandConcertRequestDto(title, genre, posterImageKey, imageKeys, description, ageRating,
+                startDate, endDate, openAt, venueId, artistIds);
     }
 }

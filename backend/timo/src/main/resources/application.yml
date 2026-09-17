@@ -10,6 +10,13 @@ spring:
         format_sql: true
   Jackson:
     time-zone: Asia/Seoul
+  # 공연 등록이 포스터 1장 + 상세 이미지 여러 장을 한 요청(multipart)에 같이 올린다. 기본값
+  # (1MB/10MB)으로는 사진 한 장도 부족해서 올려 둔다. 파일 크기 제한은 환경과 무관한 값이라
+  # 여기 한 곳에만 둔다.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB
 
 # 프론트 연동용 스텁 API(/api/v0/**) 스위치. 켜면 com.ssafy.timo.stub 의 컨트롤러가 함께 뜬다.
 # 기본은 꺼 둔다. 실제 API(/api/v1/**) 는 이 값과 무관하게 언제나 뜬다.
@@ -17,6 +24,13 @@ spring:
 api:
   stub:
     enabled: false
+
+# 이미지 저장소(S3ImageStorage) 설정. bucket-name·base-url 은 비밀은 아니지만 프로파일마다 값이
+# 갈리므로 여기 기본값을 두지 않는다(application-{profile}.yml 참고, local/test 는 S3ImageStorage
+# 자체가 뜨지 않아 필요 없다). region 은 리전이 갈릴 일이 없어 여기 공통 기본값 하나만 둔다.
+app:
+  image:
+    region: ${AWS_REGION:ap-northeast-2}
 
 # 비밀키(jwt.secret)는 프로파일마다 달라 application-{profile}.yml 에 있다.
 # 수명은 환경과 무관하게 같아야 앱 동작이 갈리지 않으므로 여기 한 곳에만 둔다.

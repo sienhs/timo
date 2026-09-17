@@ -72,7 +72,7 @@ class ConcertListApiIntegrationTest {
 
         artistId = artistRepository.save(Artist.builder()
                 .name("아이유")
-                .profileImage("artist/1/profile.png")
+                .profileImageKey("artist/1/profile.png")
                 .build()).getId();
     }
 

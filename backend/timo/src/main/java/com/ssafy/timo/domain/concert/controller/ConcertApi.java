@@ -7,12 +7,16 @@ import com.ssafy.timo.domain.concert.dto.ConcertListRequestDto;
 import com.ssafy.timo.domain.concert.dto.ConcertSummaryResponseDto;
 import jakarta.validation.Valid;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 공연 API 규약.
@@ -23,9 +27,17 @@ import org.springframework.web.bind.annotation.RequestBody;
  */
 public interface ConcertApi {
 
-    /** 공연을 생성하고 생성된 리소스 위치를 Location 헤더로 알려준다. */
-    @PostMapping
-    ResponseEntity<CommandConcertResponseDto> create(@Valid @RequestBody CommandConcertRequestDto request);
+    /**
+     * 공연을 생성하고 생성된 리소스 위치를 Location 헤더로 알려준다.
+     *
+     * <p>multipart/form-data 요청이다. {@code request} 파트는 메타 정보(JSON)만 담고, 포스터·상세
+     * 이미지는 {@code poster}·{@code images} 파일 파트로 따로 올라간다 - 구현체가 파일을 업로드해
+     * key 를 채운다({@link CommandConcertRequestDto#withImages}). 둘 다 없어도 된다.
+     */
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<CommandConcertResponseDto> create(@Valid @RequestPart("request") CommandConcertRequestDto request,
+                                                       @RequestPart(value = "poster", required = false) MultipartFile poster,
+                                                       @RequestPart(value = "images", required = false) List<MultipartFile> images);
 
     /**
      * 조건에 맞는 공연 목록을 페이지 단위로 조회한다.

@@ -1,0 +1,55 @@
+# local 과 똑같이 휘발성 도커 MySQL 로 뜨지만, 이미지 저장소만 실제 S3(S3ImageStorage)로 바꾼 프로필.
+# 목적은 하나 - LocalDataSeeder 가 넣는 데모 이미지가 실제 S3 버킷에 정말 올라가는지 눈으로 확인하는
+# 것뿐이다. 그래서 DB·시크릿은 local 것을 그대로 복붙했다 - application-{profile}.yml 이 서로 다른
+# 파일로 독립돼 있는 이 저장소 관례(application-local.yml, application-prod.yml 참고)를 따른다.
+#
+# 기동 전에 infra/modules/image-storage 의 runtime_environment 출력값을 환경변수로 내보내야 한다:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION,
+#   S3_PUBLIC_BUCKET_NAME, IMAGE_BASE_URL
+# 안 내보내면 S3ImageStorage 생성자 주입에서 기동이 바로 실패한다(값이 비어 있는 걸 허용하지 않음).
+#
+# local 과 달리 @Profile("!local") 인 빈들(SecurityConfig, SolapiSmsSender 등)이 실제로 뜬다 -
+# 그래서 solapi.* 를 채워 둔다(문자 발송을 실제로 시도하진 않지만 생성자 주입 값이 없으면 컨텍스트가
+# 안 뜬다). 인증도 운영과 같은 정책이라 API 를 직접 두드리려면 실제 토큰이 필요하다 - 이 프로필의
+# 목적은 API 호출이 아니라 시더가 만드는 데이터라 문제되지 않는다.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:db/seed-local.sql
+      encoding: UTF-8
+  docker:
+    compose:
+      lifecycle-management: start-only
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+jwt:
+  secret: local-dev-only-secret-please-change-in-prod-0123456789
+
+entry-pass:
+  secret: local-dev-only-entry-pass-secret-please-change-in-prod-0123456789
+
+api:
+  stub:
+    enabled: true
+
+wallet:
+  master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
+
+app:
+  image:
+    bucket-name: ${S3_PUBLIC_BUCKET_NAME}
+    base-url: ${IMAGE_BASE_URL}
+
+solapi:
+  api-key: demo-api-key
+  api-secret: demo-api-secret
+  sender-phone-number: "01000000000"

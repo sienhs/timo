@@ -23,12 +23,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 공연 API 스텁 (v0).
@@ -57,7 +59,10 @@ public class ConcertStubController implements ConcertApi {
     }
 
     @Override
-    public ResponseEntity<CommandConcertResponseDto> create(CommandConcertRequestDto request) {
+    public ResponseEntity<CommandConcertResponseDto> create(CommandConcertRequestDto rawRequest,
+                                                              MultipartFile poster,
+                                                              List<MultipartFile> images) {
+        CommandConcertRequestDto request = withUploadedImages(rawRequest, poster, images);
         if (request.venueId() == StubFixtures.NOT_FOUND_ID) {
             throw new VenueNotFoundException(request.venueId());
         }
@@ -120,6 +125,28 @@ public class ConcertStubController implements ConcertApi {
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
 
         return ResponseEntity.ok(toDetail(concert));
+    }
+
+    /**
+     * 실제 {@code ConcertController} 의 업로드 처리를 옮겨 왔다. 프론트가 v0 로 먼저 이미지 업로드
+     * 연동을 맞춰 볼 수 있어야 한다. 공연은 아직 저장 전이라 id 가 없어, key 를 묶는 폴더명은 DB id
+     * 대신 무작위 값을 쓴다.
+     */
+    private CommandConcertRequestDto withUploadedImages(CommandConcertRequestDto request,
+                                                          MultipartFile poster,
+                                                          List<MultipartFile> images) {
+        String groupId = UUID.randomUUID().toString();
+        String posterKey = poster == null || poster.isEmpty()
+                ? null
+                : imageStorage.upload("concert/" + groupId + "/poster", poster);
+        List<String> imageKeys = images == null
+                ? List.of()
+                : images.stream()
+                        .filter(image -> !image.isEmpty())
+                        .map(image -> imageStorage.upload("concert/" + groupId + "/detail", image))
+                        .toList();
+
+        return request.withImages(posterKey, imageKeys);
     }
 
     /** 실제 {@code ConcertServiceImpl} 의 기간 검증을 옮겨 왔다. 프론트가 400 분기를 볼 수 있어야 한다. */

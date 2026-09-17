@@ -202,8 +202,8 @@ class ArtistListApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(artistId.intValue()))
                 .andExpect(jsonPath("$.content[0].name").value("아이유"))
-                // 아티스트 프로필은 아직 ImageStorage 를 태우지 않아 저장된 값 그대로 나간다.
-                .andExpect(jsonPath("$.content[0].profileImage").value("artist/아이유/profile.png"))
+                .andExpect(jsonPath("$.content[0].profileImageUrl")
+                        .value("https://cdn.test.timo.io/artist/아이유/profile.png"))
                 // 출연 공연은 컬렉션이라 목록에 담지 않는다.
                 .andExpect(jsonPath("$.content[0].concerts").doesNotExist());
     }
@@ -248,7 +248,7 @@ class ArtistListApiIntegrationTest {
     private Artist saveArtist(String name) {
         return artistRepository.save(Artist.builder()
                 .name(name)
-                .profileImage("artist/" + name + "/profile.png")
+                .profileImageKey("artist/" + name + "/profile.png")
                 .build());
     }
 

@@ -35,3 +35,11 @@ solapi:
   api-key: test-api-key
   api-secret: test-api-secret
   sender-phone-number: "01000000000"
+
+# 이 프로파일에서는 S3ImageStorage 가 뜬다(SolapiSmsSender 와 같은 사정). S3Client 생성 자체는
+# 자격증명을 검증하지 않아 실제 호출 없이는 문제되지 않지만, bucket-name·base-url 값이 없으면
+# 생성자 주입에서 기동이 실패한다.
+app:
+  image:
+    bucket-name: test-images-bucket
+    base-url: https://cdn.securitytest.timo.io

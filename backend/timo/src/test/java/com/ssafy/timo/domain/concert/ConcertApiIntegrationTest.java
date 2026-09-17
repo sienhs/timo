@@ -18,17 +18,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -76,21 +79,20 @@ class ConcertApiIntegrationTest {
 
         iuId = artistRepository.save(Artist.builder()
                 .name("아이유")
-                .profileImage("artist/1/profile.png")
+                .profileImageKey("artist/1/profile.png")
                 .build()).getId();
 
         parkId = artistRepository.save(Artist.builder()
                 .name("박효신")
-                .profileImage("artist/2/profile.png")
+                .profileImageKey("artist/2/profile.png")
                 .build()).getId();
     }
 
     @Test
     @DisplayName("공연을 생성하면 201 과 함께 생성된 리소스 위치를 반환한다")
     void create_returnsCreatedWithLocation() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody())))
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.title").value("아이유 콘서트"))
@@ -104,9 +106,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("Location 헤더의 경로는 실제로 저장된 공연의 id 를 가리킨다")
     void create_locationPointsToSavedConcert() throws Exception {
-        MvcResult result = mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        MvcResult result = mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody())))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -122,9 +123,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("상태와 조회수는 요청에 없어도 서버가 정한다")
     void create_serverDecidesStatusAndViewCount() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("SCHEDULED"))
                 .andExpect(jsonPath("$.viewCount").value(0));
@@ -134,34 +134,41 @@ class ConcertApiIntegrationTest {
         assertThat(saved.getViewCount()).isZero();
     }
 
+    /** key 는 이제 서버가 업로드 시점에 무작위로 만들어, "concert/1/poster.png" 처럼 고정값을 알 수 없다. */
+    private static final String UPLOADED_KEY_PATTERN = "concert/[^/]+/%s/[^/]+\\.png";
+
     @Test
     @DisplayName("이미지 key 가 URL 로 변환돼 요청 순서대로 응답에 담긴다")
     void create_convertsImageKeysToUrlsInOrder() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody()))
+                        .file(posterPart())
+                        .file(imagePart("detail1.png"))
+                        .file(imagePart("detail2.png")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.posterImageUrl")
-                        .value(IMAGE_BASE_URL + "/concert/1/poster.png"))
+                        .value(matchesPattern(IMAGE_BASE_URL + "/" + UPLOADED_KEY_PATTERN.formatted("poster"))))
                 .andExpect(jsonPath("$.imageUrls.length()").value(2))
                 .andExpect(jsonPath("$.imageUrls[0]")
-                        .value(IMAGE_BASE_URL + "/concert/1/detail-1.png"))
+                        .value(matchesPattern(IMAGE_BASE_URL + "/" + UPLOADED_KEY_PATTERN.formatted("detail"))))
                 .andExpect(jsonPath("$.imageUrls[1]")
-                        .value(IMAGE_BASE_URL + "/concert/1/detail-2.png"));
+                        .value(matchesPattern(IMAGE_BASE_URL + "/" + UPLOADED_KEY_PATTERN.formatted("detail"))));
     }
 
     @Test
     @DisplayName("이미지는 key 로 저장되고 노출 순서가 함께 기록된다")
     void create_persistsImageKeysWithSortOrder() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody()))
+                        .file(posterPart())
+                        .file(imagePart("detail1.png"))
+                        .file(imagePart("detail2.png")))
                 .andExpect(status().isCreated());
 
         List<ConcertImage> images = onlySavedConcert().getImages();
 
         assertThat(images).extracting(ConcertImage::getImageKey)
-                .containsExactly("concert/1/detail-1.png", "concert/1/detail-2.png");
+                .allMatch(key -> key.matches(UPLOADED_KEY_PATTERN.formatted("detail")));
         assertThat(images).extracting(ConcertImage::getSortOrder)
                 .containsExactly(0, 1);
     }
@@ -169,9 +176,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("출연 아티스트가 요청 순서대로 저장되고 응답에 함께 내려온다")
     void create_persistsArtistsInRequestedOrder() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.artists.length()").value(2))
                 .andExpect(jsonPath("$.artists[0].id").value(iuId.intValue()))
@@ -190,9 +196,8 @@ class ConcertApiIntegrationTest {
                 "\"artistIds\": [%d, %d]".formatted(iuId, parkId),
                 "\"artistIds\": [%d, %d, %d]".formatted(iuId, iuId, iuId));
 
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(body)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.artists.length()").value(1));
 
@@ -202,9 +207,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("일정과 이미지가 없어도 최소 필드만으로 생성된다")
     void create_acceptsMinimalRequest() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart("""
                                 {
                                   "title": "소극장 단독 공연",
                                   "genre": "PLAY",
@@ -212,7 +216,7 @@ class ConcertApiIntegrationTest {
                                   "venueId": %d,
                                   "artistIds": [%d]
                                 }
-                                """.formatted(venueId, iuId)))
+                                """.formatted(venueId, iuId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.startDate").isEmpty())
                 .andExpect(jsonPath("$.endDate").isEmpty())
@@ -231,11 +235,10 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("필수값이 빠지면 400 과 필드 에러를 반환하고 아무것도 저장하지 않는다")
     void create_rejectsMissingRequiredFields() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart("""
                                 {"title":"  ","venueId":null,"artistIds":null}
-                                """))
+                                """)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorMessage").value(ErrorCode.INVALID_INPUT_VALUE.getMessage()))
                 .andExpect(jsonPath("$.errors[*].field")
@@ -250,9 +253,8 @@ class ConcertApiIntegrationTest {
         String body = fullBody().replace(
                 "\"artistIds\": [%d, %d]".formatted(iuId, parkId), "\"artistIds\": []");
 
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("artistIds"))
                 .andExpect(jsonPath("$.errors[0].reason").value("출연 아티스트는 최소 1명이어야 합니다."));
@@ -263,9 +265,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("공연명이 200자를 넘으면 400 을 반환한다")
     void create_rejectsTooLongTitle() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody().replace("아이유 콘서트", "가".repeat(201))))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody().replace("아이유 콘서트", "가".repeat(201)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("title"))
                 .andExpect(jsonPath("$.errors[0].reason").value("공연명은 200자 이하여야 합니다."));
@@ -276,9 +277,8 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("정의되지 않은 장르 값이면 400 과 함께 허용되는 값을 알려준다")
     void create_rejectsUnknownGenre() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody().replace("\"CONCERT\"", "\"OPERA\"")))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody().replace("\"CONCERT\"", "\"OPERA\""))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorMessage").value(ErrorCode.INVALID_INPUT_VALUE.getMessage()))
                 .andExpect(jsonPath("$.errors[0].field").value("genre"))
@@ -293,10 +293,9 @@ class ConcertApiIntegrationTest {
     void create_returnsNotFoundWhenVenueMissing() throws Exception {
         long missingVenueId = venueId + 1_000L;
 
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody().replace("\"venueId\": " + venueId,
-                                "\"venueId\": " + missingVenueId)))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody().replace("\"venueId\": " + venueId,
+                                "\"venueId\": " + missingVenueId))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.errorMessage")
@@ -314,9 +313,8 @@ class ConcertApiIntegrationTest {
                 "\"artistIds\": [%d, %d]".formatted(iuId, parkId),
                 "\"artistIds\": [%d, %d]".formatted(iuId, missingArtistId));
 
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(body)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorMessage")
                         .value("존재하지 않는 아티스트입니다. (artistId=" + missingArtistId + ")"))
@@ -328,11 +326,10 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("공연 기간이 뒤집혀 있으면 400 과 도메인 에러 메시지를 반환한다")
     void create_returnsBadRequestOnReversedPeriod() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody()
                                 .replace("\"endDate\": \"2026-04-12T21:00:00\"",
-                                        "\"endDate\": \"2026-04-09T21:00:00\"")))
+                                        "\"endDate\": \"2026-04-09T21:00:00\""))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorMessage").value("공연 종료일은 시작일보다 빠를 수 없습니다."))
                 .andExpect(jsonPath("$.exception").value("InvalidConcertPeriodException"));
@@ -343,11 +340,10 @@ class ConcertApiIntegrationTest {
     @Test
     @DisplayName("예매 오픈이 공연 시작보다 늦으면 400 을 반환한다")
     void create_returnsBadRequestWhenOpenAtIsAfterStart() throws Exception {
-        mvc.perform(post("/api/v1/concerts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(fullBody()
+        mvc.perform(multipart("/api/v1/concerts")
+                        .file(requestPart(fullBody()
                                 .replace("\"openAt\": \"2026-03-01T20:00:00\"",
-                                        "\"openAt\": \"2026-04-11T20:00:00\"")))
+                                        "\"openAt\": \"2026-04-11T20:00:00\""))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorMessage").value("예매 오픈은 공연 시작 전이어야 합니다."))
                 .andExpect(jsonPath("$.exception").value("InvalidTicketOpenTimeException"));
@@ -438,13 +434,12 @@ class ConcertApiIntegrationTest {
         return concertRepository.save(concert);
     }
 
+    /** 이미지 key 필드는 없다 - 실제 엔드포인트는 이 값 대신 업로드된 파일로 key 를 채운다. */
     private String fullBody() {
         return """
                 {
                   "title": "아이유 콘서트",
                   "genre": "CONCERT",
-                  "posterImageKey": "concert/1/poster.png",
-                  "imageKeys": ["concert/1/detail-1.png", "concert/1/detail-2.png"],
                   "description": "2026 아이유 단독 콘서트",
                   "ageRating": "AGE_7",
                   "startDate": "2026-04-10T19:00:00",
@@ -454,6 +449,22 @@ class ConcertApiIntegrationTest {
                   "artistIds": [%d, %d]
                 }
                 """.formatted(venueId, iuId, parkId);
+    }
+
+    /** {@code request} JSON 파트를 만든다. multipart 요청은 이걸로 메타 정보를 싣는다. */
+    private MockMultipartFile requestPart(String json) {
+        return new MockMultipartFile(
+                "request", "", MediaType.APPLICATION_JSON_VALUE, json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private MockMultipartFile posterPart() {
+        return new MockMultipartFile(
+                "poster", "poster.png", MediaType.IMAGE_PNG_VALUE, "poster-bytes".getBytes(StandardCharsets.UTF_8));
+    }
+
+    private MockMultipartFile imagePart(String filename) {
+        return new MockMultipartFile(
+                "images", filename, MediaType.IMAGE_PNG_VALUE, (filename + "-bytes").getBytes(StandardCharsets.UTF_8));
     }
 
     /**

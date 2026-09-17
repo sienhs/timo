@@ -137,6 +137,12 @@ class LocalDataSeederTest {
     @Autowired
     private com.ssafy.timo.global.config.BlockchainProperties blockchainProperties;
 
+    @Autowired
+    private com.ssafy.timo.global.storage.ImageStorage imageStorage;
+
+    @Autowired
+    private org.springframework.core.env.Environment environment;
+
     private LocalDataSeeder seeder;
 
     @BeforeEach
@@ -384,7 +390,7 @@ class LocalDataSeederTest {
     }
 
     @Test
-    @DisplayName("local 프로필이 아니면 빈으로 등록되지 않는다")
+    @DisplayName("local · demo 프로필이 아니면 빈으로 등록되지 않는다")
     void isNotRegisteredOutsideLocalProfile() {
         assertThat(applicationContext.getBeanNamesForType(LocalDataSeeder.class)).isEmpty();
     }
@@ -408,7 +414,9 @@ class LocalDataSeederTest {
                 clock,
                 showRegistryClient,
                 walletService,
-                blockchainProperties);
+                blockchainProperties,
+                imageStorage,
+                environment);
     }
 
     /** 좌석 상태가 들어간 공연들. 예매 중인 것만이라 상태로 고른다. */
@@ -431,6 +439,6 @@ class LocalDataSeederTest {
     }
 
     private static Artist artist(String name, String profileImage) {
-        return Artist.builder().name(name).profileImage(profileImage).build();
+        return Artist.builder().name(name).profileImageKey(profileImage).build();
     }
 }

@@ -67,7 +67,7 @@ public record ConcertDetailResponseDto(
                 concert.getVenue().getId(),
                 concert.getVenue().getName(),
                 concert.getArtists().stream()
-                        .map(ArtistSummary::from)
+                        .map(artist -> ArtistSummary.from(artist, imageStorage))
                         .toList(),
                 sections.stream()
                         .map(SectionPrice::from)
@@ -91,13 +91,14 @@ public record ConcertDetailResponseDto(
     /**
      * 응답에 실리는 아티스트 요약.
      *
-     * <p>{@code profileImage} 는 아직 저장소 key 가 아니라 저장된 값 그대로다.
-     * 아티스트 프로필까지 S3 로 옮기면 여기도 {@link ImageStorage} 를 태운다.
+     * <p>저장된 것은 이미지 key 지만 클라이언트가 바로 쓸 수 있도록 {@link ImageStorage} 로 URL 을
+     * 만들어 내려준다.
      */
-    public record ArtistSummary(Long id, String name, String profileImage) {
+    public record ArtistSummary(Long id, String name, String profileImageUrl) {
 
-        static ArtistSummary from(Artist artist) {
-            return new ArtistSummary(artist.getId(), artist.getName(), artist.getProfileImage());
+        static ArtistSummary from(Artist artist, ImageStorage imageStorage) {
+            return new ArtistSummary(artist.getId(), artist.getName(),
+                    imageStorage.getUrl(artist.getProfileImageKey()));
         }
     }
 }

@@ -2,18 +2,20 @@ package com.ssafy.timo.global.storage;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
- * S3 연동 전까지 쓰는 임시 {@link ImageStorage}.
+ * {@code local} 과 {@code test} 에서만 뜨는 {@link ImageStorage}. 로컬은 정적 리소스를, 테스트는
+ * 가짜 CDN 도메인을 key 앞에 그대로 붙여 URL 을 만들고, 삭제는 경고 로그만 남긴다 - 둘 다 실제
+ * S3 버킷이 필요 없다.
  *
- * <p>key 앞에 설정된 base URL 만 붙여서 돌려주고, 삭제는 경고 로그만 남긴다.
- *
- * <p><b>TODO</b>: S3 업로드 방식이 정해지면 실제 구현체로 교체하고 이 클래스는 삭제한다.
- * 도메인은 {@link ImageStorage} 에만 의존하므로 교체 시 공연/이미지 코드는 손대지 않아도 된다.
+ * <p>{@link S3ImageStorage} 와 프로파일 조건이 서로 여집합이어야 한다는 점은 그쪽 주석 참고.
  */
 @Slf4j
 @Component
+@Profile({"local", "test"})
 public class PlaceholderImageStorage implements ImageStorage {
 
     private final String baseUrl;
@@ -33,5 +35,18 @@ public class PlaceholderImageStorage implements ImageStorage {
     @Override
     public void delete(String imageKey) {
         log.warn("이미지 삭제가 아직 구현되지 않았습니다. imageKey={}", imageKey);
+    }
+
+    /**
+     * 실제로 저장하지 않는다 - {@code local}/{@code test} 는 S3 버킷이 없다. content type 검증은
+     * {@link S3ImageStorage} 와 같은 기준({@link ImageKeys})으로 하므로, 업로드 API 를 테스트할 때
+     * 지원하지 않는 형식은 여기서도 똑같이 걸러진다.
+     */
+    @Override
+    public String upload(String keyPrefix, MultipartFile file) {
+        String key = ImageKeys.generate(keyPrefix, file.getContentType());
+        log.warn("이미지 업로드가 아직 구현되지 않았습니다. key={}", key);
+
+        return key;
     }
 }

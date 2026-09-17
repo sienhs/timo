@@ -437,7 +437,7 @@ class ConcertServiceImplTest {
     private Artist artist(Long id, String name) {
         Artist artist = Artist.builder()
                 .name(name)
-                .profileImage("https://cdn.timo.io/" + id + ".png")
+                .profileImageKey("artist/" + id + "/profile.png")
                 .build();
         ReflectionTestUtils.setField(artist, "id", id);
         return artist;
