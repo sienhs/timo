@@ -25,8 +25,9 @@ void main() {
     ),
   ];
 
-  testWidgets('catalogue shows a placeholder per concert and starts the '
-      'creator for that concert', (tester) async {
+  testWidgets('starts on "내가 가진 티켓만 보기", and the catalogue shows a '
+      'placeholder per concert that starts the creator for that concert',
+      (tester) async {
     CollectionSlot? started;
     await tester.pumpWidget(
       MaterialApp(
@@ -46,20 +47,23 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text(CollectionText.title), findsOneWidget);
+
+    // 첫 진입은 "내가 가진 티켓만 보기". 가진 티켓이 없으면 빈 무대가 보인다.
+    // 빈 자리는 마스코트가 지킨다. 회색 티켓 자리표시를 쓰면 격자의
+    // '아직 없는 소장품' 칸과 구분이 안 된다.
+    expect(find.text(CollectionText.emptyTitle), findsOneWidget);
+    expect(find.byType(TimoMascot), findsOneWidget);
+    expect(find.byType(TicketPlaceholder), findsNothing);
+
+    // "모두 보기"로 바꾸면 공연마다 자리표시가 하나씩 나온다.
+    await tester.tap(find.text(CollectionText.filterAll));
+    await tester.pumpAndSettle();
+    expect(find.text(CollectionText.emptyTitle), findsNothing);
     expect(find.byType(TicketPlaceholder), findsNWidgets(2));
 
     await tester.tap(find.byType(TicketPlaceholder).last);
     await tester.pump();
     expect(started?.concertId, 'c2');
-
-    // "내가 가진 티켓만 보기" with nothing owned shows the empty stage.
-    await tester.tap(find.text(CollectionText.filterMine));
-    await tester.pumpAndSettle();
-    expect(find.text(CollectionText.emptyTitle), findsOneWidget);
-    // 빈 자리는 마스코트가 지킨다. 회색 티켓 자리표시를 쓰면 격자의
-    // '아직 없는 소장품' 칸과 구분이 안 된다.
-    expect(find.byType(TimoMascot), findsOneWidget);
-    expect(find.byType(TicketPlaceholder), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

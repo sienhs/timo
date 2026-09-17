@@ -25,7 +25,7 @@ class CollectionView extends StatefulWidget {
     required this.onCreateFor,
     required this.onOpen,
     required this.onDelete,
-    this.initialFilter = CollectionFilter.all,
+    this.initialFilter = CollectionFilter.mine,
   });
 
   /// Catalogue cells in display order.
