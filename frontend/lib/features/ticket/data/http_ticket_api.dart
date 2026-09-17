@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/my_ticket.dart';
+import '../models/reservation_detail.dart';
 import 'ticket_api.dart';
 
 /// 백엔드 예매 API(`/api/v1/reservations`)에 실제로 요청하는 [TicketApi].
@@ -44,6 +45,30 @@ class HttpTicketApi implements TicketApi {
     await _guard(
       () => _dio.delete<dynamic>('$reservationsPath/$reservationId'),
     );
+  }
+
+  /// 본문은 백엔드 `CreateReservationRequestDto` 와 필드 이름이 같다. 결제
+  /// 수단은 보내지 않는다 — 결제는 예치 잔액 차감 한 가지뿐이다.
+  @override
+  Future<ReservationDetail> createReservation({
+    required int concertId,
+    required int seatId,
+  }) async {
+    final response = await _guard(
+      () => _dio.post<dynamic>(
+        reservationsPath,
+        data: {'concertId': concertId, 'seatId': seatId},
+      ),
+    );
+    return ReservationDetail.fromJson(_body(response));
+  }
+
+  @override
+  Future<ReservationDetail> fetchReservation(int reservationId) async {
+    final response = await _guard(
+      () => _dio.get<dynamic>('$reservationsPath/$reservationId'),
+    );
+    return ReservationDetail.fromJson(_body(response));
   }
 
   /// 목록 응답은 Spring 의 `PagedModel` 이라 항목이 `content` 안에 있다.

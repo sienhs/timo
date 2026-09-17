@@ -11,6 +11,7 @@ import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
+import 'package:timo/features/ticket/models/reservation_detail.dart';
 import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
 
@@ -166,4 +167,14 @@ class _SpyApi implements TicketApi {
 
   @override
   Future<List<MyTicket>> fetchMyTickets() => _base.fetchMyTickets();
+
+  @override
+  Future<ReservationDetail> createReservation({
+    required int concertId,
+    required int seatId,
+  }) => _base.createReservation(concertId: concertId, seatId: seatId);
+
+  @override
+  Future<ReservationDetail> fetchReservation(int reservationId) =>
+      _base.fetchReservation(reservationId);
 }

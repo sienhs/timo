@@ -26,18 +26,15 @@ class OrderSummaryCard extends StatelessWidget {
             label: PaymentConstants.bookerLabel,
             value: order.bookerName,
           ),
+          // 시안에 있던 '예매 수수료' 줄은 뺐다. 수수료가 없어 정가가 곧 결제
+          // 금액이다(`Performance` 주석). TOTAL 줄은 시안대로 남긴다.
           OrderInfoRow(
             label: PaymentConstants.ticketPriceLabel,
             value: formatWon(order.ticketPrice),
             valueColor: PaymentColors.price,
           ),
-          OrderInfoRow(
-            label: PaymentConstants.bookingFeeLabel,
-            value: formatWon(order.bookingFee),
-            valueColor: PaymentColors.price,
-          ),
           const _CardDivider(),
-          _TotalRow(total: order.totalPrice),
+          _TotalRow(total: order.ticketPrice),
         ],
       ),
     );

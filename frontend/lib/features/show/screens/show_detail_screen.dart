@@ -6,7 +6,6 @@ import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/poster_image.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/state/auth_session_scope.dart';
-import '../../booking/constants.dart';
 import '../../booking/models/performance.dart';
 import '../../booking/state/booking_scope.dart';
 import '../../favorite/state/favorite_scope.dart';
@@ -185,7 +184,6 @@ class _LoadedShowState extends State<_LoadedShow> {
         venue: widget.detail.venue,
         startAt: widget.detail.startAt,
         posterUrl: widget.detail.posterUrl,
-        bookingFee: BookingConstants.bookingFee,
       ),
     );
     await Navigator.pushNamed(

@@ -22,19 +22,42 @@ class PaymentConstants {
   static String get holdWarning =>
       '${holdDuration.inMinutes}분안에 결제하지 않으면 자리가 넘어가요!';
 
+  /// 주문을 만들려는데 로그인이 풀려 있을 때(401). 좌석을 잡을 때와 같은 문구다.
+  static const loginRequired = '로그인이 필요해요.';
+
+  /// 완료 화면이 발행 진행 상태를 다시 묻는 주기.
+  ///
+  /// 서버는 체인 트랜잭션 두 개(잔액 차감 · 발행)가 확정되기를 기다린다.
+  /// 로컬 하드햇 기준 몇 초라, 이보다 잦게 물으면 서버만 두드린다.
+  static const issuePollInterval = Duration(seconds: 3);
+
+  /// 발행 상태 묻기를 그만두는 시점.
+  ///
+  /// 이 뒤에도 안 끝났으면 화면은 "발행 중" 그대로 두고 더 묻지 않는다. 결과는
+  /// 내 티켓에서 확인하면 된다. 서버가 발행에 실패하면 주문을 되돌리는 데도
+  /// 시간이 걸려, 너무 일찍 그만두면 실패를 못 보여 준다.
+  static const issuePollTimeout = Duration(minutes: 2);
+
   static const completeTitle = '결제가 완료됐어요';
+
+  // 발행 진행 상태 배지와 그 아래 안내. 시안에는 '발행 중' 하나만 있다. 완료와
+  // 실패는 같은 자리에 같은 모양으로, 색과 문구만 바꿔 보여 준다.
   static const issuingBadgeLabel = '티켓 발행 중';
+  static const issuedBadgeLabel = '티켓 발행 완료';
+  static const issueFailedBadgeLabel = '티켓 발행 실패';
   static const issuingDescription =
       '티켓 발행에는 1~2분이 걸릴 수 있어요.\n완료되면 알림으로 알려드릴게요.';
+  static const issuedDescription = '티켓이 발행됐어요.\n내 티켓에서 바로 확인할 수 있어요.';
+
+  /// 잔액 차감이나 발행이 실패한 경우다. 서버가 차감했던 금액을 되돌리고 주문을
+  /// 취소한다. 실패 사유는 서버 내부 문구라 여기 찍지 않는다.
+  static const issueFailedDescription = '티켓 발행에 실패했어요.\n결제된 금액은 자동으로 환불돼요.';
+
   static const viewTicketLabel = '티켓 보러 가기';
   static const goHomeLabel = '홈으로';
 
-  /// 티켓 화면이 아직 없어 목업에서 안내만 띄운다.
-  static const viewTicketPendingMessage = '티켓 화면은 준비 중이에요.';
-
   static const bookerLabel = '예매자 성함';
   static const ticketPriceLabel = '티켓 가격';
-  static const bookingFeeLabel = '예매 수수료';
   static const totalLabel = 'TOTAL';
   static const concertLabel = '공연명';
   static const performedAtLabel = '일시';
@@ -49,7 +72,6 @@ class PaymentConstants {
     seat: 'A구역 9열 6번',
     bookerName: '홍길동',
     ticketPrice: 186000,
-    bookingFee: 3000,
   );
 }
 
@@ -82,6 +104,13 @@ class PaymentColors {
   static const posterPlaceholder = Color(0xFFE7E9EB);
   static const avatarRing = AppTheme.accentColor;
 
+  // 발행 상태 배지. 옅은 바탕에 진한 글자로, 세 상태가 같은 결이다. 글자가
+  // 작아(12px) 브랜드 초록·코랄을 그대로 쓰면 바탕과 대비가 모자라 한 단계
+  // 진하게 잡았다.
   static const issuingBadgeBackground = Color(0xFFFDF2D0);
   static const issuingBadgeForeground = Color(0xFFB07B12);
+  static const issuedBadgeBackground = Color(0xFFDDF3E7);
+  static const issuedBadgeForeground = Color(0xFF0F7A47);
+  static const issueFailedBadgeBackground = Color(0xFFFCE4E1);
+  static const issueFailedBadgeForeground = Color(0xFFC0392B);
 }

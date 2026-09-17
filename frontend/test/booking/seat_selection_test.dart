@@ -81,7 +81,6 @@ BookingController _buildController() => BookingController(
     title: '테스트 공연',
     venue: '테스트홀',
     startAt: DateTime(2026, 11, 4, 18),
-    bookingFee: 3000,
   ),
 );
 
@@ -98,8 +97,19 @@ Widget _app(BookingController controller, BookingApi api) => MaterialApp(
   // 이동 자체가 실패하므로 자리만 세워 둔다.
   routes: {
     // AppBar 를 두는 이유: 뒤로 가기 버튼이 있어야 tester.pageBack() 이 된다.
-    AppRoutes.payment: (_) =>
-        Scaffold(appBar: AppBar(), body: const Text('결제 화면')),
+    // '결제 완료' 는 실제 결제 화면이 주문을 만들고 남기는 결과(true)를 흉내 낸다.
+    AppRoutes.payment: (context) => Scaffold(
+      appBar: AppBar(),
+      body: Column(
+        children: [
+          const Text('결제 화면'),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('결제 완료'),
+          ),
+        ],
+      ),
+    ),
     AppRoutes.login: (_) =>
         Scaffold(appBar: AppBar(), body: const Text('로그인 화면')),
   },
@@ -137,8 +147,8 @@ void main() {
 
     // 좌석 이름은 구역 이름으로 만든다. 서버가 주는 이름이 그대로 들어간다.
     expect(find.text('1층 A블록 1열 1번'), findsOneWidget);
-    // 정가 100,000 + 예매 수수료 3,000
-    expect(find.text('103,000원'), findsOneWidget);
+    // 정가 그대로다. 수수료는 없다.
+    expect(find.text('100,000원'), findsOneWidget);
     expect(controller.selectedSeat?.id, 11);
   });
 
@@ -228,6 +238,21 @@ void main() {
       expect(controller.hold, isNull);
       // 고른 자리는 남는다. 자리가 다시 비었으니 한 번 더 누르면 다시 잡힌다.
       expect(controller.selectedSeat?.id, 11);
+    });
+
+    // 서버가 선점을 주문으로 바꿨다. 여기서 풀면 안 된다 — 이미 우리 자리다.
+    testWidgets('결제가 끝났으면 잡아 둔 자리를 풀지 않는다', (tester) async {
+      await pumpSeats(tester);
+      await checkout(tester);
+
+      await tester.tap(find.text('결제 완료'));
+      await tester.pumpAndSettle();
+
+      expect(api.cancelled, isEmpty);
+      // 잡은 자리는 이제 산 자리다. 고른 자리를 잊고 배치도를 새로 받는다.
+      expect(controller.hold, isNull);
+      expect(controller.selectedSeat, isNull);
+      expect(api.fetchCount, 2);
     });
 
     // 초록 자리를 눌러 잡으려는데 그 사이 남이 채 간 경우다. 회색 자리를

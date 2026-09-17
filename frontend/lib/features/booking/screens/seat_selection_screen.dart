@@ -112,13 +112,22 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       if (mounted) setState(() => _holding = false);
     }
 
-    await Navigator.pushNamed(context, AppRoutes.payment);
+    // 결제 화면은 주문을 만들었으면 true 를 남기고 완료 화면으로 교체된다.
+    // 그 순간 이 대기가 풀린다 — 완료 화면이 닫힐 때가 아니다.
+    final paid = await Navigator.pushNamed(context, AppRoutes.payment);
+    if (!mounted) return;
+
+    if (paid == true) {
+      // 서버가 선점을 주문으로 바꿨다. 여기서 풀면 안 된다 — 이미 우리
+      // 자리다. 고른 자리를 잊고 배치도를 새로 받아, 완료 화면에서 뒤로
+      // 돌아오면 그 자리가 판매 완료로 보이게 한다.
+      _controller.clearSelection();
+      _refresh();
+      return;
+    }
+
     // 결제를 마치지 않고 돌아왔다. 잡아 둔 자리를 놓아 남이 살 수 있게 한다.
-    //
-    // 결제를 끝내고 온 경우와 구분하지 않는 이유: 주문 API 가 아직 없어
-    // 결제 화면이 서버에 아무것도 남기지 않는다. 주문이 붙으면 결제 성공
-    // 여부를 받아 갈라야 한다.
-    if (mounted) await _releaseHold();
+    await _releaseHold();
   }
 
   /// 잡아 둔 자리를 푼다. 실패는 삼킨다 — 5분 뒤 서버가 알아서 푼다.
