@@ -51,6 +51,7 @@ import 'routes/app_routes.dart';
 class App extends StatefulWidget {
   const App({
     super.key,
+    this.initialRoute = AppRoutes.splash,
     this.session,
     this.authApi,
     this.homeApi,
@@ -64,6 +65,12 @@ class App extends StatefulWidget {
     this.memoryConcertApi,
     this.resaleApi,
   });
+
+  /// 처음 띄울 화면. 앱은 로딩 화면에서 시작해 애니메이션이 끝나면 홈으로
+  /// 넘어간다. 테스트는 홈처럼 보고 싶은 화면을 바로 넘겨 로딩(2.5초)을
+  /// 건너뛴다 — 안 그러면 앱을 통째로 띄우는 테스트마다 그 시간을 돌려야 하고,
+  /// 로딩 시간을 손볼 때 무관한 테스트가 흔들린다.
+  final String initialRoute;
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
   /// 메모리 저장소로 된 로그아웃 상태에서 시작한다.
@@ -269,6 +276,25 @@ class _AppState extends State<App> {
     ApiClient.dio.interceptors.insert(0, _authInterceptor);
   }
 
+  /// 첫 화면을 **하나만** 쌓는다.
+  ///
+  /// Flutter 기본 동작은 첫 화면 이름이 '/splash' 처럼 '/' 아래에 있으면 '/'(홈)를
+  /// 먼저 쌓고 그 위에 첫 화면을 쌓는다(딥링크로 깊은 화면을 열었을 때 뒤로
+  /// 가기가 자연스럽도록). 우리한텐 해롭다 — 홈이 로딩 화면 밑에서 만들어져
+  /// 서버까지 부르고, 로딩이 끝나 홈으로 교체하면 홈이 둘이 된다. 그래서 이름에
+  /// 상관없이 요청한 화면 하나만 만든다. 라우트 종류는 routes 맵으로 만들 때와
+  /// 같은 MaterialPageRoute 다.
+  List<Route<dynamic>> _generateInitialRoutes(String name) {
+    final builder = AppRoutes.routes[name];
+    assert(builder != null, '등록되지 않은 첫 화면: $name');
+    return [
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: name),
+        builder: builder!,
+      ),
+    ];
+  }
+
   @override
   void dispose() {
     ApiClient.dio.interceptors.remove(_authInterceptor);
@@ -318,9 +344,10 @@ class _AppState extends State<App> {
                                   title: 'TIMO',
                                   theme: AppTheme.light,
                                   navigatorKey: _navigatorKey,
-                                  // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                                  // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                                  initialRoute: AppRoutes.home,
+                                  // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
+                                  initialRoute: widget.initialRoute,
+                                  onGenerateInitialRoutes:
+                                      _generateInitialRoutes,
                                   routes: AppRoutes.routes,
                                   // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
                                   // 화면에 있든 끝나면 배너로 알려야 한다. 그래서

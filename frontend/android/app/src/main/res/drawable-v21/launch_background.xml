@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!--
+    Flutter 엔진이 첫 프레임을 그리기 전까지 안드로이드가 보여 주는 런치 화면.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    앱은 라이트 테마만 있고 Flutter 로딩 화면(features/splash)의 배경이 흰색이다.
+    기본값(시스템 배경색)을 두면 기기가 다크 모드일 때 검은 화면이 번쩍이고
+    흰 로딩 화면이 떠서, 앱 배경과 같은 흰색으로 고정한다. drawable/ 의 같은
+    파일과 값을 맞춘다.
+
+    글자 애니메이션은 여기서 못 한다. 시안의 로딩 1~4 는 Flutter 쪽 로딩 화면이
+    그린다.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
 </layer-list>

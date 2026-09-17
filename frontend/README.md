@@ -20,6 +20,7 @@ lib/
 ├── common/
 │   └── widgets/              # 여러 기능에서 같이 쓰는 공용 위젯
 └── features/                 # 기능 단위 폴더 (기능별로 담당자가 작업)
+    ├── splash/               # 앱 첫 화면(로딩). 끝나면 홈으로 넘어간다
     └── home/
         └── screens/home_screen.dart
 ```
@@ -57,6 +58,14 @@ flutter run --dart-define=API_BASE_URL=http://192.168.0.10:8080
 - 기본 주소가 암호화 없는 http 라서 디버그 빌드의 안드로이드 설정(`android/app/src/debug/AndroidManifest.xml`)에서만 http 를 허용해 두었다. 배포 빌드는 https 만 된다.
 - 백엔드를 내 컴퓨터에서 띄우려면 Docker Desktop 을 켜고 `backend/timo` 에서 `./gradlew bootRun`. 자바 21 이 필요하다. 로컬 프로필에서는 인증 문자가 실제로 가지 않고 백엔드 콘솔에 `[SMS NOT SENT] … code=…` 로 인증번호가 찍힌다.
 - 배포 서버는 인증 문자가 실제로 가고, 한 번 가입한 전화번호로는 다시 가입할 수 없다.
+
+## 로딩 화면
+
+앱은 로딩 화면(`features/splash/`)에서 시작한다. 시안 '로딩 1~4' 대로 `세상의 모든 티켓을 모아,` 아래 워드마크가 `ticket moa → TIcket MOa → TIMO` 로 바뀌고 마지막에 로고가 뜬다. 2.5초 뒤 홈으로 **교체** 이동해 뒤로 가기로 돌아올 수 없다. 장면별 시간은 `features/splash/constants.dart` 한 곳에서 고친다.
+
+- **서버를 부르지 않는다.** 로그인 되살리기는 `main.dart` 가 앱을 띄우기 전에 끝내고, 홈 데이터는 홈이 스켈레톤을 보이며 직접 받는다. 버전 확인·점검 공지 API 가 생기면 그때 이 화면에 붙인다.
+- 첫 화면은 `App(initialRoute:)` 로 바꿀 수 있다. 앱을 통째로 띄우는 테스트는 `AppRoutes.home` 을 넘겨 로딩을 건너뛴다. 첫 화면 이름이 `/` 아래에 있으면 Flutter 가 홈을 먼저 쌓아 버리는 함정이 있어, `app.dart` 가 첫 화면을 하나만 쌓도록 직접 만든다.
+- Flutter 가 뜨기 전 안드로이드가 보여 주는 런치 화면(`android/app/src/main/res/drawable*/launch_background.xml`)은 흰 배경만 있다. 로딩 화면 배경과 같은 색이라 이어져 보인다.
 
 ## 내 티켓 화면
 

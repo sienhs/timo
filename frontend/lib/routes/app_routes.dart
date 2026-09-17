@@ -30,6 +30,7 @@ import '../features/resale/screens/listing_purchase_screen.dart';
 import '../features/resale/screens/listing_register_screen.dart';
 import '../features/resale/screens/market_concerts_screen.dart';
 import '../features/resale/screens/market_listings_screen.dart';
+import '../features/splash/screens/splash_screen.dart';
 
 /// 화면 라우트 등록부.
 /// 새 화면을 만들면 1) 이름 상수 추가, 2) routes 맵에 builder 등록.
@@ -37,6 +38,13 @@ import '../features/resale/screens/market_listings_screen.dart';
 class AppRoutes {
   AppRoutes._();
 
+  /// 로딩(스플래시). 앱의 첫 화면이다. 애니메이션이 끝나면 홈으로 교체 이동해
+  /// 뒤로 가기로 돌아올 수 없다. 첫 화면인데 이름이 '/' 가 아닌 사정은 App 의
+  /// 첫 화면 처리 주석에 있다.
+  static const splash = '/splash';
+
+  /// 홈. 로딩이 끝나면 여기로 오고, 다른 화면들이 "홈으로" 갈 때도 이 이름을
+  /// 쓴다.
   static const home = '/';
 
   /// 공연 상세. 공연 id 를 arguments 로 받는다.
@@ -100,6 +108,7 @@ class AppRoutes {
   static const signupComplete = '/signup/complete';
 
   static final Map<String, WidgetBuilder> routes = {
+    splash: (_) => const SplashScreen(),
     // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
     // 라우트로 노출하지 않는다. 빠른 메뉴에서 연 화면이 하단 바로 돌아올 때는
     // 열 탭 번호를 arguments 로 넘긴다.

@@ -404,6 +404,8 @@ void main() {
     usePhoneSize(tester);
     await tester.pumpWidget(
       const App(
+        // 로딩 화면을 건너뛰고 홈에서 시작한다.
+        initialRoute: AppRoutes.home,
         homeApi: MockHomeApi(latency: Duration.zero),
         showApi: MockShowApi(latency: Duration.zero),
       ),

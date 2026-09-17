@@ -8,6 +8,7 @@ import 'package:timo/features/booking/data/mock_booking_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/show/data/mock_show_api.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
+import 'package:timo/routes/app_routes.dart';
 
 /// 레이아웃 스모크 테스트.
 ///
@@ -41,6 +42,8 @@ void main() {
 
     await tester.pumpWidget(
       App(
+        // 로딩 화면을 건너뛰고 홈에서 시작한다.
+        initialRoute: AppRoutes.home,
         session: session,
         homeApi: const MockHomeApi(latency: Duration.zero),
         // 예매 화면은 서버에서 구역·좌석을 받아 온다. 테스트에서는 고정
