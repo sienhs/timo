@@ -153,4 +153,29 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                and t.status = com.ssafy.timo.domain.ticket.entity.TicketStatus.OWNED
             """)
     int markUsedIfOwned(@Param("ticketId") Long ticketId);
+
+    /**
+     * 이 공연의 티켓을 지금 들고 있는 회원 id. 취소표 추첨에서 뺄 사람이다.
+     *
+     * <p>판정은 {@link #findMyTickets} 와 같은 두 갈래다 — 거래된 적 없는 {@code PAID} 주문의 예매자, 그리고
+     * 마지막 거래의 구매자. 판 사람은 주문이 {@code PAID} 로 남아 첫 갈래에 잡히는데, 예매의 1인 1매도 그
+     * 주문을 보므로 뽑아 봐야 결제가 막힌다. 산 사람은 주문이 없어 둘째 갈래로만 잡힌다.
+     */
+    @Query(value = """
+            select r1.member_id
+              from ticket t1
+              join reservation r1 on r1.reservation_id = t1.reservation_id
+             where r1.concert_id = :concertId
+               and r1.status = 'PAID'
+               and not exists (select 1 from ticket_trade tt where tt.ticket_id = t1.ticket_id)
+            union
+            select tt2.buyer_member_id
+              from ticket_trade tt2
+              join ticket t2      on t2.ticket_id = tt2.ticket_id
+              join reservation r2 on r2.reservation_id = t2.reservation_id
+             where r2.concert_id = :concertId
+               and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
+                                    where x.ticket_id = tt2.ticket_id)
+            """, nativeQuery = true)
+    List<Long> findHoldingMemberIdsByConcertId(@Param("concertId") Long concertId);
 }

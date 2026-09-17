@@ -434,21 +434,20 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
-                    @DisplayName("취소된 적이 있는(회수된) 좌석이면 409 를 반환한다")
-    void hold_returnsConflictWhenRevoked() throws Exception {
+    @DisplayName("취소된 적이 있는 좌석도 열린 구매 기회가 없으면 잡을 수 있다 - 취소표는 기회가 끝나면 풀린다")
+    void hold_allowsRevokedSeatWithoutOffer() throws Exception {
         Long seatId = seatIdAt(1, 1);
         revoke(concertA, seatId, someoneElse);
         flushAndClear();
 
-        // 재오픈 절차(스토리 35)가 생기기 전에는 취소된 적이 있는 자리를 다시 선점할 수 없다 — 조회에서
-        // 이미 예매 가능으로 안 보이는 자리라, API 직접 호출로도 뚫리면 안 된다.
+        // 취소 시 찜한 회원이 없으면 기회 없이 곧바로 열리고, 기회가 있었어도 1시간이 지나면 같은 상태다.
+        // 기회가 열린 동안의 잠금은 CancelOfferFlowIntegrationTest 가 본다.
         mvc.perform(holdBy(me, concertA, seatId))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.exception").value("SeatNotHoldableException"));
+                .andExpect(status().isOk());
         flushAndClear();
 
         assertThat(seatHoldRepository.findActive(concertA.getId(), seatId, LocalDateTime.now()))
-                .isEmpty();
+                .isPresent();
     }
 
     @Test

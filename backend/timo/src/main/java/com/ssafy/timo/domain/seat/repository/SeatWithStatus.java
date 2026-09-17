@@ -10,10 +10,10 @@ import com.ssafy.timo.domain.seat.entity.SeatStatus;
  * {@link #status()} 에서 판정하는 이유는, 판정 규칙이 JPQL 문자열 안이 아니라 자바 코드에 있어야
  * 읽고 고치기 쉽기 때문이다.
  *
- * @param holdId               유효한 선점 행의 id. 없으면 {@code null}
- * @param reservationId        유효한(PAID) 주문 행의 id. 없으면 {@code null}
- * @param revokedReservationId 취소된(CANCELLED) 주문 행 중 하나의 id. 없으면 {@code null}. 여러 건이어도
- *                             "회수된 적이 있는가" 만 보면 되므로 어느 것인지는 상관없다
+ * @param holdId        유효한 선점 행의 id. 없으면 {@code null}
+ * @param reservationId 유효한(PAID) 주문 행의 id. 없으면 {@code null}
+ * @param offerId       열려 있는 취소표 구매 기회의 id. 없으면 {@code null}. 당첨자만 이 자리를 잡을 수 있어
+ *                      남에게는 선점과 같다
  */
 public record SeatWithStatus(
         Long seatId,
@@ -21,7 +21,7 @@ public record SeatWithStatus(
         int seatCol,
         Long holdId,
         Long reservationId,
-        Long revokedReservationId
+        Long offerId
 ) {
 
     /**
@@ -30,18 +30,15 @@ public record SeatWithStatus(
      * <p>주문을 선점보다 먼저 본다. 주문 확정 직후 선점이 아직 {@code CONVERTED} 로 바뀌지 않은
      * 순간에도 팔린 자리는 팔린 것으로 보여야 한다.
      *
-     * <p>회수는 예매 가능보다 먼저 본다. 취소된 적이 있는 자리는 재오픈 절차(스토리 35) 전까지 다시
-     * 예매 가능으로 보이면 안 된다 — 그 절차가 생기기 전에는 이 판정이 영구적이다.
+     * <p>열린 구매 기회는 선점으로 보인다. 당첨자 한 사람만 잡을 수 있는 자리라 남에게는 잡힌 자리와
+     * 같고, 당첨자는 배치도가 아니라 내 기회 목록에서 이 자리로 들어온다. 기회가 끝난 자리는 그냥 빈 자리다.
      */
     public SeatStatus status() {
         if (reservationId != null) {
             return SeatStatus.SOLD;
         }
-        if (holdId != null) {
+        if (holdId != null || offerId != null) {
             return SeatStatus.HELD;
-        }
-        if (revokedReservationId != null) {
-            return SeatStatus.REVOKED;
         }
         return SeatStatus.AVAILABLE;
     }

@@ -1,0 +1,119 @@
+###############################################################################
+# 취소표 구매 기회 - 당첨자 조회부터 결제까지
+#
+# 먼저 offer-fixture.sql 을 돌린다(취소된 주문과 seed002 의 1시간 기회를 만든다).
+#   docker exec -i timo-mysql mysql -utimo -ptimo1234 timo < http/domain/offer/offer-fixture.sql
+#
+# 흐름: seed002 내 기회 조회 -> seed003 이 그 자리 선점(409) -> seed002 선점(200)
+#       -> seed002 주문 확정(201) -> 기회가 목록에서 사라짐.
+#
+# 마지막 주문 확정은 공연이 ON_SALE 이고 온체인 등록이 끝나 있어야 한다. 시더가 체인 등록을
+# 건너뛴 환경이면 500 이 난다 - reservation/reservation-create.http 머리말의 확인 절차를 본다.
+# 그 앞 단계까지는 체인 없이 돈다.
+###############################################################################
+
+### 당첨자 로그인
+POST {{baseUrl}}/api/v1/auth/login
+X-Device-Id: 22222222-2222-2222-2222-222222222222
+Content-Type: application/json
+
+{
+  "username": "seed002",
+  "password": "timo1234!"
+}
+
+> {%
+    client.global.set("winnerToken", response.body.accessToken);
+%}
+
+### 행인 로그인
+POST {{baseUrl}}/api/v1/auth/login
+X-Device-Id: 33333333-3333-3333-3333-333333333333
+Content-Type: application/json
+
+{
+  "username": "seed003",
+  "password": "timo1234!"
+}
+
+> {%
+    client.global.set("strangerToken", response.body.accessToken);
+%}
+
+### 내 기회 - 결제에 필요한 값과 서버 시각이 실린다
+GET {{baseUrl}}/api/v1/offers/me
+Authorization: Bearer {{winnerToken}}
+
+> {%
+    client.test("기회가 하나 있고 필드가 다 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.offers.length === 1, "offers: " + response.body.offers.length + " - offer-fixture.sql 을 먼저 돌린다");
+        var o = response.body.offers[0];
+        client.assert(o.concertId !== undefined && o.seatId !== undefined, "concertId, seatId 가 없다");
+        client.assert(o.price > 0, "price: " + o.price);
+        client.assert(o.expiresAt !== undefined && response.body.serverTime !== undefined, "시각이 없다");
+    });
+    var o = response.body.offers[0];
+    client.global.set("offerConcert", o.concertId);
+    client.global.set("offerSeat", o.seatId);
+    client.log("기회 " + o.offerId + ": 공연 " + o.concertId + " 좌석 " + o.seatId + " (" + o.sectionName + " " + o.seatNo + "-" + o.seatCol + "), 기한 " + o.expiresAt);
+%}
+
+### 행인은 그 자리를 못 잡는다 - 409. 좌석표에서는 선점된 자리로 보인다
+POST {{baseUrl}}/api/v1/seats/{{offerSeat}}/hold?concertId={{offerConcert}}
+Authorization: Bearer {{strangerToken}}
+
+> {%
+    client.test("409 SeatNotHoldableException", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotHoldableException", "exception: " + response.body.exception);
+    });
+%}
+
+### 행인에게는 없는 기회
+GET {{baseUrl}}/api/v1/offers/me
+Authorization: Bearer {{strangerToken}}
+
+> {%
+    client.test("빈 목록", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.offers.length === 0, "offers: " + response.body.offers.length);
+    });
+%}
+
+### 당첨자는 잡는다 - 200
+POST {{baseUrl}}/api/v1/seats/{{offerSeat}}/hold?concertId={{offerConcert}}
+Authorization: Bearer {{winnerToken}}
+
+> {%
+    client.test("200", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}
+
+### 당첨자가 주문을 확정한다 - 201. 체인 등록이 안 된 환경이면 500 (머리말 참고)
+POST {{baseUrl}}/api/v1/reservations
+Authorization: Bearer {{winnerToken}}
+Content-Type: application/json
+
+{
+  "concertId": {{offerConcert}},
+  "seatId": {{offerSeat}}
+}
+
+> {%
+    client.test("201", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+    });
+%}
+
+### 결제한 기회는 목록에서 사라진다(ACCEPTED)
+GET {{baseUrl}}/api/v1/offers/me
+Authorization: Bearer {{winnerToken}}
+
+> {%
+    client.test("빈 목록", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.offers.length === 0, "offers: " + response.body.offers.length);
+    });
+%}

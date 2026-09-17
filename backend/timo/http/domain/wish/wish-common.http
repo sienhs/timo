@@ -1,0 +1,44 @@
+###############################################################################
+# 공연 찜 API 공통 준비
+#
+# 실행 순서: wish-common.http -> wish-success.http -> wish-fail.http
+# local 프로필로 띄우고 우측 상단에서 env 를 local 로 고른다({{baseUrl}}).
+#
+# 요청자는 반드시 access token 이다. @CurrentMember 가 SecurityContext 의 JWT 에서
+# sub 를 꺼내므로 X-Device-Id 나 X-Member-Id 헤더로는 대신할 수 없다.
+# 시드 회원(seed001~, 비밀번호 timo1234!)이 기동 때 들어가 있어 그대로 로그인한다.
+#
+# 찜은 취소표 추첨의 모집단이다. 예매가 취소되면 그 공연을 찜한 회원 중 한 명이
+# 1시간 구매 기회를 받는다(offer/offer.http).
+###############################################################################
+
+### 로그인 - 찜하는 사람
+POST {{baseUrl}}/api/v1/auth/login
+X-Device-Id: 11111111-1111-1111-1111-111111111111
+Content-Type: application/json
+
+{
+  "username": "seed001",
+  "password": "timo1234!"
+}
+
+> {%
+    client.test("로그인하면 access token 이 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+    client.global.set("token", response.body.accessToken);
+%}
+
+### 찜할 공연 둘을 잡아 둔다
+GET {{baseUrl}}/api/v1/concerts?size=2
+Authorization: Bearer {{token}}
+
+> {%
+    client.test("공연이 둘 이상 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length >= 2, "공연이 부족하다 - 앱을 새로 띄워 시드를 다시 만든다");
+    });
+    client.global.set("concertA", response.body.content[0].id);
+    client.global.set("concertB", response.body.content[1].id);
+    client.log("찜할 공연 " + response.body.content[0].id + ", " + response.body.content[1].id);
+%}

@@ -152,19 +152,19 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소된 적이 있는 좌석도 잔여석에서 빠진다")
-    void findSections_excludesRevokedSeatsFromAvailableCount() throws Exception {
+    @DisplayName("취소된 적이 있는 좌석은 열린 구매 기회가 없으면 잔여석에 든다")
+    void findSections_countsRevokedSeatsWithoutOfferAsAvailable() throws Exception {
         Section section = saveSection("1층 A블록", 150000, 3, 2);
         revokeFirstSeats(section, 2);
         flushAndClear();
 
-        // 취소는 재오픈 절차(스토리 35) 전까지 자리를 예매 가능으로 되돌리지 않는다 — 팔린 자리와
-        // 똑같이 잔여석에서 빠져야 한다.
+        // 취소표는 찜한 회원의 1시간 기회가 끝나면(혹은 없으면) 그냥 빈 자리다. 기회가 열린 동안
+        // 잔여석에서 빠지는 것은 CancelOfferFlowIntegrationTest 가 본다.
         mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[0].seatCount").value(6))
-                .andExpect(jsonPath("$.sections[0].availableCount").value(4))
-                .andExpect(jsonPath("$.totalAvailableCount").value(4));
+                .andExpect(jsonPath("$.sections[0].availableCount").value(6))
+                .andExpect(jsonPath("$.totalAvailableCount").value(6));
     }
 
     @Test
@@ -294,18 +294,18 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소된 적이 있는 자리는 회수 상태로 남고, 다시 예매 가능으로 보이지 않는다")
-    void findSeats_returnsRevokedStatusForCancelledSeat() throws Exception {
+    @DisplayName("취소된 적이 있는 자리는 열린 구매 기회가 없으면 예매 가능으로 보인다")
+    void findSeats_showsCancelledSeatAsAvailableWithoutOffer() throws Exception {
         Section section = saveSection("1층 A블록", 150000, 2, 2);
         revokeFirstSeats(section, 1);
         flushAndClear();
 
-        // 재오픈 절차(스토리 35)가 없는 지금은 이 판정이 영구적이다 — AVAILABLE 도 SOLD 도 아니어야 한다.
+        // 회수 상태는 따로 없다. 기회가 열린 동안은 HELD, 끝나면 AVAILABLE 이다.
         mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seatCount").value(4))
-                .andExpect(jsonPath("$.availableCount").value(3))
-                .andExpect(jsonPath("$.seats[0].status").value("REVOKED"))
+                .andExpect(jsonPath("$.availableCount").value(4))
+                .andExpect(jsonPath("$.seats[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.seats[1].status").value("AVAILABLE"));
     }
 

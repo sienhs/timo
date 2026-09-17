@@ -5,6 +5,7 @@ import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.offer.repository.CancelOfferRepository;
 import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
 import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
@@ -61,6 +62,7 @@ public class SeatServiceImpl implements SeatService {
     private final SeatRepository seatRepository;
     private final SeatHoldRepository seatHoldRepository;
     private final ReservationRepository reservationRepository;
+    private final CancelOfferRepository cancelOfferRepository;
     private final VenueRepository venueRepository;
     private final ConcertRepository concertRepository;
     private final MemberRepository memberRepository;
@@ -133,11 +135,9 @@ public class SeatServiceImpl implements SeatService {
      * <p>이 공연의 티켓을 이미 산 회원은 다른 자리를 선점할 수 없다("1인 1매"). 지금 잡고 있는
      * 내 선점을 다시 누르는 것과는 다른 얘기다 — 그건 결제 전 단계라 여기 걸리지 않는다.
      *
-     * <p>이 공연에서 취소된 적이 있는 자리도 선점할 수 없다("회수됨",
-     * {@link com.ssafy.timo.domain.seat.entity.SeatStatus#REVOKED}).
-     * 취소는 자리를 곧바로 예매 가능으로 되돌리지 않는다 — 재오픈 절차(스토리 35)가 생기기 전에는
-     * 이 판정이 영구적이다. 조회에서 이미 예매 가능으로 보이지 않는 자리라, 여기서 안 막으면 화면엔
-     * 안 보이는 자리를 API 로 직접 잡는 통로가 남는다.
+     * <p>취소표 구매 기회가 열린 자리는 <b>당첨자만</b> 선점할 수 있다. 조회에서는 선점처럼 보이는 자리라,
+     * 여기서 안 막으면 화면엔 잡힌 자리를 API 로 직접 잡는 통로가 남는다. 기회가 없거나 끝난 자리는
+     * 취소된 적이 있어도 누구나 잡는다 — 취소표는 기회 1시간이 지나면 그냥 풀린다.
      *
      * <p>좌석 행을 잠그지 않는다. 좌석은 모든 공연이 공유하는 한 행이라 거기 잠금을 걸면 서로 다른
      * 공연의 선점 요청이 같은 줄에 선다. 대신 {@code seat_hold} INSERT 를 시도하고,
@@ -171,9 +171,12 @@ public class SeatServiceImpl implements SeatService {
         if (reservationRepository.existsPaidSeat(concertId, seatId)) {
             throw new SeatNotHoldableException(seatId);
         }
-        // 회수된 자리(취소된 적 있음)도 같은 이유로 따로 막는다. 재오픈 절차(스토리 35) 전까지는
-        // 조회에서도 예매 가능으로 보이지 않으므로, API 로 직접 찔러도 뚫리면 안 된다.
-        if (reservationRepository.existsRevokedSeat(concertId, seatId)) {
+        // 취소표 구매 기회가 열린 자리는 당첨자 몫이다. 조회에서 선점처럼 보이므로 여기서도 막아야
+        // API 직접 호출로 뚫리지 않는다. 기회가 없거나 지났으면 그냥 빈 자리다.
+        boolean offeredToSomeoneElse = cancelOfferRepository.findActiveOfSeat(concertId, seatId, now)
+                .map(offer -> !offer.isFor(memberId))
+                .orElse(false);
+        if (offeredToSomeoneElse) {
             throw new SeatNotHoldableException(seatId);
         }
 
