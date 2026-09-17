@@ -8,6 +8,7 @@ import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
+import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.entity.TicketTrade;
@@ -130,6 +131,66 @@ public class ListingService {
                 LocalDateTime.now(clock));
 
         return ListingDetailResponseDto.from(save(listing, ticketId), imageStorage, memberId);
+    }
+
+    /**
+     * 등록가를 바꾼다. 매물을 올린 판매자 본인만 할 수 있다.
+     *
+     * <p>검사 순서는 먼저 걸리는 것 하나만 응답한다.
+     *
+     * <ol>
+     *   <li>매물이 있는가 → 404</li>
+     *   <li>내가 올린 매물인가 → 403</li>
+     *   <li>새 가격이 정가 이하인가 → 400</li>
+     *   <li>아직 {@code LISTED} 인가 → 409. <b>조회가 아니라 전이의 결과로 판정한다</b></li>
+     * </ol>
+     *
+     * <p>권한 판정은 {@link #currentOwnerId} 가 아니라 {@code sellerMemberId} 로 한다. 등록과 기준이
+     * 다른 것이 의도다 — 등록은 "지금 이 티켓의 주인인가" 를 묻지만 여기서는 "이 매물을 올린 사람인가"
+     * 를 묻는다. 취소({@link #cancel})와 같은 기준이고, 매물을 올린 뒤 소유가 바뀌는 경로는
+     * 체결뿐인데 그때는 매물이 {@code SOLD} 라 4번에서 막힌다.
+     *
+     * <p>정가 기준은 <b>등록 시점에 잡힌 스냅샷</b>({@code face_value})이지 지금의
+     * {@code Concert.facePrice} 가 아니다. 매물이 열린 뒤 공연 정가가 바뀌어도 그 매물의 판정 기준은
+     * 흔들리지 않아야 한다({@code TicketListing} 주석). 그래서 여기서는 공연을 읽지도 않는다.
+     *
+     * <p>3번을 4번보다 앞에 두는 이유는 등록({@link #register})과 반대로 보이지만 사정이 다르다.
+     * 등록의 409("이미 등록 중")는 가격을 고쳐도 결과가 같아 먼저 알려야 하는 것이고, 여기 3번은
+     * 판매자 확인을 위해 이미 읽어 둔 행만으로 끝나는 검사다. 4번은 경쟁 상태라 UPDATE 를
+     * 돌려 봐야만 알 수 있으므로 순서를 바꿀 여지가 없다.
+     *
+     * <p>바뀐 값이 없어도(같은 가격을 다시 보내도) 그대로 UPDATE 한다. 재시도가 안전해야 해서
+     * 절댓값을 받는 API 이고, 같은 값이면 {@code updatedAt} 만 움직인다.
+     *
+     * <p>온체인 가격 갱신은 부르지 않는다. 등록·취소와 같은 사정이다 — 판매자 지갑 서명이 필요한데
+     * 커스터디얼이라 step-up 인증이 선행돼야 한다.
+     */
+    @Transactional
+    public ListingDetailResponseDto updatePrice(Long listingId,
+                                                UpdateListingPriceRequestDto request,
+                                                Long memberId) {
+        TicketListing listing = ticketListingRepository.findById(listingId)
+                .orElseThrow(() -> new ListingNotFoundException(listingId));
+        if (!listing.isSeller(memberId)) {
+            throw new NotListingSellerException(listingId);
+        }
+
+        long price = request.price();
+        long faceValue = listing.getFaceValue();
+        if (price > faceValue) {
+            throw new ListPriceExceedsFacePriceException(price, faceValue);
+        }
+
+        if (ticketListingRepository.updatePriceIfListed(listingId, price, LocalDateTime.now(clock)) == 0) {
+            throw new ListingAlreadyClosedException(listingId);
+        }
+
+        // 조건부 UPDATE 가 영속성 컨텍스트를 비우므로 위에서 읽은 매물은 이미 옛 가격을 들고 있다.
+        // 응답이 공연·공연장·구역을 쓰므로 상세용 조회로 다시 읽는다.
+        TicketListing updated = ticketListingRepository.findDetailById(listingId)
+                .orElseThrow(() -> new ListingNotFoundException(listingId));
+
+        return ListingDetailResponseDto.from(updated, imageStorage, memberId);
     }
 
     /**

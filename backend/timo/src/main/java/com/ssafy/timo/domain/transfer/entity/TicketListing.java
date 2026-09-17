@@ -155,7 +155,12 @@ public class TicketListing extends BaseEntity {
     private int seatCol;
 
     /**
-     * 등록가. {@link #faceValue} 이하만 허용한다. 등록 후 바뀌지 않는다.
+     * 등록가. {@link #faceValue} 이하만 허용한다.
+     *
+     * <p><b>매물이 열려 있는 동안 판매자가 바꿀 수 있다</b>(2026-09-17 추가). 이 클래스의 다른
+     * 필드와 달리 가변이지만, 변경은 {@code TicketListingRepository.updatePriceIfListed} 의 조건부
+     * UPDATE 로만 한다 — 상태 전이와 같은 이유다. 조회해서 {@code LISTED} 인지 확인한 뒤 바꾸면
+     * 체결 직후의 매물 가격이 바뀌어 체결 기록과 어긋난다.
      *
      * <p>{@code int} 가 아니라 {@code long} 인 이유는 {@link #faceValue} 와 같다.
      */

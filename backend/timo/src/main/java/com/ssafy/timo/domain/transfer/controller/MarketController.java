@@ -8,6 +8,7 @@ import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.service.ListingService;
 import com.ssafy.timo.domain.transfer.service.MarketQueryService;
 import com.ssafy.timo.domain.transfer.service.PurchaseService;
@@ -73,6 +74,12 @@ public class MarketController implements MarketApi {
         return ResponseEntity
                 .created(URI.create(BASE_PATH + "/listings/" + response.listingId()))
                 .body(response);
+    }
+
+    @Override
+    public ResponseEntity<ListingDetailResponseDto> updatePrice(
+            Long listingId, UpdateListingPriceRequestDto request, Long memberId) {
+        return ResponseEntity.ok(listingService.updatePrice(listingId, request, memberId));
     }
 
     @Override

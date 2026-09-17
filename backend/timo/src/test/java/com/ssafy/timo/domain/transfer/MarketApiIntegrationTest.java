@@ -42,6 +42,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -360,6 +361,125 @@ class MarketApiIntegrationTest {
     }
 
     @Nested
+    @DisplayName("가격 수정")
+    class UpdatePrice {
+
+        @Test
+        @DisplayName("내 매물 가격을 내리면 200 이고 목록·상세·할인율에 함께 반영된다")
+        void updatePrice() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(80_000)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.listingId").value(listing.getId()))
+                    .andExpect(jsonPath("$.status").value("LISTED"))
+                    .andExpect(jsonPath("$.price").value(80_000))
+                    // 정가는 등록 시점 스냅샷이라 가격을 고쳐도 움직이지 않는다.
+                    .andExpect(jsonPath("$.faceValue").value(FACE_PRICE))
+                    .andExpect(jsonPath("$.discountRate").value(20))
+                    .andExpect(jsonPath("$.mine").value(true))
+                    // 노출 경계는 상세와 같다.
+                    .andExpect(jsonPath("$.ticketId").doesNotExist())
+                    .andExpect(jsonPath("$.sellerMemberId").doesNotExist());
+
+            mvc.perform(get(MARKET_PATH + "/listings/{listingId}", listing.getId()))
+                    .andExpect(jsonPath("$.price").value(80_000));
+            mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
+                    .andExpect(jsonPath("$.content[0].price").value(80_000));
+        }
+
+        @Test
+        @DisplayName("올리는 것도 정가 이하면 된다 - 방향이 아니라 상한만 본다")
+        void raisePrice() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(FACE_PRICE)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.price").value(FACE_PRICE))
+                    .andExpect(jsonPath("$.discountRate").value(0));
+        }
+
+        @Test
+        @DisplayName("같은 가격을 다시 보내도 200 - 재시도가 안전해야 한다")
+        void samePriceIsIdempotent() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(LIST_PRICE)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.price").value(LIST_PRICE));
+        }
+
+        @Test
+        @DisplayName("정가를 넘기면 400 - 등록과 같은 규칙이다")
+        void exceedsFacePrice() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(FACE_PRICE + 1)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.exception").value("ListPriceExceedsFacePriceException"));
+
+            mvc.perform(get(MARKET_PATH + "/listings/{listingId}", listing.getId()))
+                    .andExpect(jsonPath("$.price").value(LIST_PRICE));
+        }
+
+        @Test
+        @DisplayName("남의 매물은 고칠 수 없다 - 403")
+        void notSeller() throws Exception {
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", othersListing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(10_000)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.exception").value("NotListingSellerException"));
+        }
+
+        @Test
+        @DisplayName("이미 종료된 매물이면 409")
+        void alreadyClosed() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(post(MARKET_PATH + "/listings/{listingId}/cancel", listing.getId()))
+                    .andExpect(status().isNoContent());
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(80_000)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingAlreadyClosedException"));
+        }
+
+        @Test
+        @DisplayName("없는 매물이면 404")
+        void notFound() throws Exception {
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", 99_999L)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(80_000)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
+        }
+
+        @Test
+        @DisplayName("0 이하면 400 - 무상 전송은 성립하지 않는다")
+        void nonPositivePrice() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(0)))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
     @DisplayName("취소")
     class Cancel {
 
@@ -489,6 +609,12 @@ class MarketApiIntegrationTest {
                 .header("Idempotency-Key", "key-" + listing.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"expectedPrice\": %d}".formatted(expectedPrice)));
+    }
+
+    private String priceBody(long price) {
+        return """
+                {"price": %d}
+                """.formatted(price);
     }
 
     private String body(long ticketId, long price) {

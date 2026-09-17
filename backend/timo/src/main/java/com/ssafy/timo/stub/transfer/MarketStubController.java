@@ -13,6 +13,7 @@ import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeType;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TradeStatus;
 import com.ssafy.timo.domain.transfer.exception.CannotBuyOwnListingException;
@@ -232,6 +233,28 @@ public class MarketStubController implements MarketApi {
         return ResponseEntity
                 .created(URI.create(BASE_PATH + "/listings/" + listing.listingId))
                 .body(toDetail(listing));
+    }
+
+    @Override
+    public synchronized ResponseEntity<ListingDetailResponseDto> updatePrice(
+            Long listingId, UpdateListingPriceRequestDto request, Long memberId) {
+        settle();
+        StubListing listing = Optional.ofNullable(listings.get(listingId))
+                .orElseThrow(() -> new ListingNotFoundException(listingId));
+        // 검사 순서는 실제 구현과 같다. 매물 존재 -> 등록자 -> 정가 -> 매물 상태.
+        if (!listing.listedByMe) {
+            throw new NotListingSellerException(listingId);
+        }
+        if (request.price() > listing.ticket.faceValue) {
+            throw new ListPriceExceedsFacePriceException(request.price(), listing.ticket.faceValue);
+        }
+        if (listing.status != ListingStatus.LISTED) {
+            throw new ListingAlreadyClosedException(listingId);
+        }
+
+        listing.price = request.price();
+
+        return ResponseEntity.ok(toDetail(listing));
     }
 
     @Override
@@ -463,7 +486,8 @@ public class MarketStubController implements MarketApi {
 
         private final long listingId;
         private final MarketTicket ticket;
-        private final long price;
+        /** 열려 있는 동안 판매자가 바꿀 수 있다. 실제 구현도 이 값만 가변이다. */
+        private long price;
         /** 등록한 사람이 나인가. 티켓의 소유자는 바뀌지만 이 값은 등록 시점에 고정된다. */
         private final boolean listedByMe;
         private final LocalDateTime listedAt;
