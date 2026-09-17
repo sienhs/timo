@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1026565427476",
+    "project_id": "timo-90f65",
+    "storage_bucket": "timo-90f65.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1026565427476:android:cd1d4de0a796a3a68af201",
+        "android_client_info": {
+          "package_name": "com.ssafy.timo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDBeEMlYsPvjIk1PEvtBOxA_O_l0Q9fgn8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
