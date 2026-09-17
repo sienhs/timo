@@ -264,9 +264,11 @@ resource "aws_ssm_association" "backend_bootstrap" {
 }
 
 # RDS does not accept a schema file as part of aws_db_instance creation. Run
-# the versioned SQL from the private application instance instead, after the
+# idempotent SQL from the private application instance instead, after the
 # instance can read the existing DB secret. This avoids exposing DB credentials
-# in Terraform state or opening MySQL to the CI runner.
+# in Terraform state or opening MySQL to the CI runner. The script never drops
+# existing tables or loads test fixtures, so it is safe to reapply on an RDS
+# instance that already holds operating data.
 resource "aws_ssm_document" "rds_schema_bootstrap" {
   name            = "${var.name}-rds-schema-bootstrap"
   document_type   = "Command"
@@ -276,7 +278,7 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
   # CRLF inside the heredoc, which makes the shebang resolve as `bash\r`.
   content = replace(jsonencode({
     schemaVersion = "2.2"
-    description   = "Initialise the Timo RDS schema and load test members"
+    description   = "Apply the idempotent Timo RDS schema"
     mainSteps = [{
       action = "aws:runShellScript"
       name   = "initialiseRds"
@@ -291,8 +293,7 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
           secret_file=$(mktemp)
           env_file=$(mktemp)
           sql_file=$(mktemp)
-          drop_file=$(mktemp)
-          trap 'rm -f "$secret_file" "$env_file" "$sql_file" "$drop_file"' EXIT
+          trap 'rm -f "$secret_file" "$env_file" "$sql_file"' EXIT
 
           aws secretsmanager get-secret-value \
             --region ${var.aws_region} \
@@ -317,7 +318,7 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
           set -a
           source "$env_file"
           set +a
-          printf '%s' '${var.db_init_sql_base64}' | base64 --decode >"$sql_file"
+          printf '%s' '${var.db_schema_sql_base64}' | base64 --decode >"$sql_file"
 
           mysql_cmd=(
             mysql
@@ -330,48 +331,18 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
           )
 
           for attempt in $(seq 1 60); do
-            if existing_tables=$(MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names \
-              --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"); then
+            if MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --execute="SELECT 1"; then
               break
             fi
             sleep 10
           done
 
-          if [[ -z "$${existing_tables:-}" ]]; then
+          if ! MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --execute="SELECT 1" >/dev/null 2>&1; then
             echo 'RDS did not accept connections within 10 minutes.' >&2
             exit 1
           fi
 
-          if [[ "$existing_tables" != "0" ]]; then
-            echo "Resetting database: removing $existing_tables existing tables."
-            MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names --batch \
-              --execute="
-                SELECT CONCAT(
-                  'DROP TABLE IF EXISTS ',
-                  CHAR(96),
-                  REPLACE(table_name, CHAR(96), CONCAT(CHAR(96), CHAR(96))),
-                  CHAR(96),
-                  ';'
-                )
-                FROM information_schema.tables
-                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
-              " >"$drop_file"
-
-            {
-              echo 'SET FOREIGN_KEY_CHECKS = 0;'
-              cat "$drop_file"
-              echo 'SET FOREIGN_KEY_CHECKS = 1;'
-            } | MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}"
-          fi
-
           MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" <"$sql_file"
-
-          member_count=$(MYSQL_PWD="$DB_PASSWORD" "$${mysql_cmd[@]}" --skip-column-names \
-            --execute="SELECT COUNT(*) FROM member")
-          [[ "$member_count" == "100000" ]] || {
-            echo "Expected 100000 load-test members, found $member_count." >&2
-            exit 1
-          }
           exit 0
 
           SCRIPT
@@ -382,10 +353,10 @@ resource "aws_ssm_document" "rds_schema_bootstrap" {
 }
 
 # The association has no schedule and normally runs only when it is created.
-# Make the SQL content an explicit replacement trigger so a changed init file
-# always produces a fresh association execution and a reproducible test DB.
+# Replacing it when idempotent schema SQL changes applies newly added tables
+# without deleting existing operating data.
 resource "terraform_data" "rds_schema_revision" {
-  triggers_replace = [sha256(var.db_init_sql_base64)]
+  triggers_replace = [sha256(var.db_schema_sql_base64)]
 }
 
 resource "aws_ssm_association" "rds_schema_bootstrap" {
