@@ -1,0 +1,21 @@
+name: timo_gate
+description: "TIMO 게이트 — 공연장 입구 검표 스캐너 앱"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  dio: ^5.11.1
+  flutter:
+    sdk: flutter
+  mobile_scanner: ^7.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
