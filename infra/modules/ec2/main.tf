@@ -169,7 +169,7 @@ resource "aws_instance" "this" {
               import os
               import sys
 
-              required = ("SPRING_PROFILES_ACTIVE", "DB_URL", "DB_USERNAME", "DB_PASSWORD", "JWT_SECRET", "WALLET_MASTER_KEY",
+              required = ("SPRING_PROFILES_ACTIVE", "DB_URL", "DB_USERNAME", "DB_PASSWORD", "JWT_SECRET", "ENTRY_PASS_SECRET", "WALLET_MASTER_KEY",
                           "ADMIN_PRIVATE_KEY", "SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "SMS_LIVE_TEST_TO")
               values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
               for key in required:
