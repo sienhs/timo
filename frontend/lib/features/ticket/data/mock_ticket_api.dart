@@ -1,5 +1,6 @@
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
+import '../models/entry_pass.dart';
 import '../models/my_ticket.dart';
 import '../models/reservation_detail.dart';
 import '../models/ticket_status.dart';
@@ -163,6 +164,32 @@ class MockTicketApi implements TicketApi {
         : _issued(detail, tokenId: '$reservationId');
   }
 
+  /// 서버 형식(`timo:entry:1:<티켓번호>.<만료>.<서명>`)을 흉내 낸다. 화면은
+  /// 문자열을 해석하지 않으니 모양이 같을 필요는 없지만, 글자 수가 같아야 QR
+  /// 칸의 촘촘함이 실제와 같아 시안과 대조할 때 어긋나지 않는다. 서명 자리는
+  /// 가짜라 검표기에는 통하지 않는다.
+  ///
+  /// 부를 때마다 만료 시각이 달라 문자열도 달라진다 — 실제 서버와 같다.
+  @override
+  Future<EntryPass> issueEntryPass(int ticketId) async {
+    await _respond();
+    final tickets = _tickets ??= _initialTickets();
+    if (!tickets.any((t) => t.ticketId == ticketId)) {
+      throw const ApiException('존재하지 않는 티켓입니다.', status: 404);
+    }
+    final now = clock();
+    const lifetime = TicketMetrics.mockEntryPassLifetime;
+    final expiresAt = now.add(lifetime).millisecondsSinceEpoch ~/ 1000;
+    return EntryPass(
+      token: 'timo:entry:1:$ticketId.$expiresAt.$_mockSignature',
+      lifetime: lifetime,
+      receivedAt: now,
+    );
+  }
+
+  /// 서명 자리. 실제 서명(HMAC 앞 16바이트의 base64url)과 글자 수(22)만 같다.
+  static const _mockSignature = 'mockSignatureMockSign0';
+
   /// 발행 결과가 채워진 사본. 둘 중 하나만 넘긴다.
   static ReservationDetail _issued(
     ReservationDetail detail, {
@@ -324,7 +351,7 @@ class MockTicketApi implements TicketApi {
   ///
   /// 하루 넘게 떨어진 공연은 날짜만 옮기고 시각을 저녁 7시로 맞춘다. 실행
   /// 시각을 그대로 쓰면 `2026.09.14 04:33` 같은 새벽 공연이 나와 시안과 대조할
-  /// 때 눈에 거슬린다. 오늘 공연만 실제 시각을 써야 입장 QR 창(시작 3시간
+  /// 때 눈에 거슬린다. 오늘 공연만 실제 시각을 써야 입장 QR 창(시작 2시간
   /// 전부터)에 들어온다.
   static DateTime _startAt(DateTime now, Duration startsIn) {
     final at = now.add(startsIn);

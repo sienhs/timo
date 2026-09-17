@@ -56,7 +56,15 @@ class ShellStrings {
 /// 아이콘은 시안의 커스텀 아이콘을 Material 아이콘으로 근사한 것이다.
 /// 아이콘 에셋이 나오면 이 목록만 교체하면 된다.
 const quickMenuItems = <QuickMenuItem>[
-  QuickMenuItem(icon: Icons.qr_code_2, label: '입장QR'),
+  // 입장 QR 은 티켓 한 장에 붙는 것이라 따로 화면이 없다. 내 티켓으로 보내
+  // 예정 공연 카드의 '입장 QR 보기' 로 이어지게 한다. 지금 입장 가능한 티켓이
+  // 한 장뿐이면 바로 QR 로 뛰는 것도 가능하지만, 메뉴가 예매 목록을 조회하게
+  // 되어 별도로 판단한다.
+  QuickMenuItem(
+    icon: Icons.qr_code_2,
+    label: '입장QR',
+    routeName: AppRoutes.myTickets,
+  ),
   QuickMenuItem(
     icon: Icons.confirmation_number_outlined,
     label: '마이 티켓',

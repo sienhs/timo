@@ -9,18 +9,22 @@ import 'package:timo/features/ticket/models/ticket_status.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
-/// 예매 v1 API 에 맞는 요청이 나가고 응답을 제대로 읽는지.
+/// 예매·티켓 v1 API 에 맞는 요청이 나가고 응답을 제대로 읽는지.
 /// 서버 없이 [FakeHttpAdapter] 로 검사한다.
 void main() {
   late FakeHttpAdapter adapter;
   late HttpTicketApi api;
 
-  /// [handler] 가 돌려주는 응답으로 가짜 서버를 세운다.
-  void givenServer(FutureOr<ResponseBody> Function(RecordedRequest) handler) {
+  /// [handler] 가 돌려주는 응답으로 가짜 서버를 세운다. [clock] 은 입장 QR 을
+  /// 받은 시각을 고정할 때만 넘긴다.
+  void givenServer(
+    FutureOr<ResponseBody> Function(RecordedRequest) handler, {
+    DateTime Function()? clock,
+  }) {
     adapter = FakeHttpAdapter(handler);
     final dio = Dio(BaseOptions(baseUrl: 'http://fake.test'))
       ..httpClientAdapter = adapter;
-    api = HttpTicketApi(dio: dio);
+    api = HttpTicketApi(dio: dio, clock: clock);
   }
 
   /// 서버 예매 목록 응답 한 건. 실제 `ReservationSummaryResponseDto` 모양이다.
@@ -323,6 +327,98 @@ void main() {
         api.fetchReservation(7),
         throwsA(isA<ApiException>().having((e) => e.status, 'status', 404)),
       );
+    });
+  });
+
+  group('입장 QR 발급', () {
+    /// 서버가 주는 문자열. `timo:entry:1:<티켓번호>.<만료>.<서명>` 꼴이지만 앱은
+    /// 해석하지 않으므로 여기서도 그냥 문자열이다.
+    const token = 'timo:entry:1:107.1789736400.AbCdEfGhIjKlMnOpQrStUv';
+
+    /// 서버 입장 QR 응답. 실제 `EntryPassResponseDto` 모양이다.
+    Map<String, dynamic> entryPassJson({int expiresInSeconds = 30}) => {
+      'token': token,
+      'expiresInSeconds': expiresInSeconds,
+    };
+
+    // 예매 번호가 아니라 티켓 번호다. 바꿔 넘기면 엉뚱한 티켓을 가리켜 404 가 난다.
+    test('티켓 번호로 티켓 주소에 GET 한다', () async {
+      givenServer((_) => jsonResponse(entryPassJson()));
+
+      await api.issueEntryPass(107);
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/api/v1/tickets/107/entry-pass');
+      expect(request.rawBody, isNull);
+    });
+
+    // 앱이 문자열 안을 해석하기 시작하면 서버가 형식을 바꿀 때마다 앱 배포까지
+    // 묶인다. 남은 시간도 토큰이 아니라 따로 온 초 값으로 센다.
+    test('문자열은 손대지 않고 그대로, 수명은 초 값으로 읽는다', () async {
+      givenServer((_) => jsonResponse(entryPassJson(expiresInSeconds: 45)));
+
+      final pass = await api.issueEntryPass(107);
+
+      expect(pass.token, token);
+      expect(pass.lifetime, const Duration(seconds: 45));
+    });
+
+    // 서버는 만료 시각이 아니라 남은 초만 준다. 어디서부터 셀지는 받은 쪽이 찍는다.
+    test('받은 시각을 찍어 거기서부터 센다', () async {
+      final received = DateTime(2026, 9, 14, 18, 30);
+      givenServer((_) => jsonResponse(entryPassJson()), clock: () => received);
+
+      final pass = await api.issueEntryPass(107);
+
+      expect(pass.receivedAt, received);
+      expect(
+        pass.remaining(received.add(const Duration(seconds: 10))),
+        const Duration(seconds: 20),
+      );
+    });
+
+    // 남의 티켓도 403 이 아니라 404 다. 존재를 알리지 않는다(백엔드 규칙).
+    test('없는 티켓·남의 티켓은 404 다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 404,
+          errorMessage: '존재하지 않는 티켓입니다.',
+          exception: 'TicketNotFoundException',
+        ),
+      );
+
+      await expectLater(
+        api.issueEntryPass(107),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 404)),
+      );
+    });
+
+    // 사유(시간대·티켓 상태)는 서버만 안다. 화면이 그 문구를 그대로 보여주므로
+    // 잃어버리면 안 된다.
+    test('발급할 수 없는 티켓이면 409 와 서버 문구를 그대로 올린다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 409,
+          errorMessage: '입장 QR 을 발급할 수 없는 티켓입니다.',
+          exception: 'EntryPassNotIssuableException',
+        ),
+      );
+
+      await expectLater(
+        api.issueEntryPass(107),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 409)
+              .having((e) => e.message, 'message', '입장 QR 을 발급할 수 없는 티켓입니다.'),
+        ),
+      );
+    });
+
+    test('JSON 객체가 아닌 응답이면 안내 문구로 바꾼다', () async {
+      givenServer((_) => ResponseBody.fromString('<html>gateway</html>', 200));
+
+      expect(() => api.issueEntryPass(107), throwsA(isA<ApiException>()));
     });
   });
 }

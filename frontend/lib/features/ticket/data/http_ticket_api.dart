@@ -3,15 +3,18 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
+import '../models/entry_pass.dart';
 import '../models/my_ticket.dart';
 import '../models/reservation_detail.dart';
 import 'ticket_api.dart';
 
-/// 백엔드 예매 API(`/api/v1/reservations`)에 실제로 요청하는 [TicketApi].
+/// 백엔드 예매 API(`/api/v1/reservations`)와 티켓 API(`/api/v1/tickets`)에
+/// 실제로 요청하는 [TicketApi].
 ///
-/// **로그인이 필요하다.** 목록은 서버가 요청한 회원의 주문만 골라 준다 — 그래서
-/// "내" 티켓이다. 토큰은 `AuthInterceptor` 가 붙이고, 비로그인이면 401 이
-/// 화면의 오류 안내로 그대로 나온다.
+/// **로그인이 필요하다.** 목록은 서버가 요청한 회원의 주문만 골라 주고, 입장 QR
+/// 도 요청한 회원의 티켓에만 내준다 — 그래서 "내" 티켓이다. 토큰은
+/// `AuthInterceptor` 가 붙이고, 비로그인이면 401 이 화면의 오류 안내로 그대로
+/// 나온다.
 ///
 /// 로컬 백엔드는 시더가 시드 회원(`seed001` 등)에게 예매를 넣어 두므로, 그
 /// 계정으로 로그인하면 목록이 바로 채워진다. 서버로는 만들 수 없는 상태(앱이
@@ -22,13 +25,21 @@ import 'ticket_api.dart';
 /// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
 /// [ApiException] 이 맡는다.
 ///
-/// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
+/// [dio] 와 [clock] 은 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio]
+/// 와 기기 시계를 쓴다.
 class HttpTicketApi implements TicketApi {
-  HttpTicketApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
+  HttpTicketApi({Dio? dio, DateTime Function()? clock})
+    : _dio = dio ?? ApiClient.dio,
+      _clock = clock ?? DateTime.now;
 
   static const reservationsPath = '/api/v1/reservations';
+  static const ticketsPath = '/api/v1/tickets';
 
   final Dio _dio;
+
+  /// 입장 QR 응답을 받은 시각을 찍는 데 쓴다. 서버는 만료 시각이 아니라 남은
+  /// 초만 주므로, 세기 시작할 기준점은 응답을 손에 넣은 여기서 찍어야 한다.
+  final DateTime Function() _clock;
 
   /// 상태로 거르지 않고 전부 받는다. 취소된 티켓도 회색 카드로 남겨 결과를
   /// 보여줘야 하기 때문이다. 거르는 일은 화면이 공연 날짜와 상태로 한다.
@@ -69,6 +80,18 @@ class HttpTicketApi implements TicketApi {
       () => _dio.get<dynamic>('$reservationsPath/$reservationId'),
     );
     return ReservationDetail.fromJson(_body(response));
+  }
+
+  /// GET 이다. 발급이 서버 상태를 바꾸지 않아 같은 티켓으로 몇 번을 불러도
+  /// 되고(백엔드 `EntryPassApi` 주석), 화면이 만료마다 다시 부르는 요청이라
+  /// 그래야 한다. 실패 문구는 서버 것을 그대로 올린다 — 409 의 사유(시간대·티켓
+  /// 상태)는 서버만 알고, 화면은 그 문구를 그대로 보여준다.
+  @override
+  Future<EntryPass> issueEntryPass(int ticketId) async {
+    final response = await _guard(
+      () => _dio.get<dynamic>('$ticketsPath/$ticketId/entry-pass'),
+    );
+    return EntryPass.fromJson(_body(response), receivedAt: _clock());
   }
 
   /// 목록 응답은 Spring 의 `PagedModel` 이라 항목이 `content` 안에 있다.

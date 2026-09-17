@@ -132,7 +132,7 @@ class UpcomingTicketCard extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          TicketStrings.qrOpensOnShowDay,
+          TicketStrings.qrOpensBeforeShow,
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
