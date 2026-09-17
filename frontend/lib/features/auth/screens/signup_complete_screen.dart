@@ -6,8 +6,8 @@ import '../constants.dart';
 
 /// 가입 완료 화면. 로고(위 가운데) → 그림 → 문구 → '티켓 보러 가기'.
 ///
-/// 이 화면 아래 스택에는 홈만 남아 있다(닉네임 화면이 입력 화면들을 지우고
-/// 왔다). 그래서 버튼도, 뒤로가기도 홈으로 간다.
+/// 이 화면 아래 스택에는 홈 탭만 남아 있다(닉네임 화면이 스택을 [홈, 완료]로
+/// 다시 세우고 왔다). 그래서 버튼도, 뒤로가기도 홈 탭으로 간다.
 class SignupCompleteScreen extends StatelessWidget {
   const SignupCompleteScreen({super.key});
 

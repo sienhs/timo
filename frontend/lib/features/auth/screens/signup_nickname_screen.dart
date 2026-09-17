@@ -126,11 +126,17 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
     }
     if (!mounted) return;
     // 뒤로가기로 입력 화면에 돌아올 일이 없으니 _busy 는 풀지 않는다.
+    //
+    // 스택을 [홈 탭, 완료 화면] 으로 다시 세운다. 로그인 화면과 같은 규칙 —
+    // 로그인이 끝나면 어디서 시작했든 홈으로 간다. 완료 화면 아래에 홈 탭을
+    // 깔아 두면 '티켓 보러 가기' 든 뒤로가기든 홈 탭에 닿는다. 그냥 첫 화면까지
+    // 걷어내면 가입을 시작한 탭(마이페이지)으로 돌아간다.
     Navigator.pushNamedAndRemoveUntil(
       context,
-      AppRoutes.signupComplete,
-      (route) => route.isFirst,
+      AppRoutes.home,
+      (route) => false,
     );
+    Navigator.pushNamed(context, AppRoutes.signupComplete);
   }
 
   /// 가입 거절 원인별 안내.

@@ -167,14 +167,13 @@ class _LoadedShowState extends State<_LoadedShow> {
   /// 그려진다. 그대로 두면 자리를 고르고 확인 다이얼로그까지 누른 뒤에야
   /// 로그인하라는 말을 듣게 된다.
   ///
-  /// 로그인 화면은 성공하면 결과로 true 를 넘기며 닫힌다. 돌아오면 고르던
-  /// 공연 그대로 예매를 이어 간다.
+  /// 로그인 화면은 성공하면 홈으로 가며 이 화면까지 걷어낸다. 그래서 여기서
+  /// 예매를 이어 갈 일은 없고, 로그인 화면으로 보내는 데서 끝난다.
   Future<void> _startBooking() async {
     if (!AuthSessionScope.of(context).isLoggedIn) {
-      final loggedIn = await Navigator.pushNamed(context, AppRoutes.login);
-      if (loggedIn != true || !mounted) return;
+      Navigator.pushNamed(context, AppRoutes.login);
+      return;
     }
-    if (!mounted) return;
     // 예매 화면들의 머리말에 찍을 공연을 여기서 넘긴다. 저쪽이 공연 번호로
     // 다시 조회하게 하면 같은 공연을 두 번 부르고, 서버 조회수도 두 번 오른다.
     BookingScope.read(context).startBooking(

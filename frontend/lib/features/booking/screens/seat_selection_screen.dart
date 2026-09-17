@@ -148,8 +148,10 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   void _onHoldFailed(ApiException e) {
     switch (e.status) {
       case 401:
-        // 서버가 요청자를 알아야 자리를 잡아 준다. 고른 자리는 그대로 두므로
-        // 로그인하고 돌아와 결제하기를 한 번 더 누르면 된다.
+        // 서버가 요청자를 알아야 자리를 잡아 준다. 로그인 화면은 성공하면
+        // 홈으로 가며 예매 화면을 걷어내므로, 공연 상세에서 예매를 다시 시작한다.
+        // 상세에서 로그인을 먼저 확인하기 때문에 여기 오는 일은 세션이 도중에
+        // 끊긴 경우뿐이다.
         _showMessage(BookingStrings.loginRequired);
         Navigator.pushNamed(context, AppRoutes.login);
       case 409:
