@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/network/server_errors.dart';
 import 'package:timo/features/booking/models/performance.dart';
 import 'package:timo/features/booking/models/seat.dart';
 import 'package:timo/features/booking/models/seat_hold.dart';
@@ -278,19 +279,77 @@ void main() {
       expect(results, [true]);
     });
 
-    // 선점 만료 · 이미 산 공연 · 판매 중이 아닌 공연은 이 자리로는 더 못 간다.
-    // 서버 문구를 그대로 띄우고 좌석 화면으로 돌아간다.
-    testWidgets('서버가 거절하면 사유를 띄우고 좌석 화면으로 돌아간다', (tester) async {
+    // 우리가 문구를 붙이지 못한 거절이다. 뭉뚱그리면 원인을 알 길이 없어지므로
+    // 서버 문구를 그대로 띄운다.
+    testWidgets('모르는 사유로 거절하면 서버 문구를 띄우고 좌석 화면으로 돌아간다', (tester) async {
       await _pumpFlow(tester, api: api, booking: booking, results: results);
-      api.failure = const ApiException('선점이 만료된 좌석입니다.', status: 409);
+      api.failure = const ApiException('결제할 수 없는 주문입니다.', status: 409);
 
       await pay(tester);
 
-      expect(find.text('선점이 만료된 좌석입니다.'), findsOneWidget);
+      expect(find.text('결제할 수 없는 주문입니다.'), findsOneWidget);
       expect(find.byType(PaymentScreen), findsNothing);
       expect(find.text('결제 화면으로'), findsOneWidget);
       expect(results, [null]);
     });
+
+    // 서버는 이 넷 중 셋을 같은 409 로 준다(남의 선점만 403). 상태 코드로는 못
+    // 가르므로 예외 이름을 본다. 서버 문구를 그대로 띄우면 `(seatId=1009)` 같은
+    // 디버깅용 꼬리까지 사용자에게 보인다.
+    final rejections =
+        <({String reason, ApiException failure, String expected})>[
+          (
+            reason: '잡아 둔 시간이 지났을 때',
+            failure: const ApiException(
+              '선점 상태가 아닌 좌석입니다. (seatId=1009)',
+              status: 409,
+              exceptionName: BookingServerErrors.seatNotHeld,
+            ),
+            expected: PaymentConstants.holdExpired,
+          ),
+          (
+            reason: '남이 잡고 있는 자리일 때',
+            failure: const ApiException(
+              '본인이 선점한 좌석이 아닙니다. (seatId=1009)',
+              status: 403,
+              exceptionName: BookingServerErrors.seatHoldNotOwned,
+            ),
+            expected: PaymentConstants.holdNotOwned,
+          ),
+          (
+            reason: '이 공연 티켓이 이미 있을 때',
+            failure: const ApiException(
+              '이미 이 공연의 티켓을 보유하고 있습니다. (concertId=3)',
+              status: 409,
+              exceptionName: BookingServerErrors.alreadyReserved,
+            ),
+            expected: PaymentConstants.alreadyReserved,
+          ),
+          (
+            reason: '예매 중인 공연이 아닐 때',
+            failure: const ApiException(
+              '예매 중인 공연이 아닙니다. (concertId=3, status=CLOSED)',
+              status: 409,
+              exceptionName: BookingServerErrors.concertNotOnSale,
+            ),
+            expected: PaymentConstants.concertNotOnSale,
+          ),
+        ];
+
+    for (final rejection in rejections) {
+      testWidgets('${rejection.reason} 우리 문구로 알린다', (tester) async {
+        await _pumpFlow(tester, api: api, booking: booking, results: results);
+        api.failure = rejection.failure;
+
+        await pay(tester);
+
+        expect(find.text(rejection.expected), findsOneWidget);
+        // 서버 문구의 디버깅용 꼬리가 새어 나오지 않는다.
+        expect(find.textContaining('='), findsNothing);
+        expect(find.byType(PaymentScreen), findsNothing);
+        expect(results, [null]);
+      });
+    }
 
     testWidgets('로그인이 풀려 있으면 로그인 안내와 함께 돌아간다', (tester) async {
       await _pumpFlow(tester, api: api, booking: booking, results: results);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/server_errors.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../../ticket/state/ticket_api_scope.dart';
@@ -102,13 +103,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
   /// 자리는 아직 잡혀 있다.
   void _onPayFailed(ApiException e) {
     final status = e.status;
-    showErrorSnackBar(
-      context,
-      status == 401 ? PaymentConstants.loginRequired : e.message,
-    );
+    showErrorSnackBar(context, _failureMessage(e));
     if (status != null && status >= 400 && status < 500) {
       Navigator.pop(context);
     }
+  }
+
+  /// 거절 사유를 화면 문구로 바꾼다.
+  ///
+  /// **상태 코드만으로는 못 가른다.** 선점 만료·1인 1매·판매 중이 아닌 공연이
+  /// 전부 409 라, 서버가 실어 준 예외 이름을 본다.
+  ///
+  /// 서버 문구를 그대로 쓰지 않는다. 우리가 아는 사유에는 `(concertId=3)` 같은
+  /// 디버깅용 꼬리가 붙어 있고, 문구가 좌석 화면의 것과 따로 놀면 같은 이유로
+  /// 두 번 막혔을 때 다른 일이 일어난 것처럼 읽힌다.
+  ///
+  /// 모르는 실패는 서버 문구를 그대로 보여준다. 우리가 문구를 붙이지 못한
+  /// 거절까지 뭉뚱그리면 원인을 알 길이 없어진다(api-response-convention).
+  String _failureMessage(ApiException e) {
+    if (e.status == 401) return PaymentConstants.loginRequired;
+
+    return switch (e.exceptionName) {
+      BookingServerErrors.seatNotHeld => PaymentConstants.holdExpired,
+      BookingServerErrors.seatHoldNotOwned => PaymentConstants.holdNotOwned,
+      BookingServerErrors.alreadyReserved => PaymentConstants.alreadyReserved,
+      BookingServerErrors.concertNotOnSale => PaymentConstants.concertNotOnSale,
+      _ => e.message,
+    };
   }
 
   @override
