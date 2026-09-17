@@ -66,7 +66,7 @@ class MarketHoursGuardTest {
     void setUp() {
         listingService = new ListingService(ticketRepository, ticketListingRepository, ticketTradeRepository,
                 imageStorage, marketHoursService, CLOCK);
-        purchaseService = new PurchaseService(ticketListingRepository, ticketTradeRepository,
+        purchaseService = new PurchaseService(ticketListingRepository, ticketTradeRepository, ticketRepository,
                 marketHoursService, CLOCK);
     }
 
@@ -98,7 +98,7 @@ class MarketHoursGuardTest {
         assertThatThrownBy(() -> purchaseService.purchase(LISTING_ID, new PurchaseRequestDto(PRICE), MEMBER_ID))
                 .isInstanceOf(MarketClosedException.class);
         // 먼저 SOLD 로 바꾸고 나서 거절하면, 롤백되기까지 그 매물이 남에게 잠깐 사라진다.
-        verifyNoInteractions(ticketListingRepository, ticketTradeRepository);
+        verifyNoInteractions(ticketListingRepository, ticketTradeRepository, ticketRepository);
     }
 
     @Test

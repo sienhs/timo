@@ -18,6 +18,7 @@ import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
+import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.support.Authenticated;
@@ -37,8 +38,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.notNullValue;
@@ -110,6 +113,9 @@ class MarketApiIntegrationTest {
 
     @Autowired
     private TicketListingRepository ticketListingRepository;
+
+    @Autowired
+    private TicketTradeRepository ticketTradeRepository;
 
     @Autowired
     private EntityManager em;
@@ -574,6 +580,24 @@ class MarketApiIntegrationTest {
             purchase(othersListing, LIST_PRICE)
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("ListingAlreadyClosedException"));
+        }
+
+        @Test
+        @DisplayName("매물은 LISTED 인데 티켓이 회수됐으면 409 - 예매 취소 가드가 뚫려도 여기서 한 번 더 막는다")
+        void ticketNoLongerOwned() throws Exception {
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+            othersTicket.revoke();
+            em.flush();
+
+            purchase(othersListing, LIST_PRICE)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingAlreadyClosedException"))
+                    .andExpect(jsonPath("$.errorMessage").value(containsString("REVOKED")));
+
+            em.clear();
+            // 거절이 조건부 UPDATE 를 되돌려 매물은 LISTED 로 남는다. 한 트랜잭션이라 여기서는 보이지 않으므로
+            // 거래 행이 없는 것으로 대신 확인한다.
+            assertThat(ticketTradeRepository.existsByListingId(othersListing.getId())).isFalse();
         }
 
         @Test

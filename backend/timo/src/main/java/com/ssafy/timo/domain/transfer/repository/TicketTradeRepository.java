@@ -121,4 +121,12 @@ public interface TicketTradeRepository extends JpaRepository<TicketTrade, Long> 
      * 여기서는 조회·점검용으로만 쓴다.
      */
     boolean existsByListingId(Long listingId);
+
+    /**
+     * 한 번이라도 양도된 티켓인지 본다. 예매 취소가 이 값으로 막힌다.
+     *
+     * <p>현재 소유자가 누구든 상관없이 이력 유무만 묻는다. 되사기(A→B→A)로 원 예매자에게 돌아온
+     * 티켓도 {@code true} 다 — 그 사이 오간 양도 대금과 예매 환불이 섞이므로 원 주문으로 되돌리지 않는다.
+     */
+    boolean existsByTicketId(Long ticketId);
 }

@@ -14,4 +14,10 @@ public class ListingAlreadyClosedException extends BusinessException {
         super(TransferErrorCode.LISTING_ALREADY_CLOSED,
                 TransferErrorCode.LISTING_ALREADY_CLOSED.getMessage() + " (listingId=" + listingId + ")");
     }
+
+    /** 매물은 {@code LISTED} 인데 티켓 쪽이 무너진 경우. 앱에는 같은 "더 못 사는 매물" 이라 코드를 나누지 않는다. */
+    public ListingAlreadyClosedException(Long listingId, String why) {
+        super(TransferErrorCode.LISTING_ALREADY_CLOSED,
+                TransferErrorCode.LISTING_ALREADY_CLOSED.getMessage() + " (listingId=" + listingId + ", " + why + ")");
+    }
 }
