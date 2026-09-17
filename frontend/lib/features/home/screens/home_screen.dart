@@ -213,8 +213,6 @@ class _HomeScreenState extends State<HomeScreen> {
             artists: artists,
             onArtistPressed: (artist) =>
                 _notify(context, HomeStrings.artistNotReady(artist.name)),
-            onMorePressed: () =>
-                _notifyMoreNotReady(context, HomeStrings.artistSection),
           ),
         ),
         const SizedBox(height: HomeMetrics.sectionGap),

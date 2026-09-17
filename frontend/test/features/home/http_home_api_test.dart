@@ -6,17 +6,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/http_home_api.dart';
-import 'package:timo/features/home/data/mock_home_data.dart';
+import 'package:timo/features/home/models/trending_keyword.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
 /// 실제 서버 구현이 백엔드 규약대로 요청하고 응답을 읽는지, 가짜 서버로 검사한다.
 ///
 /// 주소·쿼리 이름·응답 키는 백엔드 `ConcertApi` · `ConcertListRequestDto` ·
-/// `ConcertSummaryResponseDto` 에서 그대로 가져왔다. 백엔드가 바뀌면 이 테스트를
+/// `ConcertSummaryResponseDto` 와 `ArtistApi` · `ArtistListRequestDto` ·
+/// `ArtistSummaryResponseDto` 에서 그대로 가져왔다. 백엔드가 바뀌면 이 테스트를
 /// 같이 고쳐야 한다. 그게 이 테스트의 역할이다.
 void main() {
-  const basePath = HttpHomeApi.basePath;
+  const concertsPath = HttpHomeApi.concertsPath;
+  const artistsPath = HttpHomeApi.artistsPath;
 
   late FakeHttpAdapter adapter;
 
@@ -69,7 +71,7 @@ void main() {
 
       final request = adapter.requests.single;
       expect(request.method, 'GET');
-      expect(request.path, basePath);
+      expect(request.path, concertsPath);
       expect(request.query, {
         'genre': 'CONCERT',
         'status': 'SCHEDULED',
@@ -137,13 +139,22 @@ void main() {
     });
   });
 
+  /// 백엔드 `ArtistSummaryResponseDto` 모양. 사진 키가 `profileImage` 다.
+  Map<String, Object?> artist({
+    int id = 1,
+    String name = '아이유',
+    Object? profileImage = 'artist/iu.jpg',
+  }) => {'id': id, 'name': name, 'profileImage': profileImage};
+
   group('검색', () {
-    test('검색어를 keyword 로 보낸다', () async {
+    test('검색어를 keyword 로 공연 목록에 보낸다', () async {
       final api = build((_) => jsonResponse(paged([concert()])));
 
       await api.search('이승기');
 
-      expect(adapter.requests.single.query, {
+      final request = adapter.requests.single;
+      expect(request.path, concertsPath);
+      expect(request.query, {
         'genre': 'CONCERT',
         'keyword': '이승기',
         'size': '${HomeMetrics.searchPageSize}',
@@ -176,28 +187,126 @@ void main() {
     });
   });
 
-  group('아티스트 · 인기 검색어 (API 없음)', () {
-    test('인기 아티스트는 요청 없이 목업을 돌려준다', () async {
-      final api = build((_) => throw StateError('요청이 나가면 안 된다'));
+  group('관련 아티스트', () {
+    test('검색어를 keyword 로 아티스트 목록에 보낸다', () async {
+      final api = build((_) => jsonResponse(paged([artist()])));
+
+      await api.searchArtists('아이');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, artistsPath);
+      expect(request.query, {
+        'keyword': '아이',
+        'size': '${HomeMetrics.relatedArtistPageSize}',
+      });
+    });
+
+    test('응답 한 건을 이름·사진으로 읽는다', () async {
+      final api = build((_) => jsonResponse(paged([artist()])));
+
+      final artists = await api.searchArtists('아이');
+
+      final found = artists.single;
+      expect(found.name, '아이유');
+      expect(found.profileImageUrl, 'artist/iu.jpg');
+    });
+
+    test('사진이 없어도 읽는다', () async {
+      final api = build(
+        (_) => jsonResponse(paged([artist(profileImage: null)])),
+      );
+
+      final artists = await api.searchArtists('아이');
+
+      expect(artists.single.profileImageUrl, isNull);
+    });
+
+    test('페이지 모양이 아닌 응답은 읽을 수 없다는 예외로 던진다', () async {
+      final api = build((_) => jsonResponse({'unexpected': true}));
+
+      await expectLater(
+        api.searchArtists('아이'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            HomeStrings.unreadableResponse,
+          ),
+        ),
+      );
+    });
+  });
+
+  group('인기 아티스트', () {
+    test('최근 등록순으로 격자 크기만큼 아티스트 목록을 요청한다', () async {
+      final api = build((_) => jsonResponse(paged([artist()])));
 
       final artists = await api.fetchPopularArtists();
 
-      expect(artists, MockHomeData.artists);
-      expect(adapter.requests, isEmpty);
+      expect(artists.single.name, '아이유');
+      final request = adapter.requests.single;
+      expect(request.path, artistsPath);
+      expect(request.query, {
+        'sort': 'LATEST',
+        'size': '${HomeMetrics.popularArtistGridSize}',
+      });
     });
+  });
 
-    test('추천 검색어 아티스트는 요청 없이 목업을 돌려준다', () async {
-      final api = build((_) => throw StateError('요청이 나가면 안 된다'));
+  group('추천 검색어 아티스트', () {
+    test('최근 등록순으로 한 줄만 아티스트 목록을 요청한다', () async {
+      final api = build((_) => jsonResponse(paged([])));
 
       final artists = await api.fetchRecommendedArtists();
 
-      expect(artists, MockHomeData.recommendedArtists);
-      expect(adapter.requests, isEmpty);
+      expect(artists, isEmpty);
+      final request = adapter.requests.single;
+      expect(request.path, artistsPath);
+      expect(request.query, {
+        'sort': 'LATEST',
+        'size': '${HomeMetrics.recommendedArtistRowSize}',
+      });
+    });
+  });
+
+  group('인기 검색어 (집계 API 없음)', () {
+    /// 공연 둘 · 아티스트 둘을 주는 서버. 요청 경로로 가른다.
+    ResponseBody respondByPath(RecordedRequest request) {
+      if (request.path == concertsPath) {
+        return jsonResponse(
+          paged([
+            {...concert(id: 1), 'title': '이승기 콘서트'},
+            {...concert(id: 2), 'title': '로이킴 콘서트'},
+          ]),
+        );
+      }
+      return jsonResponse(
+        paged([artist(id: 1, name: '이승기'), artist(id: 2, name: '로이킴')]),
+      );
+    }
+
+    test('조회수 순 공연과 최근 등록순 아티스트를 함께 요청한다', () async {
+      final api = build(respondByPath);
+
+      await api.fetchTrendingKeywords();
+
+      final byPath = {for (final r in adapter.requests) r.path: r.query};
+      expect(byPath, hasLength(2));
+      expect(byPath[concertsPath], {
+        'genre': 'CONCERT',
+        'sort': 'POPULAR',
+        'size': '${HomeMetrics.trendingCount}',
+      });
+      expect(byPath[artistsPath], {
+        'sort': 'LATEST',
+        'size': '${HomeMetrics.trendingCount}',
+      });
     });
 
-    test('인기 검색어는 요청 없이 목업을 정시 집계 시각과 함께 돌려준다', () async {
+    test('공연명을 앞에, 아티스트명을 뒤에 두고 1위부터 순위를 매긴다', () async {
       final now = DateTime(2026, 9, 4, 13, 20);
-      adapter = FakeHttpAdapter((_) => throw StateError('요청이 나가면 안 된다'));
+      adapter = FakeHttpAdapter(respondByPath);
       final api = HttpHomeApi(
         dio: Dio(BaseOptions(baseUrl: 'http://fake.test'))
           ..httpClientAdapter = adapter,
@@ -206,18 +315,70 @@ void main() {
 
       final trending = await api.fetchTrendingKeywords();
 
-      expect(trending.items, MockHomeData.trendingKeywords);
-      expect(trending.asOf, DateTime(2026, 9, 4, 13));
-      expect(adapter.requests, isEmpty);
+      expect(trending.asOf, now);
+      expect(trending.items.map((i) => i.rank), [1, 2, 3, 4]);
+      expect(trending.items.map((i) => i.keyword), [
+        '이승기 콘서트',
+        '로이킴 콘서트',
+        '이승기',
+        '로이킴',
+      ]);
     });
 
-    test('관련 아티스트는 요청 없이 이름으로 걸러 돌려준다', () async {
-      final api = build((_) => throw StateError('요청이 나가면 안 된다'));
+    test('첫 조회는 전부 보합이고, 다시 조회하면 직전 순위와 비교해 등락을 매긴다', () async {
+      var swapped = false;
+      final api = build((request) {
+        if (request.path != concertsPath) return jsonResponse(paged([]));
+        final titles = swapped
+            ? ['로이킴 콘서트', '이승기 콘서트', '김필 콘서트']
+            : ['이승기 콘서트', '로이킴 콘서트'];
+        return jsonResponse(
+          paged([
+            for (final (i, title) in titles.indexed)
+              {...concert(id: i + 1), 'title': title},
+          ]),
+        );
+      });
 
-      final artists = await api.searchArtists('아이');
+      final first = await api.fetchTrendingKeywords();
+      swapped = true;
+      final second = await api.fetchTrendingKeywords();
 
-      expect(artists.map((a) => a.name), ['아이유']);
-      expect(adapter.requests, isEmpty);
+      expect(
+        first.items.map((i) => i.trend),
+        everyElement(KeywordTrend.steady),
+      );
+      expect(second.items.map((i) => i.trend), [
+        KeywordTrend.up, // 로이킴 2위 → 1위
+        KeywordTrend.down, // 이승기 1위 → 2위
+        KeywordTrend.steady, // 김필은 직전에 없었다
+      ]);
+    });
+
+    test('같은 말은 먼저 온 자리만 남기고 열 개까지만 담는다', () async {
+      final api = build(
+        (request) => request.path == concertsPath
+            ? jsonResponse(
+                paged([
+                  for (var i = 1; i <= 8; i++)
+                    {...concert(id: i), 'title': '공연 $i'},
+                ]),
+              )
+            : jsonResponse(
+                paged([
+                  artist(id: 1, name: '공연 1'),
+                  artist(id: 2, name: '가수 A'),
+                  artist(id: 3, name: '가수 B'),
+                  artist(id: 4, name: '가수 C'),
+                ]),
+              ),
+      );
+
+      final trending = await api.fetchTrendingKeywords();
+
+      expect(trending.items, hasLength(HomeMetrics.trendingCount));
+      expect(trending.items.map((i) => i.keyword).toSet(), hasLength(10));
+      expect(trending.items.last.keyword, '가수 B');
     });
   });
 

@@ -79,6 +79,10 @@ class MockTicketApi implements TicketApi {
   /// 다음 주문에 붙일 번호. 시안 목록의 번호(1~4 · 11~12)와 겹치지 않게 띄운다.
   int _nextReservationId = 100;
 
+  /// 다음 주문의 티켓에 붙일 번호. 예매 번호와 다른 값이어야 하고(위 `_ticket`
+  /// 주석), 시안 목록의 티켓 번호(102~105 · 111~112)와도 겹치지 않게 띄운다.
+  int _nextTicketId = 200;
+
   @override
   Future<List<MyTicket>> fetchMyTickets() async {
     await _respond();
@@ -127,6 +131,7 @@ class MockTicketApi implements TicketApi {
       0,
       MyTicket(
         reservationId: id,
+        ticketId: _nextTicketId++,
         concertId: concertId,
         title: detail.title,
         venueName: detail.venueName,

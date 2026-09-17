@@ -9,12 +9,14 @@ import 'package:timo/core/widgets/async_boundary.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/home_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/data/mock_home_data.dart';
 import 'package:timo/features/home/models/artist_summary.dart';
 import 'package:timo/features/home/models/show_summary.dart';
 import 'package:timo/features/home/models/trending_keyword.dart';
 import 'package:timo/features/home/screens/show_search_screen.dart';
 import 'package:timo/features/home/models/refresh_hint.dart';
 import 'package:timo/features/home/widgets/home_refresh_hint.dart';
+import 'package:timo/features/home/widgets/artist_avatar_cell.dart';
 import 'package:timo/features/home/widgets/artist_section.dart';
 import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 import 'package:timo/features/home/widgets/home_section_header.dart';
@@ -97,7 +99,7 @@ void main() {
     );
   }
 
-  /// '더보기' 는 아티스트 섹션과 오픈 임박 섹션에 모두 있다. 어느 섹션의
+  /// '더보기' 는 오픈 임박 섹션과 인기 공연 섹션에 모두 있다. 어느 섹션의
   /// 것인지 제목으로 좁힌다.
   Finder moreButtonOf(String sectionTitle, String moreLabel) => find.descendant(
     of: find.ancestor(
@@ -124,7 +126,7 @@ void main() {
     }
   });
 
-  testWidgets('인기 아티스트는 시안 순서대로 7명 + 더보기다', (tester) async {
+  testWidgets('인기 아티스트는 받은 순서대로 그리고 더보기 칸이 없다', (tester) async {
     await pumpHome(tester);
 
     await scrollTo(tester, find.text(HomeStrings.artistSection));
@@ -135,9 +137,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(ArtistSection),
-        matching: find.text(HomeStrings.artistMore),
+        matching: find.byType(ArtistAvatarCell),
       ),
-      findsOneWidget,
+      findsNWidgets(MockHomeData.artists.length),
     );
   });
 

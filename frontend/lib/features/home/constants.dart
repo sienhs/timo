@@ -105,6 +105,20 @@ class HomeMetrics {
   /// 검색 결과 한 번에 받아 오는 수. 서버 기본값과 같다.
   static const searchPageSize = 20;
 
+  /// 홈 인기 아티스트 격자에 받아 오는 수. 두 줄을 꽉 채우는 칸 수다.
+  static const popularArtistGridSize = artistColumns * 2;
+
+  /// 검색 화면 추천 검색어 한 줄에 받아 오는 수. 넘기지 않는 한 줄이라 칸 수와
+  /// 같다.
+  static const recommendedArtistRowSize = artistColumns;
+
+  /// 관련 아티스트 한 줄에 받아 오는 수. 가로로 넘기는 한 줄이라 공연 검색
+  /// 결과만큼 받을 필요가 없다.
+  static const relatedArtistPageSize = 10;
+
+  /// 실시간 인기 검색어 줄 수. 시안이 10위까지다.
+  static const trendingCount = 10;
+
   /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태와 새로 고침
   /// 안내 문구가 눈에 보인다. 안내 문구의 튀어오르기 연출이 끝나기 전에
   /// 응답이 오면 문구가 도중에 접힌다.
@@ -160,7 +174,6 @@ class HomeStrings {
   static const searchEntry = '공연 검색';
 
   static const artistSection = '인기 아티스트';
-  static const artistMore = '더보기';
   static const ticketOpenSection = '티켓 오픈 임박';
   static const ticketOpenMore = '더보기';
   static const popularSection = '인기 공연';

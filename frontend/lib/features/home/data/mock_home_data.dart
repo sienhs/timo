@@ -1,16 +1,15 @@
 import '../models/artist_summary.dart';
 import '../models/trending_keyword.dart';
 
-/// 서버 API 가 아직 없는 홈·검색 섹션의 목업 데이터.
+/// 홈·검색 섹션의 목업 데이터. 테스트용 `MockHomeApi` 만 쓴다.
 ///
-/// 공연 세 가지(오픈 임박 · 인기 · 검색)와 배너는 서버에서 받아 오므로 여기
-/// 없다. 아티스트와 인기 검색어만 남았다 — `HttpHomeApi` 의 해당 메서드가
-/// 서버 API 가 생기기 전까지 이 값을 돌려준다. API 가 붙으면 그 항목을 지운다.
+/// 앱의 `HttpHomeApi` 는 공연·아티스트·인기 검색어를 모두 서버에서 받아 오므로
+/// 여기서 가져가는 것이 없다.
 class MockHomeData {
   MockHomeData._();
 
-  /// 홈 인기 아티스트. 시안의 원형 목록 순서. 마지막 '더보기' 칸은 데이터가
-  /// 아니라 화면이 그린다.
+  /// 홈 인기 아티스트(테스트용). 시안의 원형 목록 순서. 마지막 '더보기' 칸은
+  /// 데이터가 아니라 화면이 그린다.
   static const artists = <ArtistSummary>[
     ArtistSummary(name: '김준수'),
     ArtistSummary(name: '옥주현'),
@@ -21,7 +20,7 @@ class MockHomeData {
     ArtistSummary(name: '페기구'),
   ];
 
-  /// 검색 화면의 추천 검색어. 시안 순서대로 네 명이다.
+  /// 검색 화면의 추천 검색어(테스트용). 시안 순서대로 네 명이다.
   static const recommendedArtists = <ArtistSummary>[
     ArtistSummary(name: '리센느'),
     ArtistSummary(name: '뷔'),
@@ -37,7 +36,7 @@ class MockHomeData {
     ),
   ];
 
-  /// 실시간 인기 검색어. 시안의 순위·등락 그대로다.
+  /// 실시간 인기 검색어(테스트용). 시안의 순위·등락 그대로다.
   static const trendingKeywords = <TrendingKeyword>[
     TrendingKeyword(rank: 1, keyword: 'RESCENE', trend: KeywordTrend.up),
     TrendingKeyword(rank: 2, keyword: '제니'),
@@ -51,8 +50,8 @@ class MockHomeData {
     TrendingKeyword(rank: 10, keyword: '레드벨벳', trend: KeywordTrend.up),
   ];
 
-  /// 인기 검색어 집계 시각. 실제 서버는 정시마다 집계할 것이라 지금 시각을
-  /// 정시로 내린다 — 고정 날짜로 두면 화면에 늘 지난 날짜가 찍힌다.
+  /// 인기 검색어 집계 시각(테스트용). 정시마다 집계하는 서버를 흉내 내 지금
+  /// 시각을 정시로 내린다 — 고정 날짜로 두면 화면에 늘 지난 날짜가 찍힌다.
   static DateTime trendingAsOf(DateTime now) =>
       DateTime(now.year, now.month, now.day, now.hour);
 
