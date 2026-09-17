@@ -71,9 +71,21 @@ class StubApiTest {
     /** 예매 스텁은 주문 뒤 흐른 시간으로 발행 상태를 정하므로 테스트가 시간을 움직일 수 있어야 한다. */
     private final MutableClock clock = new MutableClock(START);
 
-    /** 시작 시각이 정오라 실제 운영 시간(20:00~)이면 마켓 케이스가 전부 409 다. 창 판정은 따로 본다. */
-    private final MarketHoursService alwaysOpenMarket = new MarketHoursService(
-            new MarketHoursProperties(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)), clock);
+    /**
+     * 운영 시간 가드를 끈 판정 서비스. 시작 시각이 정오라 실제 규칙이면 목록·구매는 409 이고 가격
+     * 수정만 되는데, 한 테스트가 둘을 오가는 경우가 많다. 가드 자체는 v1 쪽 테스트가 본다.
+     * {@code status()} 는 그대로라 운영 시간 응답은 실제 규칙(정오 = 닫힘)으로 나온다.
+     */
+    private final MarketHoursService guardsOffMarket = new MarketHoursService(
+            new MarketHoursProperties(LocalTime.of(20, 0, 0), LocalTime.of(23, 59, 59)), clock) {
+        @Override
+        public void requireOpen() {
+        }
+
+        @Override
+        public void requireClosed() {
+        }
+    };
 
     private MockMvc mockMvc;
 
@@ -91,7 +103,7 @@ class StubApiTest {
                         new SeatStubController(seatStateStore, clock),
                         new ReservationStubController(seatStateStore, concertStore, ticketStore, imageStorage, clock),
                         new MarketStubController(ticketStore, concertStore, imageStorage, clock,
-                                alwaysOpenMarket))
+                                guardsOffMarket))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new CurrentMemberArgumentResolver())
                 .build();
@@ -515,13 +527,13 @@ class StubApiTest {
         }
 
         @Test
-        @DisplayName("운영 시간 응답은 v1 과 같은 모양이다 - 이 테스트는 종일 열린 설정으로 조립했다")
+        @DisplayName("운영 시간 응답은 v1 과 같은 모양이다 - 정오라 닫혀 있고 다음 창은 오늘 20:00 이다")
         void hours() throws Exception {
             mockMvc.perform(get("/api/v0/market/hours"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.open").value(true))
+                    .andExpect(jsonPath("$.open").value(false))
                     .andExpect(jsonPath("$.serverTime").value("2026-09-10T12:00:00"))
-                    .andExpect(jsonPath("$.opensAt").value("2026-09-10T00:00:00"))
+                    .andExpect(jsonPath("$.opensAt").value("2026-09-10T20:00:00"))
                     .andExpect(jsonPath("$.closesAt").value("2026-09-10T23:59:59"));
         }
 

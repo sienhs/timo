@@ -39,6 +39,10 @@ import java.time.LocalDateTime;
  *
  * <p>{@code mine} 은 요청자 본인에게만 true 이므로 익명성과 무관하다. 목록에서 내 것을 빼면 내가
  * 올린 매물이 지금 어떤 가격대에 놓여 있는지 알 수 없어 함께 내려 준다.
+ *
+ * <p><b>남의 매물이 보이는 두 경로(공연 목록, 공연별 매물)는 운영 시간에만 연다.</b> 닫힌 시간에 등록된
+ * 매물이 여기서 처음 드러나므로, 이 가드가 곧 "20:00 에 일괄로 올라간다" 의 구현이다. 상세와 내 내역은
+ * 판매자가 자기 매물을 보는 경로라 시간을 보지 않는다 — 구매는 따로 막혀 있어 새는 것이 없다.
  */
 @Service
 @RequiredArgsConstructor
@@ -53,6 +57,7 @@ public class MarketQueryService {
     private final TicketListingRepository ticketListingRepository;
     private final TicketTradeRepository ticketTradeRepository;
     private final ImageStorage imageStorage;
+    private final MarketHoursService marketHoursService;
     private final Clock clock;
 
     /**
@@ -62,6 +67,8 @@ public class MarketQueryService {
      * 비례해 커진다.
      */
     public PagedModel<MarketConcertSummaryResponseDto> findConcerts(MarketListRequestDto request) {
+        marketHoursService.requireOpen();
+
         // 정렬은 쿼리 안에 있다. 여기서 또 넘기면 order by 가 중복된다.
         return new PagedModel<>(ticketListingRepository
                 .findConcertSummaries(LocalDateTime.now(clock), request.toPageable(Sort.unsorted()))
@@ -77,6 +84,8 @@ public class MarketQueryService {
     public PagedModel<ListingSummaryResponseDto> findListings(Long concertId,
                                                               MarketListRequestDto request,
                                                               Long requesterId) {
+        marketHoursService.requireOpen();
+
         if (!concertRepository.existsById(concertId)) {
             throw new ConcertNotFoundException(concertId);
         }

@@ -139,6 +139,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
             MarketListRequestDto request, Long memberId) {
+        marketHoursService.requireOpen();
         settle();
 
         // 공연마다 매물 수와 최저가만 모은다. 실제 구현은 group by 한 번이다.
@@ -176,6 +177,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<PagedModel<ListingSummaryResponseDto>> findListings(
             Long concertId, MarketListRequestDto request, Long memberId) {
+        marketHoursService.requireOpen();
         settle();
         concertStore.find(concertId).orElseThrow(() -> new ConcertNotFoundException(concertId));
 
@@ -229,7 +231,6 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<ListingDetailResponseDto> list(CreateListingRequestDto request,
                                                                       Long memberId) {
-        marketHoursService.requireOpen();
         settle();
         MarketTicket ticket = ticketStore.find(request.ticketId())
                 .orElseThrow(() -> new TicketNotFoundException(request.ticketId()));
@@ -253,7 +254,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<ListingDetailResponseDto> updatePrice(
             Long listingId, UpdateListingPriceRequestDto request, Long memberId) {
-        marketHoursService.requireOpen();
+        marketHoursService.requireClosed();
         settle();
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));

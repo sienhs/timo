@@ -79,7 +79,6 @@ public class ListingService {
      * <p>검사 순서는 먼저 걸리는 것 하나만 응답한다.
      *
      * <ol>
-     *   <li>운영 시간인가 → 409. 닫혀 있으면 아래는 전부 무의미하므로 티켓을 읽기 전에 본다</li>
      *   <li>티켓이 있는가 → 404</li>
      *   <li>내가 현재 소유자인가 → 403</li>
      *   <li>티켓이 발행 완료 상태인가 → 409</li>
@@ -87,13 +86,14 @@ public class ListingService {
      *   <li>등록가가 정가 이하인가 → 400</li>
      * </ol>
      *
-     * <p>5번을 6번보다 먼저 보는 이유는, 이미 등록된 티켓에 대해 "가격이 잘못됐다"고 답하면
+     * <p>4번을 5번보다 먼저 보는 이유는, 이미 등록된 티켓에 대해 "가격이 잘못됐다"고 답하면
      * 사용자가 가격을 고쳐 다시 시도하게 되기 때문이다. 고쳐도 결과는 같다.
+     *
+     * <p><b>운영 시간을 보지 않는다.</b> 닫힌 시간에 올린 매물은 저장만 되고, 남에게는 조회가 열리는
+     * 20:00 에 드러난다({@link MarketHoursService}). 등록을 창 안으로 묶으면 정각에 등록 요청이 몰린다.
      */
     @Transactional
     public ListingDetailResponseDto register(CreateListingRequestDto request, Long memberId) {
-        marketHoursService.requireOpen();
-
         Long ticketId = request.ticketId();
 
         Ticket ticket = ticketRepository.findById(ticketId)
@@ -143,7 +143,8 @@ public class ListingService {
      * <p>검사 순서는 먼저 걸리는 것 하나만 응답한다.
      *
      * <ol>
-     *   <li>운영 시간인가 → 409. 등록과 같은 규칙이다 — 닫힌 마켓의 매물 가격이 바뀌면 안 된다</li>
+     *   <li>운영 시간 <b>밖</b>인가 → 409. 거래가 열려 있는 동안 가격은 고정이다 — 구매자가 목록에서 본
+     *       값이 상세와 결제까지 그대로여야 한다. 바꾼 가격은 다음 창에 올라간다</li>
      *   <li>매물이 있는가 → 404</li>
      *   <li>내가 올린 매물인가 → 403</li>
      *   <li>새 가격이 정가 이하인가 → 400</li>
@@ -174,7 +175,7 @@ public class ListingService {
     public ListingDetailResponseDto updatePrice(Long listingId,
                                                 UpdateListingPriceRequestDto request,
                                                 Long memberId) {
-        marketHoursService.requireOpen();
+        marketHoursService.requireClosed();
 
         TicketListing listing = ticketListingRepository.findById(listingId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId));

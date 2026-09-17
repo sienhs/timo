@@ -1,10 +1,11 @@
 ###############################################################################
-# 양도 마켓 운영 시간 - 실패 케이스 (마켓이 닫힌 시간에 돌린다)
+# 양도 마켓 운영 시간 - 닫힌 시간에 돌리는 흐름
 #
 # market-common.http 와 market-success.http 를 먼저 실행해 토큰과 {{keptListingId}} 를
 # 채워 둬야 한다. 앱을 다시 띄웠으면 시드가 새로 만들어져 매물이 없으니 success 부터 다시.
 #
-# 닫힌 시간에는 등록·가격 수정·구매가 409 MARKET_CLOSED 다. 취소와 조회는 된다.
+# 닫힌 시간에는 공연 목록, 공연별 매물, 구매가 409 MARKET_CLOSED 다.
+# 등록은 되고(20:00 에 목록에 드러난다), 가격 수정은 닫힌 시간에만 된다. 취소와 상세, 내 내역도 된다.
 # 도메인 예외 응답에는 errorCode 가 없고 exception 이 실린다(GlobalExceptionHandler).
 ###############################################################################
 
@@ -22,35 +23,24 @@ Authorization: Bearer {{sellerToken}}
     });
 %}
 
-### 등록 - 닫혀 있어 409. 티켓이 있는지도 보기 전에 거절된다
-POST {{baseUrl}}/api/v1/market/listings
-Authorization: Bearer {{sellerToken}}
-Content-Type: application/json
-
-{
-  "ticketId": 999999,
-  "price": 1
-}
+### 공연 목록 - 닫혀 있어 409. 등록된 매물이 있어도 남에게는 안 보인다
+GET {{baseUrl}}/api/v1/market/concerts
+Authorization: Bearer {{buyerToken}}
 
 > {%
-    client.test("409 MarketClosedException - 없는 티켓(404)보다 먼저 걸린다", function () {
+    client.test("409 MarketClosedException", function () {
         client.assert(response.status === 409, "status: " + response.status);
         client.assert(response.body.exception === "MarketClosedException", "exception: " + response.body.exception);
         client.assert(response.body.errorMessage.indexOf("opensAt=") >= 0, "다음 여는 시각이 메시지에 없다");
     });
 %}
 
-### 가격 수정 - 열린 시간에 만든 매물이라도 닫혀 있으면 409
-PATCH {{baseUrl}}/api/v1/market/listings/{{keptListingId}}/price
-Authorization: Bearer {{sellerToken}}
-Content-Type: application/json
-
-{
-  "price": {{keptPrice}}
-}
+### 공연별 매물 - 닫혀 있어 409. 공연이 있는지보다 먼저 걸린다
+GET {{baseUrl}}/api/v1/market/concerts/999999/listings
+Authorization: Bearer {{buyerToken}}
 
 > {%
-    client.test("409 MarketClosedException", function () {
+    client.test("409 MarketClosedException - 없는 공연(404)보다 먼저", function () {
         client.assert(response.status === 409, "status: " + response.status);
         client.assert(response.body.exception === "MarketClosedException", "exception: " + response.body.exception);
     });
@@ -73,7 +63,41 @@ Content-Type: application/json
     });
 %}
 
-### 조회는 닫혀 있어도 된다 - 매물이 아직 LISTED 인지 함께 확인
+### 등록 - 닫혀 있어도 201. 이 매물은 20:00 에 공연 목록에 드러난다
+POST {{baseUrl}}/api/v1/market/listings
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "ticketId": {{ticketToRegisterClosed}},
+  "price": {{facePrice}}
+}
+
+> {%
+    client.test("201 이고 LISTED 다 - 대기 상태가 따로 없다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.status === "LISTED", "status: " + response.body.status);
+    });
+    client.global.set("closedListingId", response.body.listingId);
+%}
+
+### 가격 수정 - 닫힌 시간에만 된다. 200 이고 바뀐 가격이 다음 창에 올라간다
+PATCH {{baseUrl}}/api/v1/market/listings/{{keptListingId}}/price
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "price": {{keptPrice}}
+}
+
+> {%
+    client.test("200 이고 가격이 그대로다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.price === client.global.get("keptPrice"), "price: " + response.body.price);
+    });
+%}
+
+### 상세는 닫혀 있어도 된다 - 매물이 아직 LISTED 인지 함께 확인
 GET {{baseUrl}}/api/v1/market/listings/{{keptListingId}}
 Authorization: Bearer {{buyerToken}}
 
@@ -81,6 +105,20 @@ Authorization: Bearer {{buyerToken}}
     client.test("200 이고 여전히 LISTED 다", function () {
         client.assert(response.status === 200, "status: " + response.status);
         client.assert(response.body.status === "LISTED", "구매 거절이 매물 상태를 건드렸다: " + response.body.status);
+    });
+%}
+
+### 내 거래 내역 - 닫혀 있어도 된다. 닫힌 채 등록한 매물이 LISTED 로 보인다
+GET {{baseUrl}}/api/v1/market/listings/me
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("200 이고 닫힌 채 등록한 매물이 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        var mine = response.body.content.filter(function (t) {
+            return t.listingId === client.global.get("closedListingId");
+        });
+        client.assert(mine.length === 1, "내 내역에 방금 등록한 매물이 없다");
     });
 %}
 

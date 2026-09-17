@@ -55,9 +55,13 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * wei, 백엔드 구역 가격은 원화 정수라 예매 API 도 같은 상태다. 앱은 이 값을 32비트 정수로
  * 받지 않는다.
  *
- * <p><b>마켓은 매일 정해진 시간에만 열린다</b>({@code market.hours}, 기본 20:00:00~23:59:59). 등록·가격
- * 수정·구매는 창 밖이면 409({@code MARKET_CLOSED})다. 판정은 서버 시계이며 앱은 {@link #hours} 로
- * 받은 시각을 표시에만 쓴다. 취소와 조회는 시간과 무관하다.
+ * <p><b>마켓은 매일 정해진 시간에만 열린다</b>({@code market.hours}, 기본 20:00:00~23:59:59). 판정은
+ * 서버 시계이며 앱은 {@link #hours} 로 받은 시각을 표시에만 쓴다.
+ * <ul>
+ *   <li>등록·취소·상세·내 내역: 시간 무관. 닫힌 시간에 올린 매물은 20:00 에 목록에 한꺼번에 드러난다</li>
+ *   <li>공연 목록·공연별 매물·구매: 창 안에서만. 밖이면 409({@code MARKET_CLOSED})</li>
+ *   <li>가격 수정: 창 <b>밖</b>에서만. 안이면 409({@code MARKET_OPEN}) — 거래 중 가격은 고정이다</li>
+ * </ul>
  */
 public interface MarketApi {
 
@@ -79,6 +83,9 @@ public interface MarketApi {
      *
      * <p>정렬은 공연 시작일 오름차순이다. 티켓은 공연이 끝나면 가치가 없어 임박한 것부터가
      * 유일하게 의미 있는 순서다.
+     *
+     * <p>운영 시간 밖이면 409 다. 닫힌 시간에 등록된 매물이 여기서 처음 보이므로 이 가드가 곧
+     * "20:00 에 일괄로 올라간다" 다.
      */
     @GetMapping("/concerts")
     ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
@@ -94,7 +101,8 @@ public interface MarketApi {
      * <p>내 매물도 함께 나오고 {@code mine} 으로 구분된다. 목록에서 내 것을 빼면 내가 올린 매물이
      * 지금 어떤 가격대에 놓여 있는지 알 수 없다.
      *
-     * <p>공연이 없으면 404 지만, 공연이 있고 매물만 없으면 빈 목록으로 200 이다.
+     * <p>공연이 없으면 404 지만, 공연이 있고 매물만 없으면 빈 목록으로 200 이다. 운영 시간 밖이면
+     * 공연 유무보다 먼저 409 다.
      */
     @GetMapping("/concerts/{concertId}/listings")
     ResponseEntity<PagedModel<ListingSummaryResponseDto>> findListings(
@@ -133,6 +141,9 @@ public interface MarketApi {
      * 때만 성립하므로({@code ReservationServiceImpl.cancel}) 등록 중인 티켓은 취소되지 않는다.
      *
      * <p>남의 티켓이면 403, 정가 초과면 400, 이미 등록 중이면 409 다.
+     *
+     * <p>운영 시간과 무관하게 받는다. 닫힌 시간에 올린 매물은 {@code LISTED} 로 저장되고 남에게는
+     * 다음 창이 열릴 때 보인다. 앱은 {@link #hours} 의 {@code opensAt} 으로 "언제 올라가는지" 를 안내한다.
      */
     @PostMapping("/listings")
     ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request,
@@ -154,7 +165,9 @@ public interface MarketApi {
      * 스냅샷으로 잡힌 정가</b>({@code ticket_listing.face_value}) 이하여야 한다. 구역 가격이 그 뒤에
      * 바뀌었더라도 기준은 스냅샷이다. 올리는 방향도 정가 이하이면 허용한다.
      *
-     * <p>남의 매물이면 403, 정가 초과면 400, 이미 팔렸거나 취소된 매물이면 409, 매물이 없으면 404 다.
+     * <p><b>운영 시간 중에는 409({@code MARKET_OPEN})다.</b> 거래가 열려 있는 동안 가격은 고정이고,
+     * 마감 뒤에 바꾼 가격이 다음 창에 올라간다. 그 밖에 남의 매물이면 403, 정가 초과면 400, 이미 팔렸거나
+     * 취소된 매물이면 409, 매물이 없으면 404 다.
      *
      * <p><b>구매자가 보던 가격이 바뀌는 문제는 체결 쪽이 막는다.</b> 구매 요청은
      * {@code expectedPrice} 를 함께 보내고, 그 값이 등록가와 다르면 409

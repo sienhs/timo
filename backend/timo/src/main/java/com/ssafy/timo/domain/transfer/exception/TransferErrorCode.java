@@ -66,7 +66,14 @@ public enum TransferErrorCode implements BaseErrorCode {
      * <p>403 이 아닌 이유는 요청자의 권한 문제가 아니라 시각이라는 상태의 문제이고, 기다리면
      * 같은 요청이 그대로 통과하기 때문이다. 취소와 조회는 시간과 무관하게 받는다.
      */
-    MARKET_CLOSED(HttpStatus.CONFLICT, "양도 마켓 운영 시간이 아닙니다.");
+    MARKET_CLOSED(HttpStatus.CONFLICT, "양도 마켓 운영 시간이 아닙니다."),
+    /**
+     * 운영 시간 중에 등록가를 바꾸려 한 경우. {@link #MARKET_CLOSED} 의 반대다.
+     *
+     * <p>거래가 열려 있는 동안은 가격이 고정이다. 구매자가 목록에서 본 값이 상세에 들어갈 때까지
+     * 바뀌지 않아야 하고, 마감 뒤에 바꾸면 다음 창에 새 가격으로 올라간다.
+     */
+    MARKET_OPEN(HttpStatus.CONFLICT, "운영 시간 중에는 등록가를 바꿀 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
