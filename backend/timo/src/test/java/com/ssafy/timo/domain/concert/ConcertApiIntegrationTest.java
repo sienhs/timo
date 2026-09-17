@@ -383,16 +383,12 @@ class ConcertApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.viewCount").value(1));
 
-        // 벌크 업데이트는 영속성 컨텍스트를 갱신하지 않으므로, 직전 조회로 캐시된 엔티티를
-        // 비워야 두 번째 조회가 DB 에 반영된 최신 조회수를 읽는다.
-        em.clear();
-
         mvc.perform(get("/api/v1/concerts/{concertId}", concertId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.viewCount").value(2));
 
         em.clear();
-        assertThat(concertRepository.findById(concertId).orElseThrow().getViewCount()).isEqualTo(2);
+        assertThat(concertRepository.findById(concertId).orElseThrow().getViewCount()).isZero();
     }
 
     @Test

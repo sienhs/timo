@@ -15,6 +15,7 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
 import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.concert.view.ViewCountStore;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
@@ -57,6 +58,9 @@ class ConcertServiceImplTest {
 
     @Mock
     private ConcertRepository concertRepository;
+
+    @Mock
+    private ViewCountStore viewCountStore;
 
     @Mock
     private VenueRepository venueRepository;
@@ -283,8 +287,8 @@ class ConcertServiceImplTest {
     void find_success() {
         // given
         Concert concert = concertWithId(1L);
-        given(concertRepository.increaseViewCount(1L)).willReturn(1);
         given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
         givenImageStoragePrefixesKeys();
 
         // when
@@ -308,8 +312,8 @@ class ConcertServiceImplTest {
     void find_includesSectionPrices() {
         // given
         Concert concert = concertWithId(1L);
-        given(concertRepository.increaseViewCount(1L)).willReturn(1);
         given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
         givenImageStoragePrefixesKeys();
         given(sectionRepository.findAllByVenueIdOrderByIdAsc(10L))
                 .willReturn(List.of(section(1L, "A구역", 150_000), section(2L, "B구역", 99_000)));
@@ -328,8 +332,8 @@ class ConcertServiceImplTest {
     @DisplayName("좌석을 아직 등록하지 않은 공연장이면 구역별 가격은 빈 목록이다")
     void find_returnsEmptySectionPricesWhenVenueHasNoSection() {
         // given
-        given(concertRepository.increaseViewCount(1L)).willReturn(1);
         given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concertWithId(1L)));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
         givenImageStoragePrefixesKeys();
         given(sectionRepository.findAllByVenueIdOrderByIdAsc(10L)).willReturn(List.of());
 
@@ -351,31 +355,31 @@ class ConcertServiceImplTest {
     }
 
     @Test
-    @DisplayName("조회할 때마다 조회수가 원자적으로 1 증가한다")
-    void find_increasesViewCountAtomically() {
+    @DisplayName("조회할 때마다 메모리 조회수 저장소를 통해 1 증가한다")
+    void find_increasesViewCountInStore() {
         // given
-        given(concertRepository.increaseViewCount(1L)).willReturn(1);
         given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concertWithId(1L)));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
 
         // when
         concertService.find(1L);
 
         // then
-        then(concertRepository).should().increaseViewCount(1L);
+        then(viewCountStore).should().incrementAndGet(1L, 0);
     }
 
     @Test
     @DisplayName("존재하지 않는 공연이면 조회하지 않고 예외를 던진다")
     void find_throwsWhenNotFound() {
         // given
-        given(concertRepository.increaseViewCount(99L)).willReturn(0);
+        given(concertRepository.findByIdWithVenue(99L)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> concertService.find(99L))
                 .isInstanceOf(ConcertNotFoundException.class)
                 .hasMessageContaining("99");
 
-        then(concertRepository).should(never()).findByIdWithVenue(any());
+        then(viewCountStore).shouldHaveNoInteractions();
     }
 
     private void givenVenueExists() {

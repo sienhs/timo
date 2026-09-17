@@ -13,6 +13,7 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
 import com.ssafy.timo.domain.concert.exception.InvalidTicketOpenTimeException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.concert.view.ViewCountStore;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.exception.VenueNotFoundException;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
 public class ConcertServiceImpl implements ConcertService {
 
     private final ConcertRepository concertRepository;
+    private final ViewCountStore viewCountStore;
     private final VenueRepository venueRepository;
     private final ArtistRepository artistRepository;
     private final SectionRepository sectionRepository;
@@ -70,23 +72,23 @@ public class ConcertServiceImpl implements ConcertService {
     /**
      * 상태(취소·종료 포함)와 무관하게 조회할 수 있다 — 취소·종료된 공연도 상세 페이지는 남는다.
      *
-     * <p>조회수는 매 조회마다 원자적으로 1 증가시킨다. 대상이 없으면 갱신된 행이 0 이므로,
-     * 그 시점에 바로 {@link ConcertNotFoundException} 을 던지고 뒤이은 조회는 하지 않는다.
+     * <p>조회수 증가분은 DB 행을 갱신하지 않고 {@link ViewCountStore}에 기록한다. 따라서 같은
+     * 공연으로 조회가 몰려도 DB update 락 경합이 생기지 않는다. 현재는 애플리케이션 메모리를 쓰며,
+     * 다중 인스턴스가 필요해지면 Redis 구현체로 교체할 수 있다.
      */
     @Override
+    @Transactional(readOnly = true)
     public ConcertDetailResponseDto find(Long concertId) {
-        if (concertRepository.increaseViewCount(concertId) == 0) {
-            throw new ConcertNotFoundException(concertId);
-        }
-
         Concert concert = concertRepository.findByIdWithVenue(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        int viewCount = viewCountStore.incrementAndGet(concertId, concert.getViewCount());
 
         // 구역은 공연이 아니라 공연장에 속한다. 좌석을 아직 등록하지 않은 공연장이면 빈 목록이다.
         return ConcertDetailResponseDto.from(
                 concert,
                 sectionRepository.findAllByVenueIdOrderByIdAsc(concert.getVenue().getId()),
-                imageStorage);
+                imageStorage,
+                viewCount);
     }
 
     /**
