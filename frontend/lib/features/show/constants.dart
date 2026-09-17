@@ -67,7 +67,9 @@ class ShowDetailStrings {
   /// 서버 응답을 JSON 으로 읽지 못했을 때. 프록시가 HTML 을 준 경우 등.
   static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
 
+  /// 상단 바 하트. 찜 여부에 따라 둘 중 하나가 붙는다.
   static const favoriteAction = '찜하기';
+  static const unfavoriteAction = '찜 해제';
 
   /// 시안에는 '좌석별 가격' 이지만 구역별로 낸다. 서버에 좌석 등급이 하나뿐이라
   /// 금액이 갈리는 단위가 구역이다(`ZonePrice` 주석 참고).
@@ -107,7 +109,6 @@ class ShowDetailStrings {
   static const canceledNotice = '취소된 공연입니다';
 
   /// 아직 화면이 없는 조작부. 시안대로 두고 안내만 띄운다.
-  static const favoriteNotReady = '찜하기는 준비 중이에요.';
   static const notifyNotReady = '오픈 알림은 준비 중이에요.';
 
   static String venueLine(String venue) => '공연 장소: $venue';

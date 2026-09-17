@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/features/favorite/data/favorite_store.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/home_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
@@ -31,6 +32,9 @@ void main() {
 
   late InMemoryRecentSearchStore store;
 
+  /// 하트가 넣고 빼는 찜 목록.
+  late InMemoryFavoriteStore favorites;
+
   /// 360 x 800 dp
   void usePhoneSize(WidgetTester tester) {
     tester.view.physicalSize = const Size(1080, 2400);
@@ -47,10 +51,13 @@ void main() {
   }) async {
     usePhoneSize(tester);
     store = InMemoryRecentSearchStore(recent);
+    favorites = InMemoryFavoriteStore();
+    addTearDown(favorites.dispose);
     await tester.pumpWidget(
       App(
         homeApi: api ?? MockHomeApi(latency: Duration.zero, clock: () => now),
         recentSearchStore: store,
+        favoriteStore: favorites,
         // 검색 결과를 누르면 공연 상세가 열린다. 목을 안 꽂으면 진짜 서버로
         // 요청이 나간다.
         showApi: const MockShowApi(latency: Duration.zero),
@@ -296,14 +303,46 @@ void main() {
       expect(find.byType(ShowDetailScreen), findsOneWidget);
     });
 
-    testWidgets('하트를 누르면 준비 중 안내가 뜬다', (tester) async {
+    testWidgets('카드의 하트를 누르면 찜 목록에 들어가고, 다시 누르면 빠진다', (tester) async {
       await pumpSearch(tester);
       await submit(tester, '아이유');
 
+      // 첫 하트는 첫 결과 카드의 것이다(관련 아티스트 줄은 그 아래).
       await tester.tap(find.byTooltip(HomeStrings.favorite).first);
       await tester.pumpAndSettle();
 
-      expect(find.text(HomeStrings.favoriteNotReady), findsOneWidget);
+      expect(favorites.favorites.shows, hasLength(1));
+      expect(find.byTooltip(HomeStrings.unfavorite), findsOneWidget);
+
+      await tester.tap(find.byTooltip(HomeStrings.unfavorite));
+      await tester.pumpAndSettle();
+
+      expect(favorites.favorites.shows, isEmpty);
+      expect(find.byTooltip(HomeStrings.unfavorite), findsNothing);
+    });
+
+    testWidgets('관련 아티스트의 하트를 누르면 찜 목록에 들어간다', (tester) async {
+      await pumpSearch(tester);
+      await submit(tester, '아이유');
+
+      final heart = find
+          .descendant(
+            of: find.byType(RelatedArtistRow),
+            matching: find.byTooltip(HomeStrings.favorite),
+          )
+          .first;
+      await tester.ensureVisible(heart);
+      await tester.tap(heart);
+      await tester.pumpAndSettle();
+
+      expect(favorites.favorites.artists.map((a) => a.name), ['아이유']);
+      expect(
+        find.descendant(
+          of: find.byType(RelatedArtistRow),
+          matching: find.byTooltip(HomeStrings.unfavorite),
+        ),
+        findsOneWidget,
+      );
     });
   });
 

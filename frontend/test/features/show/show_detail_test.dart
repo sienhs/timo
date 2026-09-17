@@ -15,6 +15,8 @@ import 'package:timo/features/booking/state/booking_api_scope.dart';
 import 'package:timo/features/booking/screens/zone_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
+import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/state/favorite_scope.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 import 'package:timo/features/show/constants.dart';
@@ -66,6 +68,9 @@ void main() {
 
   /// 기준 시각. 실제 시계를 쓰면 카운트다운 문구가 실행할 때마다 달라진다.
   final now = DateTime(2026, 5, 1, 10);
+
+  /// 상단 바 하트가 넣고 빼는 찜 목록.
+  late InMemoryFavoriteStore favorites;
 
   ShowDetail detailOpening({
     Duration? after,
@@ -121,6 +126,9 @@ void main() {
     if (loggedIn) await session.signIn(tokens);
     addTearDown(session.dispose);
 
+    favorites = InMemoryFavoriteStore();
+    addTearDown(favorites.dispose);
+
     await tester.pumpWidget(
       AuthSessionScope(
         session: session,
@@ -130,19 +138,23 @@ void main() {
             api: MockBookingApi(latency: Duration.zero),
             child: BookingScope(
               controller: controller,
-              child: MaterialApp(
-                theme: AppTheme.light,
-                home: ShowDetailScreen(
-                  showId: detail.id,
-                  clock: clock ?? () => now,
-                ),
-                // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
-                routes: {
-                  AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen(
-                    concertId: BookingConstants.fallbackConcertId,
+              child: FavoriteScope(
+                store: favorites,
+                child: MaterialApp(
+                  theme: AppTheme.light,
+                  home: ShowDetailScreen(
+                    showId: detail.id,
+                    clock: clock ?? () => now,
                   ),
-                  AppRoutes.login: (_) => const Scaffold(body: Text('로그인 화면')),
-                },
+                  // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
+                  routes: {
+                    AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen(
+                      concertId: BookingConstants.fallbackConcertId,
+                    ),
+                    AppRoutes.login: (_) =>
+                        const Scaffold(body: Text('로그인 화면')),
+                  },
+                ),
               ),
             ),
           ),
@@ -347,16 +359,39 @@ void main() {
     expect(find.text(ShowDetailStrings.noticeSection), findsOneWidget);
   });
 
-  group('아직 없는 화면', () {
-    testWidgets('찜하기는 준비 중이라고 알려 준다', (tester) async {
+  group('찜', () {
+    testWidgets('하트를 누르면 찜 목록에 들어가고, 다시 누르면 빠진다', (tester) async {
       await pumpDetail(tester, detailOpening());
 
       await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
       await tester.pump();
 
-      expect(find.text(ShowDetailStrings.favoriteNotReady), findsOneWidget);
+      expect(favorites.favorites.hasShow(1), isTrue);
+      expect(favorites.favorites.shows.single.title, '2026 아이유 콘서트');
+      expect(favorites.favorites.shows.single.isOnSale, isTrue);
+      expect(
+        find.byTooltip(ShowDetailStrings.unfavoriteAction),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip(ShowDetailStrings.unfavoriteAction));
+      await tester.pump();
+
+      expect(favorites.favorites.shows, isEmpty);
+      expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
     });
 
+    testWidgets('끝난 공연은 판매 종료로 남는다', (tester) async {
+      await pumpDetail(tester, detailOpening(status: ShowStatus.closed));
+
+      await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
+      await tester.pump();
+
+      expect(favorites.favorites.shows.single.isOnSale, isFalse);
+    });
+  });
+
+  group('아직 없는 화면', () {
     testWidgets('공유 버튼은 아직 달지 않는다', (tester) async {
       await pumpDetail(tester, detailOpening());
 

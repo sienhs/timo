@@ -16,6 +16,8 @@ import 'features/booking/data/mock_booking_data.dart';
 import 'features/booking/state/booking_api_scope.dart';
 import 'features/booking/state/booking_controller.dart';
 import 'features/booking/state/booking_scope.dart';
+import 'features/favorite/data/favorite_store.dart';
+import 'features/favorite/state/favorite_scope.dart';
 import 'features/home/data/home_api.dart';
 import 'features/home/data/http_home_api.dart';
 import 'features/home/data/recent_search_store.dart';
@@ -56,6 +58,7 @@ class App extends StatefulWidget {
     this.ticketApi,
     this.bookingApi,
     this.recentSearchStore,
+    this.favoriteStore,
     this.showApi,
     this.ticketStore,
     this.memoryConcertApi,
@@ -85,6 +88,10 @@ class App extends StatefulWidget {
   /// 검색 화면의 최근 검색어 저장소. main 이 기기 저장소 구현을 넘긴다. 안
   /// 넘기면(위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
   final RecentSearchStore? recentSearchStore;
+
+  /// 찜 목록 저장소. main 이 기기 저장소 구현을 되살려 넘긴다. 안 넘기면
+  /// (위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
+  final FavoriteStore? favoriteStore;
 
   /// 공연 상세 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는 목을 넣는다.
   final ShowApi? showApi;
@@ -228,6 +235,11 @@ class _AppState extends State<App> {
   late final RecentSearchStore _recentSearchStore =
       widget.recentSearchStore ?? InMemoryRecentSearchStore();
 
+  /// 찜 목록 저장소. 검색·상세·찜리스트가 같은 목록을 봐야 해서 앱에 하나만
+  /// 두고 [FavoriteScope] 로 내려준다.
+  late final FavoriteStore _favoriteStore =
+      widget.favoriteStore ?? InMemoryFavoriteStore();
+
   /// 소장품 저장소. API 들과 같은 이유로 앱에 하나만 두고 [TicketStoreScope] 로
   /// 내려준다.
   late final TicketStore _ticketStore =
@@ -265,6 +277,7 @@ class _AppState extends State<App> {
     // 저장소는 우리가 만든 것(테스트·실패 대비 기본값)만 정리한다. main 이
     // 넘긴 것은 앱과 수명이 같다. 세션을 다루는 방식과 같다.
     if (widget.ticketStore == null) _ticketStore.dispose();
+    if (widget.favoriteStore == null) _favoriteStore.dispose();
     // 세션은 우리가 만든 것(테스트용 기본값)만 정리한다. main 이 넘긴 것은
     // 앱과 수명이 같아 따로 정리할 일이 없다.
     if (widget.session == null) _session.dispose();
@@ -299,28 +312,31 @@ class _AppState extends State<App> {
                             api: _resaleApi,
                             child: CreationJobScope(
                               job: _creationJob,
-                              child: MaterialApp(
-                                title: 'TIMO',
-                                theme: AppTheme.light,
-                                navigatorKey: _navigatorKey,
-                                // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
-                                // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
-                                initialRoute: AppRoutes.home,
-                                routes: AppRoutes.routes,
-                                // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                                // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                                // 라우트가 아니라 앱 전체를 감싼다.
-                                //
-                                // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                                // 애니메이션 채널도 같이 멈춘다.
-                                builder: (context, child) {
-                                  AmbientMotion.instance.enabled =
-                                      !Motion.reduced(context);
-                                  return CreationNotificationHost(
-                                    navigatorKey: _navigatorKey,
-                                    child: child!,
-                                  );
-                                },
+                              child: FavoriteScope(
+                                store: _favoriteStore,
+                                child: MaterialApp(
+                                  title: 'TIMO',
+                                  theme: AppTheme.light,
+                                  navigatorKey: _navigatorKey,
+                                  // 하단 바를 두른 홈 셸이 생겼으므로 여기서 시작한다.
+                                  // 예매 흐름은 홈의 '예매 화면 보기' 로 들어간다.
+                                  initialRoute: AppRoutes.home,
+                                  routes: AppRoutes.routes,
+                                  // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                  // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                  // 라우트가 아니라 앱 전체를 감싼다.
+                                  //
+                                  // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                  // 애니메이션 채널도 같이 멈춘다.
+                                  builder: (context, child) {
+                                    AmbientMotion.instance.enabled =
+                                        !Motion.reduced(context);
+                                    return CreationNotificationHost(
+                                      navigatorKey: _navigatorKey,
+                                      child: child!,
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),

@@ -182,10 +182,10 @@ class HomeStrings {
   static const resultSection = '오픈 예정 / 예매중';
   static const resultMore = '더보기';
   static const relatedArtistSection = '관련 아티스트';
-  static const favorite = '찜';
 
-  /// 찜 API 가 아직 없다. 하트를 누르면 이 문구를 띄운다.
-  static const favoriteNotReady = '찜 기능은 준비 중이에요.';
+  /// 하트 버튼. 찜 여부에 따라 둘 중 하나가 붙는다.
+  static const favorite = '찜';
+  static const unfavorite = '찜 해제';
 
   /// 검색어를 누르면 그 말로 검색한다는 스크린 리더용 라벨. (예: `아이유 검색`)
   static String searchFor(String keyword) => '$keyword 검색';
