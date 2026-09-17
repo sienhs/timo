@@ -24,6 +24,9 @@ spring:
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789
 
+entry-pass:
+  secret: local-dev-only-entry-pass-secret-please-change-in-prod-0123456789
+
 wallet:
   master-key: ec94c90e35eb865661cf6841f750256ba8bb1d78898db219ef9928438a23eb99
 

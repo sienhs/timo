@@ -1,0 +1,207 @@
+###############################################################################
+# 주문 생성 (좌석 선점 → 주문 확정)
+#
+# 환경 변수는 프로젝트 루트의 http-client.env.json 에 있는 local 을 쓴다.
+# 실행 전에 우측 상단 드롭다운에서 local 을 선택해야 {{baseUrl}} 이 치환된다.
+#
+# 이 파일이 만든 주문에는 티켓(ticket) 행이 함께 생긴다. 그래서 입장 QR 을 끝까지 보고 싶으면
+# entry-pass-fixture.sql 대신 이 파일을 먼저 돌리는 편이 실제 흐름에 가깝다.
+#
+# ── 돌아가려면 체인 접근이 필요하다 ─────────────────────────────────────────
+# 주문 확정은 공연이 ON_SALE 이고 온체인 등록까지 끝나 있어야 한다
+# (ReservationServiceImpl.create 의 isReadyForBooking 검사).
+#
+# ADMIN_PRIVATE_KEY 가 더미면 시더는 온체인 등록을 통째로 건너뛰는데, 이때 공연은 ON_SALE 인
+# 채로 show_id / organizer_id 가 NULL 로 남는다. 등록을 "시도했다가 실패" 한 경우에만 공연을
+# SCHEDULED 로 되돌리기 때문이다(LocalDataSeeder.registerOnChain 의 이른 return 은 그 롤백보다
+# 앞에 있다). 그래서 공연 목록에는 ON_SALE 이 멀쩡히 보이는데 주문 확정만 500 이 난다.
+#
+# 확인:
+#   docker exec timo-mysql mysql -utimo -ptimo1234 timo \
+#     -e "SELECT concert_id, status, show_id FROM concert;"
+#   -- ON_SALE 인데 show_id 가 NULL 이면 이 경우다.
+#
+# 해결:
+#   export ADMIN_PRIVATE_KEY=...   (blockchain/.env 참고) 후 앱 재기동
+#
+# 방화벽이 지정 IP 만 허용하므로 키가 있어도 허용되지 않은 망에서는 여전히 막힌다. 그 환경이면
+# 이 파일 대신 ../ticket/entry-pass-fixture.sql 로 티켓을 직접 넣어 입장 QR 만 확인한다.
+#
+# ── 계정을 seed111 로 쓰는 이유 ─────────────────────────────────────────────
+# 한 계정은 한 공연에서 티켓을 1매만 보유할 수 있다(uk_rsv_member / AlreadyReservedException).
+# 로컬 시더는 seed001~seed110 에게 ON_SALE 공연마다 주문을 하나씩 쥐여 주므로, 그 계정으로는
+# 새 주문을 만들 수 없다(409). seed111~seed180 은 선점만 가진 계정이라 비어 있다.
+# 시더 규칙(구역 5개 × 200석, 9번째 판매·13번째 선점)이 바뀌면 이 경계도 함께 바뀐다.
+#
+# ── 재실행 ──────────────────────────────────────────────────────────────────
+# 한 번 성공하면 seed111 은 그 공연의 티켓을 갖게 되어 두 번째 실행은 409 다. 다른 ON_SALE
+# 공연을 고르거나(아래 3번의 인덱스를 바꾼다), 앱을 재기동해 시드를 새로 깔면 된다.
+###############################################################################
+
+### 헬스 체크 - 애플리케이션이 떠 있는지 먼저 확인한다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.status === "UP", "health: " + response.body.status);
+    });
+%}
+
+### 선점만 가진 시드 계정으로 로그인
+# X-Device-Id 는 필수 헤더다. refresh 토큰이 (member_id, device_id) 로 유일해서 세션을 가르는
+# 값이라, 아무 문자열이나 넣어도 로그인은 되고 그 값으로 세션 행 하나가 잡힌다.
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+X-Device-Id: http-client-seed111
+
+{
+  "username": "seed111",
+  "password": "timo1234!"
+}
+
+> {%
+    client.test("로그인된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.accessToken !== undefined, "accessToken 이 없다");
+    });
+
+    client.global.set("bookAccessToken", response.body.accessToken);
+    client.global.set("bookMemberId", response.body.memberId);
+%}
+
+### 예매 중인 공연 고르기
+GET {{baseUrl}}/api/v1/concerts?status=ON_SALE&size=20
+Authorization: Bearer {{bookAccessToken}}
+
+> {%
+    const concerts = response.body.content || [];
+    // 여러 건이면 여기 인덱스를 바꿔 다른 공연으로 돌릴 수 있다.
+    const concert = concerts[0] || {};
+
+    client.test("예매 중인 공연이 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(concert.id !== undefined,
+            "ON_SALE 공연이 없다. ADMIN_PRIVATE_KEY 를 export 하고 앱을 다시 띄웠는지 확인하라 " +
+            "(시더가 온체인 등록에 실패하면 공연을 SCHEDULED 로 되돌린다).");
+    });
+
+    client.global.set("bookConcertId", concert.id);
+    client.global.set("bookConcertTitle", concert.title);
+%}
+
+### 남은 자리가 있는 구역 고르기
+GET {{baseUrl}}/api/v1/sections?concertId={{bookConcertId}}
+Authorization: Bearer {{bookAccessToken}}
+
+> {%
+    const sections = response.body.sections || [];
+    const section = sections.find(s => s.availableCount > 0) || {};
+
+    client.test("남은 자리가 있는 구역이 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(section.id !== undefined,
+            "전 구역이 매진이다: " + JSON.stringify(sections.map(s => [s.name, s.availableCount])));
+    });
+
+    client.global.set("bookSectionId", section.id);
+%}
+
+### 그 구역에서 빈 자리 하나 고르기
+GET {{baseUrl}}/api/v1/seats?concertId={{bookConcertId}}&sectionId={{bookSectionId}}
+Authorization: Bearer {{bookAccessToken}}
+
+> {%
+    const seats = response.body.seats || [];
+    const seat = seats.find(s => s.status === "AVAILABLE") || {};
+
+    client.test("빈 자리가 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(seat.id !== undefined, "AVAILABLE 좌석이 없다. availableCount 와 어긋난 것이다.");
+    });
+
+    client.global.set("bookSeatId", seat.id);
+%}
+
+### 좌석 선점 - 5분간 다른 사람이 못 잡는다
+# seed111 은 시더가 잡아 둔 선점이 이미 있다. 한 계정은 한 공연에서 한 자리만 잡을 수 있어
+# 이 요청이 그 선점을 대신 풀어 주고(releasedSeatId), 우리가 고른 자리로 갈아탄다.
+POST {{baseUrl}}/api/v1/seats/{{bookSeatId}}/hold?concertId={{bookConcertId}}
+Authorization: Bearer {{bookAccessToken}}
+
+> {%
+    client.test("200 으로 선점된다", function () {
+        client.assert(response.status === 200,
+            "status: " + response.status + " body: " + JSON.stringify(response.body));
+        client.assert(response.body.status === "HELD", "status: " + response.body.status);
+    });
+
+    client.test("만료 시각을 함께 준다", function () {
+        // 화면이 남은 시간을 세려면 서버가 정한 시각을 그대로 받아야 한다.
+        client.assert(response.body.expiresAt !== undefined, "expiresAt 이 없다");
+    });
+%}
+
+### 주문 확정 - 이 요청이 ticket 행(PENDING_MINT)까지 만든다
+# 500 IllegalStateException 이 나면 이 공연이 ON_SALE 인데 온체인 등록이 안 된 것이다.
+# 파일 맨 위 "돌아가려면 체인 접근이 필요하다" 를 본다. 좌석 선점까지는 멀쩡히 되기 때문에
+# 여기서 처음 드러난다.
+POST {{baseUrl}}/api/v1/reservations
+Authorization: Bearer {{bookAccessToken}}
+Content-Type: application/json
+
+{
+  "concertId": {{bookConcertId}},
+  "seatId": {{bookSeatId}}
+}
+
+> {%
+    client.test("201 로 주문이 확정된다", function () {
+        client.assert(response.status === 201,
+            "status: " + response.status + " body: " + JSON.stringify(response.body));
+        client.assert(response.body.id !== undefined, "주문 id 가 비어 있다");
+    });
+
+    client.test("주문은 PAID 이고 발행은 아직 진행 중이다", function () {
+        client.assert(response.body.status === "PAID", "status: " + response.body.status);
+        // 좌석 배정과 잔액 차감은 이 요청 안에서 끝나고 온체인 발행은 비동기다. 응답에 티켓 상태
+        // 필드는 따로 없고, tokenId 가 비어 있다는 것이 곧 아직 발행 전(PENDING_MINT)이라는 뜻이다.
+        client.assert(response.body.tokenId === null, "tokenId: " + response.body.tokenId);
+    });
+
+    client.global.set("bookReservationId", response.body.id);
+%}
+
+### 발행 상태 확인 - 비동기 정산이 끝났는지 본다. 바로 안 바뀌면 이 요청만 몇 번 다시 보낸다
+GET {{baseUrl}}/api/v1/reservations/{{bookReservationId}}
+Authorization: Bearer {{bookAccessToken}}
+
+> {%
+    client.test("주문 상세가 나온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+
+    client.test("발행이 끝났다", function () {
+        // tokenId 가 채워지면 티켓이 OWNED 다. 입장 QR 은 그때부터 발급된다.
+        client.assert(response.body.tokenId !== null,
+            "아직 tokenId 가 비어 있다. failureReason 이 있으면 발행이 실패한 것이고" +
+            "(체인 접근·방화벽·키 확인), 없으면 진행 중이니 이 요청을 다시 보낸다. " +
+            "failureReason=" + response.body.failureReason +
+            ", mintAttemptCount=" + response.body.mintAttemptCount);
+    });
+%}
+
+###############################################################################
+# 여기까지 성공했으면 이 주문에 OWNED 티켓이 달려 있다. 입장 QR 은 티켓 번호로 받으므로
+# ../ticket/entry-pass.http 로 이어서 보면 된다. 티켓 번호는 아래로 찾는다.
+#
+#   docker exec timo-mysql mysql -utimo -ptimo1234 timo \
+#     -e "SELECT ticket_id, status FROM ticket WHERE reservation_id = <위에서 만든 주문 번호>;"
+#
+# 그 ticket_id 를 entry-pass.http 맨 위 @ticketId 에 넣는다.
+#
+# 공연 시작이 2시간 넘게 남았으면 409 "아직 입장 시간이 아닙니다" 가 정상이다. 그때는
+# 시작 시각만 당긴다.
+#
+#   UPDATE concert SET start_date = NOW() + INTERVAL 30 MINUTE WHERE concert_id = <공연 번호>;
+###############################################################################

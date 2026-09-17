@@ -51,6 +51,22 @@ public class TicketNftClient extends ContractClient {
         sendAndWait(new Function("revoke", List.of(new Uint256(tokenId)), Collections.emptyList()));
     }
 
+    /**
+     * 게이트 입장 처리. 온체인도 {@code OWNED}에서만 성립하고, 양도 등록 중({@code LISTED})인
+     * 티켓은 거절한다 - 팔려고 내놓은 표로 입장시키는 것은 말이 안 되기 때문이다.
+     *
+     * <p><b>admin 지갑에 {@code GATE_ROLE}이 있어야 한다.</b> 배포 스크립트는 admin에게
+     * {@code ORGANIZER_ROLE}·{@code OPERATOR_ROLE}만 부여하므로, 이미 떠 있는 노드라면
+     * {@code grantRole(GATE_ROLE, admin)}을 한 번 따로 보내야 한다. 없으면 여기서
+     * AccessControl 로 되돌려진다.
+     *
+     * <p>게이트 응답 경로에서 이 호출을 기다리면 안 된다. 입장 줄은 1인당 1초 싸움이라 체인 확정을
+     * 기다릴 여유가 없다. 입장했다는 사실의 원본은 DB이고 체인은 그 기록이다.
+     */
+    public void markUsed(BigInteger tokenId) {
+        sendAndWait(new Function("markUsed", List.of(new Uint256(tokenId)), Collections.emptyList()));
+    }
+
     private BigInteger seatTokenId(BigInteger showId, BigInteger seatId) {
         byte[] key = call(new Function("seatKey",
                 List.of(new Uint256(showId), new Uint256(seatId)),

@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -48,4 +49,28 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
         Long getTicketId();
     }
+
+    /**
+     * 입장 처리. <b>중복 입장을 막는 곳이 여기다.</b>
+     *
+     * <p>읽고 나서 판단하고 쓰면 게이트 두 대가 같은 티켓을 동시에 스캔했을 때 둘 다
+     * {@code OWNED}를 읽고 둘 다 통과한다. 조건을 UPDATE 문 안에 넣으면 DB가 행 잠금으로
+     * 직렬화해 주므로, 몇 대가 동시에 찍든 1을 받는 쪽은 하나뿐이다.
+     *
+     * <p>덕분에 QR 문자열마다 사용 여부를 따로 기억할 필요가 없다. 캡처해 둔 예전 QR을 들이밀어도
+     * 그 티켓은 이미 {@code USED}라 여기서 0이 나온다. 별도 nonce 테이블이나 Redis가 없는 이유다.
+     *
+     * <p>벌크 연산이라 {@code updatedAt} 감사 필드는 갱신되지 않는다. 입장 시각이 필요해지면
+     * 그때 컬럼을 따로 두고 이 UPDATE에서 함께 채운다.
+     *
+     * @return 1이면 이번 호출이 입장시킨 것이고, 0이면 이미 입장했거나 정상 소유 상태가 아니다
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Ticket t
+               set t.status = com.ssafy.timo.domain.ticket.entity.TicketStatus.USED
+             where t.id = :ticketId
+               and t.status = com.ssafy.timo.domain.ticket.entity.TicketStatus.OWNED
+            """)
+    int markUsedIfOwned(@Param("ticketId") Long ticketId);
 }
