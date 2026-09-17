@@ -3,15 +3,11 @@ import 'wire_time.dart';
 
 /// 양도 등록 화면에서 고를 수 있는 내 티켓 한 장.
 ///
-/// **이 목록을 주는 서버 주소가 아직 없다.** 마켓 API 에는 등록(`POST /listings`)
-/// 만 있고 "내가 등록할 수 있는 티켓" 을 주는 경로가 없으며, 티켓 도메인 자체가
-/// 아직 컨트롤러 없이 엔티티만 있다. 그래서 [HttpResaleApi] 는 예매 목록
-/// (`GET /api/v1/reservations`)에서 만들고, 등록 요청이 필요로 하는 [ticketId]
-/// 자리에는 예매 번호가 들어간다 — 두 번호는 서로 다른 값이라 그 조합으로는
-/// 등록이 서버에서 거절된다. 앱 기본값이 목 구현인 이유가 이것이다
-/// ([ResaleApi] 주석).
-///
-/// 예매 응답에 `ticketId` 가 실리면 [fromReservationJson] 의 한 줄만 바뀐다.
+/// **이 목록만 주는 서버 주소는 없다.** 마켓 API 에는 등록(`POST /listings`)
+/// 만 있고 "내가 등록할 수 있는 티켓" 을 주는 경로가 없어, [HttpResaleApi] 는
+/// 예매 목록(`GET /api/v1/reservations`)에서 만든다. 등록 요청이 받는
+/// [ticketId] 는 그 응답의 `ticketId` 다 — 예매 번호(`id`)와는 **다른 값**이라
+/// 바꿔 넣으면 서버가 거절한다(백엔드 `ReservationSummaryResponseDto` 주석).
 class ListableTicket {
   const ListableTicket({
     required this.ticketId,
@@ -28,8 +24,7 @@ class ListableTicket {
   /// 예매 목록 응답(`ReservationSummaryResponseDto`) 한 건에서 만든다.
   factory ListableTicket.fromReservationJson(Map<String, dynamic> json) =>
       ListableTicket(
-        // TODO(S15P21D206-307): 서버가 예매 응답에 ticketId 를 실어 주면 바꾼다.
-        ticketId: (json['id'] as num).toInt(),
+        ticketId: (json['ticketId'] as num).toInt(),
         concertTitle: json['concertTitle'] as String,
         venueName: json['venueName'] as String,
         // 서버 필드 이름이 직관과 반대다. `seatNo` 가 구역 안의 행(열) 번호,

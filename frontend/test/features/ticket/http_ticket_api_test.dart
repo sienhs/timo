@@ -29,6 +29,8 @@ void main() {
     String? startDate = '2026-10-10T19:00:00',
   }) => {
     'id': id,
+    // 예매 번호와 다른 값이다. 양도 등록이 받는 쪽.
+    'ticketId': 100 + id,
     'concertId': 11,
     'concertTitle': '2026 REMIND: 리센느',
     'posterImageUrl': 'poster/remind.gif',
@@ -75,6 +77,8 @@ void main() {
 
       final ticket = tickets.single;
       expect(ticket.reservationId, 1);
+      // 둘은 다른 값이다. 바꿔 읽으면 양도 등록이 서버에서 거절된다.
+      expect(ticket.ticketId, 101);
       expect(ticket.title, '2026 REMIND: 리센느');
       expect(ticket.status, TicketStatus.paid);
       expect(ticket.facePrice, 154000);

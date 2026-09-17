@@ -6,6 +6,7 @@ import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/resale/constants.dart';
 import 'package:timo/features/resale/data/mock_resale_api.dart';
 import 'package:timo/features/resale/data/resale_api.dart';
 import 'package:timo/features/resale/state/resale_api_scope.dart';
@@ -170,19 +171,16 @@ void main() {
       );
     });
 
-    // 가격 수정 API 가 아직 없다. 버튼은 시안대로 두되 누르면 안내만 띄운다.
-    testWidgets('가격 수정을 누르면 준비 중 안내가 뜬다', (tester) async {
+    // 수정 흐름 자체는 edit_listing_price_test 가 본다. 여기서는 입구만.
+    testWidgets('가격 수정을 누르면 가격 시트가 열린다', (tester) async {
       await pumpScreen(tester);
       await tester.pumpAndSettle();
       await openListings(tester);
 
       await tester.tap(find.text(TicketStrings.editPrice));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(
-        find.text(TicketStrings.notReady(TicketStrings.editPrice)),
-        findsOneWidget,
-      );
+      expect(find.text(ResaleStrings.editPriceSubmit), findsOneWidget);
     });
 
     testWidgets('올린 매물이 없으면 0 과 빈 안내가 나온다', (tester) async {

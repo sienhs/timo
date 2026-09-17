@@ -15,16 +15,25 @@ import 'package:timo/features/resale/models/trade_status.dart';
 /// "돌아오면 다시 받는다" · "그대로 두면 안 보낸다" 는 화면에 드러나지 않는
 /// 약속이라 이렇게만 확인할 수 있다. 예매 쪽의 `_SpyApi` 와 같은 역할이다.
 class SpyResaleApi implements ResaleApi {
-  SpyResaleApi({DateTime Function() clock = DateTime.now, this.cancelFailure})
-    : _base = MockResaleApi(latency: Duration.zero, clock: clock);
+  SpyResaleApi({
+    DateTime Function() clock = DateTime.now,
+    this.cancelFailure,
+    this.priceFailure,
+  }) : _base = MockResaleApi(latency: Duration.zero, clock: clock);
 
   final MockResaleApi _base;
 
   /// 등록 취소가 던질 실패. 없으면 목에 그대로 넘긴다.
   final ApiException? cancelFailure;
 
+  /// 가격 수정이 던질 실패. 없으면 목에 그대로 넘긴다.
+  final ApiException? priceFailure;
+
   /// 등록 취소가 나간 매물 번호. 나간 순서대로다.
   final cancelled = <int>[];
+
+  /// 가격 수정이 나간 (매물 번호, 새 가격). 나간 순서대로다.
+  final priceUpdates = <({int listingId, int price})>[];
 
   /// 내 거래 내역을 몇 번 받아 갔나.
   int myTradesCalls = 0;
@@ -34,6 +43,16 @@ class SpyResaleApi implements ResaleApi {
     if (cancelFailure case final failure?) throw failure;
     cancelled.add(listingId);
     await _base.cancelListing(listingId);
+  }
+
+  @override
+  Future<ListingDetail> updateListingPrice({
+    required int listingId,
+    required int price,
+  }) {
+    if (priceFailure case final failure?) throw failure;
+    priceUpdates.add((listingId: listingId, price: price));
+    return _base.updateListingPrice(listingId: listingId, price: price);
   }
 
   @override

@@ -75,11 +75,14 @@ void main() {
     );
   });
 
-  testWidgets('양도 등록하기를 누르면 등록 화면으로 간다', (tester) async {
+  testWidgets('양도 등록하기를 누르면 그 티켓 번호를 얹어 등록 화면으로 간다', (tester) async {
     await pumpScreen(tester, resaleApi: SpyResaleApi(clock: now));
     await goToRegister(tester);
 
     expect(find.byType(_FakeRegisterScreen), findsOneWidget);
+    // 아이유 카드의 티켓 번호(예매 목 102). 예매 번호(2)가 아니다 — 등록이
+    // 받는 것은 티켓 번호다.
+    expect(find.text(_FakeRegisterScreen.argumentLabel(102)), findsOneWidget);
   });
 
   testWidgets('등록하고 돌아오면 양도 목록을 다시 받는다', (tester) async {
@@ -110,18 +113,22 @@ void main() {
 }
 
 /// 등록 화면 자리에 세우는 가짜. 실제 화면처럼 등록했으면 true 를, 그냥
-/// 나갔으면 아무것도 돌려주지 않는다.
+/// 나갔으면 아무것도 돌려주지 않는다. 받은 인자(미리 고를 티켓 번호)는 글자로
+/// 찍어 검사할 수 있게 한다.
 class _FakeRegisterScreen extends StatelessWidget {
   const _FakeRegisterScreen();
 
   static const registered = '등록 완료';
   static const left = '그냥 나가기';
 
+  static String argumentLabel(Object? argument) => '인자 $argument';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
+          Text(argumentLabel(ModalRoute.of(context)?.settings.arguments)),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text(registered),

@@ -96,6 +96,7 @@ class MockTicketApi implements TicketApi {
       // 공연이 곧 시작한다 — 입장 QR 버튼이 열린 카드.
       _ticket(
         reservationId: 1,
+        ticketId: 103,
         concertId: 11,
         title: '2026 REMIND: 리센느',
         venueName: '올림픽공원 체조경기장',
@@ -109,6 +110,7 @@ class MockTicketApi implements TicketApi {
       // 아직 멀었다 — 상세정보 버튼만 있는 카드.
       _ticket(
         reservationId: 2,
+        ticketId: 102,
         concertId: 12,
         title: '2026 아이유 콘서트',
         venueName: '블루스퀘어 마스터카드홀',
@@ -121,6 +123,7 @@ class MockTicketApi implements TicketApi {
       ),
       _ticket(
         reservationId: 3,
+        ticketId: 104,
         concertId: 13,
         title: '2025 블랙핑크',
         venueName: '올림픽공원 체조경기장',
@@ -133,6 +136,7 @@ class MockTicketApi implements TicketApi {
       ),
       _ticket(
         reservationId: 4,
+        ticketId: 105,
         concertId: 14,
         title: '2024 BIGBANG',
         venueName: '올림픽공원 체조경기장',
@@ -147,6 +151,7 @@ class MockTicketApi implements TicketApi {
     TicketMockScenario.states => [
       _ticket(
         reservationId: 11,
+        ticketId: 111,
         concertId: 11,
         title: '2026 REMIND: 리센느',
         venueName: '올림픽공원 체조경기장',
@@ -160,6 +165,7 @@ class MockTicketApi implements TicketApi {
       ),
       _ticket(
         reservationId: 12,
+        ticketId: 112,
         concertId: 12,
         title: '2026 아이유 콘서트',
         venueName: '블루스퀘어 마스터카드홀',
@@ -174,8 +180,13 @@ class MockTicketApi implements TicketApi {
     ],
   };
 
+  /// [ticketId] 는 예매 번호와 다른 값으로 둔다 — 둘을 바꿔 써도 목에서는
+  /// 티가 안 나는 일이 없게. 아이유 콘서트(102)만 마켓 목의 등록 가능한
+  /// 티켓과 같은 번호라, 그 카드의 `양도 등록하기` 는 목만으로도 등록 화면에
+  /// 미리 골라진다.
   MyTicket _ticket({
     required int reservationId,
+    required int ticketId,
     required int concertId,
     required String title,
     required String venueName,
@@ -190,6 +201,7 @@ class MockTicketApi implements TicketApi {
     final now = clock();
     return MyTicket(
       reservationId: reservationId,
+      ticketId: ticketId,
       concertId: concertId,
       title: title,
       venueName: venueName,
