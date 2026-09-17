@@ -31,6 +31,20 @@ management:
         otlp:
           endpoint: ${TRACING_OTLP_ENDPOINT}
 
+# datasource-micrometer가 DataSource를 프록시해 SQL 실행만 span으로 기록한다.
+# 바인드 파라미터와 SQL 로그는 개인정보·토큰 유출 및 불필요한 부하를 막기 위해 기록하지 않는다.
+jdbc:
+  includes: QUERY
+  datasource-proxy:
+    include-parameter-values: false
+    query:
+      enable-logging: false
+  opentelemetry:
+    spans:
+      enabled: true
+    metrics:
+      enabled: false
+
 jwt:
   secret: ${JWT_SECRET}
 

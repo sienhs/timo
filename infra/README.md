@@ -103,8 +103,10 @@ OTLP HTTP 수집 포트 `4318`은 애플리케이션 보안 그룹에서만 접�
 Grafana의 공개 HTTPS 및 로그인 설정은 유지합니다.
 
 백엔드는 Spring Boot OpenTelemetry starter로 HTTP 요청을 추적합니다. 운영 프로필은
-기본 10%를 수집하며 `TRACING_SAMPLING_PROBABILITY`로 조절합니다. 모든 서비스 메서드나
-SQL이 자동으로 개별 span이 되는 것은 아니며, 필요한 업무 구간은 별도 계측이 필요합니다.
+기본 10%를 수집하며 `TRACING_SAMPLING_PROBABILITY`로 조절합니다. JDBC query 실행은
+별도 span으로 수집하므로, Jaeger에서 각 요청의 DB 실행 시간을 확인할 수 있습니다.
+바인드 파라미터와 SQL 로그는 수집하지 않습니다. 모든 서비스 메서드가 자동으로 개별 span이
+되는 것은 아니며, 필요한 업무 구간은 별도 계측이 필요합니다.
 배포 스크립트는 SSM Parameter Store의 `/<project>-<environment>/tracing/endpoint`를 읽어
 `TRACING_OTLP_ENDPOINT`를 주입합니다. 백엔드 코드 변경은 이미지 빌드·배포가 필요합니다.
 
