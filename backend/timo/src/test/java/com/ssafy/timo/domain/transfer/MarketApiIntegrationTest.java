@@ -194,7 +194,7 @@ class MarketApiIntegrationTest {
         }
 
         @Test
-        @DisplayName("닫힌 시간에도 등록은 201 - 매물은 저장되고 목록에는 20:00 에 드러난다")
+        @DisplayName("닫힌 시간에도 등록은 201 - 매물은 저장되지만 오늘 창에는 나오지 않는다")
         void registerWhileClosed() throws Exception {
             marketClock.closed();
 
@@ -204,14 +204,38 @@ class MarketApiIntegrationTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("LISTED"));
 
-            // 닫힌 동안은 남의 눈에 안 보이고, 열리면 그 매물이 그대로 나온다.
+            // 닫힌 동안은 목록 자체가 막히고, 열려도 오늘 등록한 매물은 다음 날 20:00 까지 안 보인다.
             mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("MarketClosedException"));
             marketClock.open();
             mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].price").value(LIST_PRICE));
+                    .andExpect(jsonPath("$.page.totalElements").value(0));
+        }
+
+        @Test
+        @DisplayName("어제 등록한 매물은 보이고 오늘 등록한 매물은 보이지 않는다 - 등록 다음 날 20:00 노출")
+        void listingsBecomeVisibleTheDayAfter() throws Exception {
+            TicketListing yesterday = openListingAt(othersTicket, LIST_PRICE, LocalDateTime.now().minusDays(1));
+            TicketListing today = openListingAt(myTicket, LIST_PRICE - 10_000, LocalDateTime.now());
+
+            mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.page.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].listingId").value(yesterday.getId()));
+            // 공연 목록의 매물 수와 최저가도 어제 것만 센다. 오늘 것이 더 싸지만 잡히면 안 된다.
+            mvc.perform(get(MARKET_PATH + "/concerts"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].listingCount").value(1))
+                    .andExpect(jsonPath("$.content[0].lowestPrice").value(LIST_PRICE));
+            // 번호를 알아도 오늘 등록된 매물은 살 수 없다. 상세는 판매자 경로라 열려 있다.
+            Authenticated.set(buyer.getId());
+            purchase(today, LIST_PRICE - 10_000)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingNotOpenYetException"));
+            mvc.perform(get(MARKET_PATH + "/listings/{listingId}", today.getId()))
+                    .andExpect(status().isOk());
         }
 
         @Test
@@ -753,8 +777,12 @@ class MarketApiIntegrationTest {
                 """.formatted(ticketId, price);
     }
 
-    /** 서비스를 거치지 않고 매물을 연다. 등록 API 가 아닌 것을 볼 때 쓴다. */
+    /** 서비스를 거치지 않고 <b>어제</b> 등록된 매물을 연다. 오늘 등록된 매물은 목록과 구매에서 아직 보이지 않는다. */
     private TicketListing openListing(Ticket ticket, long price) {
+        return openListingAt(ticket, price, LocalDateTime.now().minusDays(1));
+    }
+
+    private TicketListing openListingAt(Ticket ticket, long price, LocalDateTime listedAt) {
         TicketListing listing = ticketListingRepository.saveAndFlush(TicketListing.open(
                 ticket.getId(),
                 ticket.getReservation().getMember().getId(),
@@ -764,7 +792,7 @@ class MarketApiIntegrationTest {
                 ticket.getReservation().getSeat().getSeatCol(),
                 price,
                 FACE_PRICE,
-                LocalDateTime.now()));
+                listedAt));
         em.flush();
         return listing;
     }

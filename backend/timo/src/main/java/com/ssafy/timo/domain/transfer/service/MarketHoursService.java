@@ -15,10 +15,11 @@ import java.time.temporal.ChronoUnit;
 /**
  * 양도 마켓 운영 시간 판정.
  *
- * <p><b>등록은 언제나 받고, 남의 매물이 보이는 조회와 구매만 창 안에서 연다.</b> 닫힌 시간에 등록한
- * 매물은 {@code LISTED} 로 저장돼 있다가 20:00 에 조회가 열리면서 한꺼번에 드러난다 — 별도 대기
- * 상태나 일괄 전이 없이 "일괄로 올라가는" 경험이 된다. 가격 수정은 반대로 창 밖에서만 받는다
- * ({@link #requireClosed()}). 거래 중에 가격이 흔들리면 구매자가 본 값이 상세에서 달라진다.
+ * <p><b>등록은 언제나 받고, 남의 매물이 보이는 조회와 구매만 창 안에서 연다.</b> 매물은 <b>등록한
+ * 다음 날 20:00</b> 에 올라간다 — 그날 창에 등록한 것도 그날은 안 보인다. 판정은 {@link #visibleBefore()}
+ * 하나로 끝난다: 오늘 이전에 등록된 매물만 노출. 별도 대기 상태나 일괄 전이 없이 "일괄로 올라가는"
+ * 경험이 된다. 가격 수정은 반대로 창 밖에서만 받는다({@link #requireClosed()}). 거래 중에 가격이
+ * 흔들리면 구매자가 본 값이 상세에서 달라진다.
  *
  * <p>판정의 근거는 서버 {@link Clock} 하나다. 앱이 자기 시계로 화면을 잠그는 것은 안내이지
  * 접근 제어가 아니라서, 기기 시각을 돌리거나 API 를 직접 치면 그대로 뚫린다.
@@ -56,6 +57,21 @@ public class MarketHoursService {
         if (!status.open()) {
             throw new MarketClosedException(status.opensAt());
         }
+    }
+
+    /**
+     * 이 시각보다 먼저 등록된 매물만 남에게 보인다. 오늘 00:00 이다.
+     *
+     * <p>"등록 다음 날 20:00 에 올라간다" 를 날짜 하나로 옮긴 것이다. 창은 어차피 20:00 에 열리므로,
+     * 창 안에서 "어제까지 등록된 것" 을 보이면 그게 곧 다음 날 20:00 노출이다.
+     */
+    public LocalDateTime visibleBefore() {
+        return LocalDate.now(clock).atStartOfDay();
+    }
+
+    /** 이 시각에 등록된 매물이 처음 보이는 시각. 등록 다음 날의 여는 시각이다. */
+    public LocalDateTime visibleFrom(LocalDateTime listedAt) {
+        return listedAt.toLocalDate().plusDays(1).atTime(properties.openAt());
     }
 
     /** 열려 있으면 409. 메시지에 마감 시각이 실린다. */

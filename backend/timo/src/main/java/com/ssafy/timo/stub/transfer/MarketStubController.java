@@ -21,6 +21,7 @@ import com.ssafy.timo.domain.transfer.exception.CannotBuyOwnListingException;
 import com.ssafy.timo.domain.transfer.exception.ListPriceExceedsFacePriceException;
 import com.ssafy.timo.domain.transfer.exception.ListingAlreadyClosedException;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
+import com.ssafy.timo.domain.transfer.exception.ListingNotOpenYetException;
 import com.ssafy.timo.domain.transfer.exception.ListingPriceMismatchException;
 import com.ssafy.timo.domain.transfer.exception.NotListingSellerException;
 import com.ssafy.timo.domain.transfer.exception.NotTicketOwnerException;
@@ -145,7 +146,7 @@ public class MarketStubController implements MarketApi {
         // 공연마다 매물 수와 최저가만 모은다. 실제 구현은 group by 한 번이다.
         Map<Long, List<StubListing>> byConcert = new LinkedHashMap<>();
         for (StubListing listing : listings.values()) {
-            if (listing.status == ListingStatus.LISTED) {
+            if (isVisible(listing)) {
                 byConcert.computeIfAbsent(listing.ticket.concertId(), id -> new ArrayList<>()).add(listing);
             }
         }
@@ -182,7 +183,7 @@ public class MarketStubController implements MarketApi {
         concertStore.find(concertId).orElseThrow(() -> new ConcertNotFoundException(concertId));
 
         List<ListingSummaryResponseDto> matched = listings.values().stream()
-                .filter(listing -> listing.status == ListingStatus.LISTED)
+                .filter(this::isVisible)
                 .filter(listing -> listing.ticket.concertId() == concertId)
                 // 낮은 가격순. 동가는 listingId 오름차순으로 고정해 페이지를 넘길 때 같은 매물이 두 번 나오지 않게 한다.
                 .sorted(Comparator.comparingLong((StubListing listing) -> listing.price)
@@ -301,9 +302,12 @@ public class MarketStubController implements MarketApi {
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
 
-        // 검사 순서는 실제 구현과 같다. 매물 상태 -> 가격 -> 내 매물.
+        // 검사 순서는 실제 구현과 같다. 매물 상태 -> 노출 여부 -> 가격 -> 내 매물.
         if (listing.status != ListingStatus.LISTED) {
             throw new ListingAlreadyClosedException(listingId);
+        }
+        if (!listing.listedAt.isBefore(marketHoursService.visibleBefore())) {
+            throw new ListingNotOpenYetException(listingId, marketHoursService.visibleFrom(listing.listedAt));
         }
         if (request.expectedPrice() != listing.price) {
             throw new ListingPriceMismatchException(listingId);
@@ -347,6 +351,12 @@ public class MarketStubController implements MarketApi {
     private void close(StubListing listing, ListingStatus status) {
         listing.status = status;
         listing.closedAt = LocalDateTime.now(clock);
+    }
+
+    /** 남에게 보이는 매물인가. 열려 있고, 등록 다음 날 20:00 이 지났어야 한다(v1 과 같은 규칙). */
+    private boolean isVisible(StubListing listing) {
+        return listing.status == ListingStatus.LISTED
+                && listing.listedAt.isBefore(marketHoursService.visibleBefore());
     }
 
     /** 내 매물 중 팔릴 시각이 지난 것을 남에게 넘긴다. 멱등이라 몇 번 불려도 같다. */

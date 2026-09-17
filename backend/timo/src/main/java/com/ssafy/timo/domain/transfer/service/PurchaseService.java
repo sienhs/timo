@@ -9,6 +9,7 @@ import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.entity.TicketTrade;
 import com.ssafy.timo.domain.transfer.exception.CannotBuyOwnListingException;
 import com.ssafy.timo.domain.transfer.exception.ListingAlreadyClosedException;
+import com.ssafy.timo.domain.transfer.exception.ListingNotOpenYetException;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
 import com.ssafy.timo.domain.transfer.exception.ListingPriceMismatchException;
 import com.ssafy.timo.domain.transfer.exception.TradePriceExceedsFaceValueException;
@@ -59,6 +60,7 @@ public class PurchaseService {
      *   <li>운영 시간인가 → 409. 닫힌 마켓에서 자리를 먼저 잡는 일이 없도록 UPDATE 앞에 둔다</li>
      *   <li>매물이 있는가 → 404</li>
      *   <li>{@code LISTED} 인 행만 {@code SOLD} 로 조건부 UPDATE. 영향 행 0 이면 → 409</li>
+     *   <li>마켓에 올라온 매물인가(등록 다음 날 20:00 부터) → 409. 목록에 없어도 번호로 닿을 수 있다</li>
      *   <li>{@code expectedPrice} 가 등록가와 같은가 → 409</li>
      *   <li>내 매물이 아닌가 → 409</li>
      *   <li>등록가가 정가 이하인가(재검증) → 422</li>
@@ -70,7 +72,7 @@ public class PurchaseService {
      * <p><b>3번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
      * 요청이 같은 매물을 통과한다. 확인과 전이가 한 문장 안에서 일어나야 선착순이 성립한다.
      *
-     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~7 번에서
+     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~8 번에서
      * 예외가 나면 트랜잭션이 통째로 되돌아가 {@code SOLD} 도 함께 풀린다. 먼저 자리를 잡고 나서
      * 따지는 쪽이, 따지는 동안 남에게 자리를 빼앗기는 것보다 낫다.
      *
@@ -96,6 +98,9 @@ public class PurchaseService {
         TicketListing listing = ticketListingRepository.findDetailById(listingId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
 
+        if (!listing.getListedAt().isBefore(marketHoursService.visibleBefore())) {
+            throw new ListingNotOpenYetException(listingId, marketHoursService.visibleFrom(listing.getListedAt()));
+        }
         if (listing.getPrice() != request.expectedPrice()) {
             // 사용자가 본 금액과 다른 금액이 빠져나가면 안 된다. 실제 가격은 메시지에 담지 않는다 —
             // 남의 매물 가격을 확인하는 경로가 되면 안 된다.

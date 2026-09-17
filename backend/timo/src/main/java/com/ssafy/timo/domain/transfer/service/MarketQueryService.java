@@ -12,7 +12,6 @@ import com.ssafy.timo.domain.transfer.dto.MyTradeRow;
 import com.ssafy.timo.domain.transfer.dto.MyTradeStatus;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeType;
-import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
@@ -71,7 +70,8 @@ public class MarketQueryService {
 
         // 정렬은 쿼리 안에 있다. 여기서 또 넘기면 order by 가 중복된다.
         return new PagedModel<>(ticketListingRepository
-                .findConcertSummaries(LocalDateTime.now(clock), request.toPageable(Sort.unsorted()))
+                .findConcertSummaries(LocalDateTime.now(clock), marketHoursService.visibleBefore(),
+                        request.toPageable(Sort.unsorted()))
                 .map(this::toConcertSummary));
     }
 
@@ -91,7 +91,7 @@ public class MarketQueryService {
         }
 
         return new PagedModel<>(ticketListingRepository
-                .findByConcertIdAndStatus(concertId, ListingStatus.LISTED,
+                .findVisibleByConcertId(concertId, marketHoursService.visibleBefore(),
                         request.toPageable(LOWEST_PRICE_FIRST))
                 .map(listing -> ListingSummaryResponseDto.from(listing, requesterId)));
     }

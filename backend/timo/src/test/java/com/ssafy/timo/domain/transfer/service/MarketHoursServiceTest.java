@@ -107,7 +107,25 @@ class MarketHoursServiceTest {
     }
 
     @Test
-    @DisplayName("종일 창(00:00:00~23:59:59)은 언제나 열려 있다 - test 프로파일이 쓰는 설정이다")
+    @DisplayName("노출 기준은 오늘 00:00 - 그보다 먼저 등록된 매물만 보인다")
+    void visibleBeforeIsStartOfToday() {
+        assertThat(at(LocalDateTime.of(2026, 9, 17, 21, 0, 0)).visibleBefore())
+                .isEqualTo(LocalDateTime.of(2026, 9, 17, 0, 0, 0));
+    }
+
+    @Test
+    @DisplayName("등록 다음 날 여는 시각에 처음 보인다 - 열린 시간에 등록해도 그날은 아니다")
+    void visibleFromIsNextDayOpening() {
+        MarketHoursService service = at(LocalDateTime.of(2026, 9, 17, 21, 0, 0));
+
+        assertThat(service.visibleFrom(LocalDateTime.of(2026, 9, 17, 10, 0)))
+                .isEqualTo(LocalDateTime.of(2026, 9, 18, 20, 0, 0));
+        assertThat(service.visibleFrom(LocalDateTime.of(2026, 9, 17, 21, 30)))
+                .isEqualTo(LocalDateTime.of(2026, 9, 18, 20, 0, 0));
+    }
+
+    @Test
+    @DisplayName("종일 창(00:00:00~23:59:59)은 언제나 열려 있다")
     void allDayWindowIsAlwaysOpen() {
         MarketHoursProperties allDay = new MarketHoursProperties(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59));
 
