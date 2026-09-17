@@ -1,7 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/features/memory/data/creation_service.dart';
-import 'package:timo/features/memory/data/outpaint_service.dart';
 import 'package:timo/features/memory/models/memory_ticket.dart';
 
 void main() {
@@ -43,7 +42,7 @@ void main() {
               'depthMapPath': 'real-depth.png',
             };
           });
-      final service = CreationService(outpaint: const NoOutpaintService());
+      final service = CreationService();
       final upgraded = await service.upgradeBackground(legacy);
       expect(upgraded.demoDepth, false);
       expect(upgraded.depthMapPath, 'real-depth.png');
@@ -61,7 +60,7 @@ void main() {
     () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (_) async => {'demo': true});
-      final service = CreationService(outpaint: const NoOutpaintService());
+      final service = CreationService();
       expect(await service.upgradeBackground(legacy), same(legacy));
     },
   );

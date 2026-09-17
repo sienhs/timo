@@ -52,9 +52,6 @@ app.*.map.json
 assets/models/depth_anything_v2_vits.onnx
 assets/models/depth_anything_v2_vits.json
 
-# 아웃페인팅 API 키. --dart-define-from-file=.env 로 읽는다.
-.env
-
 # 통합 테스트가 기기에서 뽑는 검증 이미지. 수치와 결론은
 # docs/memory/verification/ 의 REPORT.md·json 에 남긴다.
 verification/

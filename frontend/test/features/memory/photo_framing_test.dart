@@ -6,24 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/features/memory/data/creation_service.dart';
-import 'package:timo/features/memory/data/outpaint_service.dart';
 import 'package:timo/features/memory/widgets/creator/photo_frame.dart';
 import 'package:timo/features/memory/models/photo_framing.dart';
-
-class _ForbiddenOutpaint extends NoOutpaintService {
-  int calls = 0;
-  @override
-  bool get available => true;
-  @override
-  Future<Uint8List> outpaint({
-    required Uint8List image,
-    required OutpaintPlan plan,
-    required String prompt,
-  }) {
-    calls++;
-    throw StateError('Ticket creation must never request AI');
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -94,11 +78,10 @@ void main() {
   );
 
   test(
-    'saved crop and whole-photo pixels match the selected framing without AI',
+    'saved crop and whole-photo pixels match the selected framing',
     () async {
       final original = await File(source).readAsBytes();
-      final outpaint = _ForbiddenOutpaint();
-      final service = CreationService(outpaint: outpaint);
+      final service = CreationService();
       var depthCalls = 0;
       messenger.setMockMethodCallHandler(pipeline, (call) async {
         expect(call.method, 'depth');
@@ -152,7 +135,6 @@ void main() {
         image.dispose();
       }
       expect(depthCalls, 4);
-      expect(outpaint.calls, 0);
       expect(await File(source).readAsBytes(), original);
     },
   );
