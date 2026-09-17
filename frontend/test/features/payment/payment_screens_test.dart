@@ -14,6 +14,7 @@ import 'package:timo/features/payment/constants.dart';
 import 'package:timo/features/payment/screens/payment_complete_screen.dart';
 import 'package:timo/features/payment/screens/payment_screen.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
+import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
 import 'package:timo/features/ticket/models/ticket_status.dart';
@@ -65,6 +66,11 @@ class _FakeTicketApi implements TicketApi {
 
   @override
   Future<void> cancelReservation(int reservationId) async {}
+
+  /// 결제 흐름은 입장 QR 을 부르지 않는다. 불리면 테스트가 잘못된 것이다.
+  @override
+  Future<EntryPass> issueEntryPass(int ticketId) =>
+      throw UnimplementedError('결제 흐름은 입장 QR 을 발급하지 않는다');
 
   /// 주문 상세 한 건. 아무것도 안 넘기면 발행 중이다.
   static ReservationDetail detail({

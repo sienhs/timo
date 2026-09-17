@@ -10,6 +10,7 @@ import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
+import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
 import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
@@ -177,4 +178,8 @@ class _SpyApi implements TicketApi {
   @override
   Future<ReservationDetail> fetchReservation(int reservationId) =>
       _base.fetchReservation(reservationId);
+
+  @override
+  Future<EntryPass> issueEntryPass(int ticketId) =>
+      _base.issueEntryPass(ticketId);
 }

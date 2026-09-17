@@ -13,6 +13,7 @@ import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
+import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
 import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
@@ -218,7 +219,7 @@ void main() {
       expect(find.text(TicketStrings.enterQr), findsOneWidget);
       expect(find.text(TicketStrings.showDetail), findsOneWidget);
       // QR 이 안 열린 카드에는 그 이유가 한 줄 붙는다.
-      expect(find.text(TicketStrings.qrOpensOnShowDay), findsOneWidget);
+      expect(find.text(TicketStrings.qrOpensBeforeShow), findsOneWidget);
     });
 
     testWidgets('D-day 배지가 남은 날만큼 찍힌다', (tester) async {
@@ -367,4 +368,8 @@ class _ManyTicketsApi implements TicketApi {
   @override
   Future<ReservationDetail> fetchReservation(int reservationId) =>
       _base.fetchReservation(reservationId);
+
+  @override
+  Future<EntryPass> issueEntryPass(int ticketId) =>
+      _base.issueEntryPass(ticketId);
 }

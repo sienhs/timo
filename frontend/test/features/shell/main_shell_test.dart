@@ -8,6 +8,7 @@ import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
 import 'package:timo/features/shell/widgets/quick_menu_button.dart';
+import 'package:timo/routes/app_routes.dart';
 
 void main() {
   Future<void> pumpShell(WidgetTester tester) async {
@@ -116,14 +117,21 @@ void main() {
     expect(find.text('입장QR'), findsNothing);
   });
 
+  // 입장 QR 은 따로 화면이 없다. 티켓 카드의 '입장 QR 보기' 가 입구라, 메뉴는
+  // 내 티켓으로 보낸다. 준비 중 안내로 되돌아가면 기능이 있는데 없다고 말하는 꼴이다.
+  test('입장QR 은 내 티켓으로 간다', () {
+    final item = quickMenuItems.singleWhere((item) => item.label == '입장QR');
+    expect(item.routeName, AppRoutes.myTickets);
+  });
+
   testWidgets('화면이 없는 항목을 고르면 준비 중 안내가 뜬다', (tester) async {
     await pumpShell(tester);
 
     await tester.tap(quickMenuButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('입장QR'));
+    await tester.tap(find.text('카테고리'));
     await tester.pumpAndSettle();
 
-    expect(find.text(ShellStrings.notReady('입장QR')), findsOneWidget);
+    expect(find.text(ShellStrings.notReady('카테고리')), findsOneWidget);
   });
 }

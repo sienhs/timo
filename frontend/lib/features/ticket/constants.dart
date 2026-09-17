@@ -14,12 +14,16 @@ class TicketMetrics {
   static const cancelDeadline = Duration(hours: 24);
 
   /// 입장 QR 이 열리는 시각. 공연 시작 이만큼 전부터.
-  static const qrOpensBefore = Duration(hours: 3);
+  ///
+  /// 백엔드 `EntryPassService.ENTRY_OPENS_BEFORE_START` 와 같아야 한다. 앱이
+  /// 더 일찍 열면 버튼은 눌리는데 서버가 409 로 거절해 "왜 안 되지" 만 남는다.
+  static const qrOpensBefore = Duration(hours: 2);
 
   /// 입장 QR 이 닫히는 시각. 공연 시작 이만큼 뒤까지.
   ///
-  /// 예매 목록 응답에 공연 **종료** 시각이 없어 시작 시각에서 어림잡았다.
-  /// 서버가 입장 가능 여부를 직접 알려주게 되면 그 값을 쓰고 이 상수는 지운다.
+  /// 백엔드 `EntryPassService.ENTRY_CLOSES_AFTER_START` 와 같아야 한다. 종료
+  /// 시각이 아니라 시작 시각 기준인 것도 서버와 같다 — 여러 날 공연이면 종료일이
+  /// 며칠 뒤라 그동안 내내 열린 채가 된다.
   static const qrClosesAfter = Duration(hours: 6);
 
   /// 검색 칸을 띄우기 시작하는 티켓 수.
@@ -38,6 +42,10 @@ class TicketMetrics {
   /// 확정되기까지 몇 초가 걸린다.
   static const mockIssueAfterPolls = 2;
 
+  /// 가짜 API 가 내주는 입장 QR 의 수명. 서버 기본값(`entry-pass.ttl`, 30초)과
+  /// 같다. 실제 서버는 응답에 수명을 실어 주므로 앱 어디에도 이 값을 박지 않는다.
+  static const mockEntryPassLifetime = Duration(seconds: 30);
+
   // 목록·카드 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
   static const horizontalPadding = 16.0;
   static const cardRadius = 12.0;
@@ -55,6 +63,19 @@ class TicketMetrics {
   /// 입장 QR 화면 오른쪽 위 포스터. 목록 카드보다 조금 크다.
   static const qrPosterWidth = 96.0;
   static const qrPosterHeight = 128.0;
+
+  /// 남은 시간이 이 안쪽이면 카운트다운을 경고색으로 바꾼다.
+  ///
+  /// 5초는 검표기가 QR 을 읽고 서버가 판정하기까지 걸리는 시간(보통 1~2초)에
+  /// 여유를 둔 값이다. 이보다 적게 남았으면 내밀지 말고 새로 받는 편이 낫다.
+  static const qrWarningThreshold = Duration(seconds: 5);
+
+  /// 만료된 QR 을 덮는 흰색의 불투명도. 검은 칸이 연한 회색으로 보일 만큼
+  /// 덮되, 아래에 QR 이 있었다는 것은 알아볼 수 있게 남긴다.
+  static const qrExpiredOverlayOpacity = 0.8;
+
+  /// 만료된 QR 가운데의 새로고침 아이콘 크기. 손가락으로 바로 누를 만큼.
+  static const qrRefreshIconSize = 36.0;
 
   static const buttonHeight = 44.0;
   static const infoIconSize = 15.0;
@@ -95,7 +116,12 @@ class TicketStrings {
   ///
   /// 없으면 카드마다 버튼이 다른 이유를 알 수 없다. 첫 카드만 초록 버튼인 것을
   /// 보고 "왜 이 공연만 입장이 되지" 로 읽힌다.
-  static const qrOpensOnShowDay = '입장 QR 은 공연 당일에 열려요';
+  ///
+  /// 시각은 [TicketMetrics.qrOpensBefore] 에서 가져온다. "공연 당일" 이라고
+  /// 적어 두면 당일 아침에 눌러 보고 안 열려 의아해한다 — 실제 규칙은 시작
+  /// 2시간 전이고, 서버가 그 폭을 바꾸면 문구도 따라가야 한다.
+  static String get qrOpensBeforeShow =>
+      '입장 QR 은 공연 시작 ${TicketMetrics.qrOpensBefore.inHours}시간 전에 열려요';
 
   /// 지난 공연 카드의 버튼.
   ///
@@ -135,7 +161,16 @@ class TicketStrings {
   // 입장 QR 화면.
   static const qrScreenTitle = '입장 QR';
   static const qrRemaining = '남은 시간';
-  static const qrRotateNotice = 'QR 은 30초마다 자동으로 새로 만들어져요';
+
+  /// QR 이 몇 초 동안 쓸 수 있는지. 숫자는 서버가 응답에 실어 준 수명이다 —
+  /// 앱에 30 을 박아 두면 서버가 수명을 바꿨을 때 문구가 거짓말을 한다.
+  static String qrValidFor(int seconds) => 'QR 은 $seconds초 동안 유효해요';
+
+  /// 수명이 다한 뒤. 흐린 QR 만으로는 무엇을 해야 하는지 알 수 없어 한 줄 붙인다.
+  static const qrExpiredNotice = 'QR 이 만료됐어요. 새로고침을 눌러 다시 받아 주세요';
+
+  /// 만료된 QR 가운데의 새로고침 버튼. 화면 읽기 프로그램이 읽는 이름이다.
+  static const qrRefresh = 'QR 새로 받기';
   static const qrCaptureNotice =
       '화면을 캡처한 QR 은 입장할 수 없어요.\n입장 시 이 화면을 직접 보여주세요.';
 
