@@ -14,10 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>엔드포인트 규약은 {@link GateEntryApi} 에 있다. 이 클래스는 버전 경로를 정하고 서비스에
  * 위임만 한다.
  *
- * <p><b>인증을 걸지 않는다(팀 결정).</b> 게이트 앱에 로그인 화면이 없어 지금은 보낼 토큰이 없다.
- * 그래서 QR 문자열을 아는 사람은 누구나 그 티켓을 {@code USED} 로 만들 수 있다 - 캡처 한 장이면
- * 관람객이 입구에 서기도 전에 표가 소진된다. 게이트 앱에 로그인이 생기면
- * {@code SecurityConfig} 의 {@code permitAll} 에서 이 경로를 빼는 것으로 닫힌다.
+ * <p><b>ADMIN 역할만 호출할 수 있다.</b> {@code SecurityConfig} 가 이 경로를 {@code hasRole(ADMIN)}
+ * 으로 제한한다 - QR 문자열을 아는 사람 누구나 호출할 수 있으면 캡처 한 장으로 관람객이 입구에
+ * 서기도 전에 표가 소진된다. 게이트 앱은 아직 로그인 화면과 실제 API 연동이 없어(목으로만
+ * 동작) 이 제한을 걸어도 지금 당장 깨지는 흐름은 없다 - 실제 연동을 붙일 때 로그인해 받은 토큰을
+ * Authorization 헤더에 실어야 한다.
  */
 @RestController
 @RequestMapping(GateEntryController.BASE_PATH)
