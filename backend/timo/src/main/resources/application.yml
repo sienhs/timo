@@ -31,6 +31,9 @@ api:
 app:
   image:
     region: ${AWS_REGION:ap-northeast-2}
+  firebase:
+    # 기본은 꺼 둔다. 서비스 계정이 없는 로컬·테스트 기동을 막지 않는다.
+    messaging-enabled: ${FIREBASE_MESSAGING_ENABLED:false}
 
 # 비밀키(jwt.secret)는 프로파일마다 달라 application-{profile}.yml 에 있다.
 # 수명은 환경과 무관하게 같아야 앱 동작이 갈리지 않으므로 여기 한 곳에만 둔다.

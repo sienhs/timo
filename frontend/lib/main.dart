@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -8,10 +10,19 @@ import 'features/auth/state/auth_session.dart';
 import 'features/favorite/data/favorite_store.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/memory/data/ticket_store.dart';
+import 'features/notification/push_notification_service.dart';
+
+/// 백그라운드 수신은 Flutter 엔진이 이 진입점을 찾아 호출하므로 트리 셰이킹하면 안 된다.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 Future<void> main() async {
   // 기기 저장소(플러그인)를 runApp 전에 쓰려면 먼저 엔진과 연결해야 한다.
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   final storage = SecureTokenStorage();
   final session = AuthSession(storage: storage);
@@ -31,6 +42,11 @@ Future<void> main() async {
       ),
     );
   }
+
+  // 권한·토큰은 기기 단위, 서버 등록은 로그인 회원 단위다. 로그인/로그아웃을
+  // 구독하므로 앱을 켠 뒤 로그인해도, FCM 토큰이 바뀌어도 자동으로 동기화된다.
+  final pushNotificationService = PushNotificationService(session);
+  await pushNotificationService.start();
 
   // 소장품(메모리 티켓) 저장소. 컬렉션 화면이 열리자마자 목록을 그려야 해서
   // 상자를 여기서 미리 연다. 여는 데 실패하면 소장품 기능만 빼고 앱은 켠다 —

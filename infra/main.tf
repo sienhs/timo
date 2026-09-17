@@ -9,14 +9,16 @@ module "backend_secret" {
 
   name = "${var.project_name}/${var.environment}/backend"
   secret_string = jsonencode(merge({
-    SPRING_PROFILES_ACTIVE = "prod"
-    DB_URL                 = "jdbc:mysql://${module.rds.endpoint}:${module.rds.port}/${var.db_name}?connectionTimeZone=Asia/Seoul&characterEncoding=UTF-8"
-    DB_USERNAME            = var.db_username
-    DB_PASSWORD            = var.db_password
-    JWT_SECRET             = var.jwt_secret
-    ENTRY_PASS_SECRET      = var.entry_pass_secret
-    ADMIN_PRIVATE_KEY      = var.admin_private_key
-    WALLET_MASTER_KEY      = var.wallet_master_key
+    SPRING_PROFILES_ACTIVE               = "prod"
+    DB_URL                               = "jdbc:mysql://${module.rds.endpoint}:${module.rds.port}/${var.db_name}?connectionTimeZone=Asia/Seoul&characterEncoding=UTF-8"
+    DB_USERNAME                          = var.db_username
+    DB_PASSWORD                          = var.db_password
+    JWT_SECRET                           = var.jwt_secret
+    ENTRY_PASS_SECRET                    = var.entry_pass_secret
+    ADMIN_PRIVATE_KEY                    = var.admin_private_key
+    WALLET_MASTER_KEY                    = var.wallet_master_key
+    FIREBASE_MESSAGING_ENABLED           = "true"
+    FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = var.firebase_service_account_json_base64
   }, var.solapi_environment, module.image_storage.runtime_environment))
 }
 
