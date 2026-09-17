@@ -1,6 +1,6 @@
 -- 현재 JPA 엔티티 기준의 빈 스키마 초기화 파일이다.
--- 보조 인덱스, UNIQUE 제약, FOREIGN KEY는 의도적으로 만들지 않는다.
--- PK는 각 엔티티 식별자 및 AUTO_INCREMENT 생성을 위해서만 둔다.
+-- JPA 엔티티가 선언한 UNIQUE 제약과 조회 경로의 보조 인덱스는 함께 만든다.
+-- FOREIGN KEY는 애플리케이션의 기존 참조 방식에 맞춰 만들지 않는다.
 -- 기존 테이블을 삭제하지 않으므로, 빈 데이터베이스에서 한 번만 실행한다.
 
 CREATE TABLE `member` (
@@ -12,7 +12,9 @@ CREATE TABLE `member` (
     `nickname` VARCHAR(30) NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`member_id`)
+    PRIMARY KEY (`member_id`),
+    UNIQUE KEY `uk_member_phone_number` (`phone_number`),
+    UNIQUE KEY `uk_member_nickname` (`nickname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `venue` (
@@ -47,6 +49,9 @@ CREATE TABLE `concert` (
     `end_date` DATETIME(6) NULL,
     `open_at` DATETIME(6) NULL,
     `venue_id` BIGINT NOT NULL,
+    `organizer_id` BIGINT NULL,
+    `face_price` DECIMAL(38,0) NULL,
+    `show_id` DECIMAL(38,0) NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
     PRIMARY KEY (`concert_id`)
@@ -63,20 +68,19 @@ CREATE TABLE `section` (
     `venue_id` BIGINT NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`section_id`)
+    PRIMARY KEY (`section_id`),
+    UNIQUE KEY `uk_section_venue_name` (`venue_id`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `seat` (
     `seat_id` BIGINT NOT NULL AUTO_INCREMENT,
     `seat_no` INT NOT NULL,
     `seat_col` INT NOT NULL,
-    `status` VARCHAR(255) NOT NULL,
     `section_id` BIGINT NOT NULL,
-    `held_by_member_id` BIGINT NULL,
-    `held_until` DATETIME(6) NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`seat_id`)
+    PRIMARY KEY (`seat_id`),
+    UNIQUE KEY `uk_seat_section_position` (`section_id`, `seat_no`, `seat_col`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `concert_artist` (
@@ -126,7 +130,38 @@ CREATE TABLE `refresh_token` (
     `expires_at` DATETIME(6) NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
-    PRIMARY KEY (`refresh_token_id`)
+    PRIMARY KEY (`refresh_token_id`),
+    UNIQUE KEY `uk_refresh_token_member_device` (`member_id`, `device_id`),
+    UNIQUE KEY `uk_refresh_token_hash` (`token_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 예약별 온체인 NFT 발행 상태. token_id와 reservation_id는 각각 하나의 티켓에만 대응한다.
+CREATE TABLE `ticket` (
+    `ticket_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `reservation_id` BIGINT NOT NULL,
+    `token_id` DECIMAL(38,0) NULL,
+    `mint_tx_hash` VARCHAR(66) NULL,
+    `mint_attempt_count` INT NOT NULL,
+    `failure_reason` VARCHAR(500) NULL,
+    `status` VARCHAR(255) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`ticket_id`),
+    UNIQUE KEY `uk_ticket_token_id` (`token_id`),
+    UNIQUE KEY `uk_ticket_reservation` (`reservation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 온체인 지갑 잔액의 화면용 오프체인 거래 이력.
+CREATE TABLE `wallet_transaction` (
+    `wallet_transaction_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `member_id` BIGINT NOT NULL,
+    `title` VARCHAR(200) NOT NULL,
+    `amount` DECIMAL(38,0) NOT NULL,
+    `balance_after` DECIMAL(38,0) NOT NULL,
+    `source` VARCHAR(100) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`wallet_transaction_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 공연별 좌석 선점 이력. HELD 상태인 행만 생성 컬럼을 통해 유일하게 만든다.
@@ -166,24 +201,28 @@ CREATE TABLE `reservation` (
     KEY `ix_rsv_member` (`member_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 티켓 양도 매물. 티켓 도메인 테이블이 없으므로 ticket_id는 식별자만 보관한다.
+-- 티켓 양도 매물. ticket_id는 응답에 내보내지 않는 내부 식별자다.
 CREATE TABLE `ticket_listing` (
     `listing_id` BIGINT NOT NULL AUTO_INCREMENT,
     `ticket_id` BIGINT NOT NULL,
     `seller_member_id` BIGINT NOT NULL,
     `concert_id` BIGINT NOT NULL,
     `section_id` BIGINT NOT NULL,
-    `price` INT NOT NULL,
-    `face_value` INT NOT NULL,
+    `seat_no` INT NOT NULL,
+    `seat_col` INT NOT NULL,
+    `price` BIGINT NOT NULL,
+    `face_value` BIGINT NOT NULL,
     `status` VARCHAR(20) NOT NULL,
     `listed_at` DATETIME(6) NOT NULL,
     `closed_at` DATETIME(6) NULL,
+    `active_ticket` BIGINT GENERATED ALWAYS AS (IF(`status` = 'LISTED', `ticket_id`, NULL)) STORED,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
     PRIMARY KEY (`listing_id`),
     KEY `idx_listing_concert_status_price` (`concert_id`, `status`, `price`),
     KEY `idx_listing_seller_status` (`seller_member_id`, `status`),
-    KEY `idx_listing_ticket` (`ticket_id`)
+    KEY `idx_listing_ticket` (`ticket_id`),
+    UNIQUE KEY `uk_listing_ticket_active` (`active_ticket`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 티켓 양도 체결 이력. 하나의 매물은 한 번만 체결할 수 있다.
@@ -229,15 +268,12 @@ INSERT INTO `section` (
 SET @load_test_section_id = LAST_INSERT_ID();
 
 INSERT INTO `seat` (
-    `seat_no`, `seat_col`, `status`, `section_id`, `held_by_member_id`, `held_until`, `created_at`, `updated_at`
+    `seat_no`, `seat_col`, `section_id`, `created_at`, `updated_at`
 )
 SELECT
     FLOOR(numbers.n / 50) + 1,
     MOD(numbers.n, 50) + 1,
-    'AVAILABLE',
     @load_test_section_id,
-    NULL,
-    NULL,
     CURRENT_TIMESTAMP(6),
     CURRENT_TIMESTAMP(6)
 FROM (
