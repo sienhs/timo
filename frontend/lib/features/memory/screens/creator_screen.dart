@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../constants.dart';
-import '../data/background_extension_service.dart';
 import '../models/memory_concert.dart';
 import '../state/creation_job_scope.dart';
 import '../state/memory_concert_api_scope.dart';
@@ -62,16 +61,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
   String? background;
   String? backgroundAsset;
   PhotoFraming framing = const PhotoFraming();
-
-  /// AI-extended copy of [background]; generated once per photo when the
-  /// user presses "쓰기" and kept so toggling never bills twice.
-  String? aiBackground;
-  bool useAi = false;
-  bool aiRunning = false;
   final people = <Map<String, dynamic>>[];
   TicketEffect effect = TicketEffect.none;
   String status = CreatorText.processing[0];
-  /// 사진 복사·보정·AI 확장처럼 화면을 잠가야 하는 작업이 도는 중.
+  /// 사진 복사·보정처럼 화면을 잠가야 하는 작업이 도는 중.
   bool busy = false;
 
   /// Set once the job has been handed off; the route then shows the stage.
@@ -80,14 +73,6 @@ class _CreatorScreenState extends State<CreatorScreen> {
 
   bool get lastStep => step == CreatorText.totalSteps - 1;
 
-  bool get aiAvailable => service.extension.available;
-  bool get aiActive => useAi && aiBackground != null;
-
-  /// What the later steps and the job actually render. The AI copy already
-  /// matches the card aspect, so it is shown edge to edge without framing.
-  String? get effectiveBackground => aiActive ? aiBackground : background;
-  PhotoFraming get effectiveFraming =>
-      aiActive ? const PhotoFraming() : framing;
   int get personIndex => step == 2 ? 0 : 1;
 
   @override
@@ -150,8 +135,6 @@ class _CreatorScreenState extends State<CreatorScreen> {
         background = path;
         backgroundAsset = asset;
         framing = const PhotoFraming();
-        aiBackground = null;
-        useAi = false;
       } else {
         Map<String, dynamic> person;
         try {
@@ -191,53 +174,6 @@ class _CreatorScreenState extends State<CreatorScreen> {
     }
   }
 
-  /// "쓰기": outpaint the picked photo to the card aspect (one paid call per
-  /// photo) and preview it in place of the framing editor.
-  Future<void> extendWithAi() async {
-    final source = background;
-    if (source == null || busy) return;
-    if (aiBackground != null) {
-      setState(() => useAi = true);
-      return;
-    }
-    setState(() {
-      busy = true;
-      status = BackgroundExtensionConstants.aiRunning;
-      aiRunning = true;
-    });
-    try {
-      final result = await service.extension.extendToAspect(
-        source,
-        ViewerConstants.cardAspect,
-      );
-      if (!mounted) return;
-      switch (result.outcome) {
-        case BackgroundExtensionOutcome.generated:
-          aiBackground = result.path;
-          useAi = true;
-        case BackgroundExtensionOutcome.skipped:
-          OverlayService.notify(
-            context,
-            aiAvailable
-                ? BackgroundExtensionConstants.aiNotNeeded
-                : BackgroundExtensionConstants.aiUnavailable,
-          );
-        case BackgroundExtensionOutcome.failed:
-          OverlayService.notify(
-            context,
-            '${BackgroundExtensionConstants.aiFailed}\n${result.error}',
-          );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          busy = false;
-          aiRunning = false;
-        });
-      }
-    }
-  }
-
   /// Match crops across everyone currently chosen, then re-seed the placement
   /// of any person whose image changed (plus the ones in [changed]).
   Future<void> harmonizePeople({Set<int> changed = const {}}) async {
@@ -258,11 +194,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
     }
     final draft = CreationDraft(
       concert: concert!,
-      background: effectiveBackground!,
+      background: background!,
       people: [for (final p in people) Map<String, dynamic>.from(p)],
       effect: effect,
-      framing: effectiveFraming,
-      aiExtended: aiActive,
+      framing: framing,
     );
     CreationJobScope.read(context).start(draft, service: service);
     setState(() => submitted = true);
@@ -410,140 +345,47 @@ class _CreatorScreenState extends State<CreatorScreen> {
     return '$cropped$segmentation\n${a['poseAvailable'] == true ? 'MediaPipe · ${CreationService.cropLabel(a['cropType'] as String)}' : '자세 분석 불가 · 크기 기반 배치'}\n${a['faceAvailable'] == true ? '얼굴 감지 완료' : '얼굴 감지 불가 · 크기 기반 배치'}';
   }
 
-  /// Opt-in card for generative outpainting. "쓰기" runs the model once;
-  /// "끄기" returns to manual framing without discarding the result.
-  Widget aiExtensionCard() => Semantics(
-    container: true,
-    label: BackgroundExtensionConstants.aiTitle,
-    child: PaperCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      radius: 12,
-      elevated: false,
-      selected: aiActive,
-      color: aiActive ? TimoColors.brandSoft : TimoColors.paperMuted,
-      child: Row(
-        children: [
-          Icon(
-            Icons.auto_awesome_rounded,
-            size: 22,
-            color: aiAvailable ? TimoColors.brandMid : TimoColors.inkTertiary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      BackgroundExtensionConstants.aiTitle,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: TimoColors.ink,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      service.extension.outpaint.label,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: TimoColors.inkTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  aiAvailable
-                      ? BackgroundExtensionConstants.aiDescription
-                      : BackgroundExtensionConstants.aiUnavailable,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    height: 1.45,
-                    color: TimoColors.inkSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          if (aiActive)
-            OutlinedButton(
-              onPressed: () => setState(() => useAi = false),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: TimoColors.brand,
-                side: const BorderSide(color: TimoColors.brandMid),
-                minimumSize: const Size(64, 38),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              child: const Text(BackgroundExtensionConstants.aiStopLabel),
-            )
-          else
-            FilledButton(
-              onPressed: aiAvailable ? extendWithAi : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: TimoColors.brandMid,
-                minimumSize: const Size(64, 38),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              child: const Text(BackgroundExtensionConstants.aiUseLabel),
-            ),
-        ],
-      ),
-    ),
-  );
-
   Widget backgroundEditor(String path) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      aiExtensionCard(),
-      const SizedBox(height: 12),
-      if (!aiActive) ...[
-        Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('프레임 채우기'),
-              selected: !framing.contain,
-              onSelected: (_) => setState(() => framing = const PhotoFraming()),
-            ),
-            ChoiceChip(
-              label: const Text('전체 사진 넣기'),
-              selected: framing.contain,
-              onSelected: (_) =>
-                  setState(() => framing = const PhotoFraming(contain: true)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-      ],
+      Wrap(
+        spacing: 8,
+        children: [
+          ChoiceChip(
+            label: const Text('프레임 채우기'),
+            selected: !framing.contain,
+            onSelected: (_) => setState(() => framing = const PhotoFraming()),
+          ),
+          ChoiceChip(
+            label: const Text('전체 사진 넣기'),
+            selected: framing.contain,
+            onSelected: (_) =>
+                setState(() => framing = const PhotoFraming(contain: true)),
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
       Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 260),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(TimoRadii.tile),
             child: PhotoFrame(
-              path: effectiveBackground ?? path,
-              framing: effectiveFraming,
-              onChanged: aiActive
-                  ? null
-                  : (value) => setState(() => framing = value),
+              path: path,
+              framing: framing,
+              onChanged: (value) => setState(() => framing = value),
             ),
           ),
         ),
       ),
       const SizedBox(height: 10),
       Text(
-        aiActive
-            ? BackgroundExtensionConstants.aiPreviewNote
-            : framing.contain
+        framing.contain
             ? '사진 전체를 보여주고 남는 공간은 단색으로 채워요.'
             : '사진을 드래그해 이동하고, 두 손가락이나 슬라이더로 확대하세요.',
         style: const TextStyle(fontSize: 12, color: TimoColors.inkSecondary),
       ),
-      if (!aiActive && !framing.contain)
+      if (!framing.contain)
         Row(
           children: [
             Text('${framing.scale.toStringAsFixed(1)}배'),
@@ -567,8 +409,8 @@ class _CreatorScreenState extends State<CreatorScreen> {
   );
 
   Widget compositionEditor() => PersonPlacementEditor(
-    background: effectiveBackground!,
-    framing: effectiveFraming,
+    background: background!,
+    framing: framing,
     people: people,
     onChanged: (index, changes) =>
         setState(() => people[index].addAll(changes)),
@@ -680,9 +522,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          aiRunning
-              ? BackgroundExtensionConstants.aiServerNote
-              : CreatorText.onDeviceNote,
+          CreatorText.onDeviceNote,
           style: const TextStyle(fontSize: 12, color: TimoColors.inkTertiary),
         ),
         const SizedBox(height: 28),

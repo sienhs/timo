@@ -19,19 +19,15 @@ class CreationDraft {
     required this.people,
     required this.effect,
     required this.framing,
-    this.aiExtended = false,
   });
 
   final MemoryConcert concert;
 
-  /// 고른 사진, 또는 '쓰기' 를 누른 뒤의 AI 확장본.
+  /// 고른 배경 사진.
   final String background;
   final List<Map<String, dynamic>> people;
   final TicketEffect effect;
   final PhotoFraming framing;
-
-  /// [background] 가 생성형 아웃페인팅 결과일 때 참.
-  final bool aiExtended;
 }
 
 sealed class CreationJobState {
@@ -90,7 +86,6 @@ class CreationJob extends ChangeNotifier {
         people: draft.people,
         effect: draft.effect.label,
         framing: draft.framing,
-        aiExtended: draft.aiExtended,
       );
       await _store.save(ticket);
       // 파티클을 한 번 치고 갈 만한 유일한 사건.

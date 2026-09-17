@@ -184,12 +184,11 @@ git lfs pull
 ### 실행
 
 ```bash
-flutter run                                   # AI 배경 확장 없이. 나머지는 전부 동작
-flutter run --dart-define-from-file=.env      # AI 배경 확장까지 (.env.example 참고)
+flutter run
 ```
 
-`.env` 는 커밋하지 않는다(`.gitignore`). 키가 없으면 '쓰기'(AI 배경 확장) 버튼만
-비활성이고 제작 흐름은 그대로 돈다.
+추억 티켓 제작은 전부 기기 안에서 돈다(누끼·깊이·합성). 외부 생성형 AI 호출이나
+API 키 주입은 없다.
 
 ### 알아둘 것
 

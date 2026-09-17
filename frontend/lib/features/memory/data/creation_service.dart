@@ -4,38 +4,20 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../constants.dart';
-import 'background_extension_service.dart';
-import 'outpaint_service.dart';
 import '../models/memory_concert.dart';
 import 'depth_service.dart';
 import 'person_layering.dart';
 import 'composition_service.dart';
 import 'segmentation_service.dart';
-import 'outpaint_config.dart';
 import '../models/memory_ticket.dart';
 import '../models/photo_framing.dart';
 import '../models/person_depth_layer.dart';
 
 class CreationService {
-  CreationService({OutpaintService? outpaint})
-    : extension = BackgroundExtensionService(
-        outpaint ??
-            outpaintServiceFor(
-              provider: OutpaintConfig.provider,
-              apiKey: OutpaintConfig.apiKey,
-              baseUrl: OutpaintConfig.baseUrl,
-              model: OutpaintConfig.model,
-            ),
-      );
   final segmentation = SegmentationService();
   final composition = CompositionService();
   final depth = DepthService();
   final layering = PersonLayering();
-
-  /// Generative outpainting. Only ever called when the user presses "쓰기"
-  /// on the creator's background step; plain creation stays on-device.
-  final BackgroundExtensionService extension;
   static const _channel = MethodChannel('timo/image_pipeline');
 
   Future<String> copyPhotoToPrivateStorage(
@@ -403,7 +385,6 @@ class CreationService {
     required List<Map<String, dynamic>> people,
     required String effect,
     PhotoFraming framing = const PhotoFraming(),
-    bool aiExtended = false,
   }) async {
     final composite = await composition.compose(people);
     final prepared = await prepareBackground(background, framing: framing);
@@ -419,12 +400,7 @@ class CreationService {
     } catch (_) {
       transition = {'firstFrameAnalyzed': false};
     }
-    final notes = <String>[
-      if (aiExtended)
-        '${BackgroundExtensionConstants.aiNote} (${extension.outpaint.label})'
-      else
-        ...prepared.notes,
-    ];
+    final notes = <String>[...prepared.notes];
     for (var i = 0; i < people.length; i++) {
       final p = people[i];
       final a = p['analysis'] as Map;
@@ -481,7 +457,7 @@ class CreationService {
       _upgradeDemoDepth(ticket);
 
   /// Replace legacy demo depth using the already prepared background. This
-  /// path never requests outpainting or rebuilds the person composition.
+  /// path never rebuilds the person composition.
   Future<MemoryTicket> _upgradeDemoDepth(MemoryTicket ticket) async {
     if (!ticket.demoDepth) return ticket;
     final result = await depth.analyzeAndCache(ticket.backgroundPath);
