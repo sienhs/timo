@@ -30,6 +30,10 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    // JDBC 쿼리를 Micrometer Observation으로 감싸 Jaeger에 DB query span을 보낸다.
+    implementation platform('net.ttddyy.observation:datasource-micrometer-bom:2.2.1')
+    implementation 'net.ttddyy.observation:datasource-micrometer-spring-boot'
+    implementation 'net.ttddyy.observation:datasource-micrometer-opentelemetry'
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'com.solapi:sdk:1.0.3'
 
