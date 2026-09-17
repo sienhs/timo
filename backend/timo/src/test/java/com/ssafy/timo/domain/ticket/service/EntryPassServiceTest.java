@@ -9,8 +9,10 @@ import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.ticket.dto.EntryPassResponseDto;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
-import com.ssafy.timo.domain.ticket.exception.EntryPassNotIssuableException;
+import com.ssafy.timo.domain.ticket.exception.EntryWindowClosedException;
+import com.ssafy.timo.domain.ticket.exception.EntryWindowNotOpenException;
 import com.ssafy.timo.domain.ticket.exception.TicketNotFoundException;
+import com.ssafy.timo.domain.ticket.exception.TicketStatusNotIssuableException;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.global.config.EntryPassProperties;
 import java.math.BigInteger;
@@ -90,7 +92,7 @@ class EntryPassServiceTest {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
 
         assertThatThrownBy(() -> serviceAt(NOW).issue(MEMBER_ID, TICKET_ID))
-                .isInstanceOf(EntryPassNotIssuableException.class);
+                .isInstanceOf(TicketStatusNotIssuableException.class);
     }
 
     @Test
@@ -100,7 +102,7 @@ class EntryPassServiceTest {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
 
         assertThatThrownBy(() -> serviceAt(NOW).issue(MEMBER_ID, TICKET_ID))
-                .isInstanceOf(EntryPassNotIssuableException.class);
+                .isInstanceOf(TicketStatusNotIssuableException.class);
     }
 
     @Test
@@ -111,7 +113,7 @@ class EntryPassServiceTest {
         LocalDateTime tooEarly = CONCERT_START.minus(EntryPassService.ENTRY_OPENS_BEFORE_START).minusMinutes(1);
 
         assertThatThrownBy(() -> serviceAt(tooEarly).issue(MEMBER_ID, TICKET_ID))
-                .isInstanceOf(EntryPassNotIssuableException.class);
+                .isInstanceOf(EntryWindowNotOpenException.class);
     }
 
     @Test
@@ -132,7 +134,7 @@ class EntryPassServiceTest {
         LocalDateTime tooLate = CONCERT_START.plus(EntryPassService.ENTRY_CLOSES_AFTER_START).plusMinutes(1);
 
         assertThatThrownBy(() -> serviceAt(tooLate).issue(MEMBER_ID, TICKET_ID))
-                .isInstanceOf(EntryPassNotIssuableException.class);
+                .isInstanceOf(EntryWindowClosedException.class);
     }
 
     @Test

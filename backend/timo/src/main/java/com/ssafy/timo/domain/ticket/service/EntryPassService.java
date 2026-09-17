@@ -5,13 +5,16 @@ import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.ticket.dto.EntryPassResponseDto;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
-import com.ssafy.timo.domain.ticket.exception.EntryPassNotIssuableException;
+import com.ssafy.timo.domain.ticket.exception.EntryWindowClosedException;
+import com.ssafy.timo.domain.ticket.exception.EntryWindowNotOpenException;
 import com.ssafy.timo.domain.ticket.exception.TicketNotFoundException;
+import com.ssafy.timo.domain.ticket.exception.TicketStatusNotIssuableException;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>아무것도 저장하지 않는다. 발급은 순수 조회 + 서명이라 같은 티켓으로 몇 번을 불러도 서버 상태가
  * 바뀌지 않는다. "이 티켓이 입장했다" 를 기록하는 일은 게이트 검증 쪽 몫이다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -62,7 +66,9 @@ public class EntryPassService {
         if (ticket.getStatus() != TicketStatus.OWNED) {
             // 발행 전(PENDING_MINT)·이미 입장(USED)·회수(REVOKED)·양도 등록 중(LISTED) 전부 여기서 걸린다.
             // 예매를 취소하면 티켓도 같은 트랜잭션에서 REVOKED 가 되므로 주문 상태는 따로 보지 않는다.
-            throw new EntryPassNotIssuableException(ticketId, "입장할 수 있는 상태가 아닙니다 (status=" + ticket.getStatus() + ")");
+            // 어떤 상태였는지는 사용자에게 알릴 이유가 없는 내부 값이라 로그로만 남긴다.
+            log.debug("입장 QR 발급 불가 - 티켓 상태 (ticketId={}, status={})", ticketId, ticket.getStatus());
+            throw new TicketStatusNotIssuableException();
         }
 
         requireWithinEntryWindow(ticketId, reservation.getConcert());
@@ -79,10 +85,12 @@ public class EntryPassService {
 
         LocalDateTime now = LocalDateTime.now(clock);
         if (now.isBefore(startDate.minus(ENTRY_OPENS_BEFORE_START))) {
-            throw new EntryPassNotIssuableException(ticketId, "아직 입장 시간이 아닙니다 (startDate=" + startDate + ")");
+            log.debug("입장 QR 발급 불가 - 아직 발급 시간 전 (ticketId={}, startDate={})", ticketId, startDate);
+            throw new EntryWindowNotOpenException();
         }
         if (now.isAfter(startDate.plus(ENTRY_CLOSES_AFTER_START))) {
-            throw new EntryPassNotIssuableException(ticketId, "입장 시간이 지났습니다 (startDate=" + startDate + ")");
+            log.debug("입장 QR 발급 불가 - 발급 시간 종료 (ticketId={}, startDate={})", ticketId, startDate);
+            throw new EntryWindowClosedException();
         }
     }
 }
