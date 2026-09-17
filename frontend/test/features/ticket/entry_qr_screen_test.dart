@@ -10,6 +10,7 @@ import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
+import 'package:timo/features/ticket/models/ticket_acquisition.dart';
 import 'package:timo/features/ticket/models/ticket_status.dart';
 import 'package:timo/features/ticket/screens/entry_qr_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
@@ -25,8 +26,10 @@ void main() {
     seatRow: 12,
     seatNumber: 24,
     facePrice: 154000,
-    status: TicketStatus.paid,
-    bookedAt: DateTime(2026, 8, 1),
+    status: TicketStatus.owned,
+    listed: false,
+    acquiredBy: TicketAcquisition.booking,
+    acquiredAt: DateTime(2026, 8, 1),
     startAt: DateTime(2026, 9, 14, 19),
   );
 

@@ -17,7 +17,7 @@ import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
-import 'package:timo/features/ticket/models/ticket_status.dart';
+import 'package:timo/features/ticket/models/reservation_status.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
@@ -75,7 +75,7 @@ class _FakeTicketApi implements TicketApi {
   /// 주문 상세 한 건. 아무것도 안 넘기면 발행 중이다.
   static ReservationDetail detail({
     int concertId = 3,
-    TicketStatus status = TicketStatus.paid,
+    ReservationStatus status = ReservationStatus.paid,
     String? tokenId,
     String? failureReason,
   }) => ReservationDetail(
@@ -330,7 +330,7 @@ void main() {
     final issuing = _FakeTicketApi.detail();
     final issued = _FakeTicketApi.detail(tokenId: '42');
     final failed = _FakeTicketApi.detail(
-      status: TicketStatus.cancelled,
+      status: ReservationStatus.cancelled,
       failureReason: 'insufficient balance',
     );
 

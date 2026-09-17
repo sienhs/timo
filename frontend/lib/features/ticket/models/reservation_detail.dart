@@ -1,4 +1,4 @@
-import 'ticket_status.dart';
+import 'reservation_status.dart';
 
 /// 온체인 티켓 발행이 어디까지 갔는지.
 ///
@@ -51,7 +51,7 @@ class ReservationDetail {
         seatRow: (json['seatNo'] as num).toInt(),
         seatNumber: (json['seatCol'] as num).toInt(),
         facePrice: (json['facePrice'] as num).toInt(),
-        status: TicketStatus.fromWire(json['status']),
+        status: ReservationStatus.fromWire(json['status']),
         posterImageUrl: json['posterImageUrl'] as String?,
         startAt: _dateTimeOrNull(json['startDate']),
         tokenId: json['tokenId'] as String?,
@@ -78,7 +78,7 @@ class ReservationDetail {
   final int facePrice;
 
   /// 이 자리를 샀는가. 발행 진행 상태는 [issueStatus] 가 따로 가른다.
-  final TicketStatus status;
+  final ReservationStatus status;
 
   /// 포스터 주소. 포스터가 없는 공연이면 null.
   final String? posterImageUrl;

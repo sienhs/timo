@@ -5,11 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/features/ticket/data/http_ticket_api.dart';
 import 'package:timo/features/ticket/models/reservation_detail.dart';
+import 'package:timo/features/ticket/models/reservation_status.dart';
+import 'package:timo/features/ticket/models/ticket_acquisition.dart';
 import 'package:timo/features/ticket/models/ticket_status.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
-/// 예매·티켓 v1 API 에 맞는 요청이 나가고 응답을 제대로 읽는지.
+/// 티켓·예매 v1 API 에 맞는 요청이 나가고 응답을 제대로 읽는지.
 /// 서버 없이 [FakeHttpAdapter] 로 검사한다.
 void main() {
   late FakeHttpAdapter adapter;
@@ -27,15 +29,19 @@ void main() {
     api = HttpTicketApi(dio: dio, clock: clock);
   }
 
-  /// 서버 예매 목록 응답 한 건. 실제 `ReservationSummaryResponseDto` 모양이다.
-  Map<String, dynamic> reservationJson({
-    int id = 1,
-    String status = 'PAID',
+  /// 서버 내 티켓 목록 응답 한 건. 실제 `MyTicketSummaryResponseDto` 모양이다.
+  /// 필드 이름은 예매 목록과 같고, 티켓 상태·등록 여부·취득 경로·취득 시각이
+  /// 더 있다.
+  Map<String, dynamic> myTicketJson({
+    int ticketId = 101,
+    String ticketStatus = 'OWNED',
+    bool listed = false,
+    String acquiredBy = 'BOOKING',
     String? startDate = '2026-10-10T19:00:00',
   }) => {
-    'id': id,
-    // 예매 번호와 다른 값이다. 양도 등록이 받는 쪽.
-    'ticketId': 100 + id,
+    'ticketId': ticketId,
+    // 이 티켓을 발행한 예매. 양도로 받았으면 판 사람 것이다.
+    'reservationId': ticketId - 100,
     'concertId': 11,
     'concertTitle': '2026 REMIND: 리센느',
     'posterImageUrl': 'poster/remind.gif',
@@ -46,9 +52,30 @@ void main() {
     'seatNo': 12,
     'seatCol': 24,
     'facePrice': 154000,
-    'status': status,
-    'createdAt': '2026-09-01T20:05:00',
+    'ticketStatus': ticketStatus,
+    'acquiredBy': acquiredBy,
+    'acquiredAt': '2026-09-01T20:05:00',
+    'listed': listed,
   };
+
+  /// 서버 예매 목록 응답 한 건. 실제 `ReservationSummaryResponseDto` 모양이다.
+  /// 예매 취소가 이 모양을 돌려준다.
+  Map<String, dynamic> reservationJson({int id = 1, String status = 'PAID'}) =>
+      {
+        'id': id,
+        'ticketId': 100 + id,
+        'concertId': 11,
+        'concertTitle': '2026 REMIND: 리센느',
+        'posterImageUrl': 'poster/remind.gif',
+        'startDate': '2026-10-10T19:00:00',
+        'venueName': '올림픽공원 체조경기장',
+        'sectionName': 'R석',
+        'seatNo': 12,
+        'seatCol': 24,
+        'facePrice': 154000,
+        'status': status,
+        'createdAt': '2026-09-01T20:05:00',
+      };
 
   /// 서버 주문 상세 응답. 실제 `ReservationDetailResponseDto` 모양이다. 주문
   /// 생성(201)과 진행 상태 조회가 같은 모양을 준다.
@@ -92,37 +119,41 @@ void main() {
   };
 
   group('내 티켓 목록', () {
-    test('예매 목록 주소로 GET 하고 한 번에 다 받는다', () async {
-      givenServer((_) => jsonResponse(paged([reservationJson()])));
+    // 예매 목록이 아니라 소유 기준 목록이다. 양도로 판 티켓이 빠지고 산 티켓이
+    // 들어오는 쪽.
+    test('티켓 조회 주소로 GET 하고 한 번에 다 받는다', () async {
+      givenServer((_) => jsonResponse(paged([myTicketJson()])));
 
       await api.fetchMyTickets();
 
       final request = adapter.requests.single;
       expect(request.method, 'GET');
-      expect(request.path, '/api/v1/reservations');
-      // 상태로 거르지 않는다. 취소된 티켓도 회색 카드로 남겨야 한다.
+      expect(request.path, '/api/v1/tickets/me');
+      // 상태로 거르지 않는다. 회수된 티켓도 회색 카드로 남겨야 한다.
       expect(request.query.containsKey('status'), isFalse);
       expect(request.query['size'], '100');
     });
 
     test('응답을 모델로 읽는다', () async {
-      givenServer((_) => jsonResponse(paged([reservationJson()])));
+      givenServer((_) => jsonResponse(paged([myTicketJson()])));
 
-      final tickets = await api.fetchMyTickets();
+      final ticket = (await api.fetchMyTickets()).single;
 
-      final ticket = tickets.single;
-      expect(ticket.reservationId, 1);
-      // 둘은 다른 값이다. 바꿔 읽으면 양도 등록이 서버에서 거절된다.
+      // 티켓 번호가 주 식별자다. 예매 번호는 취소할 때만 쓴다.
       expect(ticket.ticketId, 101);
+      expect(ticket.reservationId, 1);
       expect(ticket.title, '2026 REMIND: 리센느');
-      expect(ticket.status, TicketStatus.paid);
+      expect(ticket.status, TicketStatus.owned);
+      expect(ticket.listed, isFalse);
+      expect(ticket.acquiredBy, TicketAcquisition.booking);
+      expect(ticket.acquiredAt, DateTime(2026, 9, 1, 20, 5));
       expect(ticket.facePrice, 154000);
       expect(ticket.startAt, DateTime(2026, 10, 10, 19));
     });
 
     // 이름이 직관과 반대라 뒤집혀 들어가기 쉬운 자리다.
     test('seatNo 가 열, seatCol 이 번으로 들어간다', () async {
-      givenServer((_) => jsonResponse(paged([reservationJson()])));
+      givenServer((_) => jsonResponse(paged([myTicketJson()])));
 
       final ticket = (await api.fetchMyTickets()).single;
 
@@ -131,10 +162,27 @@ void main() {
       expect(ticket.seatLabel, 'R석 12열 24번');
     });
 
-    test('공연 날짜가 없어도 읽는다', () async {
+    // 예매 목록에는 없던 값들이다. 이걸 보고 버튼을 미리 잠근다.
+    test('양도 등록 중과 양도로 받은 티켓을 그대로 읽는다', () async {
       givenServer(
-        (_) => jsonResponse(paged([reservationJson(startDate: null)])),
+        (_) => jsonResponse(
+          paged([
+            myTicketJson(ticketId: 101, ticketStatus: 'LISTED', listed: true),
+            myTicketJson(ticketId: 102, acquiredBy: 'TRANSFER'),
+          ]),
+        ),
       );
+
+      final tickets = await api.fetchMyTickets();
+
+      expect(tickets[0].isListed, isTrue);
+      expect(tickets[0].isUsable, isFalse);
+      expect(tickets[1].acquiredBy, TicketAcquisition.transfer);
+      expect(tickets[1].isBooked, isFalse);
+    });
+
+    test('공연 날짜가 없어도 읽는다', () async {
+      givenServer((_) => jsonResponse(paged([myTicketJson(startDate: null)])));
 
       expect((await api.fetchMyTickets()).single.startAt, isNull);
     });
@@ -142,12 +190,12 @@ void main() {
     // 서버에 상태가 하나 늘어도 목록 전체가 깨지면 안 된다. 그 카드만 잠근다.
     test('모르는 상태는 알 수 없음으로 본다', () async {
       givenServer(
-        (_) => jsonResponse(paged([reservationJson(status: 'TRANSFERRED')])),
+        (_) => jsonResponse(paged([myTicketJson(ticketStatus: 'BURNED')])),
       );
 
       final ticket = (await api.fetchMyTickets()).single;
       expect(ticket.status, TicketStatus.unknown);
-      expect(ticket.status.isUsable, isFalse);
+      expect(ticket.isUsable, isFalse);
     });
 
     test('빈 목록은 정상 결과다', () async {
@@ -242,7 +290,7 @@ void main() {
       expect(detail.title, '로이킴 콘서트');
       expect(detail.seatLabel, 'A구역 1열 9번');
       expect(detail.facePrice, 150000);
-      expect(detail.status, TicketStatus.paid);
+      expect(detail.status, ReservationStatus.paid);
       expect(detail.issueStatus, TicketIssueStatus.issuing);
     });
 

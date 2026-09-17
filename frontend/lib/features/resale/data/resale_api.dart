@@ -99,8 +99,9 @@ abstract class ResaleApi {
 
   /// 내가 양도 등록할 수 있는 티켓 목록.
   ///
-  /// 이 목록만 주는 서버 주소가 없어 예매 목록에서 만든다([ListableTicket]
-  /// 주석). 등록이 받는 티켓 번호는 예매 응답의 `ticketId` 다.
+  /// 이 목록만 주는 서버 주소가 없어 내 티켓 목록에서 팔 수 있는 것(보유이고
+  /// 등록 중 아님)만 골라 만든다([ListableTicket] 주석). 양도로 받은 티켓도
+  /// 다시 팔 수 있어 함께 온다.
   Future<List<ListableTicket>> fetchListableTickets();
 
   /// 내 티켓을 매물로 등록한다.

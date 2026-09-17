@@ -232,34 +232,93 @@ void main() {
     });
   });
 
-  group('티켓이 손에 없는 상태', () {
-    testWidgets('취소됨·알 수 없음이 버튼 대신 안내로 나온다', (tester) async {
+  group('티켓 상태별 카드', () {
+    /// 상태 시나리오는 카드가 여덟 장이라 기본 화면 높이(600)에 다 안 그려진다.
+    /// 목록이 보이는 것만 만들기 때문이다. 화면을 길게 늘여 전부 그리게 한다.
+    Future<void> pumpStates(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 9000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await pumpScreen(tester, scenario: TicketMockScenario.states);
       await tester.pumpAndSettle();
+    }
 
+    bool tileEnabled(WidgetTester tester, String label) =>
+        tester.widget<ListTile>(find.widgetWithText(ListTile, label)).enabled;
+
+    // 시안에 없는 카드들. 서버가 티켓 상태를 주므로, 눌러 보고 거절당하게
+    // 하지 않고 카드에 사정을 적는다.
+    testWidgets('상태마다 버튼 대신 다른 안내가 나온다', (tester) async {
+      await pumpStates(tester);
+
+      expect(find.text(TicketStrings.listedNotice), findsOneWidget);
+      expect(find.text(TicketStrings.issuingNotice), findsOneWidget);
+      expect(find.text(TicketStrings.mintFailedNotice), findsOneWidget);
+      expect(find.text(TicketStrings.refundedNotice), findsOneWidget);
       expect(find.text(TicketStrings.cancelledNotice), findsOneWidget);
+      expect(find.text(TicketStrings.usedNotice), findsOneWidget);
       expect(find.text(TicketStrings.unknownStatusNotice), findsOneWidget);
 
-      // 이 상태들에서는 입장도 상세도 눌릴 자리가 없다.
+      // 버튼은 양도로 받은 보유 티켓 한 장에만 있다. 입장 완료 티켓은 오늘
+      // 공연이지만 QR 이 열리지 않는다 — 서버가 거절하는 상태다.
+      expect(find.text(TicketStrings.showDetail), findsOneWidget);
       expect(find.text(TicketStrings.enterQr), findsNothing);
-      expect(find.text(TicketStrings.showDetail), findsNothing);
+    });
+
+    // 아직 표가 없는데 남은 날을 세는 게 앞서 나간다.
+    testWidgets('발행 중 카드는 D-day 대신 NFT 발행 중 배지를 단다', (tester) async {
+      await pumpStates(tester);
+
+      expect(find.text(TicketStrings.issuingBadge), findsOneWidget);
+      expect(find.text('D-3'), findsNothing);
     });
 
     // 남은 날을 세는 게 의미가 없다. 이미 못 가는 공연이다.
-    testWidgets('취소된 티켓에는 D-day 배지가 없다', (tester) async {
-      await pumpScreen(tester, scenario: TicketMockScenario.states);
-      await tester.pumpAndSettle();
+    testWidgets('회수·환불된 티켓에는 D-day 배지가 없다', (tester) async {
+      await pumpStates(tester);
 
       expect(find.text('D-9'), findsNothing);
     });
 
     // 회수된 티켓은 예정 탭에 남는다. 지난 공연 탭에 섞이면 다녀온 공연으로 읽힌다.
-    testWidgets('취소된 티켓은 지난 공연 탭에 안 간다', (tester) async {
-      await pumpScreen(tester, scenario: TicketMockScenario.states);
+    testWidgets('회수·환불된 티켓은 지난 공연 탭에 안 간다', (tester) async {
+      await pumpStates(tester);
+
+      expect(find.text('${TicketStrings.tabUpcoming} 8'), findsOneWidget);
+      expect(find.text('${TicketStrings.tabPast} 0'), findsOneWidget);
+    });
+
+    // 발행 중·입장 완료·회수·환불·모르는 상태는 할 수 있는 일이 없다.
+    testWidgets('더보기는 손에 있는 티켓(보유·양도 등록 중)에만 붙는다', (tester) async {
+      await pumpStates(tester);
+
+      expect(find.byIcon(Icons.more_vert), findsNWidgets(2));
+    });
+
+    // 등록 중인 티켓에도 더보기를 열어 왜 못 하는지 알려준다.
+    testWidgets('양도 등록 중이면 두 항목이 잠기고 이유가 붙는다', (tester) async {
+      await pumpStates(tester);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
       await tester.pumpAndSettle();
 
-      expect(find.text('${TicketStrings.tabUpcoming} 2'), findsOneWidget);
-      expect(find.text('${TicketStrings.tabPast} 0'), findsOneWidget);
+      expect(tileEnabled(tester, TicketStrings.registerListing), isFalse);
+      expect(find.text(TicketStrings.alreadyListed), findsOneWidget);
+      expect(tileEnabled(tester, TicketStrings.cancelReservation), isFalse);
+      expect(find.text(TicketStrings.cancelWhileListed), findsOneWidget);
+    });
+
+    // 예매 행이 판 사람 것이라 취소는 404 다. 다시 파는 것은 된다.
+    testWidgets('양도로 받은 티켓은 등록은 되고 예매 취소만 잠긴다', (tester) async {
+      await pumpStates(tester);
+
+      await tester.tap(find.byIcon(Icons.more_vert).last);
+      await tester.pumpAndSettle();
+
+      expect(tileEnabled(tester, TicketStrings.registerListing), isTrue);
+      expect(tileEnabled(tester, TicketStrings.cancelReservation), isFalse);
+      expect(find.text(TicketStrings.cancelNotBooked), findsOneWidget);
     });
   });
 

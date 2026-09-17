@@ -15,11 +15,10 @@ enum TicketMoreAction { registerListing, cancelReservation }
 /// 양도 등록과 예매 취소 둘이다. 등록을 위에, 되돌릴 수 없는 취소를 아래에
 /// 둔다. 요구사항대로 둘 중 유리한 쪽을 고르는 자리라 한 시트에 나란히 있다.
 ///
-/// 양도 등록은 늘 열어 둔다. 이미 올린 티켓인지 예매 응답이 알려 주지 않아
-/// 화면이 가릴 수 없고, 등록 화면이 고를 수 있는 티켓만 보여 준다.
-///
-/// 취소가 안 되는 티켓은 항목을 **지우지 않고 비활성으로** 둔다. 없으면 왜
-/// 취소를 못 하는지 알 길이 없다. 이유는 그 아래 한 줄로 적는다.
+/// 할 수 없는 항목은 **지우지 않고 비활성으로** 두고 이유를 그 아래 한 줄로
+/// 적는다. 없으면 왜 못 하는지 알 길이 없다. 이유는 서버가 준 티켓 정보로
+/// 미리 안다(S15P21D206-331) — 이미 마켓에 올렸는지, 양도로 받은 티켓인지,
+/// 공연이 코앞인지.
 Future<TicketMoreAction?> showTicketMoreSheet(
   BuildContext context, {
   required MyTicket ticket,
@@ -41,10 +40,21 @@ class _TicketMoreSheet extends StatelessWidget {
   final MyTicket ticket;
   final DateTime now;
 
+  /// 예매 취소가 막힌 이유. 여러 이유가 겹치면 사용자가 풀 수 있는 순서다 —
+  /// 등록은 내리면 되고, 양도로 받은 것은 영영 안 되고, 시간은 지났다.
+  String? get _cancelReason {
+    if (ticket.canCancel(now)) return null;
+    if (ticket.isListed) return TicketStrings.cancelWhileListed;
+    if (!ticket.isBooked) return TicketStrings.cancelNotBooked;
+    return TicketStrings.cancelTooLate;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final canCancel = ticket.canCancel(now);
+    // 이 시트는 손에 있는 티켓([MyTicket.isHeld])에만 열린다. 등록이 막히는
+    // 이유는 "이미 올렸다" 하나뿐이다.
+    final canList = ticket.isUsable;
+    final cancelReason = _cancelReason;
 
     return SafeArea(
       child: Column(
@@ -63,49 +73,71 @@ class _TicketMoreSheet extends StatelessWidget {
               ),
             ),
           ),
-          ListTile(
+          _ActionTile(
+            icon: Icons.storefront_outlined,
             // 빠른 메뉴의 양도마켓과 같은 아이콘. 어디로 가는지 미리 알린다.
-            leading: const Icon(
-              Icons.storefront_outlined,
-              color: AppColors.primary,
-            ),
-            title: Text(
-              TicketStrings.registerListing,
-              style: textTheme.bodyLarge?.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
+            iconColor: AppColors.primary,
+            label: TicketStrings.registerListing,
+            reason: canList ? null : TicketStrings.alreadyListed,
             onTap: () =>
                 Navigator.pop(context, TicketMoreAction.registerListing),
           ),
-          ListTile(
-            enabled: canCancel,
-            leading: Icon(
-              Icons.cancel_outlined,
-              color: canCancel ? AppColors.accent : AppColors.textDisabled,
-            ),
-            title: Text(
-              TicketStrings.cancelReservation,
-              style: textTheme.bodyLarge?.copyWith(
-                color: canCancel
-                    ? AppColors.textPrimary
-                    : AppColors.textDisabled,
-              ),
-            ),
-            subtitle: canCancel
-                ? null
-                : Text(
-                    TicketStrings.cancelTooLate,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+          _ActionTile(
+            icon: Icons.cancel_outlined,
+            iconColor: AppColors.accent,
+            label: TicketStrings.cancelReservation,
+            reason: cancelReason,
             onTap: () =>
                 Navigator.pop(context, TicketMoreAction.cancelReservation),
           ),
           const SizedBox(height: 8),
         ],
       ),
+    );
+  }
+}
+
+/// 시트의 항목 한 줄. [reason] 이 있으면 비활성이고 그 이유가 아래 붙는다.
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.reason,
+    required this.onTap,
+  });
+
+  final IconData icon;
+
+  /// 살아 있을 때의 아이콘 색. 잠기면 회색이다.
+  final Color iconColor;
+  final String label;
+  final String? reason;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final enabled = reason == null;
+
+    return ListTile(
+      enabled: enabled,
+      leading: Icon(icon, color: enabled ? iconColor : AppColors.textDisabled),
+      title: Text(
+        label,
+        style: textTheme.bodyLarge?.copyWith(
+          color: enabled ? AppColors.textPrimary : AppColors.textDisabled,
+        ),
+      ),
+      subtitle: reason == null
+          ? null
+          : Text(
+              reason!,
+              style: textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+      onTap: onTap,
     );
   }
 }
