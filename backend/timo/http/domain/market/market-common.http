@@ -90,6 +90,8 @@ Authorization: Bearer {{sellerToken}}
     client.assert(free.length >= 2, "등록 가능한 티켓이 2장 미만이다 - 앱을 새로 띄워 시드를 다시 만든다");
     client.global.set("ticketToSell", free[0].ticketId);
     client.global.set("ticketToKeep", free[1].ticketId);
+    client.global.set("reservationToSell", free[0].reservationId);
+    client.global.set("reservationToKeep", free[1].reservationId);
     client.global.set("facePrice", free[0].facePrice);
     client.log("팔 티켓 " + free[0].ticketId + "(정가 " + free[0].facePrice + "), 남길 티켓 " + free[1].ticketId);
 %}

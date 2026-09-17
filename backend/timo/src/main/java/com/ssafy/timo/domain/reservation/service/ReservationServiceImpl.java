@@ -27,6 +27,9 @@ import com.ssafy.timo.domain.seat.repository.SeatHoldRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.transfer.entity.ListingStatus;
+import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
+import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.global.storage.ImageStorage;
 import java.math.BigInteger;
@@ -68,6 +71,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final SeatHoldRepository seatHoldRepository;
     private final ReservationRepository reservationRepository;
     private final TicketRepository ticketRepository;
+    private final TicketTradeRepository ticketTradeRepository;
+    private final TicketListingRepository ticketListingRepository;
     private final WalletService walletService;
     private final TicketVaultClient ticketVaultClient;
     private final TicketNftClient ticketNftClient;
@@ -182,6 +187,11 @@ public class ReservationServiceImpl implements ReservationService {
      * <p>좌석을 별도로 "풀어" 주지 않는다 - {@code SeatStatus}는 {@code reservation.status}에서
      * 유도되므로, {@link Reservation#cancel}이 곧 좌석 반환이다.
      *
+     * <p><b>양도된 티켓은 취소하지 못한다.</b> 체결은 예매 행도 {@code ticket.status} 도 바꾸지 않아
+     * 여기 검사만으로는 판 사람이 그대로 통과한다 — 그러면 산 사람의 티켓이 회수되고 환불은 판 사람이
+     * 받는다. 등록 중인 티켓도 막는다. 회수된 티켓이 매물로 남으면 그걸 사는 사람이 생긴다.
+     * 두 검사는 온체인 호출보다 앞에 둔다.
+     *
      * <p>승계 대기자 자동 재발급은 아직 없다 - 지금은 회수해서 미판매로 남기는 것까지만 한다.
      */
     @Override
@@ -195,6 +205,12 @@ public class ReservationServiceImpl implements ReservationService {
         Ticket ticket = ticketOf(reservationId);
         if (ticket.getStatus() != TicketStatus.OWNED) {
             throw new ReservationNotCancellableException(reservationId, "발행 전이거나 이미 종료된 티켓입니다");
+        }
+        if (ticketTradeRepository.existsByTicketId(ticket.getId())) {
+            throw new ReservationNotCancellableException(reservationId, "양도된 티켓은 예매 취소할 수 없습니다");
+        }
+        if (ticketListingRepository.existsByTicketIdAndStatus(ticket.getId(), ListingStatus.LISTED)) {
+            throw new ReservationNotCancellableException(reservationId, "양도 등록 중인 티켓입니다. 등록을 먼저 취소해 주세요");
         }
 
         Concert concert = reservation.getConcert();

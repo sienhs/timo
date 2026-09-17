@@ -1,5 +1,8 @@
 package com.ssafy.timo.domain.transfer.service;
 
+import com.ssafy.timo.domain.ticket.entity.Ticket;
+import com.ssafy.timo.domain.ticket.entity.TicketStatus;
+import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
@@ -43,6 +46,7 @@ public class PurchaseService {
 
     private final TicketListingRepository ticketListingRepository;
     private final TicketTradeRepository ticketTradeRepository;
+    private final TicketRepository ticketRepository;
     private final MarketHoursService marketHoursService;
     private final Clock clock;
 
@@ -58,13 +62,15 @@ public class PurchaseService {
      *   <li>{@code expectedPrice} 가 등록가와 같은가 → 409</li>
      *   <li>내 매물이 아닌가 → 409</li>
      *   <li>등록가가 정가 이하인가(재검증) → 422</li>
+     *   <li>티켓이 아직 {@code OWNED} 인가 → 409. 예매 취소가 등록 중인 티켓을 막으므로 정상 경로에서는
+     *       안 걸리지만, 회수된 티켓이 매물로 남는 경로를 이쪽에서도 닫는다</li>
      *   <li>체결 기록 INSERT. 상태는 {@code PENDING}</li>
      * </ol>
      *
      * <p><b>3번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
      * 요청이 같은 매물을 통과한다. 확인과 전이가 한 문장 안에서 일어나야 선착순이 성립한다.
      *
-     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~6 번에서
+     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~7 번에서
      * 예외가 나면 트랜잭션이 통째로 되돌아가 {@code SOLD} 도 함께 풀린다. 먼저 자리를 잡고 나서
      * 따지는 쪽이, 따지는 동안 남에게 자리를 빼앗기는 것보다 낫다.
      *
@@ -103,6 +109,11 @@ public class PurchaseService {
             // 도달하지 않는다. 데이터가 손상됐을 때만 걸리는 방어선이고, 그래도 두는 것은 정가 초과
             // 판매 차단이 이 서비스의 존재 이유이기 때문이다.
             throw new TradePriceExceedsFaceValueException(listingId);
+        }
+        Ticket ticket = ticketRepository.findById(listing.getTicketId())
+                .orElseThrow(() -> new ListingAlreadyClosedException(listingId, "티켓이 없다"));
+        if (ticket.getStatus() != TicketStatus.OWNED) {
+            throw new ListingAlreadyClosedException(listingId, "티켓 상태가 " + ticket.getStatus() + " 다");
         }
 
         TicketTrade trade = ticketTradeRepository.save(TicketTrade.record(listing, buyerId, now));
