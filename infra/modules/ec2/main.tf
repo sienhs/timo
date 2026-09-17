@@ -171,15 +171,38 @@ resource "aws_instance" "this" {
 
               required = ("SPRING_PROFILES_ACTIVE", "DB_URL", "DB_USERNAME", "DB_PASSWORD", "JWT_SECRET", "ENTRY_PASS_SECRET", "WALLET_MASTER_KEY",
                           "ADMIN_PRIVATE_KEY", "SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "SMS_LIVE_TEST_TO",
-                          "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_PUBLIC_BUCKET_NAME", "IMAGE_BASE_URL")
+                          "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_PUBLIC_BUCKET_NAME", "IMAGE_BASE_URL",
+                          "FIREBASE_MESSAGING_ENABLED", "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64")
               values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
               for key in required:
                   value = values.get(key)
                   if not isinstance(value, str) or not value or "\n" in value or "\r" in value:
                       sys.exit(f"Invalid or missing secret value: {key}")
-                  print(f"{key}={value}")
+                  # JSON 키는 컨테이너 환경변수에 남기지 않는다. 아래에서 root 전용 파일로 복원한다.
+                  if key != "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64":
+                      print(f"{key}={value}")
               PY
               chmod 0600 /etc/timo/backend.env
+              SECRET_FILE="$secret_file" python3 - <<'PY'
+              import base64
+              import json
+              import os
+              from pathlib import Path
+
+              values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
+              try:
+                  credential = base64.b64decode(values["FIREBASE_SERVICE_ACCOUNT_JSON_BASE64"], validate=True)
+                  json.loads(credential.decode("utf-8"))
+              except (KeyError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                  raise SystemExit("Invalid Firebase service-account secret") from error
+
+              destination = Path("/etc/timo/firebase-service-account.json")
+              temporary = destination.with_suffix(".json.tmp")
+              temporary.write_bytes(credential)
+              temporary.chmod(0o600)
+              temporary.replace(destination)
+              PY
+              printf 'GOOGLE_APPLICATION_CREDENTIALS=/etc/timo/firebase-service-account.json\n' >>/etc/timo/backend.env
               tracing_endpoint=$(aws ssm get-parameter --region ${var.aws_region} \
                 --name '/${var.name}/tracing/endpoint' --query Parameter.Value --output text)
               printf 'TRACING_OTLP_ENDPOINT=%s\n' "$tracing_endpoint" >>/etc/timo/backend.env

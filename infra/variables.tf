@@ -187,6 +187,17 @@ variable "solapi_environment" {
   sensitive = true
 }
 
+variable "firebase_service_account_json_base64" {
+  description = "Base64-encoded Firebase service-account JSON. Supply only with TF_VAR_firebase_service_account_json_base64; never commit it."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(base64decode(var.firebase_service_account_json_base64))
+    error_message = "firebase_service_account_json_base64 must be valid Base64."
+  }
+}
+
 variable "domain_name" {
   description = "Domain managed by the independent DNS root"
   type        = string

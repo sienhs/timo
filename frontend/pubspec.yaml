@@ -38,6 +38,9 @@ dependencies:
   flutter_secure_storage: ^10.3.2
   qr_flutter: ^4.1.0
   shared_preferences: ^2.5.5
+  firebase_core: ^4.5.0
+  firebase_messaging: ^16.1.0
+  flutter_local_notifications: ^19.5.0
 
   # 메모리 티켓(소장품). 사진을 골라 온디바이스로 처리하고, 만든 소장품을
   # 기기에 두고, 기울이기·영상 재생으로 본다.

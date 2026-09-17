@@ -2,6 +2,8 @@
     <!-- 릴리스 빌드에도 필요하다. 디버그·프로파일 매니페스트에만 있으면
          release 에서 서버·아웃페인팅 호출이 통째로 막힌다. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ 는 런타임 동의도 필요하다(FirebaseMessaging.requestPermission). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="timo"
         android:name="${applicationName}"

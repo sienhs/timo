@@ -17,6 +17,19 @@ CREATE TABLE IF NOT EXISTS `member` (
     UNIQUE KEY `uk_member_nickname` (`nickname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 앱 설치본별 FCM 토큰. 토큰은 재설치·복원 시 바뀔 수 있어 회원과 분리해 둔다.
+CREATE TABLE IF NOT EXISTS `push_device` (
+    `push_device_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `member_id` BIGINT NOT NULL,
+    `token` VARCHAR(512) NOT NULL,
+    `platform` VARCHAR(20) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`push_device_id`),
+    UNIQUE KEY `uk_push_device_token` (`token`),
+    KEY `idx_push_device_member` (`member_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 회원별 공연 찜. 같은 회원이 같은 공연을 중복해서 찜하지 못하게 한다.
 CREATE TABLE IF NOT EXISTS `concert_wish` (
     `wish_id` BIGINT NOT NULL AUTO_INCREMENT,
