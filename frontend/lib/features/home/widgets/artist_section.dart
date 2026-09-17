@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/artist_summary.dart';
 import 'artist_avatar_cell.dart';
 
-/// 인기 아티스트 4×2 격자. 마지막 칸은 '더보기' 다.
+/// 인기 아티스트 4×2 격자. 받은 만큼만 그리고 '더보기' 칸은 없다 — 아티스트
+/// 목록 화면이 없고, 받아 오는 수를 격자 크기에 맞춰 두었다.
 ///
 /// GridView 를 쓰지 않는다 — 스크롤하지 않는 8칸짜리 격자에 스크롤 위젯을
 /// 넣으면 부모 스크롤과 물려 `shrinkWrap` · `physics` 를 매번 손봐야 한다.
@@ -15,12 +15,10 @@ class ArtistSection extends StatelessWidget {
     super.key,
     required this.artists,
     required this.onArtistPressed,
-    required this.onMorePressed,
   });
 
   final List<ArtistSummary> artists;
   final ValueChanged<ArtistSummary> onArtistPressed;
-  final VoidCallback onMorePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -43,19 +41,6 @@ class ArtistSection extends StatelessWidget {
                     child: ArtistFace(artist: artist),
                   ),
                 ),
-              SizedBox(
-                width: cellWidth,
-                child: ArtistAvatarCell(
-                  label: HomeStrings.artistMore,
-                  onPressed: onMorePressed,
-                  child: const ColoredBox(
-                    color: AppColors.surfaceMuted,
-                    child: Center(
-                      child: Icon(Icons.add, color: AppColors.textSecondary),
-                    ),
-                  ),
-                ),
-              ),
             ],
           );
         },

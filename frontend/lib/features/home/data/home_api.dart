@@ -10,8 +10,9 @@ import '../models/trending_keyword.dart';
 /// 공연 셋(오픈 임박 · 인기 · 검색)은 서버의 공연 목록 API 하나를 조건만 달리
 /// 부른다. 홈 전용 엔드포인트는 없다. 그래도 메서드를 나눈 이유는, 화면이
 /// "오픈 임박을 달라" 고만 하고 그게 어떤 정렬·필터인지는 몰라야 서버 규약이
-/// 바뀌어도 화면이 그대로기 때문이다. 아티스트·인기 검색어는 서버 API 가 아직
-/// 없어 구현이 목업을 돌려준다 — 화면은 그 사정을 모른다.
+/// 바뀌어도 화면이 그대로기 때문이다. 아티스트 셋(인기 · 추천 · 관련)도 서버의
+/// 아티스트 목록 API 하나를 조건만 달리 부른다. 인기 검색어는 서버 집계 API 가
+/// 아직 없어 구현이 두 목록을 엮어 만든다 — 화면은 그 사정을 모른다.
 ///
 /// 반환 규칙: 성공하면 목록을, 실패(네트워크·서버 오류)는 `ApiException` 으로
 /// 던진다. 빈 목록은 실패가 아니라 "해당하는 것이 없다" 는 정상 결과다.
@@ -26,15 +27,17 @@ abstract class HomeApi {
   /// 않으므로 종료·취소 공연도 올 수 있다 — 화면이 [ShowSummary.status] 로 거른다.
   Future<List<ShowSummary>> search(String keyword);
 
-  /// 인기 아티스트. 홈 격자에 들어갈 만큼만 온다.
+  /// 인기 아티스트. 홈 격자에 들어갈 만큼만 온다. 서버에 인기 집계가 아직
+  /// 없어 지금은 최근 등록순이다.
   Future<List<ArtistSummary>> fetchPopularArtists();
 
   /// 검색 화면의 추천 검색어로 내세울 아티스트. 시안의 원형 아바타 한 줄이다.
   Future<List<ArtistSummary>> fetchRecommendedArtists();
 
-  /// 실시간 인기 검색어. 순위순이고 집계 시각이 함께 온다.
+  /// 실시간 인기 검색어. 순위순이고 기준 시각이 함께 온다.
   Future<TrendingKeywords> fetchTrendingKeywords();
 
   /// 이름에 [keyword] 가 들어 있는 아티스트. 검색 결과의 "관련 아티스트" 다.
+  /// 이름순이고 한 줄에 보일 만큼만 온다.
   Future<List<ArtistSummary>> searchArtists(String keyword);
 }

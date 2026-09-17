@@ -22,6 +22,43 @@ class TrendingKeyword {
 class TrendingKeywords {
   const TrendingKeywords({required this.asOf, required this.items});
 
+  /// 검색어 목록에 순위를 매겨 만든다. 앞에 올수록 상위이고, 같은 말이 두 번
+  /// 오면 먼저 온 자리만 남긴다. [limit] 개까지만 담는다.
+  ///
+  /// 등락은 [previous](직전 순위의 검색어 순서)와 비교한다. 없거나 직전에
+  /// 없던 말이면 보합이다.
+  factory TrendingKeywords.ranked({
+    required DateTime asOf,
+    required Iterable<String> keywords,
+    required int limit,
+    List<String> previous = const [],
+  }) {
+    final unique = <String>{};
+    final items = <TrendingKeyword>[];
+    for (final keyword in keywords) {
+      if (items.length >= limit) break;
+      if (!unique.add(keyword)) continue;
+      final rank = items.length + 1;
+      items.add(
+        TrendingKeyword(
+          rank: rank,
+          keyword: keyword,
+          trend: _trendOf(rank, previous.indexOf(keyword) + 1),
+        ),
+      );
+    }
+    return TrendingKeywords(asOf: asOf, items: items);
+  }
+
+  /// [previousRank] 가 0 이면 직전 순위에 없던 말이다.
+  static KeywordTrend _trendOf(int rank, int previousRank) {
+    if (previousRank == 0 || previousRank == rank) return KeywordTrend.steady;
+    return rank < previousRank ? KeywordTrend.up : KeywordTrend.down;
+  }
+
   final DateTime asOf;
   final List<TrendingKeyword> items;
+
+  /// 검색어만 순위순으로. 다음 집계의 등락 비교에 쓴다.
+  List<String> get keywords => [for (final item in items) item.keyword];
 }
