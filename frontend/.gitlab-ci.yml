@@ -82,7 +82,12 @@ frontend_build:
     - flutter pub get
 
   script:
-    - flutter build apk --release --build-number="$CI_PIPELINE_IID"
+    # String.fromEnvironment is compiled into the APK. Without this define a
+    # Firebase-installed app falls back to the emulator-only 10.0.2.2 address.
+    - >
+      flutter build apk --release
+      --build-number="$CI_PIPELINE_IID"
+      --dart-define=API_BASE_URL=https://api.ticketmoa.site
     - >
       firebase appdistribution:distribute
       build/app/outputs/flutter-apk/app-release.apk
