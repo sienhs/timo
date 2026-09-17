@@ -10,18 +10,21 @@ import '../models/show_summary.dart';
 /// 캐러셀 높이에, 검색 결과는 카드 높이에 맞춰 꽉 채운다.
 ///
 /// [onFavoritePressed] 를 주면 오른쪽 위에 하트가 붙는다(검색 결과). 배너는
-/// 넘기는 중에 잘못 눌리기 쉬워 붙이지 않는다.
+/// 넘기는 중에 잘못 눌리기 쉬워 붙이지 않는다. 찜한 공연([isFavorite])은
+/// 하트가 채워진다 — 상태는 화면이 알고 카드는 받은 대로 그린다.
 class ShowBannerCard extends StatelessWidget {
   const ShowBannerCard({
     super.key,
     required this.show,
     required this.onPressed,
     this.onFavoritePressed,
+    this.isFavorite = false,
   });
 
   final ShowSummary show;
   final VoidCallback onPressed;
   final VoidCallback? onFavoritePressed;
+  final bool isFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -80,10 +83,14 @@ class ShowBannerCard extends StatelessWidget {
                 right: HomeMetrics.favoriteButtonInset,
                 child: IconButton(
                   onPressed: onFavorite,
-                  tooltip: HomeStrings.favorite,
+                  tooltip: isFavorite
+                      ? HomeStrings.unfavorite
+                      : HomeStrings.favorite,
                   iconSize: HomeMetrics.favoriteIconSize,
                   color: Colors.white,
-                  icon: const Icon(Icons.favorite_border),
+                  icon: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                  ),
                 ),
               ),
           ],

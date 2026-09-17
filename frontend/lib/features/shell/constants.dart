@@ -67,7 +67,11 @@ const quickMenuItems = <QuickMenuItem>[
     label: '컬렉션',
     routeName: AppRoutes.collection,
   ),
-  QuickMenuItem(icon: Icons.favorite_border, label: '찜'),
+  QuickMenuItem(
+    icon: Icons.favorite_border,
+    label: '찜',
+    routeName: AppRoutes.favorites,
+  ),
   QuickMenuItem(
     icon: Icons.savings_outlined,
     label: '버섯 충전',

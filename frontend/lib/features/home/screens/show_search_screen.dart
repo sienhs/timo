@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
-import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
-import '../../shell/constants.dart';
+import '../../favorite/state/favorite_scope.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
 import '../../shell/widgets/quick_menu_button.dart';
@@ -15,6 +14,7 @@ import '../models/show_summary.dart';
 import '../models/trending_keyword.dart';
 import '../state/home_api_scope.dart';
 import '../state/recent_search_scope.dart';
+import '../utils/favorite_targets.dart';
 import '../widgets/home_section_header.dart';
 import '../widgets/recent_search_chips.dart';
 import '../widgets/recommended_artist_row.dart';
@@ -36,7 +36,11 @@ import '../widgets/trending_keyword_list.dart';
 /// 하나를 거친다. 필터·정렬은 없다 — 요구사항의 검색·필터(#36)는 Could 라
 /// 이번엔 키워드만 붙인다.
 class ShowSearchScreen extends StatefulWidget {
-  const ShowSearchScreen({super.key});
+  const ShowSearchScreen({super.key, this.initialKeyword});
+
+  /// 열자마자 검색할 말. 찜리스트의 아티스트처럼 "이 이름으로 검색" 이 정해진
+  /// 채로 들어올 때 준다. 없으면 검색 전 화면(최근·추천·인기 검색어)이다.
+  final String? initialKeyword;
 
   @override
   State<ShowSearchScreen> createState() => _ShowSearchScreenState();
@@ -71,6 +75,17 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     _recommended = api.fetchRecommendedArtists();
     _trending = api.fetchTrendingKeywords();
     _loadRecent();
+
+    // 정해진 검색어가 있으면 바로 결과 화면으로 시작한다. initState 에서는
+    // setState 를 못 부르므로 필드에 직접 넣는다. 최근 검색어에는
+    // [_loadRecent] 가 저장소를 읽은 뒤 넣는다.
+    final initial = widget.initialKeyword?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _keyword = initial;
+      _controller.text = initial;
+      _shows = api.search(initial);
+      _artists = api.searchArtists(initial);
+    }
   }
 
   @override
@@ -90,7 +105,15 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
       saved = const [];
     }
     if (!mounted) return;
-    setState(() => _recent = RecentSearches(saved));
+    var recent = RecentSearches(saved);
+    // 검색어를 정해 두고 열렸으면 그 말도 최근 검색어에 남긴다.
+    if (_keyword.isNotEmpty) {
+      recent = recent.add(_keyword);
+      RecentSearchScope.of(
+        context,
+      ).save(recent.items).catchError((Object _) {});
+    }
+    setState(() => _recent = recent);
   }
 
   void _search(String raw) {
@@ -179,14 +202,12 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     Navigator.pushNamed(context, AppRoutes.showDetail, arguments: show.id);
   }
 
-  /// 안내 스낵바. 하단 바와 원형 버튼에 가리지 않게 그 위로 띄운다.
-  void _notifyFavoriteNotReady() {
-    showInfoSnackBar(
-      context,
-      HomeStrings.favoriteNotReady,
-      bottomMargin:
-          ShellMetrics.barHeight + ShellMetrics.fabProtrusion + _snackBarGap,
-    );
+  void _toggleFavoriteShow(ShowSummary show) {
+    FavoriteScope.read(context).toggleShow(show.toFavorite());
+  }
+
+  void _toggleFavoriteArtist(ArtistSummary artist) {
+    FavoriteScope.read(context).toggleArtist(artist.toFavorite());
   }
 
   /// 하단 바의 홈·마이페이지로 간다. 내 티켓 화면과 같은 방식 — 셸에 어느
@@ -221,7 +242,9 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
               ),
               child: SearchField(
                 controller: _controller,
-                autofocus: true,
+                // 검색어를 정해 두고 열렸으면 결과를 보러 온 것이라 키보드를
+                // 올리지 않는다.
+                autofocus: widget.initialKeyword == null,
                 onSubmitted: _search,
                 onCleared: _reset,
               ),
@@ -294,10 +317,14 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
   }
 
   /// 검색 뒤. 공연 카드 → 관련 아티스트. 둘은 따로 기다리고 따로 실패한다.
+  ///
+  /// 찜 목록은 여기서 구독한다. 하트를 누르면 저장소가 알리고 이 화면이 다시
+  /// 그려져 채운 하트가 된다.
   Widget _resultBody(
     Future<List<ShowSummary>> shows,
     Future<List<ArtistSummary>> artists,
   ) {
+    final favorites = FavoriteScope.of(context).favorites;
     return ListView(
       padding: _listPadding,
       children: [
@@ -308,9 +335,10 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
             shows: shows,
             keyword: _keyword,
             showAll: _showAll,
+            favoriteShowIds: {for (final show in favorites.shows) show.id},
             onMorePressed: () => setState(() => _showAll = true),
             onShowPressed: _openShowDetail,
-            onFavoritePressed: (_) => _notifyFavoriteNotReady(),
+            onFavoritePressed: _toggleFavoriteShow,
           ),
         ),
         const SizedBox(height: HomeMetrics.sectionGap),
@@ -328,8 +356,11 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
                     const SizedBox(height: HomeMetrics.sectionTitleGap),
                     RelatedArtistRow(
                       artists: artists,
+                      favoriteNames: {
+                        for (final artist in favorites.artists) artist.name,
+                      },
                       onArtistPressed: (artist) => _search(artist.name),
-                      onFavoritePressed: (_) => _notifyFavoriteNotReady(),
+                      onFavoritePressed: _toggleFavoriteArtist,
                     ),
                   ],
                 ),
@@ -338,9 +369,6 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     );
   }
 }
-
-/// 안내 스낵바와 하단 바(원형 버튼 포함) 사이 틈.
-const _snackBarGap = 12.0;
 
 /// "오픈 예정 / 예매중" 섹션. 받은 공연 중 예매를 앞두거나 진행 중인 것만
 /// 큰 카드로 세운다.
@@ -353,6 +381,7 @@ class _ResultSection extends StatelessWidget {
     required this.shows,
     required this.keyword,
     required this.showAll,
+    required this.favoriteShowIds,
     required this.onMorePressed,
     required this.onShowPressed,
     required this.onFavoritePressed,
@@ -361,6 +390,10 @@ class _ResultSection extends StatelessWidget {
   final List<ShowSummary> shows;
   final String keyword;
   final bool showAll;
+
+  /// 찜한 공연 번호. 카드의 하트를 채울지 가른다.
+  final Set<int> favoriteShowIds;
+
   final VoidCallback onMorePressed;
   final ValueChanged<ShowSummary> onShowPressed;
   final ValueChanged<ShowSummary> onFavoritePressed;
@@ -398,6 +431,7 @@ class _ResultSection extends StatelessWidget {
                 height: HomeMetrics.searchCardHeight,
                 child: ShowBannerCard(
                   show: show,
+                  isFavorite: favoriteShowIds.contains(show.id),
                   onPressed: () => onShowPressed(show),
                   onFavoritePressed: () => onFavoritePressed(show),
                 ),

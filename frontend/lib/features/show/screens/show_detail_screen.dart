@@ -9,10 +9,12 @@ import '../../auth/state/auth_session_scope.dart';
 import '../../booking/constants.dart';
 import '../../booking/models/performance.dart';
 import '../../booking/state/booking_scope.dart';
+import '../../favorite/state/favorite_scope.dart';
 import '../constants.dart';
 import '../data/show_api.dart';
 import '../models/show_detail.dart';
 import '../state/show_api_scope.dart';
+import '../utils/favorite_target.dart';
 import '../widgets/show_artist_list.dart';
 import '../widgets/show_detail_app_bar.dart';
 import '../widgets/show_detail_bottom_bar.dart';
@@ -46,17 +48,36 @@ class ShowDetailScreen extends StatefulWidget {
 
 class _ShowDetailScreenState extends State<ShowDetailScreen> {
   late final ShowApi _api = ShowApiScope.of(context);
-  late Future<ShowDetail> _detail = _api.fetchShowDetail(widget.showId);
+  late Future<ShowDetail> _detail = _fetch();
+
+  /// 받아 온 공연. 상단 바의 하트가 쓴다 — 본문은 [AsyncBoundary] 가 받아
+  /// 주지만 하트는 그 바깥(Scaffold 의 appBar)에 있어 따로 들고 있어야 한다.
+  /// 아직 못 받았으면 null 이고 하트는 눌리지 않는다.
+  ShowDetail? _loaded;
+
+  Future<ShowDetail> _fetch() {
+    final future = _api.fetchShowDetail(widget.showId);
+    // 실패는 본문의 AsyncBoundary 가 알린다. 여기서는 삼켜서 처리되지 않은
+    // 오류로 새지 않게만 한다.
+    future.then<void>((detail) {
+      if (mounted) setState(() => _loaded = detail);
+    }, onError: (Object _) {});
+    return future;
+  }
 
   /// 다시 불러온다. 실패 화면의 '다시 시도' 가 쓴다.
   ///
   /// 스스로 다시 부르는 길(당겨서 새로 고침, 주기적 갱신)은 두지 않았다.
   /// 서버가 상세 조회마다 조회수를 1 올리기 때문이다.
   void _reload() {
-    final next = _api.fetchShowDetail(widget.showId);
+    final next = _fetch();
     setState(() {
       _detail = next;
     });
+  }
+
+  void _toggleFavorite(ShowDetail detail) {
+    FavoriteScope.read(context).toggleShow(detail.toFavorite());
   }
 
   void _notify(String message) {
@@ -67,9 +88,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loaded = _loaded;
     return Scaffold(
       appBar: ShowDetailAppBar(
-        onFavoritePressed: () => _notify(ShowDetailStrings.favoriteNotReady),
+        isFavorite: FavoriteScope.of(context).favorites.hasShow(widget.showId),
+        onFavoritePressed: loaded == null
+            ? null
+            : () => _toggleFavorite(loaded),
       ),
       body: AsyncBoundary<ShowDetail>(
         future: _detail,

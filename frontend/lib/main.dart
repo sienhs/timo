@@ -5,6 +5,7 @@ import 'app.dart';
 import 'features/auth/data/device_id.dart';
 import 'features/auth/data/token_storage.dart';
 import 'features/auth/state/auth_session.dart';
+import 'features/favorite/data/favorite_store.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/memory/data/ticket_store.dart';
 
@@ -51,11 +52,29 @@ Future<void> main() async {
     );
   }
 
+  // 찜 목록. 검색 결과의 하트가 첫 화면부터 찜 여부를 맞게 그려야 해서 띄우기
+  // 전에 되살린다. 수 ms 다. 읽지 못하면(저장소 오류·깨진 JSON) 빈 목록으로
+  // 시작하고, 다음에 하트를 누를 때 덮어쓴다.
+  final favoriteStore = SharedPreferencesFavoriteStore();
+  try {
+    await favoriteStore.restore();
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'timo favorite',
+        context: ErrorDescription('기기 저장소에서 찜 목록을 되살리는 중'),
+      ),
+    );
+  }
+
   runApp(
     App(
       session: session,
       // 최근 검색어는 검색 화면이 열릴 때 읽으므로 여기서 기다리지 않는다.
       recentSearchStore: SharedPreferencesRecentSearchStore(),
+      favoriteStore: favoriteStore,
       ticketStore: ticketStore,
     ),
   );
