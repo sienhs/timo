@@ -71,6 +71,7 @@ module "ec2" {
   subnet_id           = module.network.private_app_subnet_id
   security_group_id   = module.security.ec2_security_group_id
   instance_type       = var.ec2_instance_type
+  root_volume_size    = var.ec2_root_volume_size
   app_port            = var.app_port
   aws_region          = var.aws_region
   backend_secret_arn  = module.backend_secret.arn

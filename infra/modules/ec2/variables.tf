@@ -14,6 +14,11 @@ variable "instance_type" {
   type = string
 }
 
+variable "root_volume_size" {
+  description = "Encrypted gp3 root volume size in GiB"
+  type        = number
+}
+
 variable "app_port" {
   type = number
 }
