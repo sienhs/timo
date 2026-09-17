@@ -46,6 +46,17 @@ variable "ec2_instance_type" {
   default     = "t3.micro"
 }
 
+variable "ec2_root_volume_size" {
+  description = "Encrypted gp3 root volume size in GiB for the application EC2 instance"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.ec2_root_volume_size >= 20
+    error_message = "ec2_root_volume_size must be at least 20 GiB."
+  }
+}
+
 variable "ec2_detailed_monitoring" {
   description = "Enable one-minute EC2 built-in CloudWatch metrics; this incurs AWS detailed-monitoring charges."
   type        = bool

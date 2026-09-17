@@ -98,7 +98,7 @@ resource "aws_instance" "this" {
 
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = 8
+    volume_size           = var.root_volume_size
     encrypted             = true
     delete_on_termination = true
   }
@@ -185,6 +185,9 @@ resource "aws_instance" "this" {
 
               registry=$${image%%/*}
               aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin "$registry"
+              # Preserve images referenced by the running/rollback containers while
+              # removing stale releases before the next image is unpacked.
+              docker image prune --all --force
               docker pull "$image"
 
               previous=false
@@ -216,6 +219,9 @@ resource "aws_instance" "this" {
                 if curl --fail --silent --max-time 3 http://127.0.0.1:${var.app_port}/actuator/health >/dev/null; then
                   printf '%s\n' "$pipeline" >/var/lib/timo/pipeline
                   docker rm -f timo-backend-previous >/dev/null 2>&1 || true
+                  # Once the replacement is healthy, retain only images referenced
+                  # by existing containers so old release layers do not accumulate.
+                  docker image prune --all --force
                   trap - ERR
                   exit 0
                 fi
