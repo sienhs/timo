@@ -45,7 +45,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * 취소는 {@code delist}, 체결은 {@code Marketplace.buy})은 방식이 정해지지 않아
  * {@code TicketTransferService} 인터페이스 뒤로 미뤄 두었다.
  *
- * <p>금액 필드({@code price} · {@code faceValue} · {@code expectedPrice} · {@code lowestPrice})는
+ * <p><b>{@code faceValue} 는 그 좌석이 속한 구역의 정가다</b>({@code Section.price}). 공연 전체
+ * 단일가가 아니라 구역마다 다르며, 예매 응답의 {@code facePrice} 와 같은 값이다. 매물마다 등록
+ * 시점의 값이 스냅샷으로 박혀 있어, 뒤에 구역 가격이 바뀌어도 이미 열린 매물의 상한은 그대로다.
+ *
+ * <p>금액 필드({@code price}, {@code faceValue}, {@code expectedPrice}, {@code lowestPrice})는
  * 모두 JSON 정수이며 서버에서 {@code long} 이다. 단위는 <b>아직 확정되지 않았다</b> — 컨트랙트는
  * wei, 백엔드 구역 가격은 원화 정수라 예매 API 도 같은 상태다. 앱은 이 값을 32비트 정수로
  * 받지 않는다.
@@ -107,8 +111,9 @@ public interface MarketApi {
     /**
      * 내 티켓을 양도 매물로 등록한다. 201 이다.
      *
-     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 정가 기준은 구역 가격이 아니라 공연 정가
-     * ({@code Concert.facePrice}) 이며, 등록 시점의 값이 매물에 스냅샷으로 남는다. 등록되면 티켓은
+     * <p>내가 보유한 티켓만, 정가 이하로만 등록된다. 정가 기준은 공연 전체 단일가가 아니라 그 좌석이
+     * 속한 <b>구역</b>의 가격({@code Section.price}) 이며, 등록 시점의 값이 매물에 스냅샷으로 남는다.
+     * 예매 결제와 환불도 같은 기준이다. 등록되면 티켓은
      * {@code LISTED} 가 되어 취소·회수·입장이 막힌다 — 예매 취소는 이미 티켓이 {@code OWNED} 일
      * 때만 성립하므로({@code ReservationServiceImpl.cancel}) 등록 중인 티켓은 취소되지 않는다.
      *
@@ -131,7 +136,7 @@ public interface MarketApi {
      * 흔해 이 차이가 실제로 쓰인다. 이 API 에서 {@code PATCH} 를 쓰는 곳은 여기 하나다.
      *
      * <p>바꿀 수 있는 값은 가격뿐이다. 새 가격도 등록 때와 같은 규칙을 받는다 - <b>등록 시점에
-     * 스냅샷으로 잡힌 정가</b>({@code ticket_listing.face_value}) 이하여야 한다. 공연 정가가 그 뒤에
+     * 스냅샷으로 잡힌 정가</b>({@code ticket_listing.face_value}) 이하여야 한다. 구역 가격이 그 뒤에
      * 바뀌었더라도 기준은 스냅샷이다. 올리는 방향도 정가 이하이면 허용한다.
      *
      * <p>남의 매물이면 403, 정가 초과면 400, 이미 팔렸거나 취소된 매물이면 409, 매물이 없으면 404 다.

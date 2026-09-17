@@ -61,9 +61,9 @@ import java.util.Optional;
  *
  * <p>고정 티켓은 그대로 남아 있다. 앱이 예매를 하지 않아도 마켓 화면에 볼 것이 있어야 한다.
  *
- * <p>다만 <b>정가의 출처가 v1 과 다르다.</b> 여기서는 구역 가격({@code section.price})을 정가로 쓰는데
- * 실제 구현은 공연 정가({@code Concert.facePrice})다. 스텁 고정 데이터에는 공연 정가가 없고, 계약
- * (정가 이하로만 등록된다)을 재현하는 데는 어느 쪽이든 상관없어 그대로 둔다.
+ * <p>정가의 출처는 v1 과 같다. 둘 다 구역 가격({@code Section.price})을 상한으로 쓴다 - 실제 구현이
+ * 공연 단일 정가를 쓰던 시절에는 스텁만 구역 가격이라 달랐으나, 2026-09-17 자로 v1 이 구역 가격으로
+ * 옮겨 오면서 맞춰졌다.
  *
  * <p>매물({@link StubListing})과 체결({@link StubTrade})을 티켓과 따로 들고 있다. 실제 구조가
  * {@code ticket} · {@code ticket_listing} · {@code ticket_trade} 세 테이블이고, 한 티켓이 여러 번

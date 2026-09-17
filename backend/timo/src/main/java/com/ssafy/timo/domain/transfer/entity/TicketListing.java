@@ -52,17 +52,18 @@ import java.time.LocalDateTime;
  *   <li>{@link #concert} ← {@code ticket.reservation.concert}</li>
  *   <li>{@link #section} ← {@code ticket.reservation.seat.section}</li>
  *   <li>{@link #seatNo}, {@link #seatCol} ← {@code ticket.reservation.seat}</li>
- *   <li>{@link #faceValue} ← {@code ticket.reservation.concert.facePrice}</li>
+ *   <li>{@link #faceValue} ← {@code ticket.reservation.seat.section.price}</li>
  *   <li>{@link #sellerMemberId} ← {@code ticket.reservation.member} (티켓에 소유자 컬럼이 없다)</li>
  * </ul>
  *
- * <p>정가 기준은 구역 가격({@link Section#getPrice()})이 <b>아니다.</b> 예매 결제·환불이 모두
- * {@code Concert.facePrice} 로 이루어지므로({@code ReservationSettlementService}) 정가도 그 값이다.
- * 구역 가격은 좌석 레이아웃 등록에만 쓰이고 결제에는 관여하지 않는다.
+ * <p>정가 기준은 공연 전체 단일가가 아니라 이 좌석이 속한 <b>구역</b>의 가격
+ * ({@link Section#getPrice()})이다. 예매 결제·환불이 전부 구역 가격으로 이루어지므로
+ * ({@code ReservationSettlementRunner}, {@code ReservationServiceImpl.cancel}) 재판매 상한도 같은
+ * 기준이어야 한다. 공연이 들고 있던 단일 정가({@code Concert.facePrice})는 2026-09-17 자로 없어졌다.
  *
- * <p>그래도 복사해 스냅샷으로 두는 이유는, {@code Concert.facePrice} 가
- * {@code Concert.prepareForSale} 로 다시 채워질 수 있어 <b>매물이 열린 뒤 공연 정가가 바뀌면 그 매물의
- * 정가 초과 판정 기준까지 흔들리기</b> 때문이다. 판정 기준은 등록 시점에 고정돼야 한다.
+ * <p>그래도 복사해 스냅샷으로 두는 이유는 <b>판정 기준이 등록 시점에 고정돼야 하기 때문이다.</b>
+ * 지금 {@link Section#getPrice()} 에는 변경 경로가 없어 두 값이 갈라지지 않지만, 생기더라도 이미
+ * 열려 있는 매물의 상한이 뒤늦게 흔들려서는 안 된다. 조회가 구역을 다시 읽지 않아도 되는 것은 덤이다.
  *
  * <p>상태 전이는 엔티티 메서드가 아니라 {@code TicketListingRepository} 의 조건부 UPDATE 로만 한다.
  * 이유는 그쪽 주석을 본다.
@@ -168,13 +169,13 @@ public class TicketListing extends BaseEntity {
     private long price;
 
     /**
-     * 등록 시점의 공연 정가({@code Concert.facePrice}) 스냅샷. 정가 이하 판정과 할인율 표기의 기준이다.
+     * 등록 시점의 구역 정가({@link Section#getPrice()}) 스냅샷. 정가 이하 판정과 할인율 표기의 기준이다.
      *
-     * <p>원본이 {@code BigInteger} 인데 여기서 {@code long} 으로 좁힌다. <b>단위가 아직 확정되지
+     * <p>원본이 {@code int} 인데 여기서 {@code long} 으로 넓힌다. <b>단위가 아직 확정되지
      * 않았기 때문이다</b> — 컨트랙트는 wei 이고 백엔드 구역 가격은 원화 정수라, 예매 응답도
-     * "결정 전까지 wei 를 그대로 싣는다"로 두고 {@code long} 을 쓰고 있다
-     * ({@code ReservationDetailResponseDto}). 마켓만 {@code int} 로 두면 wei 값이 들어오는 순간
-     * 등록 API 가 {@code ArithmeticException} 으로 터지므로 예매 쪽 표기에 맞춘다.
+     * "결정 전까지 구역 정가를 원 단위 그대로 싣는다"로 두고 있다
+     * ({@code ReservationDetailResponseDto}). 마켓만 {@code int} 로 두면 단위가 wei 로 정해지는 순간
+     * 등록 API 가 넘쳐 터지므로 미리 넓혀 둔다.
      *
      * <p>{@code long} 도 wei 를 끝까지 담지는 못한다(9.2e18 초과 불가). 단위가 wei 로 확정되면
      * {@code BigInteger} + {@code DECIMAL} 로 다시 올려야 한다.

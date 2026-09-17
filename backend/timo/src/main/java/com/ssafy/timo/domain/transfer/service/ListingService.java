@@ -113,10 +113,10 @@ public class ListingService {
         Reservation reservation = ticket.getReservation();
         Concert concert = reservation.getConcert();
         Seat seat = reservation.getSeat();
-        long faceValue = faceValueOf(seat.getSection());
+        long sectionPrice = sectionPriceOf(seat.getSection());
         long price = request.price();
-        if (price > faceValue) {
-            throw new ListPriceExceedsFacePriceException(price, faceValue);
+        if (price > sectionPrice) {
+            throw new ListPriceExceedsFacePriceException(price, sectionPrice);
         }
 
         TicketListing listing = TicketListing.open(
@@ -127,7 +127,7 @@ public class ListingService {
                 seat.getSeatNo(),
                 seat.getSeatCol(),
                 price,
-                faceValue,
+                sectionPrice,
                 LocalDateTime.now(clock));
 
         return ListingDetailResponseDto.from(save(listing, ticketId), imageStorage, memberId);
@@ -151,8 +151,8 @@ public class ListingService {
      * 체결뿐인데 그때는 매물이 {@code SOLD} 라 4번에서 막힌다.
      *
      * <p>정가 기준은 <b>등록 시점에 잡힌 스냅샷</b>({@code face_value})이지 지금의
-     * {@code Concert.facePrice} 가 아니다. 매물이 열린 뒤 공연 정가가 바뀌어도 그 매물의 판정 기준은
-     * 흔들리지 않아야 한다({@code TicketListing} 주석). 그래서 여기서는 공연을 읽지도 않는다.
+     * {@code Section.price} 가 아니다. 매물이 열린 뒤 구역 가격이 바뀌어도 그 매물의 판정 기준은
+     * 흔들리지 않아야 한다({@code TicketListing} 주석). 그래서 여기서는 구역을 읽지도 않는다.
      *
      * <p>3번을 4번보다 앞에 두는 이유는 등록({@link #register})과 반대로 보이지만 사정이 다르다.
      * 등록의 409("이미 등록 중")는 가격을 고쳐도 결과가 같아 먼저 알려야 하는 것이고, 여기 3번은
@@ -176,9 +176,10 @@ public class ListingService {
         }
 
         long price = request.price();
-        long faceValue = listing.getFaceValue();
-        if (price > faceValue) {
-            throw new ListPriceExceedsFacePriceException(price, faceValue);
+        // 지금의 구역 가격이 아니라 등록 시점에 박아 둔 스냅샷이다. 위 주석을 본다.
+        long listedSectionPrice = listing.getFaceValue();
+        if (price > listedSectionPrice) {
+            throw new ListPriceExceedsFacePriceException(price, listedSectionPrice);
         }
 
         if (ticketListingRepository.updatePriceIfListed(listingId, price, LocalDateTime.now(clock)) == 0) {
@@ -250,7 +251,7 @@ public class ListingService {
      * 않는다 - 이미 발행(OWNED)된 티켓이라는 것 자체가 그 좌석의 구역이 존재하고 가격이 있다는
      * 것을 보장한다.
      */
-    private long faceValueOf(Section section) {
+    private long sectionPriceOf(Section section) {
         return section.getPrice();
     }
 
