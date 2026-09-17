@@ -19,6 +19,8 @@ import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
+import com.ssafy.timo.domain.ticket.entity.Ticket;
+import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SeatPositionRequest;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SectionLayout;
@@ -132,6 +134,14 @@ public class LocalDataSeeder implements ApplicationRunner {
      * <p>두 조건이 겹치는 자리(117번째)는 점유가 이긴다. v0 스텁이 쓰는 규칙과 같은 값이지만
      * 스텁에서 가져오지는 않는다 — 같은 의도를 따로 구현한 것이다.
      */
+    /**
+     * 시드 티켓의 {@code tokenId} 시작값.
+     *
+     * <p>진짜 발행은 체인이 번호를 매기고 작은 수부터 시작한다. 로컬에서 시드와 실제 예매를 섞어
+     * 쓰면 {@code uk_ticket_token_id} 가 충돌할 수 있어, 겹칠 일이 없는 높은 대역을 쓴다.
+     */
+    private static final long SEED_TOKEN_ID_START = 1_000_000_000L;
+
     private static final int OCCUPIED_EVERY = 9;
     private static final int RESERVED_EVERY = 13;
 
@@ -278,6 +288,7 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final MemberRepository memberRepository;
     private final LoginInfoRepository loginInfoRepository;
     private final ReservationRepository reservationRepository;
+    private final TicketRepository ticketRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final Clock clock;
@@ -472,6 +483,7 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         int soldTotal = 0;
         int heldTotal = 0;
+        List<Reservation> sold = new ArrayList<>();
         for (Long concertId : concertIds) {
             Concert concert = concertRepository.getReferenceById(concertId);
             int soldIndex = 0;
@@ -483,11 +495,11 @@ public class LocalDataSeeder implements ApplicationRunner {
                     Seat seat = seats.get(position - 1);
 
                     if (position % OCCUPIED_EVERY == 0) {
-                        reservationRepository.save(Reservation.builder()
+                        sold.add(reservationRepository.save(Reservation.builder()
                                 .concert(concert)
                                 .member(holders.get(soldIndex++))
                                 .seat(seat)
-                                .build());
+                                .build()));
                         soldTotal++;
                     } else if (position % RESERVED_EVERY == 0) {
                         seatService.hold(holders.get(heldIndex++).getId(), concertId, seat.getId());
@@ -497,6 +509,7 @@ public class LocalDataSeeder implements ApplicationRunner {
             }
         }
 
+        seedTickets(sold);
         extendSeedHolds();
 
         log.info("로컬 시드: 공연 {}건에 판매 {}석 · 선점 {}석을 넣었다. 시드 회원 {}명.",
@@ -504,6 +517,50 @@ public class LocalDataSeeder implements ApplicationRunner {
         log.info("로컬 시드: 시드 계정으로 로그인할 수 있다. id={}001~{}{} / pw={}",
                 SEED_MEMBER_USERNAME_PREFIX, SEED_MEMBER_USERNAME_PREFIX,
                 String.format("%03d", holders.size()), SEED_MEMBER_PASSWORD);
+    }
+
+    /**
+     * 시드 예매마다 티켓을 한 장씩 만들어 발행까지 끝난 것으로 둔다.
+     *
+     * <p>실제 경로에서는 {@code ReservationServiceImpl.create} 가 주문과 티켓을 같은 트랜잭션에서
+     * 만들고, 커밋 뒤 {@code ReservationSettlementService} 가 체인에 올려 {@code OWNED} 로 바꾼다.
+     * 시더는 예매 행만 직접 넣으므로 그 두 단계가 통째로 빠져 있었다 - 그래서 시드 예매에는 티켓이
+     * 없었고, 상세 조회는 {@code IllegalStateException} 으로 500 이 났으며 양도 등록은 시작조차
+     * 할 수 없었다.
+     *
+     * <p><b>{@code OWNED} 까지 보내는 것이 요점이다.</b> {@code PENDING_MINT} 로 두면 양도 등록이
+     * "발행 전 티켓" 으로 거절해({@code ListingService.register}) 로컬에서 마켓을 만져 볼 수 없다.
+     *
+     * <p>{@code tokenId} 와 {@code mintTxHash} 는 <b>체인에 없는 가짜다.</b> 시드 예매를 실제로
+     * 민팅하려면 좌석 수만큼 온체인 트랜잭션을 보내야 해서 기동이 현실적이지 않다. 그래서 이 값들로
+     * 온체인 호출을 하면 실패한다 - 로컬에서 시드 예매를 취소하면 {@code TicketNftClient.revoke} 가
+     * 없는 토큰을 건드려 거절당한다. 티켓이 아예 없어 500 이 나던 것에서 바뀐 지점이라 적어 둔다.
+     *
+     * <p>주문 식별자에서 유도해 {@code uk_ticket_token_id} 충돌을 피한다. 한 주문에 티켓은 하나
+     * ({@code uk_ticket_reservation})라 값도 하나로 정해진다.
+     */
+    private void seedTickets(List<Reservation> reservations) {
+        List<Ticket> tickets = reservations.stream()
+                .map(reservation -> {
+                    Ticket ticket = Ticket.builder().reservation(reservation).build();
+                    // 저장 전에 상태를 옮긴다. 영속성 컨텍스트의 변경 감지에 기대지 않아도 되고,
+                    // INSERT 한 번으로 끝난다.
+                    ticket.markMinted(seedTokenId(reservation), seedTxHash(reservation));
+                    return ticket;
+                })
+                .toList();
+
+        ticketRepository.saveAll(tickets);
+        log.info("시드 티켓 {}장을 발행 완료 상태로 넣었다", tickets.size());
+    }
+
+    private static BigInteger seedTokenId(Reservation reservation) {
+        return BigInteger.valueOf(SEED_TOKEN_ID_START + reservation.getId());
+    }
+
+    /** 체인에 없는 값이다. 형식만 진짜 해시와 같게 맞춘다 - 컬럼이 66자(0x + 64)다. */
+    private static String seedTxHash(Reservation reservation) {
+        return "0x" + String.format("%064x", reservation.getId());
     }
 
     /** 공연 하나에서 판매·선점에 각각 필요한 회원 수. */

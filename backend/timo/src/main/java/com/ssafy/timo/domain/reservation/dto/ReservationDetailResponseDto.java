@@ -18,6 +18,11 @@ import java.time.LocalDateTime;
  * {@code mintAttemptCount}·{@code failureReason}로 따로 드러난다 - 전부 연결된
  * {@link Ticket}에서 가져온다.
  *
+ * <p>{@code ticketId}는 이 주문으로 발행된 티켓의 식별자다. 주문 식별자({@code id})와 <b>다른 값이며</b>,
+ * 양도 등록({@code POST /api/v1/market/listings})이 받는 것은 이쪽이다. {@code tokenId}와도 구분된다 -
+ * 그쪽은 온체인 NFT 번호라 발행 전엔 없지만, 이 값은 주문과 같은 트랜잭션에서 티켓 행이 만들어지므로
+ * 늘 채워진다({@code ReservationServiceImpl.create}).
+ *
  * <p>{@code facePrice}는 이 좌석이 속한 {@link Section#getPrice()}다(구역마다 다름, 공연 전체
  * 단일가 아님). 단위는 아직 미확정이다 - 컨트랙트(={@code ShowRegistry}에 실리는 값)는 wei,
  * 여기 구역 가격은 원화 정수라 둘을 맞추는 결정이 남아 있다. 결정 전까지는 구역 정가를 원 단위
@@ -38,6 +43,7 @@ public record ReservationDetailResponseDto(
         int seatCol,
         long facePrice,
         ReservationStatus status,
+        Long ticketId,
         String tokenId,
         String mintTxHash,
         int mintAttemptCount,
@@ -65,6 +71,7 @@ public record ReservationDetailResponseDto(
                 seat.getSeatCol(),
                 section.getPrice(),
                 reservation.getStatus(),
+                ticket.getId(),
                 ticket.getTokenId() == null ? null : ticket.getTokenId().toString(),
                 ticket.getMintTxHash(),
                 ticket.getMintAttemptCount(),

@@ -10,6 +10,7 @@ import com.ssafy.timo.stub.seat.SeatStateStore;
 import com.ssafy.timo.stub.seat.SeatStubController;
 import com.ssafy.timo.stub.seat.SectionStubController;
 import com.ssafy.timo.stub.transfer.MarketStubController;
+import com.ssafy.timo.stub.transfer.MarketTicketStore;
 import com.ssafy.timo.stub.venue.VenueStubController;
 import com.ssafy.timo.support.Authenticated;
 import org.junit.jupiter.api.AfterEach;
@@ -73,14 +74,16 @@ class StubApiTest {
     void setUp() {
         SeatStateStore seatStateStore = new SeatStateStore();
         ConcertStore concertStore = new ConcertStore();
+        // 예매 스텁과 마켓 스텁이 같은 티켓을 봐야 한다. 따로 만들면 예매로 받은 번호로 등록할 수 없다.
+        MarketTicketStore ticketStore = new MarketTicketStore();
         PlaceholderImageStorage imageStorage = new PlaceholderImageStorage("https://cdn.stub.timo.io");
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new VenueStubController(),
                         new ConcertStubController(concertStore, imageStorage),
                         new SectionStubController(seatStateStore),
                         new SeatStubController(seatStateStore, clock),
-                        new ReservationStubController(seatStateStore, concertStore, imageStorage, clock),
-                        new MarketStubController(concertStore, imageStorage, clock))
+                        new ReservationStubController(seatStateStore, concertStore, ticketStore, imageStorage, clock),
+                        new MarketStubController(ticketStore, concertStore, imageStorage, clock))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new CurrentMemberArgumentResolver())
                 .build();
@@ -384,6 +387,9 @@ class StubApiTest {
                     .andExpect(jsonPath("$.status").value("PAID"))
                     .andExpect(jsonPath("$.orderId", startsWith("0x")))
                     .andExpect(jsonPath("$.tokenId").doesNotExist())
+                    // 양도 등록이 받는 값. 주문 번호와 다른 값이어야 앱이 둘을 혼동하지 않는다.
+                    .andExpect(jsonPath("$.ticketId").value(StubFixtures.ORDER_TICKET_ID_START))
+                    .andExpect(jsonPath("$.id").value(StubFixtures.CREATED_ID_START))
                     .andExpect(jsonPath("$.facePrice").value(150000))
                     .andExpect(jsonPath("$.concertTitle").value("김필 단독 콘서트"))
                     .andExpect(jsonPath("$.sectionName").value("1층 A블록"))
@@ -459,6 +465,9 @@ class StubApiTest {
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].status").value("PAID"))
                     .andExpect(jsonPath("$.content[0].tokenId").doesNotExist())
+                    // 발행 정보는 없지만 티켓 번호는 목록에도 실린다 - 양도 등록 화면이 이 목록으로
+                    // 고를 티켓을 만든다.
+                    .andExpect(jsonPath("$.content[0].ticketId").value(StubFixtures.ORDER_TICKET_ID_START))
                     .andExpect(jsonPath("$.page.totalElements").value(1));
 
             mockMvc.perform(get("/api/v0/reservations").param("status", "CANCELLED"))
@@ -721,6 +730,43 @@ class StubApiTest {
             purchase(OTHERS_LISTING_CONCERT1, 119_000)
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("ListingPriceMismatchException"));
+        }
+
+        @Test
+        void 예매로_받은_ticketId로_양도_등록이_된다() throws Exception {
+            long seatId = StubFixtures.seatId(StubFixtures.SECTIONS.get(0), 1, 1);
+            mockMvc.perform(post("/api/v0/seats/{seatId}/hold", seatId).param("concertId", "1"))
+                    .andExpect(status().isOk());
+
+            // 예매 응답이 주는 번호는 둘이다. 주문 번호와 티켓 번호가 다른 값이어야 한다.
+            mockMvc.perform(post("/api/v0/reservations").contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"concertId": 1, "seatId": %d}
+                                    """.formatted(seatId)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.id").value(StubFixtures.CREATED_ID_START))
+                    .andExpect(jsonPath("$.ticketId").value(StubFixtures.ORDER_TICKET_ID_START));
+
+            // 주문 번호로 등록하면 404 다. 앱이 둘을 혼동하던 것이 양도 등록이 막혀 있던 원인이다.
+            mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
+                            .content(listingBody(StubFixtures.CREATED_ID_START, 140_000)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("TicketNotFoundException"));
+
+            // 티켓 번호로 등록하면 통한다. 예매 스텁과 마켓 스텁이 같은 티켓을 본다는 뜻이다.
+            mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
+                            .content(listingBody(StubFixtures.ORDER_TICKET_ID_START, 140_000)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.status").value("LISTED"))
+                    .andExpect(jsonPath("$.price").value(140_000))
+                    // 정가는 구역 가격이다. 예매 응답의 facePrice 와 같은 값이어야 앱이 상한을 안내할 수 있다.
+                    .andExpect(jsonPath("$.faceValue").value(150_000))
+                    .andExpect(jsonPath("$.mine").value(true));
+
+            // 1번 공연 매물이 고정 3개에서 4개로 늘고, 늘어난 것이 내 것이다.
+            mockMvc.perform(get("/api/v0/market/concerts/{concertId}/listings", 1))
+                    .andExpect(jsonPath("$.content", hasSize(4)))
+                    .andExpect(jsonPath("$.content[?(@.mine == true)]", hasSize(1)));
         }
 
         @Test
