@@ -3,9 +3,8 @@ import '../models/verification_result.dart';
 
 /// 스캔 화면이 서버에 요청하는 일.
 ///
-/// 화면은 이 인터페이스만 안다. 지금은 [MockScanApi] 만 있다. 백엔드에 입장
-/// 검증 API 가 생기면 같은 시그니처의 `HttpScanApi` 를 만들어 `app.dart` 에서
-/// 갈아끼운다. 화면은 바뀌지 않는다.
+/// 화면은 이 인터페이스만 안다. 앱에서는 `HttpScanApi` 가 실제 서버에 요청하고,
+/// 서버 없는 실행과 테스트는 `MockScanApi` 를 쓴다. `app.dart` 가 고른다.
 ///
 /// 반환 규칙: 성공하면 결과를, 실패(네트워크·서버 오류)는 `ApiException` 으로
 /// 던진다. **거절은 실패가 아니다** — 서버가 200 으로 [Rejected] 를 주는 것이

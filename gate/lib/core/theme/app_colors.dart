@@ -11,6 +11,7 @@ class AppColors {
   /// 팀 브랜드 컬러 (S15P21D206-49).
   static const brand = Color(0xFF149F5C);
   static const primary = brand;
+  static const onPrimary = Color(0xFFFFFFFF);
 
   /// [primary] 를 20% 어둡게. 눌림 상태와 진한 글자용.
   static const primaryPressed = Color(0xFF107F4A);

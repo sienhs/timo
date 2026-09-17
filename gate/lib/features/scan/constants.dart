@@ -79,5 +79,6 @@ class ScanStrings {
   static const confirm = '확인';
 
   /// 결과 화면을 화면 읽기 프로그램용 한 문장으로.
-  static String resultSemantics(String title, String detail) => '$title. $detail';
+  static String resultSemantics(String title, String detail) =>
+      '$title. $detail';
 }
