@@ -43,17 +43,24 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // 배포 APK 는 arm64 실기기 전용. ONNX Runtime·MediaPipe·Flutter 네이티브
-            // 라이브러리가 ABI 3개분 들어가면 254MB 가 되어 GitLab artifact 한도를
-            // 넘고 테스터 설치도 무겁다. ndk.abiFilters 는 Flutter Gradle 플러그인이
-            // 자기 타깃 3개를 합집합으로 덧붙여 효과가 없으므로 패키징에서 뺀다.
-            // debug 는 그대로 두어 x86_64 에뮬레이터 개발이 계속 된다.
-            packaging {
-                jniLibs {
-                    excludes += listOf("lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**")
-                }
-            }
         }
+    }
+}
+
+// 배포 APK 는 arm64 실기기 전용. ONNX Runtime·MediaPipe·Flutter 네이티브
+// 라이브러리가 ABI 3개분 들어가면 254MB 가 되어 GitLab artifact 한도를
+// 넘고 테스터 설치도 무겁다. ndk.abiFilters 는 Flutter Gradle 플러그인이
+// 자기 타깃 3개를 합집합으로 덧붙여 효과가 없으므로 패키징에서 뺀다.
+//
+// buildTypes.release 안에 `packaging {}` 으로 두면 안 된다. BuildType 에는
+// packaging 이 없어 Kotlin DSL 이 바깥 android.packaging 으로 풀어 버리고, 그러면
+// debug 까지 x86_64 가 빠져 에뮬레이터에서 libflutter.so 를 못 찾고 죽는다
+// (2026-09-17 확인). 변형(variant) API 로 release 에만 건다.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll(
+            listOf("lib/armeabi-v7a/**", "lib/x86/**", "lib/x86_64/**"),
+        )
     }
 }
 

@@ -21,6 +21,8 @@ import '../features/ticket/models/my_ticket.dart';
 import '../features/ticket/screens/entry_qr_screen.dart';
 import '../features/ticket/screens/my_tickets_screen.dart';
 import '../features/show/screens/show_detail_screen.dart';
+import '../features/payment/models/order_target.dart';
+import '../features/payment/models/placed_order.dart';
 import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
 import '../features/resale/models/market_concert.dart';
@@ -144,16 +146,31 @@ class AppRoutes {
     // 고른 좌석으로 주문을 만들어 넘긴다. 이 연결이 없으면 어떤 좌석을 골라도
     // 결제 화면에 더미 좌석(A구역 9열 6번)이 찍힌다. 예매 흐름을 거치지 않고
     // 열린 경우는 ticketOrderOrSample 이 더미로 대체한다.
-    payment: (context) => PaymentScreen(
-      order: ticketOrderOrSample(context),
-      // 잡아 둔 자리가 풀리기까지 남은 시간. 예매 흐름 밖에서 열렸으면 잡아 둔
-      // 자리가 없어 null 이고, 화면이 규약값(5분)으로 센다.
-      holdRemaining: BookingScope.maybeRead(
-        context,
-      )?.hold?.remainingFrom(DateTime.now()),
-    ),
-    paymentComplete: (context) =>
-        PaymentCompleteScreen(order: ticketOrderOrSample(context)),
+    payment: (context) {
+      final booking = BookingScope.maybeRead(context);
+      final hold = booking?.hold;
+      return PaymentScreen(
+        order: ticketOrderOrSample(context),
+        // 잡아 둔 자리가 풀리기까지 남은 시간. 예매 흐름 밖에서 열렸으면 잡아 둔
+        // 자리가 없어 null 이고, 화면이 규약값(5분)으로 센다.
+        holdRemaining: hold?.remainingFrom(DateTime.now()),
+        // 잡아 둔 자리가 있을 때만 서버에 주문을 만든다. 없으면(예매 흐름 밖)
+        // 결제하기는 완료 화면만 보여 준다.
+        target: booking == null || hold == null
+            ? null
+            : OrderTarget(concertId: booking.concertId, seatId: hold.seatId),
+      );
+    },
+    // 결제 화면이 주문 정보와 예매 번호를 인자로 넘긴다. 인자 없이 열리면
+    // (딥링크 · 화면 단위 테스트) 예매 흐름의 주문이나 더미로 대신하고, 서버에
+    // 만든 주문이 없으니 발행 상태는 묻지 않는다.
+    paymentComplete: (context) {
+      final placed = ModalRoute.of(context)!.settings.arguments as PlacedOrder?;
+      return PaymentCompleteScreen(
+        order: placed?.order ?? ticketOrderOrSample(context),
+        reservationId: placed?.reservationId,
+      );
+    },
     resaleMarket: (_) => const MarketConcertsScreen(),
     // 매물 목록은 고른 공연을 통째로 받는다. 매물 응답에 공연 정보가 없어
     // 제목과 회차를 그 값에서 가져온다.

@@ -17,7 +17,6 @@ void main() {
     title: '김필 단독 콘서트',
     venue: '고척돔',
     startAt: DateTime(2026, 10, 10, 19),
-    bookingFee: 2000,
   );
 
   const zone = Zone(
@@ -52,7 +51,6 @@ void main() {
 
     expect(order, isNotNull);
     expect(order!.ticketPrice, 120000);
-    expect(order.totalPrice, 122000);
   });
 
   test('아직 안 잡았으면 고른 구역의 값을 쓴다', () {

@@ -10,7 +10,6 @@ class TicketOrder {
     required this.bookerName,
     this.posterUrl,
     required this.ticketPrice,
-    required this.bookingFee,
   });
 
   final String concertTitle;
@@ -22,12 +21,9 @@ class TicketOrder {
   /// 공연 포스터 주소. 포스터가 없는 공연이면 null 이다.
   final String? posterUrl;
 
-  /// 티켓 자체 가격(원).
+  /// 티켓 가격(원). 실제 결제되는 금액이기도 하다.
+  ///
+  /// 수수료가 없어 합계를 따로 두지 않는다. 서버가 차감하는 것도 이 정가
+  /// 하나다(`Performance` 주석).
   final int ticketPrice;
-
-  /// 예매 수수료(원).
-  final int bookingFee;
-
-  /// 실제 결제되는 금액. 가격과 수수료가 바뀌어도 합계가 어긋나지 않게 여기서 계산한다.
-  int get totalPrice => ticketPrice + bookingFee;
 }

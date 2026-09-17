@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import '../constants.dart';
 import '../models/performance.dart';
 import '../models/seat.dart';
 import '../models/zone.dart';
@@ -34,7 +33,6 @@ class MockBookingData {
     title: '2026 아이유 콘서트',
     venue: '고척스카이돔',
     startAt: DateTime(2026, 11, 4, 18),
-    bookingFee: BookingConstants.bookingFee,
   );
 
   /// 구역 하나의 격자. 서버 시드와 같은 10열 × 20번 = 200석이다.

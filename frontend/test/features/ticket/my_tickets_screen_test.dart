@@ -14,6 +14,7 @@ import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
+import 'package:timo/features/ticket/models/reservation_detail.dart';
 import 'package:timo/features/ticket/screens/my_tickets_screen.dart';
 import 'package:timo/features/ticket/state/ticket_api_scope.dart';
 import 'package:timo/features/ticket/widgets/listing_card.dart';
@@ -356,4 +357,14 @@ class _ManyTicketsApi implements TicketApi {
   @override
   Future<void> cancelReservation(int reservationId) =>
       _base.cancelReservation(reservationId);
+
+  @override
+  Future<ReservationDetail> createReservation({
+    required int concertId,
+    required int seatId,
+  }) => _base.createReservation(concertId: concertId, seatId: seatId);
+
+  @override
+  Future<ReservationDetail> fetchReservation(int reservationId) =>
+      _base.fetchReservation(reservationId);
 }

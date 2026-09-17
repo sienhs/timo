@@ -67,16 +67,12 @@ class BookingController extends ChangeNotifier {
     return zone.seatLabel(seat);
   }
 
-  /// 결제 금액 = 정가 + 예매 수수료. 선택한 좌석이 없으면 null.
+  /// 결제 금액. 고른 구역의 정가 그대로다 — 수수료는 없다(`Performance` 주석).
+  /// 선택한 좌석이 없으면 null.
   ///
   /// 시안의 좌석 선택 하단 바에는 123,000원으로 적혀 있으나 좌석 가격
-  /// (186,000원)·결제 화면 합계(189,000원)와 맞지 않는다. 결제 화면 쪽을
-  /// 기준으로 삼아 한 곳에서만 계산한다.
-  int? get payableAmount {
-    final zone = _selectedZone;
-    if (zone == null) return null;
-    return zone.price + performance.bookingFee;
-  }
+  /// (186,000원)과 맞지 않는다. 결제 화면과 같은 값을 찍는다.
+  int? get payableAmount => _selectedZone?.price;
 
   /// 어느 공연을 예매하는지 정한다.
   ///

@@ -31,6 +31,13 @@ class TicketMetrics {
   /// 가짜 API 의 응답 지연. 실제 서버처럼 로딩 상태가 보이게 한다.
   static const mockLatency = Duration(milliseconds: 400);
 
+  /// 가짜 API 가 주문 상세를 몇 번째 물었을 때 발행을 끝내는가.
+  ///
+  /// 결제 완료 화면이 몇 초마다 묻는 것을 서버 없이 볼 수 있게, 처음 몇 번은
+  /// "발행 중" 으로 답하고 그 뒤에 끝낸다. 실제 서버는 체인 트랜잭션 두 개가
+  /// 확정되기까지 몇 초가 걸린다.
+  static const mockIssueAfterPolls = 2;
+
   // 목록·카드 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
   static const horizontalPadding = 16.0;
   static const cardRadius = 12.0;

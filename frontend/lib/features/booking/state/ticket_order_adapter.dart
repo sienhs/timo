@@ -43,6 +43,5 @@ TicketOrder? ticketOrderOf(BookingController controller) {
     // 자리와 반드시 맞는다. 아직 안 잡았으면(결제 화면을 예매 흐름 밖에서 연
     // 경우) 고른 구역의 값으로 둔다.
     ticketPrice: controller.hold?.price ?? zone.price,
-    bookingFee: performance.bookingFee,
   );
 }

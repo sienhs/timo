@@ -12,13 +12,6 @@ class BookingConstants {
   /// 이 상수를 지운다.
   static const fallbackConcertId = 1;
 
-  /// 예매 수수료. 서버에 없는 값이라 앱이 들고 있는다.
-  ///
-  /// 시안에 3,000원으로 적혀 있는데 요구사항 문서에는 수수료 개념이 없다.
-  /// 온체인에 기록되는 '정가' 에 포함되는지가 양도 상한 판정에 영향을 주므로
-  /// 기획이 정해질 때까지 정가와 분리해 둔다(`Performance.bookingFee`).
-  static const bookingFee = 3000;
-
   /// 좌석을 잡아 두는 시간. 백엔드 `SeatServiceImpl.HOLD_DURATION` 과 같아야 한다.
   ///
   /// 서버가 만료 시각을 내려주는데도 이 값을 두는 이유는 `SeatHold.remainingFrom`

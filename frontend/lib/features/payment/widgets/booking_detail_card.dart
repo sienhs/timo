@@ -26,13 +26,10 @@ class BookingDetailCard extends StatelessWidget {
             label: PaymentConstants.performedAtLabel,
             value: formatPerformedAt(order.performedAt),
           ),
-          OrderInfoRow(
-            label: PaymentConstants.seatLabel,
-            value: order.seat,
-          ),
+          OrderInfoRow(label: PaymentConstants.seatLabel, value: order.seat),
           OrderInfoRow(
             label: PaymentConstants.paidAmountLabel,
-            value: formatWon(order.totalPrice),
+            value: formatWon(order.ticketPrice),
             valueColor: PaymentColors.total,
           ),
         ],

@@ -1,6 +1,7 @@
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
 import '../models/my_ticket.dart';
+import '../models/reservation_detail.dart';
 import '../models/ticket_status.dart';
 import 'ticket_api.dart';
 
@@ -17,6 +18,9 @@ enum TicketMockScenario {
   ///
   /// 앱이 모르는 상태는 서버로 만들 수 없다. 서버에 주문 상태가 하나 늘어야
   /// 나오는 카드라, 그 상황을 미리 보려면 여기서 꾸며야 한다.
+  ///
+  /// 결제 완료 화면에서는 **발행 실패** 로 끝난다. 실패는 서버로 만들기가
+  /// 어렵다(잔액을 비워 두고 결제하는 식이라 매번 계정을 준비해야 한다).
   states,
 
   /// 두 탭 모두 빈 목록.
@@ -37,7 +41,9 @@ enum TicketMockScenario {
 /// 카드 두 종류를 한 번에 볼 수 없다. 공연명·장소·좌석은 시안 그대로다.
 ///
 /// 취소는 실제로 상태를 바꾼다. 취소 버튼을 눌렀을 때 목록이 어떻게 변하는지
-/// 서버 없이 확인하기 위해서다.
+/// 서버 없이 확인하기 위해서다. 주문도 실제로 만들어져 목록 맨 앞에 붙고,
+/// 상세를 [TicketMetrics.mockIssueAfterPolls] 번 물으면 발행이 끝난다 —
+/// 결제 완료 화면의 배지가 바뀌는 것을 서버 없이 보기 위해서다.
 ///
 /// 포스터만은 백엔드가 필요하다. 주소가 백엔드의 정적 파일([_posters])을
 /// 가리켜서, 서버를 안 띄우면 회색 자리가 그려진다. 앱 에셋으로 두면 그 사정이
@@ -64,6 +70,15 @@ class MockTicketApi implements TicketApi {
 
   List<MyTicket>? _tickets;
 
+  /// 이 가짜가 만든 주문들. 상세 조회가 여기서 찾는다.
+  final _placed = <int, ReservationDetail>{};
+
+  /// 주문마다 상세를 몇 번 물었는가. 발행을 끝낼 때를 정한다.
+  final _pollCounts = <int, int>{};
+
+  /// 다음 주문에 붙일 번호. 시안 목록의 번호(1~4 · 11~12)와 겹치지 않게 띄운다.
+  int _nextReservationId = 100;
+
   @override
   Future<List<MyTicket>> fetchMyTickets() async {
     await _respond();
@@ -80,6 +95,90 @@ class MockTicketApi implements TicketApi {
     }
     tickets[index] = tickets[index].copyWith(status: TicketStatus.cancelled);
   }
+
+  /// 좌석 번호로 열·번을 어림잡는다. 목 예매 데이터(`MockBookingData.seatIdOf`)
+  /// 가 `구역 × 1000 + (열 - 1) × 20 + 번` 으로 번호를 매기므로 거꾸로 푼다.
+  /// 서버 좌석 번호는 이 규칙이 아니지만, 목은 서버와 같이 쓰지 않는다.
+  @override
+  Future<ReservationDetail> createReservation({
+    required int concertId,
+    required int seatId,
+  }) async {
+    await _respond();
+    final now = clock();
+    final id = _nextReservationId++;
+    final indexInZone = seatId % 1000;
+    final detail = ReservationDetail(
+      reservationId: id,
+      concertId: concertId,
+      title: '2026 아이유 콘서트',
+      venueName: '고척스카이돔',
+      sectionName: 'A구역',
+      seatRow: (indexInZone - 1) ~/ 20 + 1,
+      seatNumber: (indexInZone - 1) % 20 + 1,
+      facePrice: 186000,
+      status: TicketStatus.paid,
+      posterImageUrl: _posters[1],
+      startAt: _startAt(now, const Duration(days: 48)),
+    );
+    _placed[id] = detail;
+    // 완료 화면의 '티켓 보러 가기' 로 넘어갔을 때 방금 산 표가 보여야 한다.
+    (_tickets ??= _initialTickets()).insert(
+      0,
+      MyTicket(
+        reservationId: id,
+        concertId: concertId,
+        title: detail.title,
+        venueName: detail.venueName,
+        sectionName: detail.sectionName,
+        seatRow: detail.seatRow,
+        seatNumber: detail.seatNumber,
+        facePrice: detail.facePrice,
+        status: TicketStatus.paid,
+        posterImageUrl: detail.posterImageUrl,
+        bookedAt: now,
+        startAt: detail.startAt,
+      ),
+    );
+    return detail;
+  }
+
+  @override
+  Future<ReservationDetail> fetchReservation(int reservationId) async {
+    await _respond();
+    final detail = _placed[reservationId];
+    if (detail == null) {
+      throw const ApiException('없는 예매예요.', status: 404);
+    }
+    final polls = (_pollCounts[reservationId] ?? 0) + 1;
+    _pollCounts[reservationId] = polls;
+    if (polls < TicketMetrics.mockIssueAfterPolls) return detail;
+    return scenario == TicketMockScenario.states
+        ? _issued(detail, failureReason: '잔액이 부족합니다')
+        : _issued(detail, tokenId: '$reservationId');
+  }
+
+  /// 발행 결과가 채워진 사본. 둘 중 하나만 넘긴다.
+  static ReservationDetail _issued(
+    ReservationDetail detail, {
+    String? tokenId,
+    String? failureReason,
+  }) => ReservationDetail(
+    reservationId: detail.reservationId,
+    concertId: detail.concertId,
+    title: detail.title,
+    venueName: detail.venueName,
+    sectionName: detail.sectionName,
+    seatRow: detail.seatRow,
+    seatNumber: detail.seatNumber,
+    facePrice: detail.facePrice,
+    // 실패하면 서버가 주문을 되돌려 놓는다(잔액 차감 실패·환불 완료).
+    status: failureReason == null ? detail.status : TicketStatus.cancelled,
+    posterImageUrl: detail.posterImageUrl,
+    startAt: detail.startAt,
+    tokenId: tokenId,
+    failureReason: failureReason,
+  );
 
   /// 지연이 0 이면 타이머를 만들지 않는다. 0 짜리 타이머도 타이머라, 프레임을
   /// 한 번만 그리는 위젯 테스트가 끝날 때 "아직 남은 타이머" 로 잡힌다.
