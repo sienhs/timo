@@ -37,13 +37,13 @@ variable "vpc_cidr" {
 variable "nat_instance_type" {
   description = "NAT instance type"
   type        = string
-  default     = "t4g.nano"
+  default     = "t4g.micro"
 }
 
 variable "ec2_instance_type" {
-  description = "Application EC2 instance type"
+  description = "Application EC2 instance type; sized for Spring Boot and synchronous web3j blockchain RPC calls"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.medium"
 }
 
 variable "ec2_root_volume_size" {
