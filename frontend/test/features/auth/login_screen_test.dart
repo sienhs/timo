@@ -9,10 +9,18 @@ import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
+import 'package:timo/features/auth/state/auth_api_scope.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/core/widgets/timo_logo.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/screens/home_screen.dart';
 import 'package:timo/features/home/state/home_api_scope.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/screens/my_page_screen.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
+import 'package:timo/features/shell/screens/main_shell_screen.dart';
+import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
 import 'package:timo/routes/app_routes.dart';
 
 void main() {
@@ -231,28 +239,39 @@ void main() {
       expect(session.isLoggedIn, isFalse);
     });
 
-    testWidgets('맞는 정보면 세션에 로그인 상태를 담고, true 를 돌려주며 닫힌다', (tester) async {
+    testWidgets('맞는 정보면 세션에 로그인 상태를 담고, 어디서 열었든 홈 탭으로 간다', (tester) async {
       usePhoneSize(tester);
-      bool? result;
+      // 실제 라우트 표로 띄우면 화면들이 api·세션을 직접 받지 않으므로, 앱(App)이
+      // 하는 것처럼 스코프로 감싸 목과 빈 세션을 내려준다.
       await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: Builder(
-            builder: (context) => TextButton(
-              onPressed: () async {
-                result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => LoginScreen(api: api, session: session),
-                  ),
-                );
-              },
-              child: const Text('열기'),
+        HomeApiScope(
+          api: const MockHomeApi(latency: Duration.zero),
+          child: MyPageApiScope(
+            api: const MockMyPageApi(latency: Duration.zero),
+            child: AuthSessionScope(
+              session: session,
+              child: AuthApiScope(
+                api: api,
+                child: MaterialApp(
+                  theme: AppTheme.light,
+                  initialRoute: AppRoutes.home,
+                  routes: AppRoutes.routes,
+                ),
+              ),
             ),
           ),
         ),
       );
-      await tester.tap(find.text('열기'));
+
+      // 마이페이지 탭의 '로그인' 버튼으로 들어간다.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppBottomNavBar),
+          matching: find.text('마이페이지'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AuthStrings.login));
       await tester.pumpAndSettle();
       expect(find.byType(LoginScreen), findsOneWidget);
 
@@ -260,8 +279,11 @@ void main() {
       await tester.tap(loginButton());
       await settle(tester);
 
-      expect(find.byType(LoginScreen), findsNothing);
-      expect(result, isTrue);
+      // 로그인을 시작한 마이페이지 탭이 아니라 홈 탭으로 간다.
+      expect(find.byType(LoginScreen, skipOffstage: false), findsNothing);
+      expect(find.byType(MainShellScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(MyPageScreen), findsNothing);
       // 앱 전체가 로그인 상태가 되고, 기기에도 저장돼 다시 켜도 유지된다.
       expect(session.isLoggedIn, isTrue);
       expect(session.memberId, MockAuthApi.tokens.memberId);

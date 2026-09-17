@@ -25,8 +25,10 @@ import 'package:timo/core/widgets/timo_logo.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
+import 'package:timo/features/home/screens/home_screen.dart';
 import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/screens/my_page_screen.dart';
 import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
@@ -691,10 +693,12 @@ void main() {
       expect(session.isLoggedIn, isTrue);
       expect(session.memberId, MockAuthApi.tokens.memberId);
 
-      // 티켓 보러 가기 → 홈 셸
+      // 티켓 보러 가기 → 홈 셸. 가입을 시작한 마이페이지 탭이 아니라 홈 탭이다.
       await tapNext(tester, AuthStrings.goToTickets);
       await tester.pumpAndSettle();
       expect(find.byType(MainShellScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(MyPageScreen), findsNothing);
       expect(find.byType(SignupCompleteScreen), findsNothing);
 
       // 마이페이지 탭도 로그인 상태를 따라 회원 화면(로그아웃 버튼)으로 바뀌어 있다.

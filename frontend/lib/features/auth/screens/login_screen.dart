@@ -22,8 +22,8 @@ import '../../../core/widgets/timo_logo.dart';
 /// 바뀌어도 기존 계정이 로그인 못 하는 일이 없어야 하고, 맞는지 판정은 서버
 /// 몫이기 때문이다.
 ///
-/// 성공하면 받은 토큰을 [AuthSession] 에 담아(기기에도 저장됨) 이전 화면으로
-/// 돌아가며 결과로 true 를 넘긴다. 아이디·비밀번호가 틀리면 칸 아래 문구,
+/// 성공하면 받은 토큰을 [AuthSession] 에 담고(기기에도 저장됨) 어디서
+/// 열었든 홈 탭으로 간다([_goHome]). 아이디·비밀번호가 틀리면 칸 아래 문구,
 /// 정지·탈퇴 계정이나 네트워크 실패는 스낵바로 알린다.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.api, this.session});
@@ -97,14 +97,29 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // 토큰을 세션에 담으면 앱 전체가 로그인 상태가 되고 기기에도 저장된다.
-    // 저장까지 끝난 뒤 닫아야, 닫힌 직후 앱을 죽여도 로그인 상태가 남는다.
+    // 저장까지 끝난 뒤 떠나야, 떠난 직후 앱을 죽여도 로그인 상태가 남는다.
     await _session.signIn(tokens);
     if (!mounted) return;
     // 성공했을 때만 OS 에 "이 아이디·비밀번호를 저장할래?" 를 묻게 한다.
     // 틀린 비밀번호를 저장하라고 묻는 일이 없도록, 화면이 닫힐 때 무조건
     // 묻는 자동완성 그룹의 기본 동작은 아래 build 에서 꺼 두었다.
     TextInput.finishAutofillContext();
-    Navigator.pop(context, true);
+    _goHome();
+  }
+
+  /// 로그인을 마치면 어디서 들어왔든 홈 탭으로 간다.
+  ///
+  /// 이전 화면으로 되돌리지 않는 이유: 로그인 화면은 마이페이지·공연 상세·
+  /// 양도마켓 등 여러 곳에서 열리는데, 되돌아간 화면이 로그인 상태를 어떻게
+  /// 이어받을지가 화면마다 달라 동작을 예측하기 어렵다. 홈을 새로 세우고 그
+  /// 위에 쌓인 것을 전부 걷어내면 어느 경로로 왔든 결과가 같다 — 내 티켓·찜
+  /// 화면이 하단 바 탭으로 돌아갈 때와 같은 방식이다.
+  void _goHome() {
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.home,
+      (route) => false,
+    );
   }
 
   void _goSignup() => Navigator.pushNamed(context, AppRoutes.signupPhone);
