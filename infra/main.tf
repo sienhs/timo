@@ -67,19 +67,19 @@ module "security" {
 module "ec2" {
   source = "./modules/ec2"
 
-  name                = "${var.project_name}-${var.environment}"
-  subnet_id           = module.network.private_app_subnet_id
-  security_group_id   = module.security.ec2_security_group_id
-  instance_type       = var.ec2_instance_type
-  root_volume_size    = var.ec2_root_volume_size
-  app_port            = var.app_port
-  aws_region          = var.aws_region
-  backend_secret_arn  = module.backend_secret.arn
-  db_endpoint         = module.rds.endpoint
-  db_port             = module.rds.port
-  db_name             = var.db_name
-  db_init_sql_base64  = base64encode(file("${path.module}/bootstrap/rds-load-test-init.sql"))
-  detailed_monitoring = var.ec2_detailed_monitoring
+  name                 = "${var.project_name}-${var.environment}"
+  subnet_id            = module.network.private_app_subnet_id
+  security_group_id    = module.security.ec2_security_group_id
+  instance_type        = var.ec2_instance_type
+  root_volume_size     = var.ec2_root_volume_size
+  app_port             = var.app_port
+  aws_region           = var.aws_region
+  backend_secret_arn   = module.backend_secret.arn
+  db_endpoint          = module.rds.endpoint
+  db_port              = module.rds.port
+  db_name              = var.db_name
+  db_schema_sql_base64 = base64encode(file("${path.module}/bootstrap/init.sql"))
+  detailed_monitoring  = var.ec2_detailed_monitoring
 
   # Ensure the private subnet has an Internet route through the NAT instance
   # before application EC2 user_data attempts dnf update/install.

@@ -47,8 +47,8 @@ variable "db_name" {
   type        = string
 }
 
-variable "db_init_sql_base64" {
-  description = "Base64-encoded SQL executed once through SSM after RDS provisioning"
+variable "db_schema_sql_base64" {
+  description = "Base64-encoded, idempotent SQL applied through SSM after RDS provisioning"
   type        = string
   sensitive   = true
 }
