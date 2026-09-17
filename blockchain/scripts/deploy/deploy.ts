@@ -74,6 +74,12 @@ export async function deployContracts(
     await (await ticketNFT.grantRole(await ticketNFT.OPERATOR_ROLE(), admin)).wait();
     await (await ticketVault.grantRole(await ticketVault.OPERATOR_ROLE(), admin)).wait();
     console.log("Granted ORGANIZER_ROLE/OPERATOR_ROLE to admin on ShowRegistry, TicketNFT, TicketVault");
+
+    // The backend also signs the gate's markUsed call as this same admin address - there is no
+    // separate gate wallet. Without this, every entry scan reverts with
+    // AccessControlUnauthorizedAccount and DB/chain state silently drift apart (TicketEntryOnChainService).
+    await (await ticketNFT.grantRole(await ticketNFT.GATE_ROLE(), admin)).wait();
+    console.log("Granted GATE_ROLE to admin on TicketNFT");
   } else {
     console.log(
       `admin (${admin}) is not the deploying account - grant MARKETPLACE_ROLE to ${await marketplace.getAddress()} ` +

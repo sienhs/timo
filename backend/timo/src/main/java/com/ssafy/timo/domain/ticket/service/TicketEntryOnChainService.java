@@ -20,9 +20,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * 남는다는 뜻이라, 공연이 끝난 뒤 기념품 전환({@code convertToSouvenir}) 처럼 체인 상태를
  * 전제하는 작업 전에 한 번 맞춰 줘야 한다. 그 보정은 아직 없다.
  *
- * <p>{@code markUsed} 는 컨트랙트에서 {@code GATE_ROLE} 을 요구하는데 배포 스크립트는 admin 에게
- * 그 역할을 주지 않는다. 부여 전까지는 여기서 AccessControl 로 계속 되돌려진다 - 게이트 응답과
- * DB 는 정상이고 체인만 안 따라온다.
+ * <p>{@code markUsed} 는 컨트랙트에서 {@code GATE_ROLE} 을 요구한다. 배포 스크립트({@code deploy.ts})가
+ * admin 에게 그 역할을 함께 부여하므로 정상 배포된 노드에서는 통과한다 - 그 grant 없이 뜬 노드라면
+ * 여기서 AccessControl 로 계속 되돌려진다. 게이트 응답과 DB 는 그 경우에도 정상이고 체인만 안 따라온다.
  */
 @Slf4j
 @Service

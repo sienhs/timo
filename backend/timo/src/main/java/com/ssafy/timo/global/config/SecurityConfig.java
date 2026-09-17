@@ -29,34 +29,29 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+
+                        // Public endpoints
                         .requestMatchers("/actuator/health").permitAll()
-                        // External ALB traffic is blocked in Terraform. The future Prometheus
-                        // instance reaches this endpoint directly through its security group.
                         .requestMatchers("/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/sms/send",
                                 "/api/v1/auth/sms/verify",
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
-
-                                // 부르는 시점에 access 가 이미 만료돼 있다. 인증을 걸면
-                                // 재발급받으려면 재발급이 필요한 순환이 된다.
                                 "/api/v1/auth/reissue",
-                                "/api/v1/auth/logout",
-
-                                // 게이트 검표. 게이트 앱에 로그인 화면이 없어 보낼 토큰이 없다(팀 결정).
-                                // QR 을 아는 사람은 누구나 그 티켓을 USED 로 만들 수 있다는 뜻이라,
-                                // 게이트 앱에 로그인이 생기면 이 줄부터 지운다.
-                                "/api/v1/gates/entries/verify").permitAll()
+                                "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/auth/availability",
                                 "/api/v1/concerts",
                                 "/api/v1/concerts/{concertId}",
                                 "/api/v1/artists",
                                 "/api/v1/artists/{artistId}").permitAll()
-                        // 프론트 연동용 스텁. AuthControllerStub 가 @Profile("!prod") 라
-                        // 운영에서는 이 규칙에 걸리는 핸들러 자체가 없다(404).
-                        .requestMatchers("/api/v0/**").permitAll()
+
+                        // Admin endpoints
+                        .requestMatchers(HttpMethod.POST, "/api/v1/gates/entries/verify")
+                        .hasRole("ADMIN")
+
+                        // Authenticated endpoints
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(e -> e
@@ -68,6 +63,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(restAccessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                 );
+
         return http.build();
     }
 }
