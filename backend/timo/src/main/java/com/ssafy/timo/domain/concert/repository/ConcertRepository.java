@@ -6,7 +6,6 @@ import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,18 +25,6 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
      */
     @Query("select c from Concert c join fetch c.venue where c.id = :id")
     Optional<Concert> findByIdWithVenue(@Param("id") Long id);
-
-    /**
-     * 조회수를 원자적으로 1 증가시킨다.
-     *
-     * <p>엔티티를 읽어서 필드를 올리고 다시 저장하면 동시에 들어온 조회가 서로의 증가분을 덮어쓸 수
-     * 있다(lost update). DB 에서 바로 {@code view_count = view_count + 1} 을 실행해 이를 피한다.
-     *
-     * @return 갱신된 행 수. 대상 공연이 없으면 0.
-     */
-    @Modifying
-    @Query("update Concert c set c.viewCount = c.viewCount + 1 where c.id = :id")
-    int increaseViewCount(@Param("id") Long id);
 
     /**
      * 조건에 맞는 공연을 한 페이지 조회한다. 조건은 모두 선택값이라 {@code null} 이면 무시한다.

@@ -46,7 +46,8 @@ public record ConcertDetailResponseDto(
 
     public static ConcertDetailResponseDto from(Concert concert,
                                                 List<Section> sections,
-                                                ImageStorage imageStorage) {
+                                                ImageStorage imageStorage,
+                                                int viewCount) {
         return new ConcertDetailResponseDto(
                 concert.getId(),
                 concert.getTitle(),
@@ -59,7 +60,7 @@ public record ConcertDetailResponseDto(
                 concert.getDescription(),
                 concert.getAgeRating(),
                 concert.getStatus(),
-                concert.getViewCount(),
+                viewCount,
                 concert.getStartDate(),
                 concert.getEndDate(),
                 concert.getOpenAt(),
