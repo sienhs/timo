@@ -21,10 +21,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,10 +38,12 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -208,21 +212,26 @@ class StubApiTest {
 
         @Test
         void 생성한_공연은_상세와_목록에서_바로_보인다() throws Exception {
-            String body = """
+            String requestJson = """
                     {
                       "title": "새 공연", "genre": "PLAY", "ageRating": "ALL",
                       "venueId": 1, "artistIds": [1, 1, 2],
-                      "posterImageKey": "poster/new.png",
                       "startDate": "2026-12-01T19:00:00", "endDate": "2026-12-02T19:00:00",
                       "openAt": "2026-11-01T20:00:00"
                     }
                     """;
-            mockMvc.perform(post("/api/v0/concerts").contentType(MediaType.APPLICATION_JSON).content(body))
+            MockMultipartFile request = new MockMultipartFile(
+                    "request", "", MediaType.APPLICATION_JSON_VALUE, requestJson.getBytes(StandardCharsets.UTF_8));
+            MockMultipartFile poster = new MockMultipartFile(
+                    "poster", "poster.png", MediaType.IMAGE_PNG_VALUE, "poster-bytes".getBytes(StandardCharsets.UTF_8));
+
+            mockMvc.perform(multipart("/api/v0/concerts").file(request).file(poster))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", "/api/v0/concerts/" + StubFixtures.CREATED_ID_START))
                     .andExpect(jsonPath("$.status").value("SCHEDULED"))
                     .andExpect(jsonPath("$.viewCount").value(0))
-                    .andExpect(jsonPath("$.posterImageUrl").value("https://cdn.stub.timo.io/poster/new.png"))
+                    .andExpect(jsonPath("$.posterImageUrl",
+                            matchesPattern("https://cdn\\.stub\\.timo\\.io/concert/[^/]+/poster/[^/]+\\.png")))
                     .andExpect(jsonPath("$.artists", hasSize(2)))
                     .andExpect(jsonPath("$.artists[0].name").value("김필"));
 
@@ -243,12 +252,12 @@ class StubApiTest {
 
         @Test
         void 종료일이_시작일보다_빠르면_400() throws Exception {
-            mockMvc.perform(post("/api/v0/concerts")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"title": "t", "genre": "PLAY", "ageRating": "ALL", "venueId": 1, "artistIds": [1],
-                                     "startDate": "2026-12-02T19:00:00", "endDate": "2026-12-01T19:00:00"}
-                                    """))
+            MockMultipartFile request = new MockMultipartFile("request", "", MediaType.APPLICATION_JSON_VALUE, """
+                    {"title": "t", "genre": "PLAY", "ageRating": "ALL", "venueId": 1, "artistIds": [1],
+                     "startDate": "2026-12-02T19:00:00", "endDate": "2026-12-01T19:00:00"}
+                    """.getBytes(StandardCharsets.UTF_8));
+
+            mockMvc.perform(multipart("/api/v0/concerts").file(request))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.exception").value("InvalidConcertPeriodException"));
         }

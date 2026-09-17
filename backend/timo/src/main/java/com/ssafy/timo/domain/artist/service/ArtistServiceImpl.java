@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.artist.service;
 import com.ssafy.timo.domain.artist.dto.ArtistListRequestDto;
 import com.ssafy.timo.domain.artist.dto.ArtistSummaryResponseDto;
 import com.ssafy.timo.domain.artist.repository.ArtistRepository;
+import com.ssafy.timo.global.storage.ImageStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ArtistServiceImpl implements ArtistService {
 
     private final ArtistRepository artistRepository;
+    private final ImageStorage imageStorage;
 
     /**
      * 조건에 맞는 아티스트 목록을 페이지 단위로 조회한다.
@@ -32,6 +34,6 @@ public class ArtistServiceImpl implements ArtistService {
     public PagedModel<ArtistSummaryResponseDto> findAll(ArtistListRequestDto request) {
         return new PagedModel<>(artistRepository
                 .findPage(request.keywordOrNull(), request.toPageable())
-                .map(ArtistSummaryResponseDto::from));
+                .map(artist -> ArtistSummaryResponseDto.from(artist, imageStorage)));
     }
 }

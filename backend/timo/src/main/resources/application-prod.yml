@@ -63,6 +63,14 @@ api:
   stub:
     enabled: false
 
+# infra/modules/image-storage 의 runtime_environment 출력이 이 두 값과 AWS_ACCESS_KEY_ID/
+# AWS_SECRET_ACCESS_KEY/AWS_REGION 을 함께 내려준다. 자격증명은 SDK 기본 체인이 환경변수에서
+# 바로 읽으므로 여기 따로 옮겨 적지 않는다.
+app:
+  image:
+    bucket-name: ${S3_PUBLIC_BUCKET_NAME}
+    base-url: ${IMAGE_BASE_URL}
+
 wallet:
   master-key: ${WALLET_MASTER_KEY}
 

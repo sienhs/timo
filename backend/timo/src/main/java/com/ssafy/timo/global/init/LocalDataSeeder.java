@@ -35,6 +35,7 @@ import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.domain.venue.service.VenueService;
 import com.ssafy.timo.domain.wallet.service.WalletService;
+import com.ssafy.timo.global.storage.ImageStorage;
 
 import jakarta.persistence.EntityManager;
 
@@ -44,17 +45,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.env.Environment;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
+import java.net.URLConnection;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -79,7 +87,12 @@ import java.util.stream.Collectors;
  * 다른 하나는 {@code @PostConstruct} 가 프록시가 적용되기 전에 불려 {@code @Transactional} 이
  * 걸리지 않는 것이다. 컨텍스트가 다 뜬 뒤에 도는 러너에는 두 문제가 모두 없다.
  *
- * <p>{@code local} 프로필에서만 등록된다. 운영에서 이 빈이 뜨면 기동할 때마다 가짜 공연이 쌓인다.
+ * <p>{@code local}·{@code demo} 프로필에서만 등록된다. 운영에서 이 빈이 뜨면 기동할 때마다 가짜
+ * 공연이 쌓인다. {@code demo}는 실제 S3 버킷에 데모 이미지가 실제로 올라가는지 눈으로 확인하려고
+ * 만든 프로필이다({@code application-demo.yml} 참고) - DB 는 {@code local} 과 같은 휘발성 도커
+ * MySQL 을 그대로 쓰고 이미지 저장소만 실제 S3({@link com.ssafy.timo.global.storage.S3ImageStorage})로
+ * 바뀐다. 그래서 이 프로필에서만 {@link #resolveImageKey} 가 정적 리소스를 실제로 업로드한다 -
+ * {@code local} 에서는 지금처럼 그 경로를 key 로 그대로 쓴다(플레이스홀더는 진짜로 저장하지 않는다).
  *
  * <p><b>{@code ON_SALE} 공연은 실제 체인에도 등록한다.</b> {@code ReservationService}가 예매를
  * 받으려면 {@code Concert.isReadyForBooking()}(주최자·정가·온체인 showId)이 갖춰져 있어야 하는데,
@@ -97,7 +110,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-@Profile("local")
+@Profile({"local", "demo"})
 @RequiredArgsConstructor
 public class LocalDataSeeder implements ApplicationRunner {
 
@@ -295,6 +308,8 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final ShowRegistryClient showRegistryClient;
     private final WalletService walletService;
     private final BlockchainProperties blockchainProperties;
+    private final ImageStorage imageStorage;
+    private final Environment environment;
 
     /**
      * 공연이 하나라도 있으면 아무것도 하지 않는다.
@@ -315,6 +330,7 @@ public class LocalDataSeeder implements ApplicationRunner {
         seedSeats(venueId);
 
         Map<String, Long> artistIds = findArtistIdsByName();
+        resolveArtistImages(artistIds);
 
         // 좌석 상태는 예매 중인 공연에만 넣는다. 오픈 전이거나 끝난 공연에 팔린 자리가 있으면
         // 상태와 배치도가 어긋나, 화면을 보는 쪽이 어느 쪽을 믿어야 할지 알 수 없다.
@@ -660,6 +676,46 @@ public class LocalDataSeeder implements ApplicationRunner {
     }
 
     /**
+     * {@code db/seed-local.sql} 이 넣는 프로필 이미지 경로. {@link #resolveArtistImages} 가 실제
+     * 업로드로 바꿀 때만 이름과 매칭시키는 용도라, SQL 값이 바뀌면 여기도 함께 고친다.
+     */
+    private static final Map<String, String> ARTIST_SEED_IMAGE_KEYS = Map.of(
+            "김필", "artist/artist_kim_feel.jpg",
+            "이승기", "artist/artist_lee_s.jpg",
+            "로이킴", "artist/artist_roykim.jpg",
+            "Bruno Mars", "artist/artist_bruno_mars.jpg");
+
+    /**
+     * {@code db/seed-local.sql} 이 넣은 아티스트 프로필 key 를 실제 업로드 결과로 덮어쓴다.
+     * {@code demo} 에서만 돈다 - SQL 로 미리 들어간 값이라 공연 이미지처럼 {@link #resolveImageKey} 를
+     * 만드는 시점에 함께 처리할 수 없어 따로 둔다.
+     *
+     * <p>불크 업데이트라({@link #applySeedState} 와 같은 이유로) 이미 로딩된 1차 캐시를 비운다 -
+     * 안 비우면 뒤이은 공연 생성이 갱신 전 값을 그대로 읽는다.
+     */
+    private void resolveArtistImages(Map<String, Long> artistIds) {
+        if (!environment.matchesProfiles("demo")) {
+            return;
+        }
+
+        artistIds.forEach((name, id) -> {
+            String classpathKey = ARTIST_SEED_IMAGE_KEYS.get(name);
+            if (classpathKey == null) {
+                return;
+            }
+            String uploadedKey = imageStorage.upload(
+                    "demo-seed/" + UUID.randomUUID(), loadClasspathImage(classpathKey));
+            entityManager.createQuery("update Artist a set a.profileImageKey = :key where a.id = :id")
+                    .setParameter("key", uploadedKey)
+                    .setParameter("id", id)
+                    .executeUpdate();
+        });
+
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    /**
      * 시드가 쓰는 아티스트를 이름으로 한 번에 찾는다.
      *
      * <p>동명이인이 있으면 먼저 조회된 쪽을 쓴다. {@code artist_name} 에 unique 제약이 없어 가능한
@@ -692,8 +748,8 @@ public class LocalDataSeeder implements ApplicationRunner {
         CommandConcertResponseDto created = concertService.create(new CommandConcertRequestDto(
                 seed.title(),
                 seed.genre(),
-                seed.posterImageKey(),
-                seed.imageKeys(),
+                resolveImageKey(seed.posterImageKey()),
+                seed.imageKeys().stream().map(this::resolveImageKey).toList(),
                 seed.description(),
                 seed.ageRating(),
                 seed.startDate(),
@@ -705,6 +761,30 @@ public class LocalDataSeeder implements ApplicationRunner {
         applySeedState(created.id(), seed);
 
         return created.id();
+    }
+
+    /**
+     * {@code local} 에서는 정적 리소스 경로를 그대로 key 로 쓴다({@code static/} 아래가 곧 서빙 경로라
+     * 손댈 필요가 없다). {@code demo} 에서만 그 파일을 실제로 읽어 {@link ImageStorage#upload} 로
+     * 올리고, 그 결과 key 로 바꾼다 - 클래스 상단 주석 참고.
+     */
+    private String resolveImageKey(String classpathKey) {
+        if (classpathKey == null || !environment.matchesProfiles("demo")) {
+            return classpathKey;
+        }
+        return imageStorage.upload("demo-seed/" + UUID.randomUUID(), loadClasspathImage(classpathKey));
+    }
+
+    /** {@code src/main/resources/static/<classpathKey>} 를 읽어 업로드 가능한 형태로 감싼다. */
+    private MultipartFile loadClasspathImage(String classpathKey) {
+        String resourcePath = "static/" + classpathKey;
+        try (var in = new ClassPathResource(resourcePath).getInputStream()) {
+            byte[] content = in.readAllBytes();
+            String contentType = URLConnection.guessContentTypeFromName(classpathKey);
+            return new ClasspathMultipartFile(classpathKey, contentType, content);
+        } catch (IOException e) {
+            throw new UncheckedIOException("데모 시드 이미지 로딩 실패: " + resourcePath, e);
+        }
     }
 
     /**

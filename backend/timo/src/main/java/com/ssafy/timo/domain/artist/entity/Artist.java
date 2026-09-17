@@ -27,13 +27,17 @@ public class Artist extends BaseEntity {
     @Column(name = "artist_name", length = 200)
     private String name;
 
-    /** 외부 스토리지 URL 이라 길이를 제한하지 않는다. */
+    /**
+     * 저장소 key. URL 이 아니라 {@link com.ssafy.timo.global.storage.ImageStorage} 가 URL 로 바꾸는
+     * key 다({@link com.ssafy.timo.domain.concert.entity.Concert#getPosterImageKey()} 와 같은 취급).
+     * 컬럼명은 바꾸지 않는다 - 저장된 값의 shape 만 바뀌었을 뿐 마이그레이션이 필요한 변화는 아니다.
+     */
     @Column(name = "profile_image", columnDefinition = "TEXT")
-    private String profileImage;
+    private String profileImageKey;
 
     @Builder
-    public Artist(String name, String profileImage) {
+    public Artist(String name, String profileImageKey) {
         this.name = name;
-        this.profileImage = profileImage;
+        this.profileImageKey = profileImageKey;
     }
 }
