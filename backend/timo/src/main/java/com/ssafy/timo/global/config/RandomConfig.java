@@ -1,5 +1,6 @@
 package com.ssafy.timo.global.config;
 
+import java.util.Random;
 import java.util.random.RandomGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,9 @@ public class RandomConfig {
 
     @Bean
     public RandomGenerator randomGenerator() {
-        return RandomGenerator.getDefault();
+        // getDefault() is backed by the optional jdk.random module. The
+        // production JRE does not resolve that module by default, so select a
+        // java.base implementation explicitly instead.
+        return new Random();
     }
 }
