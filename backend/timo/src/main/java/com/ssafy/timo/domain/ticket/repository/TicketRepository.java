@@ -1,10 +1,13 @@
 package com.ssafy.timo.domain.ticket.repository;
 
+import com.ssafy.timo.domain.ticket.dto.MyTicketRow;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -41,6 +44,83 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             """)
     List<ReservationTicketId> findTicketIdsByReservationIds(
             @Param("reservationIds") Collection<Long> reservationIds);
+
+    /**
+     * 내가 지금 가진 티켓 목록.
+     *
+     * <p>{@code reservation.member} 는 <b>처음 예매한 사람</b>에서 멈춰 있어, 그것만 보면 판 사람에게
+     * 판 티켓이 남고 산 사람에게는 산 티켓이 안 보인다. 그래서 두 갈래를 합친다 — 내가 예매했고
+     * <b>거래된 적 없는</b> 티켓과, 그 티켓의 <b>마지막 거래</b>에서 내가 산 티켓이다. 되산 경우
+     * ({@code A->B->A})는 앞 갈래에서 빠지고 뒤 갈래가 잡는다. 마지막을 {@code MAX(trade_id)} 로
+     * 고르는 것은 재양도({@code A->B->C}) 때문이고, 같은 초에 두 건이 와도 순서가 안 흔들린다.
+     *
+     * <p>두 갈래 모두 인덱스에서 출발한다({@code ix_rsv_member}, {@code idx_trade_buyer}).
+     * {@code where coalesce(마지막구매자, 예매자) = :memberId} 로 쓰면 유도값이라 인덱스를 못 탄다.
+     * 네이티브라 기동 시점에 검증되지 않으므로 통합 테스트가 이 쿼리를 지킨다.
+     */
+    @Query(value = """
+            select t.ticket_id        as ticketId,
+                   r.reservation_id   as reservationId,
+                   c.concert_id       as concertId,
+                   c.title            as concertTitle,
+                   c.poster_image_key as posterImageKey,
+                   c.start_date       as startDate,
+                   v.venue_name       as venueName,
+                   s.name             as sectionName,
+                   st.seat_no         as seatNo,
+                   st.seat_col        as seatCol,
+                   s.price            as facePrice,
+                   t.status           as ticketStatus,
+                   owned.acquired_by  as acquiredBy,
+                   owned.acquired_at  as acquiredAt,
+                   exists (select 1
+                             from ticket_listing l
+                            where l.ticket_id = t.ticket_id
+                              and l.status = 'LISTED') as listed
+              from (
+                    select t1.ticket_id as ticket_id,
+                           'BOOKING'    as acquired_by,
+                           r1.created_at as acquired_at
+                      from ticket t1
+                      join reservation r1 on r1.reservation_id = t1.reservation_id
+                     where r1.member_id = :memberId
+                       and not exists (select 1 from ticket_trade tt
+                                        where tt.ticket_id = t1.ticket_id)
+                    union
+                    select tt2.ticket_id  as ticket_id,
+                           'TRANSFER'     as acquired_by,
+                           tt2.traded_at  as acquired_at
+                      from ticket_trade tt2
+                     where tt2.buyer_member_id = :memberId
+                       and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
+                                            where x.ticket_id = tt2.ticket_id)
+                   ) owned
+              join ticket t      on t.ticket_id = owned.ticket_id
+              join reservation r on r.reservation_id = t.reservation_id
+              join concert c     on c.concert_id = r.concert_id
+              join venue v       on v.venue_id = c.venue_id
+              join seat st       on st.seat_id = r.seat_id
+              join section s     on s.section_id = st.section_id
+             order by owned.acquired_at desc, t.ticket_id desc
+            """,
+            countQuery = """
+            select count(*) from (
+                    select t1.ticket_id
+                      from ticket t1
+                      join reservation r1 on r1.reservation_id = t1.reservation_id
+                     where r1.member_id = :memberId
+                       and not exists (select 1 from ticket_trade tt
+                                        where tt.ticket_id = t1.ticket_id)
+                    union
+                    select tt2.ticket_id
+                      from ticket_trade tt2
+                     where tt2.buyer_member_id = :memberId
+                       and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
+                                            where x.ticket_id = tt2.ticket_id)
+                   ) owned
+            """,
+            nativeQuery = true)
+    Page<MyTicketRow> findMyTickets(@Param("memberId") Long memberId, Pageable pageable);
 
     /** {@link #findTicketIdsByReservationIds}가 돌려주는 (주문, 티켓) 식별자 쌍. */
     interface ReservationTicketId {
