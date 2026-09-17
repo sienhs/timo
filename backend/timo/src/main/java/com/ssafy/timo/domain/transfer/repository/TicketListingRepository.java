@@ -144,6 +144,36 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
                              @Param("closedAt") LocalDateTime closedAt);
 
     /**
+     * 등록가를 바꾼다. <b>{@code LISTED} 인 매물만 바뀐다.</b>
+     *
+     * <p>조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면, 가격을 고치려는 찰나에 팔린 매물의
+     * 가격이 체결 뒤에 바뀐다. 구매자는 옛 가격에 샀는데 매물에는 새 가격이 남아 <b>체결 기록과
+     * 매물이 서로 다른 금액을 말하게 된다</b> — 정산과 CS 가 무엇을 믿어야 할지 알 수 없어진다.
+     * 그래서 여기서도 확인과 변경이 한 문장 안에서 일어난다. 영향 행이 0 이면 남이 먼저 샀거나
+     * 이미 취소된 것이다.
+     *
+     * <p>정가 이하인지는 보지 않는다. 기준값인 {@code face_value} 는 등록 시점 스냅샷이라 서비스가
+     * 매물을 읽어 판단한다 — 그 검사는 경쟁 상태와 무관하고, 화면에 보여 줄 말이 있는 비즈니스 예외다.
+     *
+     * <p>{@code updatedAt} 과 {@code clearAutomatically} 에 대한 설명은
+     * {@link #markSoldIfListed(Long, LocalDateTime)} 을 본다. 이 호출 뒤에 매물을 다시 쓰려면
+     * 새로 조회해야 한다.
+     *
+     * @return 영향 행 수. 0 또는 1 이다
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update TicketListing l
+               set l.price = :price,
+                   l.updatedAt = :updatedAt
+             where l.id = :listingId
+               and l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+            """)
+    int updatePriceIfListed(@Param("listingId") Long listingId,
+                            @Param("price") long price,
+                            @Param("updatedAt") LocalDateTime updatedAt);
+
+    /**
      * 이 티켓에 진행 중인 등록이 있는지 본다.
      *
      * <p><b>안내용 선검사다.</b> 흔한 경우를 친절한 메시지로 걸러낼 뿐이고, 이것만으로 막으려 하면

@@ -8,6 +8,7 @@ import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.global.security.CurrentMember;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -16,6 +17,7 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -115,6 +117,34 @@ public interface MarketApi {
     @PostMapping("/listings")
     ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request,
                                                   @CurrentMember Long memberId);
+
+    /**
+     * 등록가를 바꾼다. 매물을 올린 <b>판매자 본인만</b> 할 수 있다. 200 이고 응답은 상세와 같은 모양이다.
+     *
+     * <p>취소하고 다시 올리는 것으로 갈음하지 않는 이유는 그러면 {@code listingId} 가 새로 생기기
+     * 때문이다. 판매자에게는 "가격만 내린 같은 매물" 인데 식별자가 바뀌면 재양도 이력이
+     * 끊어져 보이고, 앱도 상세 화면을 다시 열어야 한다.
+     *
+     * <p>{@code POST} 가 아니라 {@code PATCH} 인 이유는 <b>재시도가 안전해야 하기 때문이다.</b>
+     * 취소({@link #cancel})는 되돌릴 수 없는 전이라 한 번만 일어나야 하지만, 가격 수정은 절댓값을
+     * 넣는 것이라 같은 요청이 두 번 도착해도 결과가 같다. 모바일에서 응답을 받기 전에 끊기는 일이
+     * 흔해 이 차이가 실제로 쓰인다. 이 API 에서 {@code PATCH} 를 쓰는 곳은 여기 하나다.
+     *
+     * <p>바꿀 수 있는 값은 가격뿐이다. 새 가격도 등록 때와 같은 규칙을 받는다 - <b>등록 시점에
+     * 스냅샷으로 잡힌 정가</b>({@code ticket_listing.face_value}) 이하여야 한다. 공연 정가가 그 뒤에
+     * 바뀌었더라도 기준은 스냅샷이다. 올리는 방향도 정가 이하이면 허용한다.
+     *
+     * <p>남의 매물이면 403, 정가 초과면 400, 이미 팔렸거나 취소된 매물이면 409, 매물이 없으면 404 다.
+     *
+     * <p><b>구매자가 보던 가격이 바뀌는 문제는 체결 쪽이 막는다.</b> 구매 요청은
+     * {@code expectedPrice} 를 함께 보내고, 그 값이 등록가와 다르면 409
+     * ({@code LISTING_PRICE_MISMATCH}) 로 거절된다 — 가격 수정이 진행 중인 구매를 조용히 바꾸지 못한다.
+     */
+    @PatchMapping("/listings/{listingId}/price")
+    ResponseEntity<ListingDetailResponseDto> updatePrice(
+            @PathVariable Long listingId,
+            @Valid @RequestBody UpdateListingPriceRequestDto request,
+            @CurrentMember Long memberId);
 
     /**
      * 등록을 취소한다. 티켓은 다시 보유 상태로 돌아간다. 204 다.

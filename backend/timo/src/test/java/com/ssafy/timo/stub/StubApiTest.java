@@ -35,6 +35,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -488,6 +489,14 @@ class StubApiTest {
                     """.formatted(expectedPrice);
         }
 
+        private ResultActions updatePrice(long listingId, int price) throws Exception {
+            return mockMvc.perform(patch("/api/v0/market/listings/{listingId}/price", listingId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {"price": %d}
+                            """.formatted(price)));
+        }
+
         private ResultActions purchase(long listingId, int expectedPrice) throws Exception {
             return mockMvc.perform(post("/api/v0/market/listings/{listingId}/purchase", listingId)
                     .header("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
@@ -715,6 +724,40 @@ class StubApiTest {
         }
 
         @Test
+        void 등록가는_내_매물만_정가_이하로_고칠_수_있다() throws Exception {
+            mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
+                            .content(listingBody(MY_TICKET_ID, 90_000)))
+                    .andExpect(status().isCreated());
+
+            // 남의 매물은 고칠 수 없다. 티켓 소유가 아니라 등록자인지를 본다.
+            updatePrice(OTHERS_LISTING_CONCERT1, 10_000)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.exception").value("NotListingSellerException"));
+
+            // 정가(구역 가격 99,000)를 넘기면 거절이고 가격은 그대로다.
+            updatePrice(6L, 99_001)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.exception").value("ListPriceExceedsFacePriceException"));
+
+            updatePrice(6L, 80_000)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.listingId").value(6))
+                    .andExpect(jsonPath("$.price").value(80_000))
+                    .andExpect(jsonPath("$.faceValue").value(99_000))
+                    .andExpect(jsonPath("$.discountRate").value(19));
+
+            mockMvc.perform(get("/api/v0/market/listings/{listingId}", 6))
+                    .andExpect(jsonPath("$.price").value(80_000));
+
+            // 종료된 매물은 고칠 수 없다.
+            mockMvc.perform(post("/api/v0/market/listings/{listingId}/cancel", 6))
+                    .andExpect(status().isNoContent());
+            updatePrice(6L, 70_000)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("ListingAlreadyClosedException"));
+        }
+
+        @Test
         void 없는_티켓_없는_매물_필수값_누락은_거절된다() throws Exception {
             mockMvc.perform(post("/api/v0/market/listings").contentType(MediaType.APPLICATION_JSON)
                             .content(listingBody(StubFixtures.NOT_FOUND_ID, 1000)))
@@ -724,6 +767,9 @@ class StubApiTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
             mockMvc.perform(post("/api/v0/market/listings/{listingId}/cancel", StubFixtures.NOT_FOUND_ID))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
+            updatePrice(StubFixtures.NOT_FOUND_ID, 1000)
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.exception").value("ListingNotFoundException"));
 
