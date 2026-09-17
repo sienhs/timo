@@ -9,6 +9,7 @@ import '../../auth/constants.dart';
 import '../../auth/state/auth_session_scope.dart';
 import '../../resale/models/my_trade.dart';
 import '../../resale/state/resale_api_scope.dart';
+import '../../resale/widgets/listing_price_sheet.dart';
 import '../../shell/constants.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
@@ -154,7 +155,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     if (action == null || !mounted) return;
     switch (action) {
       case TicketMoreAction.registerListing:
-        await _openRegister();
+        await _openRegister(ticket);
       case TicketMoreAction.cancelReservation:
         await _cancelReservation(ticket);
     }
@@ -163,17 +164,18 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 양도마켓의 등록 화면으로 간다. 등록하고 돌아왔으면 목록을 다시 받는다 —
   /// 양도 목록 탭에 새 매물이 보여야 한다.
   ///
-  /// 누른 티켓을 미리 골라 두지 않는다. 등록이 받는 티켓 번호와 예매 번호가
-  /// 다른 값이라(`ListableTicket` 주석) 지금은 이어 줄 수 없다. 서버가 예매
-  /// 응답에 티켓 번호를 실어 주면 그때 등록 화면에 인자를 얹는다.
+  /// 누른 티켓의 번호를 얹어 등록 화면이 그 티켓을 미리 골라 두게 한다. 어느
+  /// 티켓을 팔지 이미 정하고 누른 것이라 다시 고르게 하지 않는다. 등록이 받는
+  /// 번호는 예매 번호가 아니라 [MyTicket.ticketId] 다.
   ///
   /// 결과 타입을 `pushNamed<bool>` 로 못 박지 않는다. 라우트 등록부가 만드는
   /// 라우트는 `Route<dynamic>` 이라 타입을 지정하면 실기기에서 캐스팅 예외로
   /// 눌러도 아무 일이 안 일어난다(마켓 첫 화면과 같은 사정).
-  Future<void> _openRegister() async {
+  Future<void> _openRegister(MyTicket ticket) async {
     final registered = await Navigator.pushNamed(
       context,
       AppRoutes.resaleRegister,
+      arguments: ticket.ticketId,
     );
     if (registered == true && mounted) _reload();
   }
@@ -229,6 +231,37 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       return;
     }
     if (!mounted) return;
+    _reload();
+  }
+
+  /// 등록가를 바꾼다. 등록 취소와 같은 흐름이다 — 시트에서 새 값을 받고 서버에
+  /// 보낸 뒤 목록을 **다시 받는다.** 카드 한 장의 숫자만 바꿔치기하지 않는
+  /// 이유도 같다. 그 사이 팔렸을 수 있고, 실패했다면 아무것도 바뀌지 않아야
+  /// 한다.
+  ///
+  /// 상한은 등록 시점 정가([MyTrade.faceValue])다. 시트가 먼저 거르고, 서버도
+  /// 같은 자리에서 거절한다. 서버가 거절하면(그새 팔렸거나 내려감) 그 문구를
+  /// 그대로 띄운다.
+  Future<void> _editPrice(MyTrade trade) async {
+    final price = await showListingPriceSheet(
+      context,
+      currentPrice: trade.price,
+      faceValue: trade.faceValue,
+    );
+    if (price == null || !mounted) return;
+
+    final api = ResaleApiScope.of(context);
+    try {
+      await api.updateListingPrice(listingId: trade.listingId, price: price);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, e.message);
+      return;
+    }
+    if (!mounted) return;
+    // 바뀐 숫자는 카드에 남지만 등록 취소의 회색 카드만큼 눈에 띄지 않아
+    // 한 줄 알린다.
+    _notify(TicketStrings.priceUpdated);
     _reload();
   }
 
@@ -397,10 +430,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         itemBuilder: (_, index) => ListingCard(
           trade: sales[index],
           now: _now,
-          // 가격 수정 API 가 아직 없다. 버튼은 시안대로 두고 안내만 띄운다 —
-          // 상세정보 보기·소장품 만들기와 같은 처리다.
-          onEditPrice: () =>
-              _notify(TicketStrings.notReady(TicketStrings.editPrice)),
+          onEditPrice: () => _editPrice(sales[index]),
           onDelist: () => _delist(sales[index]),
         ),
       ),

@@ -355,6 +355,49 @@ void main() {
 
       await closeScreen(tester);
     });
+
+    // 내 티켓 카드의 `양도 등록하기` 로 들어오는 길. 어느 티켓인지 정하고 온
+    // 사람에게 다시 고르게 하지 않는다.
+    testWidgets('티켓 번호를 받고 들어오면 그 티켓을 골라 둔 채 가격 단계로 간다', (tester) async {
+      final api = MockResaleApi(
+        latency: Duration.zero,
+        clock: () => _whileOpen,
+      );
+      await pump(
+        tester,
+        api: api,
+        // 목의 등록 가능한 티켓 중 아이유 콘서트(102).
+        home: const ListingRegisterScreen(initialTicketId: 102),
+      );
+
+      expect(find.byType(ListableTicketCard), findsOneWidget);
+      expect(find.text('2026 아이유 콘서트'), findsOneWidget);
+      // 처음 값은 정가다.
+      expect(find.text('165,000'), findsOneWidget);
+      expect(find.text(ResaleStrings.registerSubmit), findsOneWidget);
+
+      await closeScreen(tester);
+    });
+
+    testWidgets('받은 티켓 번호가 목록에 없으면 고르지 않은 채 고르기부터 한다', (tester) async {
+      final api = MockResaleApi(
+        latency: Duration.zero,
+        clock: () => _whileOpen,
+      );
+      await pump(
+        tester,
+        api: api,
+        home: const ListingRegisterScreen(initialTicketId: 999),
+      );
+
+      expect(find.byType(ListableTicketCard), findsNWidgets(2));
+      expect(
+        find.widgetWithText(FilledButton, ResaleStrings.registerNext),
+        findsNothing,
+      );
+
+      await closeScreen(tester);
+    });
   });
 }
 
@@ -414,4 +457,10 @@ class _CountingResaleApi implements ResaleApi {
   @override
   Future<void> cancelListing(int listingId) =>
       _delegate.cancelListing(listingId);
+
+  @override
+  Future<ListingDetail> updateListingPrice({
+    required int listingId,
+    required int price,
+  }) => _delegate.updateListingPrice(listingId: listingId, price: price);
 }

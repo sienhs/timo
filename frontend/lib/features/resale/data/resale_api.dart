@@ -19,16 +19,13 @@ import '../models/trade_status.dart';
 /// 필요해서 조회까지 인증을 받는다(백엔드 `MarketApi` 주석). 화면은 비로그인
 /// 상태에서 아예 부르지 않고 로그인 입구를 보여 준다.
 ///
-/// **앱 기본값이 목 구현인 이유**: 등록 흐름을 서버만으로 완결할 수 없다.
-/// "내가 등록할 수 있는 티켓" 을 주는 경로가 없어 [fetchListableTickets] 가
-/// 예매 목록을 대신 읽는데, 거기서 나오는 번호는 등록이 받는 티켓 번호와
-/// 다르다([ListableTicket] 주석). 조회·구매만 볼 때는 실행 인자로 실제 서버에
-/// 붙인다 — `flutter run --dart-define=RESALE_API=http`.
+/// 다른 도메인과 같이 실제 서버(v1)가 기본값이다. 시안 데이터로 보려면
+/// `flutter run --dart-define=RESALE_API=mock`.
 ///
-/// **내 거래 내역([fetchMyTrades])과 등록 취소([cancelListing])는 마켓 화면이
-/// 아니라 내 티켓 화면의 `양도 목록` 탭이 쓴다.** 내 매물을 관리하는 자리가
-/// 그쪽이라(시안) 화면은 저기 있고, 요청은 같은 마켓 API 로 나가므로 여기에
-/// 함께 둔다.
+/// **내 거래 내역([fetchMyTrades]) · 등록 취소([cancelListing]) · 가격 수정
+/// ([updateListingPrice])은 마켓 화면이 아니라 내 티켓 화면의 `양도 목록` 탭이
+/// 쓴다.** 내 매물을 관리하는 자리가 그쪽이라(시안) 화면은 저기 있고, 요청은
+/// 같은 마켓 API 로 나가므로 여기에 함께 둔다.
 abstract class ResaleApi {
   /// 매물이 올라와 있는 공연 목록. 임박한 공연부터 온다.
   ///
@@ -86,9 +83,24 @@ abstract class ResaleApi {
   /// 서버 몫이다 — 예매 취소와 같은 규칙이다.
   Future<void> cancelListing(int listingId);
 
+  /// 내가 올린 매물의 등록가를 바꾼다. 응답은 상세와 같은 모양이다.
+  ///
+  /// 매물 번호는 그대로다 — 내렸다 다시 올리면 새 매물이 되어 재양도 이력이
+  /// 끊어져 보이기 때문에 서버가 수정 경로를 따로 둔다(백엔드 `MarketApi`
+  /// 주석). [price] 는 등록 시점 정가 이하여야 한다. 화면(`ListingPrice`)이
+  /// 먼저 거르고 서버도 같은 자리에서 거절한다.
+  ///
+  /// 남의 매물이면 403, 정가 초과면 400, 이미 팔렸거나 내린 매물이면 409 를
+  /// `ApiException` 으로 받는다. 등록 취소와 같이 최종 판정은 서버 몫이다.
+  Future<ListingDetail> updateListingPrice({
+    required int listingId,
+    required int price,
+  });
+
   /// 내가 양도 등록할 수 있는 티켓 목록.
   ///
-  /// 이 목록을 주는 서버 주소가 아직 없다([ListableTicket] 주석).
+  /// 이 목록만 주는 서버 주소가 없어 예매 목록에서 만든다([ListableTicket]
+  /// 주석). 등록이 받는 티켓 번호는 예매 응답의 `ticketId` 다.
   Future<List<ListableTicket>> fetchListableTickets();
 
   /// 내 티켓을 매물로 등록한다.

@@ -10,6 +10,7 @@ import 'ticket_status.dart';
 class MyTicket {
   const MyTicket({
     required this.reservationId,
+    required this.ticketId,
     required this.concertId,
     required this.title,
     required this.venueName,
@@ -25,6 +26,7 @@ class MyTicket {
 
   factory MyTicket.fromJson(Map<String, dynamic> json) => MyTicket(
     reservationId: (json['id'] as num).toInt(),
+    ticketId: (json['ticketId'] as num).toInt(),
     concertId: (json['concertId'] as num).toInt(),
     title: json['concertTitle'] as String,
     venueName: json['venueName'] as String,
@@ -43,6 +45,12 @@ class MyTicket {
 
   /// 예매 id. 취소할 때 쓴다.
   final int reservationId;
+
+  /// 이 예매로 발행된 티켓의 id. 양도 등록이 받는 번호다 — [reservationId] 와
+  /// **다른 값**이라 바꿔 쓰면 서버가 거절한다(백엔드
+  /// `ReservationSummaryResponseDto` 주석). 주문과 같은 트랜잭션에서 만들어져
+  /// 발행 전에도 늘 있다.
+  final int ticketId;
 
   final int concertId;
   final String title;
@@ -122,6 +130,7 @@ class MyTicket {
   /// 상태만 바꾼 사본. 취소 직후처럼 서버를 다시 부르지 않고 한 장만 갱신할 때.
   MyTicket copyWith({TicketStatus? status}) => MyTicket(
     reservationId: reservationId,
+    ticketId: ticketId,
     concertId: concertId,
     title: title,
     venueName: venueName,

@@ -164,6 +164,10 @@ class TicketStrings {
   static const editPrice = '가격 수정';
   static const delist = '등록 취소';
 
+  /// 등록가를 바꾸고 목록을 다시 받은 뒤. 바뀐 숫자만으로는 눈에 잘 안 띄어
+  /// 한 줄 알린다(등록 취소는 회색 카드가 남아 따로 알리지 않는다).
+  static const priceUpdated = '등록가를 바꿨어요';
+
   /// 등록가 줄. 결제 수단이 코인이라 단위는 `MSR` 이다(`formatMsr`).
   static String listedPrice(String price) => '$price 등록';
 

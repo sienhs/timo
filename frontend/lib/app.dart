@@ -143,23 +143,20 @@ TicketApi _ticketApiFor(String kind) => switch (kind) {
 /// 양도마켓 화면이 어느 [ResaleApi] 를 쓸지 고르는 실행 인자.
 ///
 /// ```bash
-/// flutter run                                   # 기본값. 목 데이터
-/// flutter run --dart-define=RESALE_API=http     # 실제 서버(v0 마켓 스텁)
+/// flutter run --dart-define=RESALE_API=mock    # 시안 데이터로. 백엔드 불필요
+/// flutter run                                   # 기본값. 실제 서버(v1)
 /// ```
 ///
-/// 다른 도메인과 반대로 **목이 기본값이다.** 등록 흐름을 서버만으로 완결할 수
-/// 없기 때문이다 — 등록할 수 있는 티켓 목록을 주는 주소가 없어 예매 목록으로
-/// 대신하는데, 거기서 나오는 번호는 등록이 받는 티켓 번호가 아니다
-/// ([ResaleApi] 주석). 소장품(`MemoryConcertApi`)이 목을 기본값으로 둔 것과
-/// 같은 사정이다.
+/// 내 티켓([_ticketApiKind])과 같은 장치다. 마켓에는 서버로 만들기 어려운
+/// 상태(팔린 내 매물, 양도 중 → 완료 전환)가 있어 시안 데이터를 볼 길을 남긴다.
 const _resaleApiKind = String.fromEnvironment('RESALE_API');
 
-/// 실행 인자에 맞는 구현. 모르는 값이면 목으로 간다.
+/// 실행 인자에 맞는 구현. 모르는 값이면 실제 서버로 간다.
 ResaleApi _resaleApiFor(String kind) => switch (kind) {
-  'http' => HttpResaleApi(),
+  'mock' => MockResaleApi(),
   'mock-empty' => MockResaleApi(scenario: ResaleMockScenario.empty),
   'mock-error' => MockResaleApi(scenario: ResaleMockScenario.error),
-  _ => MockResaleApi(),
+  _ => HttpResaleApi(),
 };
 
 class _AppState extends State<App> {

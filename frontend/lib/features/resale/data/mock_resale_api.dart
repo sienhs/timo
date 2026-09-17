@@ -24,10 +24,8 @@ enum ResaleMockScenario {
   error,
 }
 
-/// 서버 없이 쓰는 가짜 [ResaleApi]. **앱의 기본 구현이다.**
-///
-/// 실제 서버로는 등록 흐름을 끝까지 볼 수 없다([ResaleApi] 주석). 실제 서버에
-/// 붙이려면 `flutter run --dart-define=RESALE_API=http`.
+/// 서버 없이 쓰는 가짜 [ResaleApi]. 테스트와 시안 확인용이다 —
+/// `flutter run --dart-define=RESALE_API=mock`.
 ///
 /// 상태를 실제로 바꾼다. 사면 그 매물이 목록에서 사라지고, 등록하면 내 티켓이
 /// 목록에서 빠지며 그 공연의 매물 수가 는다. 화면이 서버 없이도 흐름대로
@@ -275,6 +273,28 @@ class MockResaleApi implements ResaleApi {
     if (ticket != null) (_tickets ??= _initialTickets()).add(ticket);
   }
 
+  @override
+  Future<ListingDetail> updateListingPrice({
+    required int listingId,
+    required int price,
+  }) async {
+    await _respond();
+    final listing = _find(listingId);
+    // 검사 순서는 서버와 같다. 내 매물 -> 매물 상태 -> 가격.
+    if (!listing.mine) {
+      throw const ApiException('내가 등록한 매물이 아니에요.', status: 403);
+    }
+    if (listing.status != ListingStatus.listed) {
+      throw const ApiException('이미 팔렸거나 내려간 매물이에요.', status: 409);
+    }
+    if (price > listing.faceValue) {
+      throw const ApiException('정가보다 비싸게는 등록할 수 없어요.', status: 400);
+    }
+
+    listing.price = price;
+    return listing.toDetail(_concertOf(listing.concertId));
+  }
+
   Iterable<_MockListing> get _openListings => (_listings ??= _initialListings())
       .where((listing) => listing.status == ListingStatus.listed);
 
@@ -505,7 +525,8 @@ class _MockConcert {
   DateTime get endAt => startAt.add(const Duration(hours: 2));
 }
 
-/// 목이 들고 있는 매물 하나. 팔리거나 내려가면 상태가 바뀌므로 가변이다.
+/// 목이 들고 있는 매물 하나. 팔리거나 내려가면 상태가, 가격을 고치면 등록가가
+/// 바뀌므로 가변이다.
 class _MockListing {
   _MockListing({
     required this.listingId,
@@ -528,7 +549,9 @@ class _MockListing {
   /// 먼저 보기 위해서다.
   final int seatRow;
   final int seatNumber;
-  final int price;
+
+  /// 등록가. 판매자가 고칠 수 있는 유일한 값이다(`updateListingPrice`).
+  int price;
   final int faceValue;
   final bool mine;
   final DateTime listedAt;

@@ -183,8 +183,12 @@ class ResaleStrings {
 
   static String faceValueOf(String price) => '정가 $price';
 
-  /// 아직 화면이 없는 곳을 눌렀을 때. 내 티켓 화면과 같은 꼴이다.
-  static String notReady(String label) => '$label 은(는) 준비 중이에요.';
+  // 가격 수정. 내 티켓의 양도 목록 탭이 여는 바텀시트다.
+  static const editPriceTitle = '가격 수정';
+  static const editPriceSubmit = '가격 수정하기';
+
+  /// 시트 제목 아래 한 줄. 무엇을 얼마에서 바꾸는지 짚어 준다.
+  static String editPriceCurrent(String price) => '지금 등록가 $price';
 }
 
 /// 양도 진행 상태 배지의 색.

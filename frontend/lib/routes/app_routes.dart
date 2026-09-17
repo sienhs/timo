@@ -166,7 +166,11 @@ class AppRoutes {
     resalePurchaseComplete: (context) => ListingPurchaseCompleteScreen(
       result: ModalRoute.of(context)!.settings.arguments! as PurchaseResult,
     ),
-    resaleRegister: (_) => const ListingRegisterScreen(),
+    // 내 티켓 카드에서 들어오면 그 티켓 번호를 받아 미리 골라 둔다. 마켓 첫
+    // 화면의 버튼으로 들어오면 인자가 없다.
+    resaleRegister: (context) => ListingRegisterScreen(
+      initialTicketId: ModalRoute.of(context)?.settings.arguments as int?,
+    ),
     login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
     signupUsername: (context) =>

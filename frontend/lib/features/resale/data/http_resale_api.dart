@@ -12,17 +12,14 @@ import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
 import 'resale_api.dart';
 
-/// 백엔드 양도 마켓 API(`/api/v0/market`)에 실제로 요청하는 [ResaleApi].
+/// 백엔드 양도 마켓 API(`/api/v1/market`)에 실제로 요청하는 [ResaleApi].
 ///
-/// v0 은 프론트 연동용 스텁이다. 실제 컨트롤러(v1)는 온체인 연동 방식이 정해지지
-/// 않아 아직 없고, 스텁이 같은 규약([MarketApi])을 그대로 구현한다. 홈이
-/// `/api/v0/concerts` 에 붙어 있는 것과 같은 사정이라, v1 이 열리면 [basePath]
-/// 한 줄만 바뀐다.
+/// v0 스텁과 v1 실제 컨트롤러가 같은 규약(`MarketApi`)을 구현하므로 응답
+/// 모양은 같고 [basePath] 만 다르다. 스텁으로 보려면 이 값만 v0 으로 바꾼다.
 ///
 /// **등록 가능한 티켓 목록만 마켓 밖에서 온다.** 그 경로가 없어 예매 목록으로
-/// 대신하는데, 거기서 나오는 번호는 등록이 받는 티켓 번호가 아니다
-/// ([ListableTicket] 주석). 그래서 이 구현으로는 등록이 서버에서 거절된다 —
-/// 앱 기본값이 목인 이유다.
+/// 만들고, 등록이 받는 티켓 번호는 예매 응답의 `ticketId` 에서 꺼낸다
+/// ([ListableTicket] 주석).
 ///
 /// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
 /// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
@@ -32,7 +29,7 @@ import 'resale_api.dart';
 class HttpResaleApi implements ResaleApi {
   HttpResaleApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
 
-  static const basePath = '/api/v0/market';
+  static const basePath = '/api/v1/market';
 
   /// 등록 가능한 티켓을 대신 읽는 곳. 내 티켓 화면이 쓰는 주소와 같다.
   static const reservationsPath = '/api/v1/reservations';
@@ -109,6 +106,23 @@ class HttpResaleApi implements ResaleApi {
     await _guard(
       () => _dio.post<dynamic>('$basePath/listings/$listingId/cancel'),
     );
+  }
+
+  /// `PATCH` 다. 절댓값을 넣는 요청이라 같은 요청이 두 번 도착해도 결과가
+  /// 같고, 그래서 응답을 못 받고 끊겨도 다시 보내면 된다(백엔드 `MarketApi`
+  /// 주석). 이 API 에서 PATCH 를 쓰는 곳은 여기 하나다.
+  @override
+  Future<ListingDetail> updateListingPrice({
+    required int listingId,
+    required int price,
+  }) async {
+    final response = await _guard(
+      () => _dio.patch<dynamic>(
+        '$basePath/listings/$listingId/price',
+        data: {'price': price},
+      ),
+    );
+    return ListingDetail.fromJson(_body(response));
   }
 
   @override

@@ -107,4 +107,39 @@ void main() {
       );
     });
   });
+
+  group('가격 수정', () {
+    test('바꾸면 내 거래 내역과 마켓 목록의 가격이 함께 바뀌고 매물 번호는 그대로다', () async {
+      final api = apiOf();
+
+      final detail = await api.updateListingPrice(listingId: 8, price: 120000);
+
+      expect(detail.listingId, 8);
+      expect(detail.price, 120000);
+      final mine = (await api.fetchMyTrades()).singleWhere(
+        (trade) => trade.listingId == 8,
+      );
+      expect(mine.price, 120000);
+      expect(mine.isOnSale, isTrue);
+      expect((await api.fetchListings(4)).single.price, 120000);
+    });
+
+    test('남의 매물은 403, 닫힌 매물은 409, 정가 초과는 400 이다', () async {
+      final api = apiOf();
+
+      await expectLater(
+        api.updateListingPrice(listingId: 1, price: 100000),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
+      );
+      await expectLater(
+        api.updateListingPrice(listingId: 9, price: 100000),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 409)),
+      );
+      // 8번의 정가는 143,000 이다.
+      await expectLater(
+        api.updateListingPrice(listingId: 8, price: 143001),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 400)),
+      );
+    });
+  });
 }

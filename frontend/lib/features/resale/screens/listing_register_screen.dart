@@ -30,7 +30,15 @@ import '../widgets/resale_search_field.dart';
 /// 등록에 성공하면 결과로 true 를 넘기며 닫힌다. 공연 목록이 그걸 받아 매물
 /// 수를 다시 받는다.
 class ListingRegisterScreen extends StatefulWidget {
-  const ListingRegisterScreen({super.key});
+  const ListingRegisterScreen({super.key, this.initialTicketId});
+
+  /// 미리 골라 둘 티켓. 내 티켓 카드의 `양도 등록하기` 로 들어왔을 때 그 카드의
+  /// 티켓 번호다 — 이미 어느 티켓인지 정하고 온 사람에게 다시 고르게 하지
+  /// 않는다. 마켓 첫 화면의 버튼으로 들어왔으면 null 이라 고르기부터 한다.
+  ///
+  /// 목록에 없는 번호(이미 올렸거나 취소한 티켓)면 고르지 않은 채 목록을
+  /// 보여 준다. 없는 티켓을 골라 둔 것처럼 보이면 안 된다.
+  final int? initialTicketId;
 
   @override
   State<ListingRegisterScreen> createState() => _ListingRegisterScreenState();
@@ -54,6 +62,9 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
   String _query = '';
   _RegisterStep _step = _RegisterStep.pickTicket;
   ListableTicket? _selected;
+
+  /// [ListingRegisterScreen.initialTicketId] 를 이미 처리했나.
+  bool _preselected = false;
 
   /// 등록 요청을 보내고 응답을 기다리는 중. 그동안 버튼을 잠가 같은 티켓이
   /// 두 번 올라가지 않게 한다.
@@ -80,9 +91,34 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_isLoggedIn) {
-      _tickets ??= ResaleApiScope.of(context).fetchListableTickets();
+      _tickets ??= _fetchTickets();
     } else {
       _tickets = null;
+    }
+  }
+
+  /// 목록을 받고, 미리 고를 티켓이 있으면 그 자리에서 골라 가격 단계로 간다.
+  ///
+  /// 목록이 오기 전에는 고를 수 없어 여기서 한다. 처음 받을 때 한 번만이다 —
+  /// 다시 받을 때([_reload])는 사용자가 이미 고른 것을 건드리지 않는다.
+  Future<List<ListableTicket>> _fetchTickets() async {
+    final tickets = await ResaleApiScope.of(context).fetchListableTickets();
+    _preselect(tickets);
+    return tickets;
+  }
+
+  void _preselect(List<ListableTicket> tickets) {
+    final ticketId = widget.initialTicketId;
+    if (ticketId == null || _preselected || !mounted) return;
+    _preselected = true;
+
+    for (final ticket in tickets) {
+      if (ticket.ticketId != ticketId) continue;
+      setState(() {
+        _select(ticket);
+        _step = _RegisterStep.setPrice;
+      });
+      return;
     }
   }
 
@@ -100,7 +136,7 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
   // 거절한다. 블록으로 둔다.
   void _reload() {
     setState(() {
-      _tickets = ResaleApiScope.of(context).fetchListableTickets();
+      _tickets = _fetchTickets();
     });
   }
 

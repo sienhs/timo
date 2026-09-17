@@ -10,6 +10,7 @@ import 'package:timo/features/ticket/screens/entry_qr_screen.dart';
 void main() {
   final ticket = MyTicket(
     reservationId: 7,
+    ticketId: 107,
     concertId: 11,
     title: '2026 REMIND: 리센느',
     venueName: '올림픽공원 체조경기장',
