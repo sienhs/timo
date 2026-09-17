@@ -25,6 +25,11 @@ wallet:
 blockchain:
   rpc-url: http://network.ticketmoa.site:8545
 
+# 입장 QR 서명키. 이 프로파일은 QR 을 발급하지 않지만 값이 없으면 기동에 실패한다
+# (EntryPassProperties 가 32바이트 미만을 거부한다). 아래 solapi 와 같은 사정이다.
+entry-pass:
+  secret: local-dev-only-entry-pass-secret-please-change-in-prod-0123456789
+
 # 이 프로파일에서는 SolapiSmsSender 가 뜬다. 실제 발송은 하지 않지만 값이 없으면 기동에 실패한다.
 solapi:
   api-key: test-api-key

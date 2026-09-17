@@ -1,0 +1,112 @@
+###############################################################################
+# 내 티켓 조회 - 성공 케이스
+#
+# ticket-common.http 를 먼저 실행해 토큰과 {{sellerTicketId}} 를 채워 둬야 한다.
+#
+# 핵심은 마지막 두 요청이다. 양도가 끝난 뒤 판매자 목록에서 그 티켓이 빠지고
+# 구매자 목록에 들어오는지를 본다 - 이 API 가 생긴 이유가 그것이다. 예전에는
+# 내 티켓이 예매 목록으로 만들어져 소유가 양쪽에서 동시에 뒤집혀 보였다.
+###############################################################################
+
+### 보유 목록에 카드에 필요한 값이 다 실린다
+GET {{baseUrl}}/api/v1/tickets/me
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("200 이고 필드가 다 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        var t = response.body.content[0];
+        client.assert(t.ticketId !== undefined, "ticketId 가 없다 - 양도 등록이 받는 값이다");
+        client.assert(t.facePrice > 0, "facePrice: " + t.facePrice);
+        client.assert(t.acquiredBy === "BOOKING" || t.acquiredBy === "TRANSFER", "acquiredBy: " + t.acquiredBy);
+        client.assert(t.acquiredAt !== undefined, "acquiredAt 이 없다");
+        client.assert(typeof t.listed === "boolean", "listed: " + t.listed);
+    });
+%}
+
+### 페이지 크기를 줄이면 그만큼만 온다
+GET {{baseUrl}}/api/v1/tickets/me?page=0&size=1
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("한 건만 오고 페이지 정보가 맞다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.content.length <= 1, "content: " + response.body.content.length);
+        client.assert(response.body.page.size === 1, "size: " + response.body.page.size);
+    });
+%}
+
+### 판매자가 양도 매물로 등록한다 - 목록이 준 ticketId 를 그대로 쓴다
+POST {{baseUrl}}/api/v1/market/listings
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "ticketId": {{sellerTicketId}},
+  "price": 100000
+}
+
+> {%
+    client.test("201 로 매물이 열린다", function () {
+        client.assert(response.status === 201, "status: " + response.status + " / " + response.body.errorMessage);
+    });
+    client.global.set("listingId", response.body.listingId);
+    client.global.set("listingPrice", response.body.price);
+%}
+
+### 등록하면 보유 목록의 listed 가 true 로 바뀐다
+GET {{baseUrl}}/api/v1/tickets/me?size=100
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("등록한 티켓만 listed 다", function () {
+        var target = response.body.content.filter(function (t) {
+            return t.ticketId === parseInt(client.global.get("sellerTicketId"));
+        })[0];
+        client.assert(target !== undefined, "등록한 티켓이 목록에서 사라졌다");
+        client.assert(target.listed === true, "listed: " + target.listed);
+    });
+%}
+
+### 구매자가 그 매물을 산다
+POST {{baseUrl}}/api/v1/market/listings/{{listingId}}/purchase
+Authorization: Bearer {{buyerToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "expectedPrice": {{listingPrice}}
+}
+
+> {%
+    client.test("202 로 체결된다. 온체인이 남아 있어 PENDING 이다", function () {
+        client.assert(response.status === 202, "status: " + response.status + " / " + response.body.errorMessage);
+        client.assert(response.body.status === "PENDING", "status: " + response.body.status);
+    });
+%}
+
+### 판매자 목록에서 판 티켓이 빠진다
+GET {{baseUrl}}/api/v1/tickets/me?size=100
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("판 티켓은 더 이상 내 것이 아니다", function () {
+        var sold = parseInt(client.global.get("sellerTicketId"));
+        var still = response.body.content.filter(function (t) { return t.ticketId === sold; });
+        client.assert(still.length === 0, "판 티켓이 아직 목록에 있다 (ticketId=" + sold + ")");
+    });
+%}
+
+### 구매자 목록에 산 티켓이 들어온다
+GET {{baseUrl}}/api/v1/tickets/me?size=100
+Authorization: Bearer {{buyerToken}}
+
+> {%
+    client.test("산 티켓이 TRANSFER 로 들어온다", function () {
+        var bought = parseInt(client.global.get("sellerTicketId"));
+        var mine = response.body.content.filter(function (t) { return t.ticketId === bought; });
+        client.assert(mine.length === 1, "산 티켓이 목록에 없다 (ticketId=" + bought + ")");
+        client.assert(mine[0].acquiredBy === "TRANSFER", "acquiredBy: " + mine[0].acquiredBy);
+        client.assert(mine[0].listed === false, "체결됐는데 아직 매물이다");
+    });
+%}
