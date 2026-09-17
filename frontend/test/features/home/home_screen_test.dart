@@ -20,6 +20,7 @@ import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 import 'package:timo/features/home/widgets/home_section_header.dart';
 import 'package:timo/features/home/widgets/show_card_row_skeleton.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
+import 'package:timo/routes/app_routes.dart';
 
 /// 홈 화면과 검색 화면.
 ///
@@ -37,7 +38,10 @@ void main() {
   /// 새로 고침 안내 문구가 보이는 시간을 확보하려면 응답이 바로 오면 안 된다.
   Future<void> pumpHome(WidgetTester tester, {HomeApi? api}) async {
     usePhoneSize(tester);
-    await tester.pumpWidget(App(homeApi: api ?? const MockHomeApi()));
+    await tester.pumpWidget(
+      // 로딩 화면을 건너뛰고 홈에서 시작한다.
+      App(initialRoute: AppRoutes.home, homeApi: api ?? const MockHomeApi()),
+    );
     // 목 응답 지연만큼 시간을 넘겨 첫 로딩을 끝낸다. 타이머는 프레임을 잡지
     // 않아 pumpAndSettle 만으로는 기다려지지 않고, 남은 타이머는 테스트가
     // 끝날 때 실패로 잡힌다.

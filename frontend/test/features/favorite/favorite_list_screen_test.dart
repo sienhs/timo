@@ -15,6 +15,7 @@ import 'package:timo/features/home/screens/show_search_screen.dart';
 import 'package:timo/features/shell/widgets/quick_menu_button.dart';
 import 'package:timo/features/show/data/mock_show_api.dart';
 import 'package:timo/features/show/screens/show_detail_screen.dart';
+import 'package:timo/routes/app_routes.dart';
 
 /// 찜리스트 화면. 빠른 메뉴에서 들어가 '무엇이 보이는가' 와 '누르면 어디로
 /// 가는가' 만 본다. 픽셀 값은 시안이 바뀌면 같이 바뀌므로 테스트로 굳히지 않는다.
@@ -69,6 +70,8 @@ void main() {
     recent = InMemoryRecentSearchStore();
     await tester.pumpWidget(
       App(
+        // 로딩 화면을 건너뛰고 홈에서 시작한다.
+        initialRoute: AppRoutes.home,
         favoriteStore: store,
         recentSearchStore: recent,
         homeApi: MockHomeApi(latency: Duration.zero),
