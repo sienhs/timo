@@ -146,7 +146,7 @@ Docker가 로그를 관리하므로 SSH 연결을 종료한 뒤에도 다른 세
 
 | 컨트랙트 | 역할 | 주요 권한 |
 |---|---|---|
-| `ShowRegistry` | 공연별 단일 정가, 좌석 수, 판매·공연 시각 관리 | `ORGANIZER_ROLE`, `OPERATOR_ROLE` |
+| `ShowRegistry` | 공연별 구역당 정가(5구역 고정), 좌석 수, 판매·공연 시각 관리 | `ORGANIZER_ROLE`, `OPERATOR_ROLE` |
 | `TicketNFT` | 좌석별 전송 제한 ERC-721 | `ORGANIZER_ROLE`, `MARKETPLACE_ROLE`, `OPERATOR_ROLE`, `GATE_ROLE` |
 | `TicketVault` | ERC-20(`MSR`, Mushroom) 기반 예치 잔액과 정산 | `OPERATOR_ROLE`, `MARKETPLACE_ROLE` |
 | `Marketplace` | `buy`를 통한 리셀 이전·정산 | `OPERATOR_ROLE` |
@@ -157,7 +157,17 @@ Docker가 로그를 관리하므로 SSH 연결을 종료한 뒤에도 다른 세
 - 공개 `transferFrom` 계열과 `approve`, `setApprovalForAll`을 차단하여 지정된 거래 경로로만 이전하도록 제한합니다.
 - `holdsShow[address][showId]`로 발행·리셀 이전·재발행 시 주소별 공연당 1매 제한을 적용합니다. 실제 사람 기준의 제한은 백엔드의 본인확인·지갑 연결 정책과 함께 보장해야 합니다.
 - `(showId, seatId)`마다 tokenId 하나를 사용합니다. 취소 후에는 `revoke`·`reissue`로 같은 토큰을 재사용합니다.
-- 발행 가격은 호출자가 전달하지 않고 `ShowRegistry.facePriceOf`에서 조회합니다.
+- 발행 가격은 호출자가 전달하지 않고, 호출자가 지정한 `sectionIndex`(0-4)로 `ShowRegistry.facePriceOf(showId, sectionIndex)`에서 조회합니다 - 호출자가 고를 수 있는 건 "어느 구역이냐"뿐이고 그 구역의 가격 자체를 조작할 방법은 없습니다.
+
+### 구역별 정가 (`ShowRegistry.SECTION_COUNT = 5`)
+
+이 시스템의 모든 공연장은 구역 5개로 고정입니다. `Show.sectionPrices`는 `uint256[5]` 고정 배열이고, 인덱스는 공연장 구역을 **id 오름차순**으로 나열한 순서와 일치해야 합니다(백엔드 `SectionRepository.findAllByVenueIdOrderByIdAsc`가 그 순서를 보장 - `SectionRepository`의 자체 문서 참고).
+
+- `registerShow`/`updateShow`는 5개 가격을 전부 받고, 하나라도 0이면 `InvalidPrice`로 거부합니다.
+- `facePriceOf(showId, sectionIndex)` — 구역 하나의 가격만 조회(`TicketNFT.mintTicket`이 씀). `sectionIndex >= 5`면 `InvalidSectionIndex`.
+- `sectionPricesOf(showId)` — 5개 전부 한 번에 조회.
+- Solidity의 구조체 자동 getter는 배열 필드를 반환값에서 생략합니다 - `shows(showId)`로는 가격을 못 읽고 위 두 함수를 써야 합니다.
+- 이전 버전은 공연당 정가가 하나였는데, "구역마다 가격이 다르다"는 실제 요구사항에 맞춰 이 구조로 바뀌었습니다. 프론트엔드는 이 변경과 무관합니다 - 백엔드가 이미 갖고 있던 `Section.price`를 그대로 온체인에 실어 올리는 것뿐입니다.
 
 ### 잔액과 정산
 
@@ -236,17 +246,17 @@ Vault의 잔액 변경 함수는 소비형 `refId(bytes32)`로 중복 요청을 
 
 ## 테스트
 
-기존 검증 기록 기준 총 94개 테스트가 통과했습니다. 현재 체크아웃의 결과는 `npm test`로 확인합니다.
+기존 검증 기록 기준 총 98개 테스트가 통과했습니다. 현재 체크아웃의 결과는 `npm test`로 확인합니다.
 
 | 대상 | 테스트 수 |
 |---|---:|
-| ShowRegistry | 25 |
+| ShowRegistry | 29 |
 | TicketNFT | 27 |
 | TicketVault | 22 |
 | Marketplace | 5 |
 | 커스터디얼 지갑 | 9 |
 | 입장 검증 | 6 |
-| 합계 | 94 |
+| 합계 | 98 |
 
 Hardhat 단위 테스트 결과는 공개 네트워크의 처리량이나 최종 확정 시간을 보장하지 않습니다.
 
@@ -289,5 +299,6 @@ Hardhat은 공개된 테스트 개인키, 잠금 해제 계정, 개발용 상태
 - 공연 취소 시 티켓 일괄 회수·환불 처리: ShowRegistry의 D-7 취소 처리와 별개
 - `GATE_ROLE` 등 기능별 권한 부여 누락 여부 확인
 - `ADMIN_PRIVATE_KEY`의 Terraform 시크릿 관리 반영
+- 구역 가격(`Section.price`, 원화 정수)을 온체인 금액 단위(그 자체는 그냥 `uint256`이지만 `TicketVault`/`deposit` 등 다른 곳에서 통상 wei 스케일로 다뤄온 값들과) 어떻게 맞출지 - 지금은 원화 정수를 그대로 싣습니다
 
 권한 부여의 실제 범위는 `scripts/deploy/deploy.ts`를 기준으로 확인합니다. 관리자 권한과 Marketplace 컨트랙트에 부여하는 권한을 구분하여 점검합니다.

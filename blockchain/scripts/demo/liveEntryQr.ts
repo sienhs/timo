@@ -28,14 +28,15 @@ async function main() {
   await (await ticketNFT.grantRole(await ticketNFT.GATE_ROLE(), gate.address)).wait();
 
   const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+  const price = ethers.parseEther("0.05");
   await (
     await showRegistry
       .connect(organizer)
-      .registerShow(ethers.parseEther("0.05"), 100, now - 60, now + 30 * 24 * 3600, "dummy://라이브 게이트 데모")
+      .registerShow([price, price, price, price, price], 100, now - 60, now + 30 * 24 * 3600, "dummy://라이브 게이트 데모")
   ).wait();
 
   const wallet = await createCustodialWallet("live-gate-demo-user");
-  await (await ticketNFT.connect(organizer).mintTicket(wallet.address, 1, 1)).wait();
+  await (await ticketNFT.connect(organizer).mintTicket(wallet.address, 1, 1, 0)).wait();
   const tokenId = await ticketNFT.seatTokenId(await ticketNFT.seatKey(1, 1));
   const signer = await loadCustodialWallet(wallet);
 

@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.transfer.service;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.seat.entity.Seat;
+import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
@@ -27,7 +28,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
@@ -112,13 +112,13 @@ public class ListingService {
 
         Reservation reservation = ticket.getReservation();
         Concert concert = reservation.getConcert();
-        long faceValue = faceValueOf(concert);
+        Seat seat = reservation.getSeat();
+        long faceValue = faceValueOf(seat.getSection());
         long price = request.price();
         if (price > faceValue) {
             throw new ListPriceExceedsFacePriceException(price, faceValue);
         }
 
-        Seat seat = reservation.getSeat();
         TicketListing listing = TicketListing.open(
                 ticketId,
                 memberId,
@@ -242,21 +242,16 @@ public class ListingService {
     /**
      * 정가 이하 판정의 기준값.
      *
-     * <p>구역 가격이 아니라 공연 정가다. 예매 결제·환불이 모두 {@code Concert.facePrice} 로
-     * 이루어지므로 기준도 그 값이어야 한다.
+     * <p>공연 전체 단일가가 아니라 이 티켓이 속한 <b>구역</b>의 정가다({@code Section.price}) -
+     * 예매 결제·환불도 이제 전부 구역 가격 기준이므로({@code ReservationSettlementRunner},
+     * {@code ReservationServiceImpl.cancel}) 재판매 상한도 같은 기준이어야 한다.
      *
-     * <p>정가가 비어 있으면 <b>기동을 멈추듯 즉시 예외</b>로 끊는다. 0 으로 넘기면 모든 등록이
-     * "정가 초과" 로 막히고, 검사를 건너뛰면 정가 초과 판매가 그대로 통과한다 — 이 서비스의
-     * 존재 이유가 그 검사다. 온체인 판매 준비({@code Concert.prepareForSale})가 끝나지 않은
-     * 공연이라는 뜻이라 사용자가 고칠 수 있는 문제도 아니다.
+     * <p>{@code Section.price}는 {@code nullable = false}라 여기서 별도로 없음을 검사하지
+     * 않는다 - 이미 발행(OWNED)된 티켓이라는 것 자체가 그 좌석의 구역이 존재하고 가격이 있다는
+     * 것을 보장한다.
      */
-    private long faceValueOf(Concert concert) {
-        BigInteger facePrice = concert.getFacePrice();
-        if (facePrice == null) {
-            throw new IllegalStateException(
-                    "정가가 없는 공연의 티켓은 양도 등록할 수 없습니다 (concertId=" + concert.getId() + ")");
-        }
-        return facePrice.longValueExact();
+    private long faceValueOf(Section section) {
+        return section.getPrice();
     }
 
     /**

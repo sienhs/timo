@@ -6,6 +6,8 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const SEAT_ID = 101;
 const FACE_PRICE = ethers.parseEther("1");
+const SECTION_PRICES: [bigint, bigint, bigint, bigint, bigint] = [FACE_PRICE, FACE_PRICE, FACE_PRICE, FACE_PRICE, FACE_PRICE];
+const SECTION_INDEX = 0; // which of the 5 registered section prices these tests mint against
 const TOTAL_SEATS = 100;
 
 // Status enum, mirrored from the contract (NONE, OWNED, LISTED, REVOKED, USED, SOUVENIR)
@@ -49,14 +51,14 @@ describe("TicketNFT", () => {
     await registerOpenShow();
 
     async function registerOpenShow() {
-      await showRegistry.connect(organizer).registerShow(FACE_PRICE, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show");
+      await showRegistry.connect(organizer).registerShow(SECTION_PRICES, TOTAL_SEATS, now - 1000, now + 1_000_000, "ipfs://show");
     }
 
     SHOW_ID = 1n;
   });
 
   async function mintToAlice() {
-    const tx = await ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID);
+    const tx = await ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID, SECTION_INDEX);
     const receipt = await tx.wait();
     return receipt;
   }
@@ -75,13 +77,13 @@ describe("TicketNFT", () => {
     it("rejects a second mint for the same seat", async () => {
       await mintToAlice();
       await expect(
-        ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID)
+        ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID, SECTION_INDEX)
       ).to.be.revertedWithCustomError(ticket, "SeatAlreadyMinted");
     });
 
     it("rejects mint from a non-organizer", async () => {
       await expect(
-        ticket.connect(stranger).mintTicket(alice.address, SHOW_ID, SEAT_ID)
+        ticket.connect(stranger).mintTicket(alice.address, SHOW_ID, SEAT_ID, SECTION_INDEX)
       ).to.be.revertedWithCustomError(ticket, "AccessControlUnauthorizedAccount");
     });
   });
@@ -90,18 +92,18 @@ describe("TicketNFT", () => {
     it("rejects minting a second seat for the same show to the same account", async () => {
       await mintToAlice();
       await expect(
-        ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID + 1)
+        ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX)
       ).to.be.revertedWithCustomError(ticket, "AlreadyHoldsShowTicket");
     });
 
     it("allows the same account to hold seats for two different shows", async () => {
       await mintToAlice();
-      await expect(ticket.connect(organizer).mintTicket(alice.address, SHOW_ID + 1n, SEAT_ID)).to.not.be.reverted;
+      await expect(ticket.connect(organizer).mintTicket(alice.address, SHOW_ID + 1n, SEAT_ID, SECTION_INDEX)).to.not.be.reverted;
     });
 
     it("rejects a marketplace settlement to a buyer who already holds a ticket for that show", async () => {
       await mintToAlice(); // alice: tokenId 1, SHOW_ID
-      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1); // bob: tokenId 2, SHOW_ID
+      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX); // bob: tokenId 2, SHOW_ID
       await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
 
       await expect(ticket.connect(marketplace).settleTransfer(1, bob.address)).to.be.revertedWithCustomError(
@@ -114,13 +116,13 @@ describe("TicketNFT", () => {
       await mintToAlice();
       await ticket.connect(operator).revoke(1);
 
-      await expect(ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID + 1)).to.not.be.reverted;
+      await expect(ticket.connect(organizer).mintTicket(alice.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX)).to.not.be.reverted;
     });
 
     it("rejects reissuing to someone who already holds a ticket for that show", async () => {
       await mintToAlice(); // alice: tokenId 1, SHOW_ID
       await ticket.connect(operator).revoke(1);
-      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1); // bob: tokenId 2, SHOW_ID
+      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX); // bob: tokenId 2, SHOW_ID
 
       await expect(ticket.connect(operator).reissue(1, bob.address)).to.be.revertedWithCustomError(
         ticket,
@@ -266,7 +268,7 @@ describe("TicketNFT", () => {
 
     it("converts a batch of USED tickets to SOUVENIR", async () => {
       await mintToAlice(); // tokenId 1, alice
-      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1); // tokenId 2, bob
+      await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX); // tokenId 2, bob
       await ticket.connect(gate).markUsed(1);
       await ticket.connect(gate).markUsed(2);
 

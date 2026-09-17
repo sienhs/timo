@@ -41,7 +41,7 @@ public record ReservationSummaryResponseDto(
                 seat.getSection().getName(),
                 seat.getSeatNo(),
                 seat.getSeatCol(),
-                concert.getFacePrice().longValueExact(),
+                seat.getSection().getPrice(),
                 reservation.getStatus(),
                 reservation.getCreatedAt());
     }

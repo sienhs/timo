@@ -12,6 +12,7 @@
     "flow:demo": "hardhat run scripts/demo/fullUserFlow.ts",
     "qr:live": "hardhat run scripts/demo/liveEntryQr.ts",
     "tickets:list": "hardhat run scripts/demo/listTickets.ts",
+    "mint:seeded": "hardhat run scripts/demo/mintTicketForUser.ts",
     "deploy": "hardhat run scripts/deploy/deploy.ts",
     "seed": "hardhat run scripts/seed/seedDummyShows.ts"
   },

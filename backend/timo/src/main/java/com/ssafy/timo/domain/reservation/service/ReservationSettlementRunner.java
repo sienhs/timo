@@ -8,6 +8,8 @@ import com.ssafy.timo.domain.blockchain.TicketVaultClient;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
+import com.ssafy.timo.domain.seat.entity.Section;
+import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.wallet.service.WalletService;
@@ -15,6 +17,7 @@ import com.ssafy.timo.domain.wallet.service.WalletService;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,7 @@ class ReservationSettlementRunner {
 
     private final ReservationRepository reservationRepository;
     private final TicketRepository ticketRepository;
+    private final SectionRepository sectionRepository;
     private final WalletService walletService;
     private final TicketVaultClient ticketVaultClient;
     private final TicketNftClient ticketNftClient;
@@ -49,13 +53,16 @@ class ReservationSettlementRunner {
         Ticket ticket = ticketRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new IllegalStateException("정산 대상 티켓이 없습니다 (reservationId=" + reservationId + ")"));
         Concert concert = reservation.getConcert();
+        Section section = reservation.getSeat().getSection();
+        BigInteger price = BigInteger.valueOf(section.getPrice());
+        int sectionIndex = sectionIndexOf(section);
 
         String buyerAddress = walletService.getAddress(reservation.getMember().getId());
         String organizerAddress = walletService.getAddress(concert.getOrganizer().getId());
         byte[] orderId = ContractClient.keccak256("reservation-" + reservationId);
 
         try {
-            ticketVaultClient.chargeForBooking(buyerAddress, organizerAddress, concert.getFacePrice(), orderId);
+            ticketVaultClient.chargeForBooking(buyerAddress, organizerAddress, price, orderId);
         } catch (ContractCallException e) {
             log.warn("예매 차감 실패, 민팅 시도 안 함 (reservationId={})", reservationId, e);
             ticket.markMintFailed(e.getMessage());
@@ -67,13 +74,28 @@ class ReservationSettlementRunner {
 
         try {
             MintResult minted = ticketNftClient.mintTicket(
-                    buyerAddress, concert.getShowId(), BigInteger.valueOf(reservation.getSeat().getId()));
+                    buyerAddress, concert.getShowId(), BigInteger.valueOf(reservation.getSeat().getId()), sectionIndex);
             ticket.markMinted(minted.tokenId(), minted.transactionHash());
         } catch (ContractCallException e) {
             log.error("차감은 됐는데 민팅 실패, 환불 시도함 (reservationId={})", reservationId, e);
-            refundOrElseMarkFailed(
-                    reservation, buyerAddress, organizerAddress, reservationId, concert.getFacePrice(), ticket, e.getMessage());
+            refundOrElseMarkFailed(reservation, buyerAddress, organizerAddress, reservationId, price, ticket, e.getMessage());
         }
+    }
+
+    /**
+     * {@code ShowRegistry}에 올라간 구역 가격 배열에서 이 구역이 몇 번째(0-4)인지 찾는다. 순서는
+     * 반드시 {@link SectionRepository#findAllByVenueIdOrderByIdAsc}가 주는 순서와 같아야 한다 -
+     * 온체인 등록 때도 같은 메서드로 구한 순서를 썼기 때문이다(LocalDataSeeder 참고).
+     */
+    private int sectionIndexOf(Section section) {
+        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(section.getVenue().getId());
+        for (int i = 0; i < sections.size(); i++) {
+            if (sections.get(i).getId().equals(section.getId())) {
+                return i;
+            }
+        }
+        throw new IllegalStateException(
+                "구역이 소속 공연장의 구역 목록에 없습니다 (sectionId=" + section.getId() + ", venueId=" + section.getVenue().getId() + ")");
     }
 
     private void refundOrElseMarkFailed(Reservation reservation, String buyerAddress, String organizerAddress, Long reservationId,

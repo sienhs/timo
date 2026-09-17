@@ -1,0 +1,5 @@
+# Shell scripts must keep LF line endings regardless of the checkout
+# platform's autocrlf setting - a CRLF shebang line ("#!/bin/sh\r") fails to
+# resolve inside Linux containers with "no such file or directory", which is
+# exactly what silently broke blockchain/docker/entrypoint.sh here.
+*.sh text eol=lf

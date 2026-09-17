@@ -4,11 +4,27 @@ import { ShowRegistry } from "../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
+const SECTION_COUNT = 5;
 const FACE_PRICE = ethers.parseEther("1");
+// Distinct per-section prices, mirroring the real shape (every venue has
+// exactly 5 sections at different price points) rather than one uniform
+// number repeated 5 times - a test that only ever used a uniform array
+// wouldn't catch a bug that mixed up section indices.
+const SECTION_PRICES: [bigint, bigint, bigint, bigint, bigint] = [
+  ethers.parseEther("1.5"),
+  ethers.parseEther("1.5"),
+  ethers.parseEther("1.2"),
+  ethers.parseEther("1.2"),
+  ethers.parseEther("0.99"),
+];
 const TOTAL_SEATS = 100;
 const METADATA_URI = "ipfs://show-metadata";
 const Status = { REGISTERED: 0, CANCELLED: 1, ENDED: 2 };
 const DAY = 24 * 60 * 60;
+
+function uniformPrices(price: bigint): [bigint, bigint, bigint, bigint, bigint] {
+  return [price, price, price, price, price];
+}
 
 describe("ShowRegistry", () => {
   let admin: HardhatEthersSigner;
@@ -36,11 +52,18 @@ describe("ShowRegistry", () => {
     showTime = now + 30 * DAY;
   });
 
-  async function register(overrides: Partial<{ facePrice: bigint; totalSeats: number; saleOpenTime: number; showTime: number }> = {}) {
+  async function register(
+    overrides: Partial<{
+      sectionPrices: [bigint, bigint, bigint, bigint, bigint];
+      totalSeats: number;
+      saleOpenTime: number;
+      showTime: number;
+    }> = {}
+  ) {
     const tx = await registry
       .connect(organizer)
       .registerShow(
-        overrides.facePrice ?? FACE_PRICE,
+        overrides.sectionPrices ?? SECTION_PRICES,
         overrides.totalSeats ?? TOTAL_SEATS,
         overrides.saleOpenTime ?? saleOpenTime,
         overrides.showTime ?? showTime,
@@ -50,45 +73,49 @@ describe("ShowRegistry", () => {
     return 1n; // first show registered in a fresh registry
   }
 
+  it("SECTION_COUNT is 5 - every venue in this system has exactly this many sections", async () => {
+    expect(await registry.SECTION_COUNT()).to.equal(SECTION_COUNT);
+  });
+
   describe("registerShow", () => {
     it("stores the show as REGISTERED under the caller as organizer", async () => {
       const showId = await register();
       const s = await registry.shows(showId);
       expect(s.organizer).to.equal(organizer.address);
-      expect(s.facePrice).to.equal(FACE_PRICE);
       expect(s.totalSeats).to.equal(TOTAL_SEATS);
       expect(s.status).to.equal(Status.REGISTERED);
+      expect(await registry.sectionPricesOf(showId)).to.deep.equal(SECTION_PRICES);
     });
 
     it("emits ShowRegistered", async () => {
-      await expect(
-        registry.connect(organizer).registerShow(FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
-      )
+      await expect(registry.connect(organizer).registerShow(SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI))
         .to.emit(registry, "ShowRegistered")
-        .withArgs(1, organizer.address, FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime);
+        .withArgs(1, organizer.address, SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime);
     });
 
-    it("rejects a zero face price", async () => {
+    it("rejects a zero price in any section", async () => {
+      const withOneZero = uniformPrices(FACE_PRICE);
+      withOneZero[3] = 0n;
       await expect(
-        registry.connect(organizer).registerShow(0, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(organizer).registerShow(withOneZero, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "InvalidPrice");
     });
 
     it("rejects zero total seats", async () => {
       await expect(
-        registry.connect(organizer).registerShow(FACE_PRICE, 0, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(organizer).registerShow(SECTION_PRICES, 0, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "InvalidSeatCount");
     });
 
     it("rejects a sale open time at or after the show time", async () => {
       await expect(
-        registry.connect(organizer).registerShow(FACE_PRICE, TOTAL_SEATS, showTime, showTime, METADATA_URI)
+        registry.connect(organizer).registerShow(SECTION_PRICES, TOTAL_SEATS, showTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "InvalidTiming");
     });
 
     it("only ORGANIZER_ROLE can register a show", async () => {
       await expect(
-        registry.connect(stranger).registerShow(FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(stranger).registerShow(SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "AccessControlUnauthorizedAccount");
     });
   });
@@ -96,16 +123,16 @@ describe("ShowRegistry", () => {
   describe("updateShow", () => {
     it("updates the catalog entry before the sale opens", async () => {
       const showId = await register();
-      const newPrice = ethers.parseEther("2");
+      const newPrices = uniformPrices(ethers.parseEther("2"));
 
-      await expect(registry.connect(organizer).updateShow(showId, newPrice, 50, saleOpenTime, showTime, "ipfs://v2"))
+      await expect(registry.connect(organizer).updateShow(showId, newPrices, 50, saleOpenTime, showTime, "ipfs://v2"))
         .to.emit(registry, "ShowUpdated")
-        .withArgs(showId, newPrice, 50, saleOpenTime, showTime);
+        .withArgs(showId, newPrices, 50, saleOpenTime, showTime);
 
       const s = await registry.shows(showId);
-      expect(s.facePrice).to.equal(newPrice);
       expect(s.totalSeats).to.equal(50);
       expect(s.metadataURI).to.equal("ipfs://v2");
+      expect(await registry.sectionPricesOf(showId)).to.deep.equal(newPrices);
     });
 
     it("rejects updates once the sale window has opened", async () => {
@@ -113,14 +140,14 @@ describe("ShowRegistry", () => {
       await time.increaseTo(saleOpenTime + 1);
 
       await expect(
-        registry.connect(organizer).updateShow(showId, FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(organizer).updateShow(showId, SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "SaleAlreadyOpen");
     });
 
     it("rejects updates from anyone but the show's own organizer", async () => {
       const showId = await register();
       await expect(
-        registry.connect(otherOrganizer).updateShow(showId, FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(otherOrganizer).updateShow(showId, SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "NotShowOrganizer");
     });
 
@@ -129,13 +156,13 @@ describe("ShowRegistry", () => {
       await registry.connect(organizer).cancelShow(showId);
 
       await expect(
-        registry.connect(organizer).updateShow(showId, FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(organizer).updateShow(showId, SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "ShowNotEditable");
     });
 
     it("reverts on a nonexistent show", async () => {
       await expect(
-        registry.connect(organizer).updateShow(999, FACE_PRICE, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
+        registry.connect(organizer).updateShow(999, SECTION_PRICES, TOTAL_SEATS, saleOpenTime, showTime, METADATA_URI)
       ).to.be.revertedWithCustomError(registry, "ShowDoesNotExist");
     });
   });
@@ -240,13 +267,31 @@ describe("ShowRegistry", () => {
   });
 
   describe("facePriceOf", () => {
-    it("returns the registered face price", async () => {
-      const showId = await register({ facePrice: ethers.parseEther("3") });
-      expect(await registry.facePriceOf(showId)).to.equal(ethers.parseEther("3"));
+    it("returns each section's own price, not just one shared value", async () => {
+      const showId = await register();
+      for (let i = 0; i < SECTION_COUNT; i++) {
+        expect(await registry.facePriceOf(showId, i)).to.equal(SECTION_PRICES[i]);
+      }
+    });
+
+    it("rejects a section index out of range", async () => {
+      const showId = await register();
+      await expect(registry.facePriceOf(showId, 5)).to.be.revertedWithCustomError(registry, "InvalidSectionIndex");
     });
 
     it("reverts for a nonexistent show", async () => {
-      await expect(registry.facePriceOf(999)).to.be.revertedWithCustomError(registry, "ShowDoesNotExist");
+      await expect(registry.facePriceOf(999, 0)).to.be.revertedWithCustomError(registry, "ShowDoesNotExist");
+    });
+  });
+
+  describe("sectionPricesOf", () => {
+    it("returns all 5 prices in one call", async () => {
+      const showId = await register();
+      expect(await registry.sectionPricesOf(showId)).to.deep.equal(SECTION_PRICES);
+    });
+
+    it("reverts for a nonexistent show", async () => {
+      await expect(registry.sectionPricesOf(999)).to.be.revertedWithCustomError(registry, "ShowDoesNotExist");
     });
   });
 });

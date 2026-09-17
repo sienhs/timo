@@ -29,6 +29,7 @@ import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.global.storage.ImageStorage;
+import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.NoSuchElementException;
@@ -167,9 +168,9 @@ public class ReservationServiceImpl implements ReservationService {
 
         String buyerAddress = walletService.getAddress(memberId);
         String organizerAddress = walletService.getAddress(concert.getOrganizer().getId());
+        BigInteger price = BigInteger.valueOf(reservation.getSeat().getSection().getPrice());
         ticketNftClient.revoke(ticket.getTokenId());
-        ticketVaultClient.refund(
-                buyerAddress, organizerAddress, concert.getFacePrice(), ContractClient.keccak256(refundRefId(reservation)));
+        ticketVaultClient.refund(buyerAddress, organizerAddress, price, ContractClient.keccak256(refundRefId(reservation)));
 
         ticket.revoke();
         reservation.cancel(now);

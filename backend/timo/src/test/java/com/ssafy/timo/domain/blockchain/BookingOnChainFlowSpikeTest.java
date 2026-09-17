@@ -61,9 +61,12 @@ class BookingOnChainFlowSpikeTest {
 
         // 조직자는 admin 지갑이 대신 등록하지만, 온체인 organizer 기록 자체는 admin 주소로 남는다.
         BigInteger facePrice = BigInteger.valueOf(50_000);
+        int sectionIndex = 0;
+        List<BigInteger> sectionPrices = List.of(facePrice, facePrice, facePrice, facePrice, facePrice);
         long saleOpenTime = Instant.now().minus(1, ChronoUnit.HOURS).getEpochSecond();
         long showTime = Instant.now().plus(1, ChronoUnit.DAYS).getEpochSecond();
-        BigInteger showId = showRegistry.registerShow(facePrice, BigInteger.valueOf(100), saleOpenTime, showTime, "ipfs://spike-test");
+        BigInteger showId =
+                showRegistry.registerShow(sectionPrices, BigInteger.valueOf(100), saleOpenTime, showTime, "ipfs://spike-test");
         assertThat(showId).isGreaterThan(BigInteger.ZERO);
         assertThat(showRegistry.isSaleOpen(showId)).isTrue();
 
@@ -80,7 +83,7 @@ class BookingOnChainFlowSpikeTest {
         ticketVault.chargeForBooking(buyerAddress, adminAddress, facePrice, orderId);
         assertThat(ticketVault.balanceOf(buyerAddress)).isEqualTo(BigInteger.ZERO);
 
-        MintResult mintResult = ticketNft.mintTicket(buyerAddress, showId, seatId);
+        MintResult mintResult = ticketNft.mintTicket(buyerAddress, showId, seatId, sectionIndex);
         assertThat(mintResult.tokenId()).isGreaterThan(BigInteger.ZERO);
         assertThat(mintResult.transactionHash()).isNotBlank();
         assertThat(ticketNft.ownerOf(mintResult.tokenId())).isEqualToIgnoringCase(buyerAddress);

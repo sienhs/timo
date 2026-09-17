@@ -8,6 +8,7 @@ import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Bool;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.abi.datatypes.generated.StaticArray5;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -20,23 +21,33 @@ import org.web3j.tx.RawTransactionManager;
 @Component
 public class ShowRegistryClient extends ContractClient {
 
-    /** registerShow(uint256,uint256,uint256,uint256,string) 가 emit하는 이벤트의 정규화 시그니처. */
+    /** {@code ShowRegistry.SECTION_COUNT}와 반드시 같아야 한다 - 컨트랙트가 그 값으로 고정 배열을 강제한다. */
+    private static final int SECTION_COUNT = 5;
+
+    /** registerShow(uint256[5],uint256,uint256,uint256,string) 가 emit하는 이벤트의 정규화 시그니처. */
     private static final String SHOW_REGISTERED_EVENT =
-            "ShowRegistered(uint256,address,uint256,uint256,uint256,uint256)";
+            "ShowRegistered(uint256,address,uint256[5],uint256,uint256,uint256)";
 
     public ShowRegistryClient(Web3j web3j, RawTransactionManager adminTransactionManager, DeployedContractAddresses addresses) {
         super(web3j, adminTransactionManager, addresses.showRegistryAddress());
     }
 
     /**
-     * 공연을 등록한다.
+     * 공연을 등록한다. sectionPrices는 반드시 {@link #SECTION_COUNT}개(구역 순서는
+     * {@code SectionRepository.findAllByVenueIdOrderByIdAsc}가 주는 순서와 일치해야 함) - 컨트랙트가
+     * 고정 크기 배열을 요구하므로 그 외 길이는 ABI 인코딩 단계에서부터 실패한다.
      *
      * @return 발급된 showId. 반환값은 영수증에 없어 {@code ShowRegistered} 이벤트 로그에서 읽는다.
      */
-    public BigInteger registerShow(BigInteger facePrice, BigInteger totalSeats,
+    public BigInteger registerShow(List<BigInteger> sectionPrices, BigInteger totalSeats,
                                     long saleOpenTimeEpochSeconds, long showTimeEpochSeconds, String metadataUri) {
+        if (sectionPrices.size() != SECTION_COUNT) {
+            throw new IllegalArgumentException("sectionPrices는 정확히 " + SECTION_COUNT + "개여야 합니다 (실제 " + sectionPrices.size() + "개)");
+        }
+        List<Uint256> prices = sectionPrices.stream().map(Uint256::new).toList();
+
         TransactionReceipt receipt = sendAndWait(new Function("registerShow",
-                List.of(new Uint256(facePrice), new Uint256(totalSeats),
+                List.of(new StaticArray5<>(Uint256.class, prices), new Uint256(totalSeats),
                         new Uint256(BigInteger.valueOf(saleOpenTimeEpochSeconds)),
                         new Uint256(BigInteger.valueOf(showTimeEpochSeconds)),
                         new Utf8String(metadataUri)),
