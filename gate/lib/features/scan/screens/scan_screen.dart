@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/widgets/logout_button.dart';
 import '../constants.dart';
 import '../models/gate_target.dart';
 import '../models/verification_result.dart';
@@ -12,7 +13,7 @@ import '../state/scan_api_scope.dart';
 import '../widgets/scan_result_view.dart';
 import '../widgets/scan_viewfinder.dart';
 
-/// 검표 화면. 앱의 유일한 화면이다.
+/// 검표 화면. 로그인한 뒤 보는 유일한 화면이다.
 ///
 /// 카메라가 QR 을 읽으면 서버에 검증을 맡기고, 결과를 화면 전체로 보여 준
 /// 뒤 다시 읽기로 돌아온다. 화면이 하는 판단은 **"지금 읽어도 되는가"** 하나다 —
@@ -78,9 +79,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
     VerificationResult result;
     try {
-      result = await ScanApiScope.of(
-        context,
-      ).verify(payload: payload, target: widget.target);
+      result = await ScanApiScope.of(context)
+          .verify(payload: payload, target: widget.target);
     } on ApiException catch (e) {
       // 서버에 닿지 못했다. 티켓 상태는 바뀌지 않았으니 다시 스캔하면 된다.
       result = Undetermined(message: e.message);
@@ -112,7 +112,10 @@ class _ScanScreenState extends State<ScanScreen> {
       appBar: AppBar(
         centerTitle: false,
         title: Text(widget.target.concertTitle),
-        actions: [_TorchButton(controller: _controller)],
+        actions: [
+          _TorchButton(controller: _controller),
+          const LogoutButton(),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -158,9 +161,7 @@ class _ScanGuide extends StatelessWidget {
             Text(
               ScanStrings.scanHint,
               textAlign: TextAlign.center,
-              style: textTheme.headlineSmall?.copyWith(
-                color: AppColors.onScan,
-              ),
+              style: textTheme.headlineSmall?.copyWith(color: AppColors.onScan),
             ),
             const SizedBox(height: 12),
             Text(

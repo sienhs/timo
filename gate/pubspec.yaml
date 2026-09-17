@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   dio: ^5.11.1
+  flutter_secure_storage: ^10.3.2
   flutter:
     sdk: flutter
   mobile_scanner: ^7.4.2
