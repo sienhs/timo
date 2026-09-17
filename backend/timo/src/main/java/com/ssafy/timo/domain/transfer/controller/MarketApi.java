@@ -58,8 +58,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * <p><b>마켓은 매일 정해진 시간에만 열린다</b>({@code market.hours}, 기본 20:00:00~23:59:59). 판정은
  * 서버 시계이며 앱은 {@link #hours} 로 받은 시각을 표시에만 쓴다.
  * <ul>
- *   <li>등록·취소·상세·내 내역: 시간 무관. 닫힌 시간에 올린 매물은 20:00 에 목록에 한꺼번에 드러난다</li>
- *   <li>공연 목록·공연별 매물·구매: 창 안에서만. 밖이면 409({@code MARKET_CLOSED})</li>
+ *   <li>등록·취소·상세·내 내역: 시간 무관. 올린 매물은 <b>등록 다음 날 20:00</b> 에 목록에 한꺼번에 드러난다</li>
+ *   <li>공연 목록·공연별 매물·구매: 창 안에서만, 그리고 올라온 매물만. 밖이면 409({@code MARKET_CLOSED}),
+ *       아직 안 올라온 매물을 사면 409({@code LISTING_NOT_OPEN_YET})</li>
  *   <li>가격 수정: 창 <b>밖</b>에서만. 안이면 409({@code MARKET_OPEN}) — 거래 중 가격은 고정이다</li>
  * </ul>
  */
@@ -84,8 +85,8 @@ public interface MarketApi {
      * <p>정렬은 공연 시작일 오름차순이다. 티켓은 공연이 끝나면 가치가 없어 임박한 것부터가
      * 유일하게 의미 있는 순서다.
      *
-     * <p>운영 시간 밖이면 409 다. 닫힌 시간에 등록된 매물이 여기서 처음 보이므로 이 가드가 곧
-     * "20:00 에 일괄로 올라간다" 다.
+     * <p>운영 시간 밖이면 409 다. 등록 다음 날부터의 매물만 세므로, 오늘 등록된 매물은 창이 열려도
+     * 여기 잡히지 않는다 — 그 규칙이 곧 "다음 날 20:00 에 일괄로 올라간다" 다.
      */
     @GetMapping("/concerts")
     ResponseEntity<PagedModel<MarketConcertSummaryResponseDto>> findConcerts(
@@ -142,8 +143,8 @@ public interface MarketApi {
      *
      * <p>남의 티켓이면 403, 정가 초과면 400, 이미 등록 중이면 409 다.
      *
-     * <p>운영 시간과 무관하게 받는다. 닫힌 시간에 올린 매물은 {@code LISTED} 로 저장되고 남에게는
-     * 다음 창이 열릴 때 보인다. 앱은 {@link #hours} 의 {@code opensAt} 으로 "언제 올라가는지" 를 안내한다.
+     * <p>운영 시간과 무관하게 받는다. 올린 매물은 {@code LISTED} 로 저장되고 남에게는 <b>등록 다음 날
+     * 20:00</b> 부터 보인다 — 열린 시간에 올려도 그날은 안 보인다. 앱은 등록일 다음 날의 여는 시각을 안내한다.
      */
     @PostMapping("/listings")
     ResponseEntity<ListingDetailResponseDto> list(@Valid @RequestBody CreateListingRequestDto request,

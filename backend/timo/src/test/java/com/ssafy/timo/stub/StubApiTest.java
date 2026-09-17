@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 
@@ -84,6 +85,12 @@ class StubApiTest {
 
         @Override
         public void requireClosed() {
+        }
+
+        /** 스텁 테스트는 등록 직후 목록에 보이는 것을 전제한다. 다음 날 노출 규칙도 v1 쪽이 본다. */
+        @Override
+        public LocalDateTime visibleBefore() {
+            return LocalDateTime.MAX;
         }
     };
 

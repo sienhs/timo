@@ -73,7 +73,14 @@ public enum TransferErrorCode implements BaseErrorCode {
      * <p>거래가 열려 있는 동안은 가격이 고정이다. 구매자가 목록에서 본 값이 상세에 들어갈 때까지
      * 바뀌지 않아야 하고, 마감 뒤에 바꾸면 다음 창에 새 가격으로 올라간다.
      */
-    MARKET_OPEN(HttpStatus.CONFLICT, "운영 시간 중에는 등록가를 바꿀 수 없습니다.");
+    MARKET_OPEN(HttpStatus.CONFLICT, "운영 시간 중에는 등록가를 바꿀 수 없습니다."),
+    /**
+     * 아직 마켓에 올라오지 않은 매물을 사려 한 경우. 매물은 등록 다음 날 20:00 에 올라간다.
+     *
+     * <p>목록에는 안 보이지만 매물 번호를 알면 상세와 구매 경로로 닿을 수 있어 구매 쪽에서 막는다.
+     * 판매자가 번호를 건네 하루 먼저 파는 통로가 되면 안 된다.
+     */
+    LISTING_NOT_OPEN_YET(HttpStatus.CONFLICT, "아직 마켓에 올라오지 않은 매물입니다.");
 
     private final HttpStatus status;
     private final String message;

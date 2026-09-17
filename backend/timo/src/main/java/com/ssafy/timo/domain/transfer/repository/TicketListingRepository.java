@@ -46,6 +46,7 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
               join l.concert c
               join c.venue v
              where l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and l.listedAt < :visibleBefore
                and c.startDate > :now
              group by c.id, c.title, c.posterImageKey, c.startDate, c.endDate, v.name
              order by c.startDate asc, c.id asc
@@ -55,12 +56,16 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
               from TicketListing l
               join l.concert c
              where l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and l.listedAt < :visibleBefore
                and c.startDate > :now
             """)
-    Page<MarketConcertRow> findConcertSummaries(@Param("now") LocalDateTime now, Pageable pageable);
+    Page<MarketConcertRow> findConcertSummaries(@Param("now") LocalDateTime now,
+                                                @Param("visibleBefore") LocalDateTime visibleBefore,
+                                                Pageable pageable);
 
     /**
-     * 공연 하나의 구매 가능한 매물 목록.
+     * 공연 하나의 구매 가능한 매물 목록. {@code visibleBefore} 보다 먼저 등록된 것만이다 — 매물은
+     * 등록 다음 날 20:00 에 올라가므로 오늘 등록된 매물은 빠진다.
      *
      * <p>정렬(낮은 가격순, 동가는 {@code listingId} 오름차순)은 {@code Pageable} 로 받는다.
      * 동가에 유일 키를 덧붙이지 않으면 페이지를 넘길 때 같은 매물이 두 번 나오거나 건너뛴다.
@@ -69,7 +74,21 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
      * 추가 쿼리가 나간다. 다대일이라 페이징과 함께 써도 안전하다.
      */
     @EntityGraph(attributePaths = "section")
-    Page<TicketListing> findByConcertIdAndStatus(Long concertId, ListingStatus status, Pageable pageable);
+    @Query(value = """
+            select l from TicketListing l
+             where l.concert.id = :concertId
+               and l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and l.listedAt < :visibleBefore
+            """,
+            countQuery = """
+            select count(l) from TicketListing l
+             where l.concert.id = :concertId
+               and l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and l.listedAt < :visibleBefore
+            """)
+    Page<TicketListing> findVisibleByConcertId(@Param("concertId") Long concertId,
+                                               @Param("visibleBefore") LocalDateTime visibleBefore,
+                                               Pageable pageable);
 
     /**
      * 매물 상세.
