@@ -107,4 +107,19 @@ public class Ticket extends BaseEntity {
     public void revoke() {
         this.status = TicketStatus.REVOKED;
     }
+
+    /**
+     * 게이트에서 입장 처리한다. 온체인 {@code markUsed}도 {@code OWNED}에서만 성립한다.
+     *
+     * <p><b>중복 입장 방지를 이 메서드에 기대면 안 된다.</b> 여기서 상태를 바꾸는 시점엔 이미
+     * 엔티티를 읽어 온 뒤라, 게이트 두 대가 같은 티켓을 동시에 스캔하면 둘 다 {@code OWNED}를
+     * 읽고 둘 다 통과한다. 원자적으로 한 번만 통과시키는 일은
+     * {@code TicketRepository.markUsedIfOwned}의 조건부 UPDATE가 맡는다.
+     *
+     * <p>그 UPDATE가 한 행을 바꿨다면 이 메서드를 따로 부를 필요가 없다. 같은 트랜잭션에서
+     * 엔티티를 이어 쓸 때 영속성 컨텍스트의 값을 맞춰 두기 위한 용도다.
+     */
+    public void markUsed() {
+        this.status = TicketStatus.USED;
+    }
 }

@@ -42,7 +42,12 @@ public class SecurityConfig {
                                 // 부르는 시점에 access 가 이미 만료돼 있다. 인증을 걸면
                                 // 재발급받으려면 재발급이 필요한 순환이 된다.
                                 "/api/v1/auth/reissue",
-                                "/api/v1/auth/logout").permitAll()
+                                "/api/v1/auth/logout",
+
+                                // 게이트 검표. 게이트 앱에 로그인 화면이 없어 보낼 토큰이 없다(팀 결정).
+                                // QR 을 아는 사람은 누구나 그 티켓을 USED 로 만들 수 있다는 뜻이라,
+                                // 게이트 앱에 로그인이 생기면 이 줄부터 지운다.
+                                "/api/v1/gates/entries/verify").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/auth/availability",
                                 "/api/v1/concerts",

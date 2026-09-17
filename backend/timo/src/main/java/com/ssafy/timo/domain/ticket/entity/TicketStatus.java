@@ -8,7 +8,9 @@ package com.ssafy.timo.domain.ticket.entity;
  * {@code Ticket} 쪽 관심사다.
  *
  * <pre>
- * PENDING_MINT ──(mint 성공)──▶ OWNED ──(회수)──▶ REVOKED
+ * PENDING_MINT ──(mint 성공)──▶ OWNED ──(입장)──▶ USED
+ *      │                          ├──(회수)──▶ REVOKED
+ *      │                          └──(양도 등록)──▶ LISTED
  *      └──(실패)──▶ MINT_FAILED ──(보상 환불)──▶ REFUNDED
  * </pre>
  */

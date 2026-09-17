@@ -23,6 +23,11 @@ api:
 jwt:
   access-token-ttl: 30m
 
+# 입장 QR 서명키(entry-pass.secret)도 프로파일마다 다르다. 수명은 환경과 무관하게 같아야
+# 팬 앱의 재발급 주기와 게이트 판정이 환경별로 갈리지 않으므로 여기 한 곳에만 둔다.
+entry-pass:
+  ttl: 30s
+
 # SSAFY EC2에 올린 persistent Hardhat 노드. 컨트랙트 주소는 여기 없다 - admin-private-key로부터
 # 결정적으로 계산된다(DeployedContractAddresses 참고). admin-private-key 기본값은 빈 문자열 -
 # 로컬/테스트에서 없어도 그냥 비어 있는 채로 뜬다(Web3jConfig가 그동안 쓸 더미 키를 알아서
