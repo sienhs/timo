@@ -30,8 +30,8 @@ import '../widgets/upcoming_ticket_card.dart';
 
 /// 내 티켓. 예정 공연 · 지난 공연 · 양도 목록 세 탭이다.
 ///
-/// 예정과 지난은 **같은 응답**을 공연 날짜로 가른다. 서버에 그 필터가 없어서
-/// 한 번 받아 화면이 나눈다.
+/// 예정과 지난은 **같은 응답**(내 티켓 목록, 소유 기준)을 공연 날짜로 가른다.
+/// 서버에 그 필터가 없어서 한 번 받아 화면이 나눈다.
 ///
 /// 양도 목록은 **다른 조회**다. 마켓 API 의 내 거래 내역에서 내가 올린 매물만
 /// 골라 그린다. 예매 목록과 따로 받는 이유는 한쪽이 실패해도 다른 쪽은 보여야
@@ -392,9 +392,10 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           ),
           onShowDetail: () =>
               _notify(TicketStrings.notReady(TicketStrings.showDetail)),
-          // 취소가 안 되는 티켓에도 더보기를 연다. 시트가 이유를 알려준다 —
-          // 버튼 자체를 지우면 왜 못 하는지 물어볼 자리가 없다.
-          onMore: ticket.status.isUsable ? () => _openMore(ticket) : null,
+          // 취소가 안 되는 티켓·양도 등록 중인 티켓에도 더보기를 연다. 시트가
+          // 이유를 알려준다 — 버튼 자체를 지우면 왜 못 하는지 물어볼 자리가 없다.
+          // 발행 중·입장 완료·회수·환불은 할 수 있는 일이 없어 열지 않는다.
+          onMore: ticket.isHeld ? () => _openMore(ticket) : null,
         ),
       ),
       1 => _ticketList(
@@ -516,8 +517,9 @@ class _MyTicketsData {
   List<MyTicket> upcoming(DateTime now) =>
       tickets.where((ticket) => !ticket.isPast(now)).toList();
 
-  /// 이미 끝난 공연. 회수된 티켓은 뺀다. 가지 않은 공연이라 소장품을 만들 수 없다.
+  /// 이미 끝난 공연. 회수·환불된 티켓은 뺀다. 가지 않은 공연이라 소장품을
+  /// 만들 수 없다.
   List<MyTicket> past(DateTime now) => tickets
-      .where((ticket) => ticket.isPast(now) && !ticket.status.isVoided)
+      .where((ticket) => ticket.isPast(now) && !ticket.isVoided)
       .toList();
 }

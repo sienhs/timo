@@ -3,6 +3,8 @@ import '../constants.dart';
 import '../models/entry_pass.dart';
 import '../models/my_ticket.dart';
 import '../models/reservation_detail.dart';
+import '../models/reservation_status.dart';
+import '../models/ticket_acquisition.dart';
 import '../models/ticket_status.dart';
 import 'ticket_api.dart';
 
@@ -15,10 +17,12 @@ enum TicketMockScenario {
   /// 시안 그대로. 예정 2장 · 지난 2장.
   design,
 
-  /// 예매 취소됨 · 앱이 모르는 상태. 시안에 없는 카드들이다.
+  /// 시안에 없는 카드 전부. 양도 등록 중 · 발행 중 · 발행 실패 · 환불됨 ·
+  /// 회수됨 · 입장 완료 · 앱이 모르는 상태 · 양도로 받은 티켓, 여덟 장이다.
   ///
-  /// 앱이 모르는 상태는 서버로 만들 수 없다. 서버에 주문 상태가 하나 늘어야
-  /// 나오는 카드라, 그 상황을 미리 보려면 여기서 꾸며야 한다.
+  /// 대부분 서버로는 만들기 어렵다. 발행 중·실패는 체인이 느려지거나 실패해야
+  /// 나오고, 양도로 받은 티켓은 구매자 지갑이 필요하고, 모르는 상태는 서버에
+  /// 상태가 하나 늘어야 나온다. 그 상황을 미리 보려면 여기서 꾸며야 한다.
   ///
   /// 결제 완료 화면에서는 **발행 실패** 로 끝난다. 실패는 서버로 만들기가
   /// 어렵다(잔액을 비워 두고 결제하는 식이라 매번 계정을 준비해야 한다).
@@ -77,11 +81,11 @@ class MockTicketApi implements TicketApi {
   /// 주문마다 상세를 몇 번 물었는가. 발행을 끝낼 때를 정한다.
   final _pollCounts = <int, int>{};
 
-  /// 다음 주문에 붙일 번호. 시안 목록의 번호(1~4 · 11~12)와 겹치지 않게 띄운다.
+  /// 다음 주문에 붙일 번호. 시안 목록의 번호(1~4 · 11~18)와 겹치지 않게 띄운다.
   int _nextReservationId = 100;
 
   /// 다음 주문의 티켓에 붙일 번호. 예매 번호와 다른 값이어야 하고(위 `_ticket`
-  /// 주석), 시안 목록의 티켓 번호(102~105 · 111~112)와도 겹치지 않게 띄운다.
+  /// 주석), 시안 목록의 티켓 번호(102~105 · 111~118)와도 겹치지 않게 띄운다.
   int _nextTicketId = 200;
 
   @override
@@ -98,7 +102,8 @@ class MockTicketApi implements TicketApi {
     if (index < 0) {
       throw const ApiException('이미 없는 예매예요.', status: 404);
     }
-    tickets[index] = tickets[index].copyWith(status: TicketStatus.cancelled);
+    // 예매를 취소하면 서버가 같은 트랜잭션에서 티켓을 회수한다.
+    tickets[index] = tickets[index].copyWith(status: TicketStatus.revoked);
   }
 
   /// 좌석 번호로 열·번을 어림잡는다. 목 예매 데이터(`MockBookingData.seatIdOf`)
@@ -122,7 +127,7 @@ class MockTicketApi implements TicketApi {
       seatRow: (indexInZone - 1) ~/ 20 + 1,
       seatNumber: (indexInZone - 1) % 20 + 1,
       facePrice: 186000,
-      status: TicketStatus.paid,
+      status: ReservationStatus.paid,
       posterImageUrl: _posters[1],
       startAt: _startAt(now, const Duration(days: 48)),
     );
@@ -140,9 +145,13 @@ class MockTicketApi implements TicketApi {
         seatRow: detail.seatRow,
         seatNumber: detail.seatNumber,
         facePrice: detail.facePrice,
-        status: TicketStatus.paid,
+        // 실제 서버는 결제 직후 몇 초 동안 발행 중이지만, 완료 화면이 상세를
+        // 물어 발행을 끝낸 뒤에야 목록으로 넘어오므로 목은 바로 보유로 둔다.
+        status: TicketStatus.owned,
+        listed: false,
+        acquiredBy: TicketAcquisition.booking,
+        acquiredAt: now,
         posterImageUrl: detail.posterImageUrl,
-        bookedAt: now,
         startAt: detail.startAt,
       ),
     );
@@ -205,7 +214,7 @@ class MockTicketApi implements TicketApi {
     seatNumber: detail.seatNumber,
     facePrice: detail.facePrice,
     // 실패하면 서버가 주문을 되돌려 놓는다(잔액 차감 실패·환불 완료).
-    status: failureReason == null ? detail.status : TicketStatus.cancelled,
+    status: failureReason == null ? detail.status : ReservationStatus.cancelled,
     posterImageUrl: detail.posterImageUrl,
     startAt: detail.startAt,
     tokenId: tokenId,
@@ -279,37 +288,93 @@ class MockTicketApi implements TicketApi {
         posterImageUrl: _posters[3],
       ),
     ],
+    // 순서에 뜻이 있다. 더보기(⋮)가 붙는 카드는 양도 등록 중(맨 앞)과 양도로
+    // 받은 티켓(맨 뒤) 둘뿐이라, 테스트가 첫 번째·마지막 더보기로 집는다.
+    // 남은 날은 회수·환불 둘만 9일로 같게 두어 "그 카드에 D-day 가 없다" 를
+    // 'D-9' 하나로 볼 수 있게 했다.
     TicketMockScenario.states => [
-      _ticket(
+      _stateTicket(
         reservationId: 11,
         ticketId: 111,
-        concertId: 11,
-        title: '2026 REMIND: 리센느',
-        venueName: '올림픽공원 체조경기장',
-        sectionName: 'R석',
-        seatRow: 12,
-        seatNumber: 24,
-        facePrice: 154000,
-        startsIn: const Duration(days: 9),
-        posterImageUrl: _posters[0],
-        status: TicketStatus.cancelled,
+        startsIn: const Duration(days: 14),
+        status: TicketStatus.listed,
+        listed: true,
       ),
-      _ticket(
+      _stateTicket(
         reservationId: 12,
         ticketId: 112,
-        concertId: 12,
-        title: '2026 아이유 콘서트',
-        venueName: '블루스퀘어 마스터카드홀',
-        sectionName: 'VIP석',
-        seatRow: 5,
-        seatNumber: 10,
-        facePrice: 198000,
-        startsIn: const Duration(days: 14),
-        posterImageUrl: _posters[1],
+        startsIn: const Duration(days: 3),
+        status: TicketStatus.pendingMint,
+      ),
+      _stateTicket(
+        reservationId: 13,
+        ticketId: 113,
+        startsIn: const Duration(days: 5),
+        status: TicketStatus.mintFailed,
+      ),
+      _stateTicket(
+        reservationId: 14,
+        ticketId: 114,
+        startsIn: const Duration(days: 9),
+        status: TicketStatus.refunded,
+      ),
+      _stateTicket(
+        reservationId: 15,
+        ticketId: 115,
+        startsIn: const Duration(days: 9),
+        status: TicketStatus.revoked,
+      ),
+      // 오늘 공연. 이미 게이트를 지났다.
+      _stateTicket(
+        reservationId: 16,
+        ticketId: 116,
+        startsIn: const Duration(hours: 1),
+        status: TicketStatus.used,
+      ),
+      _stateTicket(
+        reservationId: 17,
+        ticketId: 117,
+        startsIn: const Duration(days: 30),
         status: TicketStatus.unknown,
+      ),
+      // 양도로 받은 보유 티켓. 카드는 정상이지만 더보기의 예매 취소가 잠긴다.
+      _stateTicket(
+        reservationId: 18,
+        ticketId: 118,
+        startsIn: const Duration(days: 20),
+        acquiredBy: TicketAcquisition.transfer,
       ),
     ],
   };
+
+  /// 상태 시나리오의 카드 한 장. 공연 정보는 시안의 두 공연을 번갈아 쓴다 —
+  /// 보려는 것은 상태별 아래쪽이라 공연이 무엇이든 상관없다.
+  MyTicket _stateTicket({
+    required int reservationId,
+    required int ticketId,
+    required Duration startsIn,
+    TicketStatus status = TicketStatus.owned,
+    bool listed = false,
+    TicketAcquisition acquiredBy = TicketAcquisition.booking,
+  }) {
+    final even = reservationId.isEven;
+    return _ticket(
+      reservationId: reservationId,
+      ticketId: ticketId,
+      concertId: even ? 12 : 11,
+      title: even ? '2026 아이유 콘서트' : '2026 REMIND: 리센느',
+      venueName: even ? '블루스퀘어 마스터카드홀' : '올림픽공원 체조경기장',
+      sectionName: even ? 'VIP석' : 'R석',
+      seatRow: even ? 5 : 12,
+      seatNumber: even ? 10 : 24,
+      facePrice: even ? 198000 : 154000,
+      startsIn: startsIn,
+      posterImageUrl: _posters[even ? 1 : 0],
+      status: status,
+      listed: listed,
+      acquiredBy: acquiredBy,
+    );
+  }
 
   /// [ticketId] 는 예매 번호와 다른 값으로 둔다 — 둘을 바꿔 써도 목에서는
   /// 티가 안 나는 일이 없게. 아이유 콘서트(102)만 마켓 목의 등록 가능한
@@ -327,7 +392,9 @@ class MockTicketApi implements TicketApi {
     required int facePrice,
     required Duration startsIn,
     String? posterImageUrl,
-    TicketStatus status = TicketStatus.paid,
+    TicketStatus status = TicketStatus.owned,
+    bool listed = false,
+    TicketAcquisition acquiredBy = TicketAcquisition.booking,
   }) {
     final now = clock();
     return MyTicket(
@@ -341,8 +408,10 @@ class MockTicketApi implements TicketApi {
       seatNumber: seatNumber,
       facePrice: facePrice,
       status: status,
+      listed: listed,
+      acquiredBy: acquiredBy,
+      acquiredAt: now.subtract(const Duration(days: 30)),
       posterImageUrl: posterImageUrl,
-      bookedAt: now.subtract(const Duration(days: 30)),
       startAt: _startAt(now, startsIn),
     );
   }

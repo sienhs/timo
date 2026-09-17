@@ -257,14 +257,15 @@ void main() {
   });
 
   group('등록 가능한 티켓', () {
-    /// 서버 예매 목록 응답 한 건. 실제 `ReservationSummaryResponseDto` 모양이다.
-    Map<String, dynamic> reservationJson({
-      int id = 1,
+    /// 서버 내 티켓 목록 응답 한 건. 실제 `MyTicketSummaryResponseDto` 모양이다.
+    Map<String, dynamic> myTicketJson({
       int ticketId = 501,
-      String status = 'PAID',
+      String ticketStatus = 'OWNED',
+      bool listed = false,
+      String acquiredBy = 'BOOKING',
     }) => {
-      'id': id,
       'ticketId': ticketId,
+      'reservationId': ticketId - 500,
       'concertId': 11,
       'concertTitle': '2026 REMIND: 리센느',
       'posterImageUrl': 'poster/remind.gif',
@@ -274,29 +275,60 @@ void main() {
       'seatNo': 12,
       'seatCol': 24,
       'facePrice': 154000,
-      'status': status,
-      'createdAt': '2026-09-01T20:05:00',
+      'ticketStatus': ticketStatus,
+      'acquiredBy': acquiredBy,
+      'acquiredAt': '2026-09-01T20:05:00',
+      'listed': listed,
     };
 
-    // 예매 번호(id)와 티켓 번호(ticketId)는 다른 값이다. 바꿔 읽으면 등록이
-    // 서버에서 거절된다 — 이 작업 전까지 그랬다.
-    test('예매 목록에서 손에 있는 것만 골라 티켓 번호로 읽는다', () async {
+    // 예매 번호(reservationId)와 티켓 번호(ticketId)는 다른 값이다. 바꿔
+    // 읽으면 등록이 서버에서 거절된다.
+    test('내 티켓 목록에서 팔 수 있는 것만 골라 티켓 번호로 읽는다', () async {
       givenServer(
         (_) => jsonResponse(
           paged([
-            reservationJson(id: 1, ticketId: 501),
-            reservationJson(id: 2, ticketId: 502, status: 'CANCELLED'),
+            myTicketJson(ticketId: 501),
+            // 이미 마켓에 올렸다. 다시 등록하면 서버가 거절한다.
+            myTicketJson(ticketId: 502, ticketStatus: 'LISTED', listed: true),
+            // 발행이 아직이다.
+            myTicketJson(ticketId: 503, ticketStatus: 'PENDING_MINT'),
+            // 회수됐다.
+            myTicketJson(ticketId: 504, ticketStatus: 'REVOKED'),
           ]),
         ),
       );
 
       final tickets = await api.fetchListableTickets();
 
-      expect(adapter.requests.single.path, '/api/v1/reservations');
+      expect(adapter.requests.single.path, '/api/v1/tickets/me');
       final ticket = tickets.single;
       expect(ticket.ticketId, 501);
       expect(ticket.facePrice, 154000);
       expect(ticket.seatLabel, 'R석 12열 24번');
+    });
+
+    // 예매 목록으로 만들던 때는 내 예매가 아니라 후보에 없었다. 소유 기준
+    // 목록이라 이제 들어온다.
+    test('양도로 받은 보유 티켓도 다시 팔 수 있다', () async {
+      givenServer(
+        (_) => jsonResponse(
+          paged([myTicketJson(ticketId: 505, acquiredBy: 'TRANSFER')]),
+        ),
+      );
+
+      final tickets = await api.fetchListableTickets();
+
+      expect(tickets.single.ticketId, 505);
+    });
+
+    // 상태값이 아직 보유인데 매물 테이블에만 올라간 찰나도 있다. 백엔드 주석은
+    // `listed` 를 기준으로 삼으라고 한다.
+    test('상태가 보유라도 listed 가 켜져 있으면 뺀다', () async {
+      givenServer(
+        (_) => jsonResponse(paged([myTicketJson(ticketId: 506, listed: true)])),
+      );
+
+      expect(await api.fetchListableTickets(), isEmpty);
     });
 
     test('등록은 티켓 번호와 가격을 보낸다', () async {

@@ -8,11 +8,11 @@ import '../models/my_ticket.dart';
 import '../models/reservation_detail.dart';
 import 'ticket_api.dart';
 
-/// 백엔드 예매 API(`/api/v1/reservations`)와 티켓 API(`/api/v1/tickets`)에
+/// 백엔드 티켓 API(`/api/v1/tickets`)와 예매 API(`/api/v1/reservations`)에
 /// 실제로 요청하는 [TicketApi].
 ///
-/// **로그인이 필요하다.** 목록은 서버가 요청한 회원의 주문만 골라 주고, 입장 QR
-/// 도 요청한 회원의 티켓에만 내준다 — 그래서 "내" 티켓이다. 토큰은
+/// **로그인이 필요하다.** 목록은 서버가 요청한 회원이 지금 가진 티켓만 주고,
+/// 입장 QR 도 요청한 회원의 티켓에만 내준다 — 그래서 "내" 티켓이다. 토큰은
 /// `AuthInterceptor` 가 붙이고, 비로그인이면 401 이 화면의 오류 안내로 그대로
 /// 나온다.
 ///
@@ -41,11 +41,15 @@ class HttpTicketApi implements TicketApi {
   /// 초만 주므로, 세기 시작할 기준점은 응답을 손에 넣은 여기서 찍어야 한다.
   final DateTime Function() _clock;
 
-  /// 상태로 거르지 않고 전부 받는다. 취소된 티켓도 회색 카드로 남겨 결과를
+  /// 소유 기준 목록(`/tickets/me`)이다. 예매 목록(`/reservations`)이 아니다 —
+  /// 그쪽은 "내가 예매한 이력" 이라 양도로 판 티켓이 남고 산 티켓이 없다
+  /// (백엔드 `TicketApi` 주석).
+  ///
+  /// 상태로 거르지 않고 전부 받는다. 회수된 티켓도 회색 카드로 남겨 결과를
   /// 보여줘야 하기 때문이다. 거르는 일은 화면이 공연 날짜와 상태로 한다.
   @override
   Future<List<MyTicket>> fetchMyTickets() async {
-    final content = await _content(reservationsPath, {
+    final content = await _content('$ticketsPath/me', {
       'size': TicketMetrics.pageSize,
     });
     return content.map(MyTicket.fromJson).toList();

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../ticket/models/ticket_status.dart';
 import '../constants.dart';
 import '../models/listable_ticket.dart';
 import '../models/listing.dart';
@@ -17,9 +18,10 @@ import 'resale_api.dart';
 /// v0 스텁과 v1 실제 컨트롤러가 같은 규약(`MarketApi`)을 구현하므로 응답
 /// 모양은 같고 [basePath] 만 다르다. 스텁으로 보려면 이 값만 v0 으로 바꾼다.
 ///
-/// **등록 가능한 티켓 목록만 마켓 밖에서 온다.** 그 경로가 없어 예매 목록으로
-/// 만들고, 등록이 받는 티켓 번호는 예매 응답의 `ticketId` 에서 꺼낸다
-/// ([ListableTicket] 주석).
+/// **등록 가능한 티켓 목록만 마켓 밖에서 온다.** 그 경로가 없어 내 티켓 목록
+/// (`GET /api/v1/tickets/me`)에서 팔 수 있는 것만 골라 만든다([ListableTicket]
+/// 주석). 예전엔 예매 목록으로 만들었는데, 그쪽엔 등록 여부가 없어 이미 올린
+/// 티켓이 후보에 남고 양도로 받은 티켓은 빠졌다(S15P21D206-331 에서 바꿈).
 ///
 /// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
 /// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
@@ -32,10 +34,7 @@ class HttpResaleApi implements ResaleApi {
   static const basePath = '/api/v1/market';
 
   /// 등록 가능한 티켓을 대신 읽는 곳. 내 티켓 화면이 쓰는 주소와 같다.
-  static const reservationsPath = '/api/v1/reservations';
-
-  /// 예매 목록에서 손에 있는 티켓만 고르는 기준. 서버 `ReservationStatus` 값이다.
-  static const paidStatus = 'PAID';
+  static const myTicketsPath = '/api/v1/tickets/me';
 
   final Dio _dio;
 
@@ -125,12 +124,20 @@ class HttpResaleApi implements ResaleApi {
     return ListingDetail.fromJson(_body(response));
   }
 
+  /// 팔 수 있는 티켓만 남긴다 — 발행이 끝나 손에 있고(보유), 지금 마켓에
+  /// 올라가 있지 않은 것. 내 티켓 화면의 "쓸 수 있는가" 와 같은 조건이다.
+  /// 등록 중인 티켓을 남기면 골라서 등록을 눌러야 서버 거절을 받고, 발행 중·
+  /// 입장 완료·회수된 티켓은 서버가 어차피 거절한다.
   @override
   Future<List<ListableTicket>> fetchListableTickets() async {
-    final content = await _content(reservationsPath);
+    final content = await _content(myTicketsPath);
     return content
-        .where((json) => json['status'] == paidStatus)
-        .map(ListableTicket.fromReservationJson)
+        .where(
+          (json) =>
+              json['ticketStatus'] == TicketStatus.owned.wireName &&
+              json['listed'] != true,
+        )
+        .map(ListableTicket.fromMyTicketJson)
         .toList();
   }
 
