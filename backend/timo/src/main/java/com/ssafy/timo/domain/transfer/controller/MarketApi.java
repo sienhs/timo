@@ -4,6 +4,7 @@ import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.ListingSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketConcertSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.MarketHoursResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
@@ -53,8 +54,22 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * 모두 JSON 정수이며 서버에서 {@code long} 이다. 단위는 <b>아직 확정되지 않았다</b> — 컨트랙트는
  * wei, 백엔드 구역 가격은 원화 정수라 예매 API 도 같은 상태다. 앱은 이 값을 32비트 정수로
  * 받지 않는다.
+ *
+ * <p><b>마켓은 매일 정해진 시간에만 열린다</b>({@code market.hours}, 기본 20:00:00~23:59:59). 등록·가격
+ * 수정·구매는 창 밖이면 409({@code MARKET_CLOSED})다. 판정은 서버 시계이며 앱은 {@link #hours} 로
+ * 받은 시각을 표시에만 쓴다. 취소와 조회는 시간과 무관하다.
  */
 public interface MarketApi {
+
+    /**
+     * 지금 마켓이 열려 있는지와 창의 시각.
+     *
+     * <p>열려 있으면 이번 창, 닫혀 있으면 다음 창의 {@code opensAt}·{@code closesAt} 를 준다. 앱은
+     * 자기 시계가 아니라 {@code serverTime} 을 기준으로 남은 시간을 그린다. 이 값으로 화면을
+     * 잠그는 것은 안내일 뿐이고, 실제 차단은 등록·수정·구매가 각자 한다.
+     */
+    @GetMapping("/hours")
+    ResponseEntity<MarketHoursResponseDto> hours(@CurrentMember Long memberId);
 
     /**
      * 양도 매물이 올라와 있는 공연 목록.

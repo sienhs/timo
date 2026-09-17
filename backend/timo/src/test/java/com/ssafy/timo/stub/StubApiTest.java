@@ -9,6 +9,8 @@ import com.ssafy.timo.stub.reservation.ReservationStubController;
 import com.ssafy.timo.stub.seat.SeatStateStore;
 import com.ssafy.timo.stub.seat.SeatStubController;
 import com.ssafy.timo.stub.seat.SectionStubController;
+import com.ssafy.timo.domain.transfer.service.MarketHoursService;
+import com.ssafy.timo.global.config.MarketHoursProperties;
 import com.ssafy.timo.stub.transfer.MarketStubController;
 import com.ssafy.timo.stub.transfer.MarketTicketStore;
 import com.ssafy.timo.stub.venue.VenueStubController;
@@ -26,6 +28,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.contains;
@@ -68,6 +71,10 @@ class StubApiTest {
     /** 예매 스텁은 주문 뒤 흐른 시간으로 발행 상태를 정하므로 테스트가 시간을 움직일 수 있어야 한다. */
     private final MutableClock clock = new MutableClock(START);
 
+    /** 시작 시각이 정오라 실제 운영 시간(20:00~)이면 마켓 케이스가 전부 409 다. 창 판정은 따로 본다. */
+    private final MarketHoursService alwaysOpenMarket = new MarketHoursService(
+            new MarketHoursProperties(LocalTime.MIDNIGHT, LocalTime.of(23, 59, 59)), clock);
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -83,7 +90,8 @@ class StubApiTest {
                         new SectionStubController(seatStateStore),
                         new SeatStubController(seatStateStore, clock),
                         new ReservationStubController(seatStateStore, concertStore, ticketStore, imageStorage, clock),
-                        new MarketStubController(ticketStore, concertStore, imageStorage, clock))
+                        new MarketStubController(ticketStore, concertStore, imageStorage, clock,
+                                alwaysOpenMarket))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new CurrentMemberArgumentResolver())
                 .build();
@@ -504,6 +512,17 @@ class StubApiTest {
                     .content("""
                             {"price": %d}
                             """.formatted(price)));
+        }
+
+        @Test
+        @DisplayName("운영 시간 응답은 v1 과 같은 모양이다 - 이 테스트는 종일 열린 설정으로 조립했다")
+        void hours() throws Exception {
+            mockMvc.perform(get("/api/v0/market/hours"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.open").value(true))
+                    .andExpect(jsonPath("$.serverTime").value("2026-09-10T12:00:00"))
+                    .andExpect(jsonPath("$.opensAt").value("2026-09-10T00:00:00"))
+                    .andExpect(jsonPath("$.closesAt").value("2026-09-10T23:59:59"));
         }
 
         private ResultActions purchase(long listingId, int expectedPrice) throws Exception {

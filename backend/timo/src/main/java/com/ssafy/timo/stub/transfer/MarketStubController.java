@@ -7,6 +7,7 @@ import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.ListingSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketConcertSummaryResponseDto;
+import com.ssafy.timo.domain.transfer.dto.MarketHoursResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeStatus;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
@@ -25,6 +26,7 @@ import com.ssafy.timo.domain.transfer.exception.NotListingSellerException;
 import com.ssafy.timo.domain.transfer.exception.NotTicketOwnerException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotFoundException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotListableException;
+import com.ssafy.timo.domain.transfer.service.MarketHoursService;
 import com.ssafy.timo.global.storage.ImageStorage;
 import com.ssafy.timo.stub.StubController;
 import com.ssafy.timo.stub.StubFixtures;
@@ -84,6 +86,10 @@ import java.util.Optional;
  * 잔액 부족 거절, 1인 1매(온체인 {@code AlreadyHoldsShowTicket} 이 맡는다).
  * {@code Idempotency-Key} 는 형식만 검증하고 저장하지 않는다.
  *
+ * <p><b>운영 시간은 v1 과 같은 {@link MarketHoursService} 로 판정한다.</b> 스텁만 종일 열어 두면
+ * 앱이 닫힘 화면과 409 를 v1 에 붙고 나서야 처음 본다. 낮에 열린 흐름을 보려면
+ * {@code application-local.yml} 의 {@code market.hours} 를 바꾼다.
+ *
  * <p><b>요청자({@code memberId})를 받지만 쓰지 않는다.</b> 스텁의 "내 것" 판정은 고정 데이터가
  * 정하기 때문이다({@code mine} 플래그). 파라미터가 있는 이유는 규약({@code MarketApi})이 모든 경로에
  * 요청자를 요구해서이고, 그 덕에 <b>토큰 없이 부르면 v0 도 401</b> 이다 - v1 과 같은 지점에서 막히는
@@ -99,6 +105,7 @@ public class MarketStubController implements MarketApi {
     private final ImageStorage imageStorage;
     private final Clock clock;
     private final MarketTicketStore ticketStore;
+    private final MarketHoursService marketHoursService;
     private final Map<Long, StubListing> listings = new LinkedHashMap<>();
     private final List<StubTrade> trades = new ArrayList<>();
 
@@ -106,11 +113,13 @@ public class MarketStubController implements MarketApi {
     private long tradeSequence = 1L;
 
     public MarketStubController(MarketTicketStore ticketStore, ConcertStore concertStore,
-                                ImageStorage imageStorage, Clock clock) {
+                                ImageStorage imageStorage, Clock clock,
+                                MarketHoursService marketHoursService) {
         this.ticketStore = ticketStore;
         this.concertStore = concertStore;
         this.imageStorage = imageStorage;
         this.clock = clock;
+        this.marketHoursService = marketHoursService;
 
         // 고정 티켓 중 가격이 정해진 것만 처음부터 매물로 열어 둔다. 티켓 자체는 저장소가 들고 있다.
         for (MarketTicketFixture fixture : StubFixtures.MARKET_TICKETS) {
@@ -120,6 +129,11 @@ public class MarketStubController implements MarketApi {
             MarketTicket ticket = ticketStore.find(Long.parseLong(fixture.tokenId())).orElseThrow();
             openListing(ticket, fixture.listPrice(), StubFixtures.FIXTURE_LISTED_AT);
         }
+    }
+
+    @Override
+    public ResponseEntity<MarketHoursResponseDto> hours(Long memberId) {
+        return ResponseEntity.ok(marketHoursService.status());
     }
 
     @Override
@@ -215,6 +229,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<ListingDetailResponseDto> list(CreateListingRequestDto request,
                                                                       Long memberId) {
+        marketHoursService.requireOpen();
         settle();
         MarketTicket ticket = ticketStore.find(request.ticketId())
                 .orElseThrow(() -> new TicketNotFoundException(request.ticketId()));
@@ -238,6 +253,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<ListingDetailResponseDto> updatePrice(
             Long listingId, UpdateListingPriceRequestDto request, Long memberId) {
+        marketHoursService.requireOpen();
         settle();
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
@@ -279,6 +295,7 @@ public class MarketStubController implements MarketApi {
     @Override
     public synchronized ResponseEntity<PurchaseResponseDto> purchase(
             Long listingId, String idempotencyKey, PurchaseRequestDto request, Long memberId) {
+        marketHoursService.requireOpen();
         settle();
         StubListing listing = Optional.ofNullable(listings.get(listingId))
                 .orElseThrow(() -> new ListingNotFoundException(listingId));

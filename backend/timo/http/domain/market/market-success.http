@@ -1,0 +1,95 @@
+###############################################################################
+# 양도 마켓 운영 시간 - 성공 케이스 (마켓이 열린 시간에 돌린다)
+#
+# market-common.http 를 먼저 실행해 토큰과 {{ticketToSell}} 등을 채워 둬야 한다.
+#
+# 흐름: 열림 확인 -> 등록 -> 가격 수정 -> 구매 -> 다음 매물 등록(fail 에서 쓴다).
+# 마지막 매물은 일부러 열어 둔다. fail 은 닫힌 시간에 "이미 열린 매물" 의 수정과
+# 구매가 막히고 취소만 되는지를 보는데, 닫힌 뒤에는 매물을 새로 만들 수 없다.
+###############################################################################
+
+### 지금 열려 있어야 아래가 성립한다
+GET {{baseUrl}}/api/v1/market/hours
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("open 이고 창의 시각이 오늘이다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.open === true,
+                "닫혀 있다 (" + response.body.opensAt + " 에 연다). 이 파일은 열린 시간에 돌린다");
+        client.assert(response.body.opensAt.substring(0, 10) === response.body.serverTime.substring(0, 10),
+                "열려 있으면 opensAt 은 오늘이어야 한다: " + response.body.opensAt);
+    });
+%}
+
+### 등록 - 열린 시간이라 201
+POST {{baseUrl}}/api/v1/market/listings
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "ticketId": {{ticketToSell}},
+  "price": {{facePrice}}
+}
+
+> {%
+    client.test("201 이고 LISTED 다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.status === "LISTED", "status: " + response.body.status);
+    });
+    client.global.set("soldListingId", response.body.listingId);
+    client.global.set("listedPrice", response.body.price);
+%}
+
+### 가격 수정 - 열린 시간이라 200
+PATCH {{baseUrl}}/api/v1/market/listings/{{soldListingId}}/price
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "price": {{listedPrice}}
+}
+
+> {%
+    client.test("200 이고 가격이 그대로다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.price === client.global.get("listedPrice"), "price: " + response.body.price);
+    });
+%}
+
+### 구매 - 열린 시간이라 202
+POST {{baseUrl}}/api/v1/market/listings/{{soldListingId}}/purchase
+Authorization: Bearer {{buyerToken}}
+Idempotency-Key: {{$uuid}}
+Content-Type: application/json
+
+{
+  "expectedPrice": {{listedPrice}}
+}
+
+> {%
+    client.test("202 이고 PENDING 이다", function () {
+        client.assert(response.status === 202, "status: " + response.status);
+        client.assert(response.body.status === "PENDING", "status: " + response.body.status);
+    });
+%}
+
+### 다음 매물 등록 - fail 에서 닫힌 시간에 수정·구매가 막히는지 볼 매물이다. 열어 둔 채 끝낸다
+POST {{baseUrl}}/api/v1/market/listings
+Authorization: Bearer {{sellerToken}}
+Content-Type: application/json
+
+{
+  "ticketId": {{ticketToKeep}},
+  "price": {{facePrice}}
+}
+
+> {%
+    client.test("201 이고 LISTED 다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.status === "LISTED", "status: " + response.body.status);
+    });
+    client.global.set("keptListingId", response.body.listingId);
+    client.global.set("keptPrice", response.body.price);
+    client.log("열어 둔 매물 " + response.body.listingId + " - market-fail.http 가 닫힌 시간에 쓴다");
+%}
