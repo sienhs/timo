@@ -1,12 +1,12 @@
 ###############################################################################
-# 양도 마켓 운영 시간 - 성공 케이스 (마켓이 열린 시간에 돌린다)
+# 양도 마켓 운영 시간 - 열린 시간에 돌리는 흐름
 #
 # market-common.http 를 먼저 실행해 토큰과 {{ticketToSell}} 등을 채워 둬야 한다.
 #
-# 흐름: 열림 확인 -> 등록 -> 가격 수정 -> 구매 -> 판 사람의 예매 취소(409)
-#       -> 다음 매물 등록(fail 에서 쓴다) -> 등록 중 예매 취소(409).
-# 마지막 매물은 일부러 열어 둔다. fail 은 닫힌 시간에 "이미 열린 매물" 의 수정과
-# 구매가 막히고 취소만 되는지를 보는데, 닫힌 뒤에는 매물을 새로 만들 수 없다.
+# 흐름: 열림 확인 -> 공연 목록 -> 등록 -> 가격 수정(409, 열린 동안 가격 고정) -> 구매
+#       -> 판 사람의 예매 취소(409) -> 다음 매물 등록(fail 에서 쓴다) -> 등록 중 예매 취소(409).
+# 마지막 매물은 일부러 열어 둔다. fail 이 닫힌 시간에 그 매물로 "구매는 막히고 가격
+# 수정과 취소는 되는지" 를 본다.
 #
 # 예매 취소 두 건은 양도와 얽힌 예매를 원 예매자가 되돌리지 못하게 막는 가드다.
 # 체결이 예매 행을 안 바꿔서, 이 가드가 없으면 판 사람이 취소로 산 사람의 티켓을
@@ -27,7 +27,18 @@ Authorization: Bearer {{sellerToken}}
     });
 %}
 
-### 등록 - 열린 시간이라 201
+### 공연 목록 - 열린 시간이라 200. 닫힌 시간에 등록된 매물이 있었다면 여기서 처음 보인다
+GET {{baseUrl}}/api/v1/market/concerts
+Authorization: Bearer {{buyerToken}}
+
+> {%
+    client.test("200 이고 PagedModel 모양이다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.page !== undefined, "page 가 없다");
+    });
+%}
+
+### 등록 - 시간과 무관하게 201
 POST {{baseUrl}}/api/v1/market/listings
 Authorization: Bearer {{sellerToken}}
 Content-Type: application/json
@@ -46,7 +57,7 @@ Content-Type: application/json
     client.global.set("listedPrice", response.body.price);
 %}
 
-### 가격 수정 - 열린 시간이라 200
+### 가격 수정 - 열린 시간이라 409. 거래가 열려 있는 동안 가격은 고정이다
 PATCH {{baseUrl}}/api/v1/market/listings/{{soldListingId}}/price
 Authorization: Bearer {{sellerToken}}
 Content-Type: application/json
@@ -56,9 +67,10 @@ Content-Type: application/json
 }
 
 > {%
-    client.test("200 이고 가격이 그대로다", function () {
-        client.assert(response.status === 200, "status: " + response.status);
-        client.assert(response.body.price === client.global.get("listedPrice"), "price: " + response.body.price);
+    client.test("409 MarketOpenException, 메시지에 마감 시각", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "MarketOpenException", "exception: " + response.body.exception);
+        client.assert(response.body.errorMessage.indexOf("closesAt=") >= 0, "마감 시각이 메시지에 없다");
     });
 %}
 
@@ -107,7 +119,7 @@ Authorization: Bearer {{buyerToken}}
     });
 %}
 
-### 다음 매물 등록 - fail 에서 닫힌 시간에 수정·구매가 막히는지 볼 매물이다. 열어 둔 채 끝낸다
+### 다음 매물 등록 - fail 에서 닫힌 시간에 쓸 매물이다. 열어 둔 채 끝낸다
 POST {{baseUrl}}/api/v1/market/listings
 Authorization: Bearer {{sellerToken}}
 Content-Type: application/json

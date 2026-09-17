@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ssafy.timo.domain.transfer.dto.MarketHoursResponseDto;
 import com.ssafy.timo.domain.transfer.exception.MarketClosedException;
+import com.ssafy.timo.domain.transfer.exception.MarketOpenException;
 import com.ssafy.timo.domain.transfer.exception.TransferErrorCode;
 import com.ssafy.timo.global.config.MarketHoursProperties;
 import java.time.Clock;
@@ -86,6 +87,22 @@ class MarketHoursServiceTest {
     @DisplayName("열려 있으면 통과한다")
     void requireOpenPassesWhenOpen() {
         assertThatCode(() -> at(LocalDateTime.of(2026, 9, 17, 22, 0, 0)).requireOpen())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("열려 있으면 MARKET_OPEN 으로 거절하고 마감 시각을 메시지에 싣는다 - 가격 수정이 쓴다")
+    void requireClosedRejectsWhenOpen() {
+        assertThatThrownBy(() -> at(LocalDateTime.of(2026, 9, 17, 22, 0, 0)).requireClosed())
+                .isInstanceOf(MarketOpenException.class)
+                .hasMessageContaining("2026-09-17T23:59:59")
+                .extracting("errorCode").isEqualTo(TransferErrorCode.MARKET_OPEN);
+    }
+
+    @Test
+    @DisplayName("닫혀 있으면 requireClosed 는 통과한다")
+    void requireClosedPassesWhenClosed() {
+        assertThatCode(() -> at(LocalDateTime.of(2026, 9, 17, 12, 0, 0)).requireClosed())
                 .doesNotThrowAnyException();
     }
 

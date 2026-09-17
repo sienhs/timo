@@ -23,6 +23,7 @@ import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.support.Authenticated;
 import com.ssafy.timo.support.IntegrationTest;
+import com.ssafy.timo.support.MarketClock;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -120,6 +121,10 @@ class MarketApiIntegrationTest {
     @Autowired
     private EntityManager em;
 
+    /** 운영 시간 판정용 시계. 기본은 열림(21:00)이고, 닫는 테스트는 끝나기 전에 되돌린다. */
+    @Autowired
+    private MarketClock marketClock;
+
     private Concert concert;
     private Section section;
     private Member seller;
@@ -159,6 +164,7 @@ class MarketApiIntegrationTest {
     @AfterEach
     void clearRequester() {
         Authenticated.clear();
+        marketClock.open();
     }
 
     @Nested
@@ -166,15 +172,74 @@ class MarketApiIntegrationTest {
     class Hours {
 
         @Test
-        @DisplayName("열림 여부와 창의 시각, 서버 시각을 준다 - test 프로파일은 종일 열려 있다")
-        void hours() throws Exception {
-            // 창의 날짜는 서버 시각의 날짜와 같아야 한다. 자정 부근에 돌아도 둘은 같은 now 에서 나온다.
+        @DisplayName("열려 있으면 open 이고 오늘 창의 시각을 준다")
+        void hoursWhileOpen() throws Exception {
             mvc.perform(get(MARKET_PATH + "/hours"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.open").value(true))
-                    .andExpect(jsonPath("$.serverTime").isString())
-                    .andExpect(jsonPath("$.opensAt").value(endsWith("T00:00:00")))
+                    .andExpect(jsonPath("$.serverTime").value(endsWith("T21:00:00")))
+                    .andExpect(jsonPath("$.opensAt").value(endsWith("T20:00:00")))
                     .andExpect(jsonPath("$.closesAt").value(endsWith("T23:59:59")));
+        }
+
+        @Test
+        @DisplayName("닫혀 있으면 closed 이고 다음 창의 시각을 준다")
+        void hoursWhileClosed() throws Exception {
+            marketClock.closed();
+
+            mvc.perform(get(MARKET_PATH + "/hours"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.open").value(false))
+                    .andExpect(jsonPath("$.opensAt").value(endsWith("T20:00:00")));
+        }
+
+        @Test
+        @DisplayName("닫힌 시간에도 등록은 201 - 매물은 저장되고 목록에는 20:00 에 드러난다")
+        void registerWhileClosed() throws Exception {
+            marketClock.closed();
+
+            mvc.perform(post(MARKET_PATH + "/listings")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body(myTicket.getId(), LIST_PRICE)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.status").value("LISTED"));
+
+            // 닫힌 동안은 남의 눈에 안 보이고, 열리면 그 매물이 그대로 나온다.
+            mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("MarketClosedException"));
+            marketClock.open();
+            mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].price").value(LIST_PRICE));
+        }
+
+        @Test
+        @DisplayName("닫힌 시간에는 공연 목록과 구매가 409 - 등록된 매물이 있어도 보이지 않는다")
+        void browseAndPurchaseAreClosed() throws Exception {
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+            marketClock.closed();
+
+            mvc.perform(get(MARKET_PATH + "/concerts"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("MarketClosedException"));
+            purchase(othersListing, LIST_PRICE)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("MarketClosedException"));
+        }
+
+        @Test
+        @DisplayName("닫힌 시간에도 상세, 내 내역, 취소는 된다 - 판매자가 자기 매물을 다루는 경로다")
+        void sellerPathsStayOpenWhileClosed() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+            marketClock.closed();
+
+            mvc.perform(get(MARKET_PATH + "/listings/{listingId}", listing.getId()))
+                    .andExpect(status().isOk());
+            mvc.perform(get(MARKET_PATH + "/listings/me"))
+                    .andExpect(status().isOk());
+            mvc.perform(post(MARKET_PATH + "/listings/{listingId}/cancel", listing.getId()))
+                    .andExpect(status().isNoContent());
         }
     }
 
@@ -388,6 +453,27 @@ class MarketApiIntegrationTest {
     @DisplayName("가격 수정")
     class UpdatePrice {
 
+        /** 가격 수정은 운영 시간 밖에서만 된다. 이 묶음은 닫힌 마켓에서 돌리고, 목록을 볼 때만 연다. */
+        @BeforeEach
+        void closeMarket() {
+            marketClock.closed();
+        }
+
+        @Test
+        @DisplayName("운영 시간 중에는 409 - 거래가 열려 있는 동안 가격은 고정이다")
+        void rejectedWhileOpen() throws Exception {
+            TicketListing listing = openListing(myTicket, LIST_PRICE);
+            marketClock.open();
+
+            mvc.perform(patch(MARKET_PATH + "/listings/{listingId}/price", listing.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(priceBody(80_000)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.exception").value("MarketOpenException"));
+            mvc.perform(get(MARKET_PATH + "/listings/{listingId}", listing.getId()))
+                    .andExpect(jsonPath("$.price").value(LIST_PRICE));
+        }
+
         @Test
         @DisplayName("내 매물 가격을 내리면 200 이고 목록·상세·할인율에 함께 반영된다")
         void updatePrice() throws Exception {
@@ -410,6 +496,8 @@ class MarketApiIntegrationTest {
 
             mvc.perform(get(MARKET_PATH + "/listings/{listingId}", listing.getId()))
                     .andExpect(jsonPath("$.price").value(80_000));
+            // 목록은 열려야 보인다. 마감 뒤에 바꾼 가격이 다음 창에 그대로 올라가는지가 여기다.
+            marketClock.open();
             mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
                     .andExpect(jsonPath("$.content[0].price").value(80_000));
         }

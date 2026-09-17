@@ -43,6 +43,9 @@ import java.lang.annotation.Target;
  * <p>따라서 <b>인가 정책은 이 애노테이션으로 검증되지 않는다.</b> 엔드포인트별 권한 규칙과
  * 401/403 응답 스키마는 필터 체인을 실제로 태우는 별도 테스트에서 다뤄야 한다.
  *
+ * <p>{@link MarketHoursTestConfig} 도 함께 올린다. 양도 마켓 운영 시간 판정만 {@link MarketClock} 으로
+ * 조립해, 공용 {@code Clock} 을 건드리지 않고도 테스트가 창 안팎을 오갈 수 있게 한다.
+ *
  * <p>{@link ExceptionProbeConfig} 를 함께 올린다. 예외 처리 규약은 도메인 컨트롤러가 아니라
  * 전용 프로브 컨트롤러로 검증해야 하는데, 그것만 따로 등록하면 컨텍스트가 하나 더 뜨기 때문이다.
  * 프로브는 테스트 소스에만 있고 {@code /test/**} 경로만 쓴다.
@@ -54,7 +57,7 @@ import java.lang.annotation.Target;
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
-@Import(ExceptionProbeConfig.class)
+@Import({ExceptionProbeConfig.class, MarketHoursTestConfig.class})
 @Transactional
 public @interface IntegrationTest {
 }
