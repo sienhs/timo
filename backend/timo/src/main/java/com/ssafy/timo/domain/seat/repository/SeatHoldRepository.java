@@ -14,30 +14,41 @@ import java.util.Optional;
 public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
 
     /**
-     * 만료된 선점을 한꺼번에 {@code EXPIRED} 로 정리한다.
+     * 새 선점에 충돌할 수 있는 만료 선점만 {@code EXPIRED} 로 정리한다.
      *
-     * <p><b>새 선점을 넣기 전에 반드시 먼저 불러야 한다.</b> 유니크 제약({@code uk_hold_seat})의 재료인
-     * 생성 칼럼은 {@code status='HELD'} 인 동안 값을 갖는다. 만료됐지만 아직 {@code HELD} 로 남아 있는
-     * 행이 있으면, 그 자리를 새로 잡으려는 요청이 <b>이미 풀린 선점 때문에</b> 유니크 충돌로 거절된다.
+     * <p>유니크 제약은 공연별 좌석({@code uk_hold_seat})과 공연별 회원({@code uk_hold_member})에
+     * 각각 걸려 있다. 따라서 요청 좌석의 만료 선점뿐 아니라, 같은 회원이 이 공연에서 잡았던 만료
+     * 선점도 함께 정리해야 새 선점 INSERT가 유니크 제약에 막히지 않는다.
      *
-     * <p>조회 시점 판정(만료된 선점을 읽을 때만 무시)만으로는 이 문제를 못 푼다. 유니크 인덱스는
-     * 애플리케이션의 판정을 모르기 때문이다.
-     *
-     * <p>{@code flushAutomatically} 로 앞선 변경을 먼저 내보내고, {@code clearAutomatically} 로
-     * 영속성 컨텍스트에 남은 옛 상태를 비운다. 비우지 않으면 방금 DB 에서 만료시킨 행을 엔티티로 다시
-     * 읽을 때 {@code HELD} 로 보인다.
-     *
-     * @return 정리된 행 수
+     * <p>공연 전체의 만료 선점을 매 요청마다 갱신하지 않는다. 좌석·회원 유니크 인덱스를 각각 활용할 수
+     * 있도록 두 메서드로 나눠, 선점 API의 불필요한 전역 UPDATE와 락 경합을 막는다.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update SeatHold h
                set h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.EXPIRED,
                    h.releasedAt = :now
-             where h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.HELD
+             where h.concert.id = :concertId
+               and h.activeSeat = :seatId
                and h.expiresAt <= :now
             """)
-    int expireAllStale(@Param("now") LocalDateTime now);
+    int expireStaleForSeat(@Param("concertId") Long concertId,
+                            @Param("seatId") Long seatId,
+                            @Param("now") LocalDateTime now);
+
+    /** 같은 회원의 만료 선점이 새 선점의 회원 유니크 제약을 막지 않게 정리한다. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update SeatHold h
+               set h.status = com.ssafy.timo.domain.seat.entity.SeatHoldStatus.EXPIRED,
+                   h.releasedAt = :now
+             where h.concert.id = :concertId
+               and h.activeMember = :memberId
+               and h.expiresAt <= :now
+            """)
+    int expireStaleForMember(@Param("concertId") Long concertId,
+                              @Param("memberId") Long memberId,
+                              @Param("now") LocalDateTime now);
 
     /** 이 공연에서 이 좌석을 붙들고 있는 유효한 선점. */
     @Query("""
