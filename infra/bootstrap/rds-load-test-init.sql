@@ -232,7 +232,7 @@ CREATE TABLE `ticket_trade` (
     `ticket_id` BIGINT NOT NULL,
     `seller_member_id` BIGINT NOT NULL,
     `buyer_member_id` BIGINT NOT NULL,
-    `price` INT NOT NULL,
+    `price` BIGINT NOT NULL,
     `traded_at` DATETIME(6) NOT NULL,
     `status` VARCHAR(20) NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
