@@ -259,8 +259,9 @@ public class LocalDataSeeder implements ApplicationRunner {
      *   <li>{@code CLOSED} — 전부 과거</li>
      * </ul>
      *
-     * <p>날짜를 고정값으로 박아 둔 탓에 <b>시간이 지나면 이 관계가 깨진다.</b> {@code ON_SALE} 공연의
-     * {@code startDate} 가 지나면 "예매 중인데 이미 끝난 공연" 이 된다. 그때는 여기 날짜를 뒤로 민다.
+     * <p>날짜를 고정값으로 박아 둔 탓에 <b>시간이 지나면 이 관계가 깨진다.</b> {@code ON_SALE} 공연은
+     * {@code startDate - 2시간}({@code Concert.BOOKING_CUTOFF_HOURS})부터 선점·결제가 마감으로 거절되므로,
+     * 그 전에 여기 날짜를 뒤로 민다.
      */
     private static final List<ConcertSeed> CONCERT_SEEDS = List.of(
             // 내역. 이미 끝난 공연이라 예매 화면이 아니라 지난 공연 목록에서 확인한다.
@@ -282,7 +283,7 @@ public class LocalDataSeeder implements ApplicationRunner {
                     "poster/poster_main_roykim.jpg",
                     List.of(),
                     "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 3_300,
-                    LocalDateTime.of(2026, 9, 20, 19, 30), LocalDateTime.of(2026, 9, 20, 21, 30),
+                    LocalDateTime.of(2026, 10, 24, 19, 30), LocalDateTime.of(2026, 10, 24, 21, 30),
                     LocalDateTime.of(2026, 8, 1, 14, 0), List.of("로이킴")),
             // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
             new ConcertSeed("Bruno Mars 내한공연", ConcertGenre.CONCERT,

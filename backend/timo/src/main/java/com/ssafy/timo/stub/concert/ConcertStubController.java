@@ -8,6 +8,7 @@ import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
 import com.ssafy.timo.domain.concert.dto.ConcertListRequestDto;
 import com.ssafy.timo.domain.concert.dto.ConcertSortType;
 import com.ssafy.timo.domain.concert.dto.ConcertSummaryResponseDto;
+import com.ssafy.timo.domain.concert.entity.BookingBlockReason;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.exception.InvalidConcertPeriodException;
@@ -202,6 +203,11 @@ public class ConcertStubController implements ConcertApi {
                 concert.description(),
                 concert.ageRating(),
                 concert.status(),
+                // 스텁은 예매 가능 시간 창을 흉내내지 않는다. 판정 규칙은 Concert 엔티티 하나에만
+                // 있어야 하고, 여기서 날짜를 다시 계산하면 두 곳이 갈린다. 상태가 ON_SALE 인지로만
+                // 답하므로 오픈 전·마감 후는 구분되지 않는다 - 그 구분이 필요한 화면은 실제 API 를 쓴다.
+                concert.status() == ConcertStatus.ON_SALE,
+                concert.status() == ConcertStatus.ON_SALE ? null : BookingBlockReason.NOT_ON_SALE,
                 concert.viewCount(),
                 concert.startDate(),
                 concert.endDate(),

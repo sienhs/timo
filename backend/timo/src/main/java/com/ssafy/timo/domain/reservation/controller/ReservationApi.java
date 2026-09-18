@@ -36,7 +36,11 @@ public interface ReservationApi {
      *
      * <p>요청자가 유효하게 선점한 좌석이어야 한다. 선점이 없거나 만료됐으면 409, 남의 선점이면 403 이다.
      * 같은 공연의 유효한 주문이 이미 있으면 409({@code AlreadyReservedException}),
-     * 공연이 예매 진행 중이 아니면 409({@code ConcertNotOnSaleException}) 다.
+     * 공연이 예매 진행 중이 아니면 409({@code ConcertNotOnSaleException}), 예매 중이라도 오픈 전이면
+     * 409({@code BookingNotOpenException}), 공연 시작
+     * {@value com.ssafy.timo.domain.concert.entity.Concert#BOOKING_CUTOFF_HOURS}시간 전 마감을 지났으면
+     * 409({@code BookingClosedException}) 다.
+     * 마감 판정은 선점이 아직 유효해도 결제 시점 기준으로 다시 한다.
      */
     @PostMapping
     ResponseEntity<ReservationDetailResponseDto> create(@Valid @RequestBody CreateReservationRequestDto request,

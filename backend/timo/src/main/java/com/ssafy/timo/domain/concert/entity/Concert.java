@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 공연. 어느 공연장에서 열리는지와, 출연 아티스트·상세 이미지 목록을 함께 들고 있다.
@@ -43,6 +44,9 @@ import java.util.List;
 @Table(name = "concert")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Concert extends BaseEntity {
+
+    /** 공연 시작 이 시간 전까지만 예매(선점·결제)할 수 있다. 마감 시각은 저장하지 않고 매번 유도한다. */
+    public static final int BOOKING_CUTOFF_HOURS = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -156,6 +160,36 @@ public class Concert extends BaseEntity {
     /** 예매(민팅)를 열 수 있는 상태인지 - 주최자·온체인 showId가 모두 갖춰졌는지. */
     public boolean isReadyForBooking() {
         return organizer != null && showId != null;
+    }
+
+    /**
+     * 지금 이 공연을 예매(선점·결제)할 수 있는지, 아니라면 어떤 사유인지.
+     *
+     * <p>{@link #isReadyForBooking()}과는 역할이 다르다 - 그쪽은 주최자·온체인 showId가 갖춰져
+     * "예매를 열 수 있는 상태로 등록됐는지"(등록 시점 한 번)를 보고, 이건 지금 이 순간이 예매 가능한
+     * 시간 창(오픈 시각 ~ 공연 시작 {@value #BOOKING_CUTOFF_HOURS}시간 전) 안에 있는지(요청마다 매번)를
+     * 본다. 값이 비어 있으면 예매할 수 있다는 뜻이다.
+     *
+     * <p>판정 순서는 상태 → 오픈 전 → 마감 후다. 여러 사유가 겹치면(예: 매진인데 시간도 지남) 앞의
+     * 것을 사유로 답한다. 오픈·시작 시각 중 하나라도 없으면 오픈 전으로 본다 - 언제 열리는지 모르는
+     * 공연을 예매 가능으로 둘 수는 없다.
+     */
+    public Optional<BookingBlockReason> bookingBlockReason(LocalDateTime now) {
+        if (status != ConcertStatus.ON_SALE) {
+            return Optional.of(BookingBlockReason.NOT_ON_SALE);
+        }
+        if (openAt == null || startDate == null || now.isBefore(openAt)) {
+            return Optional.of(BookingBlockReason.NOT_OPEN);
+        }
+        if (!now.isBefore(startDate.minusHours(BOOKING_CUTOFF_HOURS))) {
+            return Optional.of(BookingBlockReason.CLOSED);
+        }
+        return Optional.empty();
+    }
+
+    /** {@link #bookingBlockReason}이 비어 있는지를 boolean으로만 보고 싶을 때. */
+    public boolean isBookableAt(LocalDateTime now) {
+        return bookingBlockReason(now).isEmpty();
     }
 
     /** 출연 아티스트를 추가한다. 중복 여부는 호출 쪽에서 걸러 온다고 보고 여기서는 검사하지 않는다. */

@@ -325,13 +325,19 @@ class LocalDataSeederTest {
 
         // 상태와 날짜가 서로 맞아야 한다. 어긋나면 오픈이 남은 공연이 예매 중이거나
         // 이미 끝난 공연을 예매할 수 있는 데이터가 된다.
+        //
+        // 공연일이 미래인 것만으로는 부족하다. 선점·결제는 startDate - BOOKING_CUTOFF_HOURS 부터
+        // 마감으로 거절되므로, 공연일이 지금부터 한 시간 뒤라면 이 단정은 통과하는데 로컬에서는
+        // 예매가 이미 막혀 있다. 시드 날짜가 낡은 것을 알려주는 장치가 이것뿐이라, 마감 시각까지
+        // 여유가 남았는지를 본다. 로컬에서 예매 흐름을 볼 수 있어야 한다는 것이 이 시드의 목적이다.
         LocalDateTime now = LocalDateTime.now(clock);
         assertThat(concerts.values())
                 .filteredOn(concert -> concert.getStatus() == ConcertStatus.ON_SALE)
                 .hasSize(EXPECTED_ON_SALE_CONCERTS)
                 .allSatisfy(concert -> {
                     assertThat(concert.getOpenAt()).as("%s 오픈", concert.getTitle()).isBefore(now);
-                    assertThat(concert.getStartDate()).as("%s 공연일", concert.getTitle()).isAfter(now);
+                    assertThat(concert.getStartDate()).as("%s 예매 마감", concert.getTitle())
+                            .isAfter(now.plusHours(Concert.BOOKING_CUTOFF_HOURS));
                 });
         assertThat(concerts.get("이승기 콘서트").getOpenAt()).isAfter(now);
         assertThat(concerts.get("김필 단독 콘서트").getEndDate()).isBefore(now);

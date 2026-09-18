@@ -7,6 +7,7 @@ import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.dto.ConcertDetailResponseDto;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
+import com.ssafy.timo.domain.concert.entity.BookingBlockReason;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
 import com.ssafy.timo.domain.concert.entity.ConcertImage;
@@ -22,18 +23,20 @@ import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.assertj.core.groups.Tuple;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,9 +51,14 @@ import static org.mockito.Mockito.never;
 @ExtendWith(MockitoExtension.class)
 class ConcertServiceImplTest {
 
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
     private static final LocalDateTime OPEN_AT = LocalDateTime.of(2026, 3, 1, 20, 0);
     private static final LocalDateTime START = LocalDateTime.of(2026, 4, 10, 19, 0);
     private static final LocalDateTime END = LocalDateTime.of(2026, 4, 12, 21, 0);
+
+    /** 오픈은 지났고 마감({@code START - 2h})은 아직인 시각. 예매 창 안이다. */
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 15, 12, 0);
 
     private static final String POSTER_KEY = "concert/1/poster.png";
     private static final List<String> IMAGE_KEYS =
@@ -74,8 +82,24 @@ class ConcertServiceImplTest {
     @Mock
     private ImageStorage imageStorage;
 
-    @InjectMocks
     private ConcertServiceImpl concertService;
+
+    /**
+     * {@code @InjectMocks} 를 쓰지 않는다. {@link Clock} 까지 목으로 꽂히면 {@code instant()} 가
+     * null 을 돌려줘 상세 조회가 그 자리에서 터진다. 시계는 가짜가 아니라 <b>고정된 진짜</b>가
+     * 필요하므로 직접 조립한다.
+     */
+    @BeforeEach
+    void setUpService() {
+        concertService = new ConcertServiceImpl(
+                concertRepository,
+                viewCountStore,
+                venueRepository,
+                artistRepository,
+                sectionRepository,
+                imageStorage,
+                Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
+    }
 
     @Captor
     private ArgumentCaptor<Concert> concertCaptor;
@@ -450,6 +474,55 @@ class ConcertServiceImplTest {
     }
 
     /** 상세 조회 응답을 검증하기 위해 공연장·아티스트·이미지가 모두 채워진 공연을 만든다. */
+    @Test
+    @DisplayName("예매 중이 아닌 공연은 예매 불가로, 사유까지 함께 답한다")
+    void find_notOnSale_isNotBookable() {
+        // 등록 직후의 공연은 SCHEDULED 다. 오픈 시각이 지났는지와 무관하게 예매가 성립하지 않는다.
+        Concert concert = concertWithId(1L);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
+        givenImageStoragePrefixesKeys();
+
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        assertThat(response.bookable()).isFalse();
+        assertThat(response.blockReason()).isEqualTo(BookingBlockReason.NOT_ON_SALE);
+    }
+
+    @Test
+    @DisplayName("예매 창 안이면 예매 가능으로 답하고 사유는 비운다")
+    void find_withinBookingWindow_isBookable() {
+        Concert concert = concertWithId(1L);
+        ReflectionTestUtils.setField(concert, "status", ConcertStatus.ON_SALE);
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
+        givenImageStoragePrefixesKeys();
+
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        assertThat(response.bookable()).isTrue();
+        assertThat(response.blockReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("예매 중이라도 마감을 지났으면 예매 불가로 답한다 - status 는 그대로 ON_SALE 이다")
+    void find_pastCutoff_isNotBookableEvenWhileOnSale() {
+        // 상태 컬럼은 1분마다 미는 거친 라벨이라 마감~종료 구간에서는 ON_SALE 로 남는다.
+        // 그 어긋남을 클라이언트가 겪지 않게 하는 것이 bookable 의 존재 이유다.
+        Concert concert = concertWithId(1L);
+        ReflectionTestUtils.setField(concert, "status", ConcertStatus.ON_SALE);
+        ReflectionTestUtils.setField(concert, "startDate", NOW.plusHours(1));
+        given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
+        given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
+        givenImageStoragePrefixesKeys();
+
+        ConcertDetailResponseDto response = concertService.find(1L);
+
+        assertThat(response.status()).isEqualTo(ConcertStatus.ON_SALE);
+        assertThat(response.bookable()).isFalse();
+        assertThat(response.blockReason()).isEqualTo(BookingBlockReason.CLOSED);
+    }
+
     private Concert concertWithId(Long id) {
         Concert concert = Concert.builder()
                 .title("아이유 콘서트")

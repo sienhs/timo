@@ -43,3 +43,9 @@ app:
   image:
     bucket-name: test-images-bucket
     base-url: https://cdn.securitytest.timo.io
+
+# @Scheduled 잡을 끈다. 통합 테스트는 @Transactional 롤백으로 서로를 격리하는데, 잡은 별도
+# 스레드에서 자기 트랜잭션으로 커밋해 그 격리를 통과한다. 잡의 동작은 빈을 직접 불러 검증한다
+# (ConcertStatusSchedulerTest).
+scheduling:
+  enabled: false

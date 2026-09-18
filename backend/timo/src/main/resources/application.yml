@@ -40,6 +40,13 @@ app:
 jwt:
   access-token-ttl: 30m
 
+# @Scheduled 잡 전체 스위치. 공연 상태를 날짜에 맞춰 미는 잡(ConcertStatusScheduler)이 여기 달려
+# 있다. 통합 테스트 프로파일만 이 값을 끈다 - 잡이 별도 스레드에서 커밋하면 테스트 롤백을 통과해
+# 다음 테스트로 새어 나간다. 배포 환경에서 끌 일은 없지만, 잡이 의심될 때 재배포 없이 떼어 볼 수
+# 있도록 속성으로 둔다.
+scheduling:
+  enabled: true
+
 # 입장 QR 서명키(entry-pass.secret)도 프로파일마다 다르다. 수명은 환경과 무관하게 같아야
 # 팬 앱의 재발급 주기와 게이트 판정이 환경별로 갈리지 않으므로 여기 한 곳에만 둔다.
 entry-pass:

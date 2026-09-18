@@ -1,14 +1,13 @@
 package com.ssafy.timo.domain.seat.service;
 
 import com.ssafy.timo.domain.concert.entity.Concert;
-import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.offer.repository.CancelOfferRepository;
 import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
-import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
+import com.ssafy.timo.domain.reservation.service.BookingWindowGuard;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
@@ -129,8 +128,11 @@ public class SeatServiceImpl implements SeatService {
     /**
      * 좌석을 선점한다.
      *
-     * <p>예매 중({@link ConcertStatus#ON_SALE})인 공연만 선점할 수 있다. 오픈 전·매진·종료·취소된
-     * 공연은 좌석이 남아 있어도(혹은 아직 없어도) 선점이 성립하지 않는다.
+     * <p>예매 중(ON_SALE)이면서 지금이 예매 가능한 시간 창 안({@link Concert#bookingBlockReason})인
+     * 공연만 선점할 수 있다. 오픈 전·마감 후·매진·종료·취소된 공연은 좌석이 남아 있어도(혹은 아직
+     * 없어도) 선점이 성립하지 않는다. 선점이 열려 있어도 결제 시점에는 마감이 지나 있을 수 있으므로
+     * {@link com.ssafy.timo.domain.reservation.service.ReservationServiceImpl#create}가 같은 판정을
+     * 한 번 더 한다.
      *
      * <p>이 공연의 티켓을 이미 산 회원은 다른 자리를 선점할 수 없다("1인 1매"). 지금 잡고 있는
      * 내 선점을 다시 누르는 것과는 다른 얘기다 — 그건 결제 전 단계라 여기 걸리지 않는다.
@@ -157,9 +159,7 @@ public class SeatServiceImpl implements SeatService {
 
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
-        if (concert.getStatus() != ConcertStatus.ON_SALE) {
-            throw new ConcertNotOnSaleException(concertId, concert.getStatus());
-        }
+        BookingWindowGuard.check(concert, now);
         if (reservationRepository.findPaidOfMember(concertId, memberId).isPresent()) {
             throw new AlreadyReservedException(concertId);
         }
