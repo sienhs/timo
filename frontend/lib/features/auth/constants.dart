@@ -103,6 +103,13 @@ class AuthServerErrors {
   /// 가입 시 닉네임 중복(409). 중복 확인과 가입 사이에 남이 채간 경우.
   static const nicknameDuplicated = 'NicknameDuplicatedException';
 
+  /// 이미 가입된 전화번호(409). 가입 요청뿐 아니라 **인증번호 발송에서도** 온다.
+  /// 서버가 가입할 수 없는 번호에는 문자를 보내지 않는다.
+  ///
+  /// 발송 제한 검사보다 뒤에서 걸러지므로 이 거절도 쿨다운(1분)과 횟수를
+  /// 소모한다. 같은 번호로 다시 요청하면 이것 대신 429 가 온다.
+  static const phoneNumberDuplicated = 'PhoneNumberDuplicatedException';
+
   /// 로그인 실패(400). 아이디 없음과 비밀번호 틀림을 서버가 하나로 묶어 준다.
   static const loginFailed = 'LoginFailedException';
 }
@@ -125,6 +132,9 @@ class AuthStrings {
   static const phoneHint = '010-0000-0000';
   static const requestCode = '인증번호 받기';
   static const codeSent = '인증번호를 보냈어요';
+
+  /// 이미 가입된 번호라고 거절당했을 때 번호 칸 아래에 함께 뜨는 링크.
+  static const goToLogin = '로그인하러 가기';
 
   // 첫 화면에서 이어지는 인증번호 입력
   static const codeLabel = '인증번호';

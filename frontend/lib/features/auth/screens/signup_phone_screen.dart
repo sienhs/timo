@@ -56,6 +56,14 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
   var _sentPhoneNumber = '';
   String? _verificationTicket;
   String? _codeError;
+  String? _phoneError;
+
+  /// 서버가 "이미 가입된 번호" 라며 거절한 번호와 그때 받은 문구.
+  ///
+  /// 같은 번호를 도로 입력하면 요청을 보내지 않고 이 문구를 다시 띄운다.
+  /// 거절당한 요청도 발송 쿨다운(1분)을 소모하기 때문에, 다시 물어보면 서버는
+  /// 429 를 주고 화면은 '요청 횟수를 초과했어요' 라는 엉뚱한 안내를 하게 된다.
+  final _takenPhoneMessages = <String, String>{};
 
   AuthApi get _api => widget.api ?? AuthApiScope.of(context);
   String get _name => _nameController.text.trim();
@@ -64,7 +72,8 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
   bool get _nameValid => SignupValidators.isValidName(_name);
   bool get _phoneValid => SignupValidators.isValidPhone(_phoneNumber);
   bool get _verified => _verificationTicket != null;
-  bool get _canRequest => !_busy && _nameValid && _phoneValid;
+  bool get _canRequest =>
+      !_busy && _nameValid && _phoneValid && _phoneError == null;
   bool get _canContinue =>
       !_busy && _verified && _nameValid && _phoneNumber == _sentPhoneNumber;
   bool get _canVerify =>
@@ -140,6 +149,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     final changedAfterSend = _codeRequested && _phoneNumber != _sentPhoneNumber;
     setState(() {
       if (changedAfterSend) _clearRequestedCode();
+      _phoneError = _takenPhoneMessages[_phoneNumber];
     });
   }
 
@@ -167,8 +177,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
       validFor = await _api.requestVerificationCode(phoneNumber);
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _busy = false);
-      showErrorSnackBar(context, _sendFailureMessage(e));
+      _handleSendFailure(e, phoneNumber);
       return;
     }
 
@@ -196,8 +205,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
       validFor = await _api.requestVerificationCode(_sentPhoneNumber);
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _busy = false);
-      showErrorSnackBar(context, _sendFailureMessage(e));
+      _handleSendFailure(e, _sentPhoneNumber);
       return;
     }
 
@@ -245,6 +253,18 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     _goToUsername();
   }
 
+  /// 이미 가입된 번호라고 거절당했을 때 로그인 화면으로 보낸다.
+  ///
+  /// 가입 화면은 로그인 화면에서만 들어오므로 보통은 되돌아가면 된다. 화면을
+  /// 단독으로 띄워 돌아갈 곳이 없으면(테스트·딥링크) 로그인으로 갈아탄다.
+  void _goToLogin() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+      return;
+    }
+    Navigator.pushReplacementNamed(context, AppRoutes.login);
+  }
+
   void _goToUsername() {
     final ticket = _verificationTicket;
     if (ticket == null) return;
@@ -281,12 +301,30 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     if (!aboutThisInput) showErrorSnackBar(context, e.message);
   }
 
-  String _sendFailureMessage(ApiException e) {
-    return switch (e.exceptionName) {
+  /// 인증번호 발송 거절 안내.
+  ///
+  /// - 이미 가입된 번호(409): 이 칸을 고쳐야 풀리는 문제라 칸 아래 문구로
+  ///   알린다(닉네임 중복을 칸 아래에 알리는 것과 같다). 문구는 서버가 준
+  ///   것을 그대로 쓴다.
+  /// - 그 외(발송 제한 429, 발송 실패, 네트워크): 번호를 고쳐도 소용없으니
+  ///   스낵바로 알리고 버튼은 그대로 둔다.
+  void _handleSendFailure(ApiException e, String phoneNumber) {
+    final alreadyMember =
+        e.exceptionName == AuthServerErrors.phoneNumberDuplicated;
+    setState(() {
+      _busy = false;
+      if (alreadyMember) {
+        _takenPhoneMessages[phoneNumber] = e.message;
+        _phoneError = e.message;
+      }
+    });
+    if (alreadyMember) return;
+
+    showErrorSnackBar(context, switch (e.exceptionName) {
       AuthServerErrors.smsSendLimitExceeded => AuthStrings.sendLimitExceeded,
       AuthServerErrors.smsSendFailed => AuthStrings.sendFailed,
       _ => e.message,
-    };
+    });
   }
 
   @override
@@ -335,6 +373,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
                 ? TextInputAction.next
                 : TextInputAction.done,
             inputFormatters: const [PhoneNumberInputFormatter()],
+            errorText: _phoneError,
             onChanged: _onPhoneChanged,
             onSubmitted: (_) {
               if (_codeRequested) {
@@ -344,6 +383,15 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
               }
             },
           ),
+          if (_phoneError != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                onPressed: _busy ? null : _goToLogin,
+                child: const Text(AuthStrings.goToLogin),
+              ),
+            ),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: _verified
