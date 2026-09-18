@@ -42,12 +42,21 @@ public class EntryPassService {
     static final Duration ENTRY_OPENS_BEFORE_START = Duration.ofHours(2);
 
     /**
-     * 공연 시작 뒤 언제까지 내줄지. 지각 입장과 재입장을 감안한 폭이다.
+     * 공연 시작 뒤 언제까지 내줄지. 지각 입장만 감안한 폭이다.
+     *
+     * <p>재입장은 이 폭과 상관이 없다. 게이트가 통과시키는 순간 티켓을 {@code USED} 로 태우므로
+     * ({@code GateEntryService.verify}) 두 번째 스캔은 창이 열려 있어도 {@code ALREADY_USED} 로
+     * 거절된다. 창을 넓혀 봐야 재입장이 열리지는 않는다.
+     *
+     * <p>발급이 닫힌 뒤에도 마지막에 나간 QR 은 수명({@code entry-pass.ttl}, 30초)만큼 게이트에서
+     * 더 통한다. 게이트는 시간을 따로 보지 않기 때문이다. 실제로 입장이 막히는 순간은 시작 +5분이
+     * 아니라 +5분 30초다. 창을 이만큼 좁히면 이 30초가 창의 10% 라, 운영상 더 좁힐 수 없는 하한이
+     * 여기라는 뜻이기도 하다.
      *
      * <p>{@code Concert.endDate} 를 쓰지 않는다. 여러 날에 걸친 공연이면 종료일이 며칠 뒤라
      * 그 기간 내내 발급 창이 열린 채로 남는다. 시작 시각 기준이 언제나 더 좁다.
      */
-    static final Duration ENTRY_CLOSES_AFTER_START = Duration.ofHours(6);
+    static final Duration ENTRY_CLOSES_AFTER_START = Duration.ofMinutes(5);
 
     private final TicketRepository ticketRepository;
     private final EntryPassProvider entryPassProvider;

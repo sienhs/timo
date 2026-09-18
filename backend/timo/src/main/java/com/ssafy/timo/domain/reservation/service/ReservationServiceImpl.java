@@ -4,7 +4,6 @@ import com.ssafy.timo.domain.blockchain.ContractClient;
 import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.blockchain.TicketVaultClient;
 import com.ssafy.timo.domain.concert.entity.Concert;
-import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
@@ -16,7 +15,6 @@ import com.ssafy.timo.domain.reservation.dto.ReservationListRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationSummaryResponseDto;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
-import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
 import com.ssafy.timo.domain.reservation.exception.ReservationNotCancellableException;
 import com.ssafy.timo.domain.reservation.exception.ReservationNotFoundException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
@@ -90,9 +88,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
-        if (concert.getStatus() != ConcertStatus.ON_SALE) {
-            throw new ConcertNotOnSaleException(concertId, concert.getStatus());
-        }
+        BookingWindowGuard.check(concert, now);
         if (!concert.isReadyForBooking()) {
             // ON_SALE 은 온체인 등록이 끝난 뒤에만 켜져야 한다 - 여기 걸리면 그 불변식이 깨진 것이다.
             throw new IllegalStateException("ON_SALE 인데 온체인 등록이 안 된 공연입니다 (concertId=" + concertId + ")");

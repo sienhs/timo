@@ -613,7 +613,8 @@ class SeatHoldApiIntegrationTest {
                 .ageRating(AgeRating.ALL)
                 .startDate(startDate)
                 .endDate(startDate.plusHours(3))
-                .openAt(startDate.minusDays(10))
+                // 선점은 openAt <= now < startDate - 2h 안에서만 성립한다. 오픈은 이미 지났어야 한다.
+                .openAt(LocalDateTime.now().minusDays(1))
                 .venue(venue)
                 .build());
         // 선점은 예매 중인 공연만 허용하므로, 등록 직후의 SCHEDULED 그대로면 이 테스트의 선점 호출이 다 막힌다.

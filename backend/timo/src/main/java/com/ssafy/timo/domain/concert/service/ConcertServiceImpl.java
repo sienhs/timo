@@ -24,6 +24,8 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +44,7 @@ public class ConcertServiceImpl implements ConcertService {
     private final ArtistRepository artistRepository;
     private final SectionRepository sectionRepository;
     private final ImageStorage imageStorage;
+    private final Clock clock;
 
     @Override
     public CommandConcertResponseDto create(CommandConcertRequestDto request) {
@@ -88,7 +91,8 @@ public class ConcertServiceImpl implements ConcertService {
                 concert,
                 sectionRepository.findAllByVenueIdOrderByIdAsc(concert.getVenue().getId()),
                 imageStorage,
-                viewCount);
+                viewCount,
+                LocalDateTime.now(clock));
     }
 
     /**

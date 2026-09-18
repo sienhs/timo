@@ -47,7 +47,14 @@ public interface ConcertApi {
     @GetMapping
     ResponseEntity<PagedModel<ConcertSummaryResponseDto>> findAll(@Valid @ModelAttribute ConcertListRequestDto request);
 
-    /** 공연 상세를 조회한다. 조회할 때마다 조회수가 1 증가한다. */
+    /**
+     * 공연 상세를 조회한다. 조회할 때마다 조회수가 1 증가한다.
+     *
+     * <p>{@code bookable} 이 지금 이 순간 선점·결제가 성립하는지를, 막혀 있다면 {@code blockReason}
+     * 이 그 사유(오픈 전·마감 후·예매 중이 아님)를 답한다. <b>예매 버튼은 {@code status} 가 아니라
+     * 이 두 값으로 그려야 한다.</b> {@code status} 는 1분마다 갱신되는 거친 라벨이라 오픈 직후
+     * 최대 1분과 마감 이후 구간에서 실제 판정과 어긋난다 - {@code ConcertDetailResponseDto} 주석 참고.
+     */
     @GetMapping("/{concertId}")
     ResponseEntity<ConcertDetailResponseDto> find(@PathVariable Long concertId);
 }
