@@ -9,8 +9,8 @@ import '../models/artist_summary.dart';
 /// 관련 아티스트가 같은 칸을 쓴다.
 ///
 /// 이미지 부분만 [child] 로 갈아끼운다 — 아티스트 사진([ArtistFace])일 수도,
-/// '더보기' 의 + 아이콘일 수도 있다. [badge] 를 주면 아바타 오른쪽 아래에 얹는다
-/// (관련 아티스트의 하트).
+/// '더보기' 의 + 아이콘일 수도 있다. [badge] 를 주면 아바타 오른쪽 아래 원
+/// 테두리에 걸쳐 얹는다(관련 아티스트의 하트).
 class ArtistAvatarCell extends StatelessWidget {
   const ArtistAvatarCell({
     super.key,
@@ -54,8 +54,14 @@ class ArtistAvatarCell extends StatelessWidget {
                     child: child,
                   ),
                 ),
+                // 원 테두리에 걸치게 아바타 밖으로 조금 내보낸다. Stack 이
+                // 자르지 않아(Clip.none) 나간 만큼 그대로 보인다.
                 if (badge != null)
-                  Positioned(right: 0, bottom: 0, child: badge),
+                  Positioned(
+                    right: -HomeMetrics.artistFavoriteOverhang,
+                    bottom: -HomeMetrics.artistFavoriteOverhang,
+                    child: badge,
+                  ),
               ],
             ),
             const SizedBox(height: HomeMetrics.artistNameGap),

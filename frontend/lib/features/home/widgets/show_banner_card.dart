@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/poster_image.dart';
 import '../constants.dart';
 import '../models/show_summary.dart';
@@ -11,7 +12,8 @@ import '../models/show_summary.dart';
 ///
 /// [onFavoritePressed] 를 주면 오른쪽 위에 하트가 붙는다(검색 결과). 배너는
 /// 넘기는 중에 잘못 눌리기 쉬워 붙이지 않는다. 찜한 공연([isFavorite])은
-/// 하트가 채워진다 — 상태는 화면이 알고 카드는 받은 대로 그린다.
+/// 하트가 초록으로 채워진다 — 흰 빈 하트와 채운 초록 하트가 앱 공통의 찜
+/// 표시다. 상태는 화면이 알고 카드는 받은 대로 그린다.
 class ShowBannerCard extends StatelessWidget {
   const ShowBannerCard({
     super.key,
@@ -87,7 +89,7 @@ class ShowBannerCard extends StatelessWidget {
                       ? HomeStrings.unfavorite
                       : HomeStrings.favorite,
                   iconSize: HomeMetrics.favoriteIconSize,
-                  color: Colors.white,
+                  color: isFavorite ? AppColors.primary : Colors.white,
                   icon: Icon(
                     isFavorite ? Icons.favorite : Icons.favorite_border,
                   ),

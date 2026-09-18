@@ -61,7 +61,13 @@ class SearchField extends StatelessWidget {
                 hintStyle: textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
+                // 바깥 상자가 테두리 노릇을 하니 칸 자체의 선은 모두 뗀다.
+                // `border` 만 none 으로 두면 테마가 상태별로 정한
+                // enabledBorder·focusedBorder 가 그대로 남아 글자 둘레에 가는
+                // 선이 그려진다.
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),

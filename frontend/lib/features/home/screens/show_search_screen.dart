@@ -84,7 +84,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
       _keyword = initial;
       _controller.text = initial;
       _shows = api.search(initial);
-      _artists = api.searchArtists(initial);
+      _artists = _searchArtistsAndSyncFavorites(initial);
     }
   }
 
@@ -130,7 +130,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
       _keyword = keyword;
       _showAll = false;
       _shows = api.search(keyword);
-      _artists = api.searchArtists(keyword);
+      _artists = _searchArtistsAndSyncFavorites(keyword);
     });
     _remember(keyword);
   }
@@ -172,8 +172,29 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
 
   void _retryArtists() {
     setState(() {
-      _artists = HomeApiScope.of(context).searchArtists(_keyword);
+      _artists = _searchArtistsAndSyncFavorites(_keyword);
     });
+  }
+
+  /// 아티스트를 검색하고, 결과가 오면 그중 **이미 찜한** 아티스트의 스냅샷을
+  /// 서버가 준 최신 모습으로 맞춘다.
+  ///
+  /// 찜리스트는 찜한 순간의 모습을 기기에 남기므로, 그 뒤 서버에 사진이
+  /// 붙어도 목록은 사진 없는 채로 남는다(실제로 사진 필드명이 어긋났던
+  /// 동안 찜한 아티스트가 그랬다). 서버의 최신 모습을 다시 받는 곳이 여기라
+  /// 이때 맞춘다. 검색 실패는 [AsyncBoundary] 가 화면에 알리므로 동기화
+  /// 쪽에서는 넘긴다.
+  Future<List<ArtistSummary>> _searchArtistsAndSyncFavorites(String keyword) {
+    final store = FavoriteScope.read(context);
+    final result = HomeApiScope.of(context).searchArtists(keyword);
+    result
+        .then(
+          (artists) => store.refreshArtists([
+            for (final artist in artists) artist.toFavorite(),
+          ]),
+        )
+        .ignore();
+    return result;
   }
 
   void _reloadRecommended() {

@@ -164,6 +164,17 @@ class HomeMetrics {
 
   /// 관련 아티스트 칸 폭. 아바타보다 조금 넓어 이름이 들어간다.
   static const relatedArtistCellWidth = 88.0;
+
+  /// 관련 아티스트 아바타 원 테두리에 걸친 하트. 아바타(68) 지름의 40% 쯤으로
+  /// 잡아 걸쳐 있다는 게 한눈에 보이게 한다. 터치 영역은 아이콘보다 넓게.
+  static const artistFavoriteIconSize = 28.0;
+  static const artistFavoriteButtonSize = 36.0;
+
+  /// 하트 버튼이 아바타 정사각형 밖으로 나가는 거리. 하트 중심이 원 테두리
+  /// (오른쪽 아래 45°, 중심에서 34·24 씩 = 58)에 오도록 잡은 값이다 — 원 안에
+  /// 넣으면 얼굴을 가리고, 밖에 두면 어느 아티스트의 하트인지 흐려진다. 칸이
+  /// 아바타보다 양옆으로 10 넓어 옆 칸을 침범하지 않는다.
+  static const artistFavoriteOverhang = 8.0;
 }
 
 /// 홈 화면 문구. 숫자에서 파생되는 문구는 파생 규칙까지 여기 둔다.

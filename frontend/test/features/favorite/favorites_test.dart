@@ -67,6 +67,22 @@ void main() {
       expect(favorites.artists, isEmpty);
     });
 
+    test('찜한 아티스트의 스냅샷만 최신으로 바뀌고 순서는 그대로다', () {
+      const iuArtist = FavoriteArtist(name: '아이유');
+      const vArtist = FavoriteArtist(name: '뷔');
+      const iuWithPhoto = FavoriteArtist(
+        name: '아이유',
+        profileImageUrl: 'artist/iu.jpg',
+      );
+      const stranger = FavoriteArtist(name: '리센느', profileImageUrl: 'a.jpg');
+
+      final favorites = const Favorites(
+        artists: [vArtist, iuArtist],
+      ).refreshArtists([iuWithPhoto, stranger]);
+
+      expect(favorites.artists, [vArtist, iuWithPhoto]);
+    });
+
     test('공연을 빼도 아티스트는 그대로다', () {
       final favorites = Favorites(
         shows: [iu],
@@ -158,6 +174,10 @@ void main() {
       expect(notified, 1);
 
       await store.removeShow(999);
+      expect(notified, 1);
+
+      // 찜하지 않은 아티스트의 최신 모습은 목록을 바꾸지 않는다.
+      await store.refreshArtists(const [FavoriteArtist(name: '아이유')]);
       expect(notified, 1);
 
       store.dispose();

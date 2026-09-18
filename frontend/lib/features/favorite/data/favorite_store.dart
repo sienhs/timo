@@ -37,6 +37,12 @@ abstract class FavoriteStore extends ChangeNotifier {
   Future<void> removeArtist(String name) =>
       _update(_favorites.removeArtist(name));
 
+  /// 이미 찜한 아티스트의 사진 등을 서버가 준 최신 모습으로 맞춘다. 규칙은
+  /// [Favorites.refreshArtists] 가 정한다. 바뀐 게 없으면 알리지도 저장하지도
+  /// 않는다.
+  Future<void> refreshArtists(Iterable<FavoriteArtist> latest) =>
+      _update(_favorites.refreshArtists(latest));
+
   /// 화면을 먼저 바꾸고 저장은 뒤따른다. 저장이 실패해도 이번 실행 동안의
   /// 화면은 이미 맞고, 다음에 하트를 누를 때 다시 저장되므로 알리지 않는다
   /// — 최근 검색어가 저장 실패를 삼키는 것과 같은 판단이다.

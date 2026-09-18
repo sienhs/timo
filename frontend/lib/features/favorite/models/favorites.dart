@@ -54,6 +54,16 @@ class Favorites {
   Favorites removeArtist(String name) =>
       _withArtists(artists.where((artist) => artist.name != name));
 
+  /// 찜한 아티스트의 스냅샷을 [latest] 의 것으로 바꾼다. 순서는 그대로다.
+  ///
+  /// 찜은 그 순간의 모습을 기기에 남기는 것이라, 서버가 나중에 사진을 붙이거나
+  /// 바꿔도 목록은 옛 모습에 머문다. 검색 결과처럼 서버가 준 최신 모습을 다시
+  /// 만났을 때 여기로 맞춘다. [latest] 에 없는 아티스트는 건드리지 않는다.
+  Favorites refreshArtists(Iterable<FavoriteArtist> latest) {
+    final byName = {for (final artist in latest) artist.name: artist};
+    return _withArtists(artists.map((artist) => byName[artist.name] ?? artist));
+  }
+
   Favorites _withShows(Iterable<FavoriteShow> next) =>
       Favorites(shows: List.unmodifiable(next), artists: artists);
 
