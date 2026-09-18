@@ -211,8 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
           loading: const ArtistSectionSkeleton(),
           builder: (context, artists) => ArtistSection(
             artists: artists,
-            onArtistPressed: (artist) =>
-                _notify(context, HomeStrings.artistNotReady(artist.name)),
+            onArtistPressed: (artist) => _openSearch(context, artist.name),
           ),
         ),
         const SizedBox(height: HomeMetrics.sectionGap),
@@ -271,8 +270,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openSearch(BuildContext context) {
-    Navigator.pushNamed(context, AppRoutes.showSearch);
+  /// 검색 화면으로 보낸다. [keyword] 를 주면 그 말로 검색된 결과에서 시작한다 —
+  /// 아티스트 상세 화면은 따로 두지 않고 검색 결과가 그 자리를 맡는다.
+  void _openSearch(BuildContext context, [String? keyword]) {
+    Navigator.pushNamed(context, AppRoutes.showSearch, arguments: keyword);
   }
 
   /// 공연 상세로 보낸다. 예매 진입은 상세가 맡는다 — 홈에서 좌석 선택으로
