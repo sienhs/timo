@@ -7,12 +7,12 @@ import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../models/listing_detail.dart';
-import '../models/market_hours.dart';
 import '../models/purchased_trade.dart';
 import '../state/resale_api_scope.dart';
 import '../utils/idempotency_key.dart';
 import '../widgets/listing_summary_card.dart';
 import '../widgets/market_countdown.dart';
+import '../widgets/market_hours_countdown.dart';
 import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_bottom_bar.dart';
 import '../widgets/resale_summary_card.dart';
@@ -34,7 +34,7 @@ class ListingPurchaseScreen extends StatefulWidget {
 
   final int listingId;
 
-  /// 지금 시각을 읽는 함수. 가격 유효 시간이 이 값을 본다.
+  /// 기기 시각을 읽는 함수. 가격 유효 시간과 상단 바의 마감 시간이 이 값을 본다.
   final DateTime Function() clock;
 
   @override
@@ -114,32 +114,19 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       showErrorSnackBar(context, e.message);
-      // 거절의 이유가 매물 쪽에 있을 수 있다(그새 팔림·가격 불일치). 다시
-      // 받아 와 화면이 지금 상태를 말하게 한다.
+      // 거절의 이유가 매물 쪽에 있을 수 있다(그새 팔림·가격 불일치·마켓 마감).
+      // 다시 받아 와 화면이 지금 상태를 말하게 한다.
       _reload();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final hours = MarketHours.at(widget.clock());
-
     return Scaffold(
       backgroundColor: resalePageBackground,
       appBar: ResaleAppBar(
         title: ResaleStrings.purchaseTitle,
-        trailing: hours.isOpen
-            ? MarketCountdown(
-                until: hours.nextBoundary,
-                clock: widget.clock,
-                semanticsLabel: ResaleStrings.openRemainingSemantics,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              )
-            : null,
+        trailing: MarketClosingCountdown(clock: widget.clock),
       ),
       body: SafeArea(
         bottom: false,

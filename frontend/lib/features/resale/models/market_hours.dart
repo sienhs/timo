@@ -1,62 +1,104 @@
-import '../constants.dart';
+import '../../../core/utils/formatters.dart';
 
-/// 지금 마켓이 열려 있는지와, 다음 경계까지 남은 시간.
+/// 양도 마켓 운영 상태. 서버 `GET /market/hours` 응답(`MarketHoursResponseDto`)
+/// 한 건이다.
 ///
-/// **서버에 운영 시간 규칙이 없어 앱이 시계로 판정한다**
-/// ([ResaleMetrics.marketOpensAtHour] 주석). 판정을 화면마다 하면 공연 목록은
-/// 열렸다고 보고 매물 목록은 닫혔다고 보는 일이 생기므로 한 곳에 모은다.
+/// **열려 있는지는 서버가 판정한다.** 앱이 기기 시계로 판정하면 시간대가 다른
+/// 기기(UTC 로 도는 에뮬레이터, 해외 기기)에서 오픈 시각이 어긋나고, 기기
+/// 시계를 돌리면 뚫린다. 이 값으로 화면을 잠그는 것은 안내일 뿐이고, 실제
+/// 차단은 등록·가격 수정·구매 요청이 각자 409 로 받는다(백엔드 `MarketApi`
+/// 주석).
 ///
-/// 기준 시각을 인자로 받는다. 안에서 `DateTime.now()` 를 부르면 같은 화면의
-/// 카운트다운과 열림 판정이 미세하게 어긋나고, 테스트가 시각을 고정할 수 없다.
+/// **남은 시간도 서버 시계로 센다.** 응답의 [serverTime] 과 그 응답을 받은
+/// 기기 시각 [receivedAt] 을 함께 들고, 이후 기기 시계가 흐른 만큼을 서버
+/// 시각에 더한다([serverNow]). 기기 시계가 몇 분 틀려 있어도 카운트다운은
+/// 서버가 닫는 순간에 0 이 된다.
+///
+/// [opensAt] · [closesAt] 는 규칙(매일 20:00~23:59:59)이 아니라 구체적인
+/// 일시다. 열려 있으면 이번 창, 닫혀 있으면 다음 창의 시각이라 "닫힘까지" 와
+/// "오픈까지" 를 같은 값([nextBoundary])으로 센다.
 class MarketHours {
-  const MarketHours._(this._now, this._openedAt);
+  const MarketHours({
+    required this.isOpen,
+    required this.serverTime,
+    required this.opensAt,
+    required this.closesAt,
+    required this.receivedAt,
+  });
 
-  /// [now] 시점의 운영 상태.
-  factory MarketHours.at(DateTime now) {
-    final todayOpen = _openOf(now);
-    // 자정을 넘겨 열려 있는 창(예: 20:00 + 6시간)도 있으므로 어제 창까지 본다.
-    final yesterdayOpen = todayOpen.subtract(const Duration(days: 1));
-    for (final openedAt in [todayOpen, yesterdayOpen]) {
-      if (!now.isBefore(openedAt) &&
-          now.isBefore(openedAt.add(ResaleMetrics.marketOpenDuration))) {
-        return MarketHours._(now, openedAt);
-      }
-    }
-    return MarketHours._(now, null);
-  }
+  /// [receivedAt] 은 응답을 받은 기기 시각이다. 서버 응답에는 없는 값이라
+  /// 요청을 보낸 쪽이 넣는다.
+  factory MarketHours.fromJson(
+    Map<String, dynamic> json, {
+    required DateTime receivedAt,
+  }) => MarketHours(
+    isOpen: json['open'] as bool,
+    serverTime: DateTime.parse(json['serverTime'] as String),
+    opensAt: DateTime.parse(json['opensAt'] as String),
+    closesAt: DateTime.parse(json['closesAt'] as String),
+    receivedAt: receivedAt,
+  );
 
-  final DateTime _now;
+  /// 지금 열려 있는가.
+  final bool isOpen;
 
-  /// 지금 열려 있는 창이 열린 시각. 닫혀 있으면 null 이다.
-  final DateTime? _openedAt;
+  /// 서버가 판정에 쓴 시각. 초 단위다.
+  final DateTime serverTime;
 
-  bool get isOpen => _openedAt != null;
+  /// 열려 있으면 이번 창이 열린 시각, 닫혀 있으면 다음에 여는 시각.
+  final DateTime opensAt;
 
-  /// 열려 있으면 닫히는 시각, 닫혀 있으면 다음에 열리는 시각.
+  /// 열려 있으면 이번 창이 닫히는 시각, 닫혀 있으면 다음 창이 닫히는 시각.
+  /// **포함**이다 — 23:59:59 까지는 열려 있다.
+  final DateTime closesAt;
+
+  /// 이 응답을 받은 기기 시각. [serverNow] 의 기준점이다.
+  final DateTime receivedAt;
+
+  /// 카운트다운 대상. 열려 있으면 닫히는 순간, 닫혀 있으면 여는 시각.
   ///
-  /// 열림·닫힘에서 세는 대상이 다를 뿐 화면이 하는 일은 "이 시각까지 남은 시간을
-  /// 보여 준다" 하나라 한 값으로 준다.
-  DateTime get nextBoundary {
-    final openedAt = _openedAt;
-    if (openedAt != null) {
-      return openedAt.add(ResaleMetrics.marketOpenDuration);
-    }
-    final todayOpen = _openOf(_now);
-    return todayOpen.isAfter(_now)
-        ? todayOpen
-        : todayOpen.add(const Duration(days: 1));
-  }
+  /// [closesAt] 은 마지막으로 열려 있는 초라 닫히는 순간은 그 1초 뒤다.
+  /// [closesAt] 까지 세면 23:59:59 에 0 이 되고, 그때 서버에 다시 물으면
+  /// 아직 열려 있다고 답해 화면이 열림 상태에 그대로 머문다.
+  DateTime get nextBoundary => isOpen ? closesAt.add(_closeGrace) : opensAt;
 
-  /// 다음 경계까지 남은 시간. 이미 지났으면 0 이다.
-  Duration get remaining {
-    final left = nextBoundary.difference(_now);
+  static const _closeGrace = Duration(seconds: 1);
+
+  /// 기기 시각 [deviceNow] 를 서버 시계로 옮긴 값.
+  DateTime serverNow(DateTime deviceNow) =>
+      serverTime.add(deviceNow.difference(receivedAt));
+
+  /// 기기 시각 [deviceNow] 에 [nextBoundary] 까지 남은 시간. 지났으면 0 이다.
+  Duration remainingAt(DateTime deviceNow) {
+    final left = nextBoundary.difference(serverNow(deviceNow));
     return left.isNegative ? Duration.zero : left;
   }
 
   /// 여는 시각을 `20:00` 처럼 적는다. 닫힘 화면의 안내 문구가 쓴다.
-  static String get opensAtLabel =>
-      '${ResaleMetrics.marketOpensAtHour.toString().padLeft(2, '0')}:00';
+  String get opensAtLabel => formatClock(opensAt);
 
-  static DateTime _openOf(DateTime day) =>
-      DateTime(day.year, day.month, day.day, ResaleMetrics.marketOpensAtHour);
+  /// [listedAt] 에 등록된 매물이 남에게 처음 보이는 시각. 등록 다음 날의 여는
+  /// 시각이다. 서버 `MarketHoursService.visibleFrom()` 과 같다.
+  ///
+  /// 내 거래 내역 응답에는 이 값이 없어 앱이 등록 시각에서 계산한다. 여는
+  /// 시각의 시:분은 서버가 준 [opensAt] 에서 가져온다 — 규칙을 앱에 박지 않는다.
+  DateTime visibleFrom(DateTime listedAt) => DateTime(
+    listedAt.year,
+    listedAt.month,
+    listedAt.day + 1,
+    opensAt.hour,
+    opensAt.minute,
+    opensAt.second,
+  );
+
+  /// [listedAt] 에 등록된 매물이 기기 시각 [deviceNow] 에 남에게 보이는 상태인가.
+  ///
+  /// 서버는 "오늘 00:00 이전에 등록된 매물" 만 목록에 낸다
+  /// (`MarketHoursService.visibleBefore()`). 마켓이 닫혀 있어 지금 당장 목록이
+  /// 안 열리는 것은 모든 매물에 같이 걸리는 일이라 여기서 보지 않는다 — 이 값은
+  /// "이 매물만 아직 안 올라갔는가" 를 가른다. 오늘은 서버 시계 기준이다.
+  bool isListingVisible(DateTime listedAt, DateTime deviceNow) {
+    final today = serverNow(deviceNow);
+    return listedAt.isBefore(DateTime(today.year, today.month, today.day));
+  }
 }

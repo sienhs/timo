@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../resale/models/market_hours.dart';
 import '../../resale/models/my_trade.dart';
 import '../constants.dart';
 import 'ticket_badge.dart';
@@ -18,6 +19,8 @@ import 'ticket_card_header.dart';
 /// | 상태 | 배지 | 아래쪽 |
 /// | --- | --- | --- |
 /// | 판매중 | `판매중` | 등록가 · 마감, `가격 수정` + `등록 취소` |
+/// | 판매중(마켓 열림) | `판매중` | 등록가 · 마감, `등록 취소` 만 |
+/// | 판매중(아직 안 올라감) | `노출 대기` + 노출 시각 줄 | 위와 같다 |
 /// | 팔림 | `판매 완료` | 등록가, "판매가 완료됐어요" 안내 |
 /// | 내림 | 없음(회색 카드) | 등록가, "등록을 취소했어요" 안내 |
 ///
@@ -31,6 +34,7 @@ class ListingCard extends StatelessWidget {
     required this.now,
     required this.onEditPrice,
     required this.onDelist,
+    this.hours,
   });
 
   /// 내가 올린 매물. [MyTrade.isSale] 인 항목만 온다.
@@ -40,12 +44,31 @@ class ListingCard extends StatelessWidget {
   /// `DateTime.now()` 를 부르면 목록 안에서 마감 기준이 미세하게 갈린다.
   final DateTime now;
 
-  final VoidCallback onEditPrice;
+  /// 마켓 운영 상태. 매물이 아직 남에게 안 보이는지([MarketHours.isListingVisible])
+  /// 와 언제 보이는지([MarketHours.visibleFrom])를 이걸로 안다. 못 받았으면
+  /// null 이라 그냥 `판매중` 으로 그린다 — 모르는 것을 단정하지 않는다.
+  final MarketHours? hours;
+
+  /// 가격 수정을 눌렀을 때. **null 이면 버튼 자체를 뺀다.** 마켓이 열려 있는
+  /// 동안은 거래 중 가격이 고정이라 서버가 수정을 409 로 거절하므로(백엔드
+  /// `MarketApi` 주석), 눌러서 거절당하게 두는 대신 그 시간에는 버튼을 안 낸다.
+  final VoidCallback? onEditPrice;
   final VoidCallback onDelist;
+
+  /// 아직 남에게 안 보이는 매물이면 그 매물이 올라가는 시각. 보이는 매물,
+  /// 팔리는 중이 아닌 매물, 운영 상태를 모를 때는 null 이다.
+  DateTime? get _exposureAt {
+    final hours = this.hours;
+    if (hours == null || trade.status != MyTradeStatus.listed) return null;
+    // 판매 항목의 [MyTrade.occurredAt] 은 등록 시각이다.
+    if (hours.isListingVisible(trade.occurredAt, now)) return null;
+    return hours.visibleFrom(trade.occurredAt);
+  }
 
   @override
   Widget build(BuildContext context) {
     final delisted = trade.status == MyTradeStatus.canceled;
+    final exposureAt = _exposureAt;
 
     return TicketCard(
       child: Column(
@@ -54,7 +77,7 @@ class ListingCard extends StatelessWidget {
             title: trade.concertTitle,
             posterImageUrl: trade.posterImageUrl,
             dimmed: delisted,
-            badge: _badge(),
+            badge: _badge(pending: exposureAt != null),
             infoLines: [
               (
                 icon: Icons.calendar_today_outlined,
@@ -63,6 +86,14 @@ class ListingCard extends StatelessWidget {
                     : formatPerformedAt(trade.startAt!),
               ),
               (icon: Icons.event_seat_outlined, text: trade.seatLabel),
+              // 마켓 목록에 왜 없는지, 언제 생기는지. 안 올라간 매물에만 붙는다.
+              if (exposureAt != null)
+                (
+                  icon: Icons.storefront_outlined,
+                  text: TicketStrings.exposureAt(
+                    formatMonthDayClock(exposureAt),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: TicketMetrics.cardPadding),
@@ -75,9 +106,12 @@ class ListingCard extends StatelessWidget {
   }
 
   /// 내린 매물에는 배지를 안 붙인다. 회색 카드와 아래 안내가 이미 말해 준다.
-  Widget? _badge() => switch (trade.status) {
-    MyTradeStatus.listed => const TicketBadge(
-      label: TicketStrings.listingBadge,
+  /// 팔리는 중이어도 아직 안 올라간 매물([pending])은 `판매중` 대신 `노출 대기` 다.
+  Widget? _badge({required bool pending}) => switch (trade.status) {
+    MyTradeStatus.listed => TicketBadge(
+      label: pending
+          ? TicketStrings.pendingExposureBadge
+          : TicketStrings.listingBadge,
     ),
     MyTradeStatus.sold => const TicketBadge(label: TicketStrings.soldBadge),
     _ => null,
@@ -86,14 +120,16 @@ class ListingCard extends StatelessWidget {
   Widget _footer() => switch (trade.status) {
     MyTradeStatus.listed => Row(
       children: [
-        Expanded(
-          child: TicketCardButton(
-            label: TicketStrings.editPrice,
-            onPressed: onEditPrice,
-            filled: true,
+        if (onEditPrice case final onEditPrice?) ...[
+          Expanded(
+            child: TicketCardButton(
+              label: TicketStrings.editPrice,
+              onPressed: onEditPrice,
+              filled: true,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
         Expanded(
           child: TicketCardButton(
             label: TicketStrings.delist,
