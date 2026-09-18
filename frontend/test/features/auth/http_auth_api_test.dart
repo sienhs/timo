@@ -70,6 +70,30 @@ void main() {
         ),
       );
     });
+
+    test('이미 가입된 번호(409)도 서버 문구를 담은 예외로 던진다', () async {
+      final api = build(
+        (_) => problemResponse(
+          status: 409,
+          errorMessage: '이미 가입된 전화번호입니다.',
+          exception: 'PhoneNumberDuplicatedException',
+        ),
+      );
+
+      await expectLater(
+        api.requestVerificationCode('01012345678'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 409)
+              .having((e) => e.message, 'message', '이미 가입된 전화번호입니다.')
+              .having(
+                (e) => e.exceptionName,
+                'exceptionName',
+                AuthServerErrors.phoneNumberDuplicated,
+              ),
+        ),
+      );
+    });
   });
 
   group('인증하기', () {

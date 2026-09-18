@@ -382,6 +382,14 @@ void main() {
     /// 서버에 닿지 못한 실패. 상태 코드가 없다.
     const networkError = ApiException('인터넷 연결을 확인해주세요.');
 
+    /// 이미 가입된 번호로 인증번호를 받으려 할 때 오는 응답. 문구는 백엔드
+    /// SignupErrorCode.PHONE_NUMBER_DUPLICATED 의 것이다.
+    const phoneTaken = ApiException(
+      '이미 가입된 전화번호입니다.',
+      status: 409,
+      exceptionName: AuthServerErrors.phoneNumberDuplicated,
+    );
+
     Finder snackBarText(String message) => find.descendant(
       of: find.byType(SnackBar),
       matching: find.text(message),
@@ -408,6 +416,90 @@ void main() {
       expect(snackBarText(AuthStrings.sendLimitExceeded), findsOneWidget);
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
       expect(nextEnabled(tester), isTrue);
+    });
+
+    testWidgets('전화번호: 이미 가입된 번호(409)는 칸 아래 문구로 알린다', (tester) async {
+      final api = _TakenPhoneApi(
+        takenPhoneNumber: '01012345678',
+        error: phoneTaken,
+      );
+      await pumpScreen(tester, SignupPhoneScreen(api: api));
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+
+      await tester.tap(nextButton());
+      await settle(tester);
+
+      // 번호 칸을 고쳐야 풀리는 문제라 스낵바가 아니라 칸 아래 문구다.
+      expect(find.text(phoneTaken.message), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(AuthStrings.goToLogin), findsOneWidget);
+      // 문자를 보내지 않았으니 인증번호 칸도 열리지 않는다.
+      expect(find.text(AuthStrings.codeLabel), findsNothing);
+      expect(nextEnabled(tester), isFalse);
+    });
+
+    testWidgets('전화번호: 거절당한 번호는 고치면 풀리고 도로 넣으면 묻지 않는다', (tester) async {
+      final api = _TakenPhoneApi(
+        takenPhoneNumber: '01012345678',
+        error: phoneTaken,
+      );
+      await pumpScreen(tester, SignupPhoneScreen(api: api));
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+      await tester.tap(nextButton());
+      await settle(tester);
+      expect(find.text(phoneTaken.message), findsOneWidget);
+
+      await tester.enterText(fields.at(1), '01099998888');
+      await tester.pump();
+      expect(find.text(phoneTaken.message), findsNothing);
+      expect(nextEnabled(tester), isTrue);
+
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+      expect(find.text(phoneTaken.message), findsOneWidget);
+      expect(nextEnabled(tester), isFalse);
+      // 다시 물어봐야 서버는 쿨다운에 걸린 429 를 줄 뿐이라 묻지 않는다.
+      expect(api.sentTo, ['01012345678']);
+    });
+
+    testWidgets('전화번호: 로그인하러 가기를 누르면 로그인 화면으로 돌아간다', (tester) async {
+      usePhoneSize(tester);
+      final api = _TakenPhoneApi(
+        takenPhoneNumber: '01012345678',
+        error: phoneTaken,
+      );
+      // 실제 앱처럼 로그인 화면 위에 가입 화면이 올라간 스택을 만든다.
+      await tester.pumpWidget(
+        AuthApiScope(
+          api: api,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: LoginScreen(api: api),
+            routes: signupRoutes,
+          ),
+        ),
+      );
+      await tester.tap(find.text(AuthStrings.signup));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '홍길동');
+      await tester.enterText(fields.at(1), '01012345678');
+      await tester.pump();
+      await tester.tap(nextButton());
+      await settle(tester);
+
+      await tester.tap(find.text(AuthStrings.goToLogin));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(SignupPhoneScreen, skipOffstage: false), findsNothing);
     });
 
     testWidgets('인증 시도 초과 안내는 재전송 전까지 유지되고 인증을 잠근다', (tester) async {
@@ -766,6 +858,28 @@ class _FailingAuthApi extends MockAuthApi {
   Future<AuthTokens> signUp(SignupDraft draft) async {
     if (onSignUp != null) throw onSignUp!;
     return super.signUp(draft);
+  }
+}
+
+/// 정해 둔 한 번호만 "이미 가입된 번호" 로 거절하는 목.
+///
+/// 발송을 요청받은 번호를 순서대로 적어 두어, 화면이 거절당한 번호로 다시
+/// 요청하지는 않는지 볼 수 있다.
+class _TakenPhoneApi extends MockAuthApi {
+  _TakenPhoneApi({required this.takenPhoneNumber, required this.error})
+    : super(latency: Duration.zero);
+
+  final String takenPhoneNumber;
+  final ApiException error;
+
+  /// 화면이 걸러 낸 요청은 여기 쌓이지 않는다.
+  final sentTo = <String>[];
+
+  @override
+  Future<Duration> requestVerificationCode(String phoneNumber) async {
+    sentTo.add(phoneNumber);
+    if (phoneNumber == takenPhoneNumber) throw error;
+    return super.requestVerificationCode(phoneNumber);
   }
 }
 
