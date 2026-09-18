@@ -235,9 +235,6 @@ class HomeStrings {
   static String moreNotReady(String sectionTitle) =>
       '$sectionTitle 목록은 준비 중이에요.';
 
-  /// 아티스트 상세도 아직 없다.
-  static String artistNotReady(String name) => '$name 화면은 준비 중이에요.';
-
   /// 순위 뱃지. (예: `1위`)
   static String rank(int rank) => '$rank위';
 

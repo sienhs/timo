@@ -316,14 +316,16 @@ void main() {
     });
   });
 
-  testWidgets('아티스트를 누르면 준비 중 안내가 뜬다', (tester) async {
+  testWidgets('아티스트를 누르면 그 이름으로 검색된 화면이 열린다', (tester) async {
     await pumpHome(tester);
 
     await scrollTo(tester, find.text('옥주현'));
     await tester.tap(find.text('옥주현'));
     await tester.pumpAndSettle();
 
-    expect(find.text(HomeStrings.artistNotReady('옥주현')), findsOneWidget);
+    expect(find.byType(ShowSearchScreen), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, '옥주현');
   });
 
   testWidgets('목록 화면이 없는 더보기를 누르면 준비 중 안내가 뜬다', (tester) async {
