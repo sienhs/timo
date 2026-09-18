@@ -235,6 +235,7 @@ resource "aws_instance" "this" {
 
               docker run -d --name timo-backend --restart unless-stopped \
                 --env-file /etc/timo/backend.env \
+                --volume /etc/timo/firebase-service-account.json:/etc/timo/firebase-service-account.json:ro \
                 --publish ${var.app_port}:${var.app_port} \
                 --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
                 "$image" >/dev/null
