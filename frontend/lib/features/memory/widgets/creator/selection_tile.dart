@@ -22,7 +22,7 @@ class SelectionTile extends StatefulWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Grey "+" style tile (gallery picker).
+  /// Grey "+" style tile (photo source picker).
   final bool muted;
   @override
   State<SelectionTile> createState() => _SelectionTileState();

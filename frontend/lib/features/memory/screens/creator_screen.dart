@@ -9,6 +9,7 @@ import '../widgets/creator/concert_card.dart';
 import '../widgets/creator/processing_orbit.dart';
 import '../widgets/creator/processing_stage.dart';
 import '../widgets/creator/photo_frame.dart';
+import '../widgets/creator/photo_source_sheet.dart';
 import '../widgets/creator/person_placement_editor.dart';
 import '../widgets/creator/selection_tile.dart';
 import '../widgets/creator/step_progress.dart';
@@ -102,21 +103,42 @@ class _CreatorScreenState extends State<CreatorScreen> {
     }
   }
 
+  /// 갤러리·카메라에서 사진 하나를 받아 경로를 돌려준다. 취소면 null.
+  ///
+  /// 실패 안내는 출처별로 다르다 — 갤러리는 사진 접근 권한, 카메라는 카메라
+  /// 권한이나 카메라가 없는 기기 문제라 같은 문장으로 묶으면 무엇을 고쳐야
+  /// 하는지 알 수 없다.
+  Future<String?> pickPhoto(PhotoSource from) async {
+    try {
+      final picked = await picker.pickImage(
+        source: switch (from) {
+          PhotoSource.gallery => ImageSource.gallery,
+          PhotoSource.camera => ImageSource.camera,
+        },
+        maxWidth: 2000,
+        maxHeight: 2000,
+      );
+      return picked?.path;
+    } catch (_) {
+      if (mounted) {
+        OverlayService.notify(
+          context,
+          switch (from) {
+            PhotoSource.gallery => CreatorText.permissionFailed,
+            PhotoSource.camera => CreatorText.cameraFailed,
+          },
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> selectPhotoAndProcess({String? asset}) async {
     String? source = asset;
     if (source == null) {
-      try {
-        source = (await picker.pickImage(
-          source: ImageSource.gallery,
-          maxWidth: 2000,
-          maxHeight: 2000,
-        ))?.path;
-      } catch (_) {
-        if (mounted) {
-          OverlayService.notify(context, CreatorText.permissionFailed);
-        }
-        return;
-      }
+      final from = await showPhotoSourceSheet(context);
+      if (from == null || !mounted) return;
+      source = await pickPhoto(from);
     }
     if (source == null || !mounted) return;
     setState(() {
@@ -267,7 +289,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
               index: assets.length,
               scaleFrom: 0.94,
               child: SelectionTile(
-                label: CreatorText.galleryLabel,
+                label: CreatorText.addPhotoLabel,
                 selected: false,
                 muted: true,
                 onTap: () => selectPhotoAndProcess(),

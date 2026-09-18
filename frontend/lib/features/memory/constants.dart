@@ -98,7 +98,12 @@ class CreatorText {
   static const stageLabel = '데모 무대';
   static const illustrationLabel = '데모 일러스트';
   static const analysisSampleLabel = '분석 테스트 사진';
+  static const addPhotoLabel = '사진 추가';
+
+  /// 사진 출처 시트. "+" 타일은 갤러리와 카메라 둘 중 하나를 고르게 한다.
+  static const photoSourceTitle = '사진을 어디서 가져올까요?';
   static const galleryLabel = '갤러리에서 선택';
+  static const cameraLabel = '카메라로 촬영';
   static const backgrounds = [
     'assets/demo/stage_blue.png',
     'assets/demo/stage_gold.png',
@@ -137,6 +142,7 @@ class CreatorText {
   static const saveFailed = '소장품을 저장하지 못했어요. 다시 시도해주세요.';
   static const photoFailed = '사진 처리에 실패했어요. 다시 선택해주세요.';
   static const permissionFailed = '사진 접근 권한을 확인한 뒤 다시 선택해주세요.';
+  static const cameraFailed = '카메라를 열 수 없어요. 카메라 권한을 확인한 뒤 다시 시도해주세요.';
   static const lostPhoto = '사진 선택 중 앱이 다시 시작됐어요. 제작 단계에서 사진을 다시 선택해주세요.';
 }
 
