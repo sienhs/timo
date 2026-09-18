@@ -1,0 +1,92 @@
+###############################################################################
+# 취소 좌석의 랜덤 해제 (S15P21D206-347)
+#
+# 취소된 좌석은 곧바로 열리지 않는다. 취소 시점에 3분 1초에서 15분 사이의 해제 시각이
+# 정해지고, 그때까지는 선점과 똑같이 HELD 로 보이며 아무도 잡을 수 없다.
+#
+# 해제 시각은 어떤 응답에도 실리지 않는다. 내려 주면 그 순간을 겨냥해 대기할 수 있어
+# 랜덤으로 둔 의미가 없어진다. 그래서 이 파일도 "언제 열리는지" 를 확인하지 않고
+# "지금 열려 있는지" 만 본다.
+#
+# 준비: release-fixture.sql 을 먼저 돌린다. 실제 취소 API 는 온체인 회수와 환불을 불러
+# 지갑 없는 로컬 시드 계정으로는 500 이 나기 때문이다.
+#
+#   docker exec -i timo-mysql mysql -utimo -ptimo1234 timo < release-fixture.sql
+#
+# 그 출력의 concert_id, seat_id, section_id 를 아래 1번 요청의 변수에 넣는다.
+#
+# 환경 변수는 프로젝트 루트의 http-client.env.json 에 있는 local 을 쓴다.
+###############################################################################
+
+### 1. 픽스처가 알려준 값을 넣는다
+GET {{baseUrl}}/actuator/health
+
+> {%
+    client.test("애플리케이션이 살아 있다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+
+    // release-fixture.sql 출력의 값으로 바꾼다.
+    client.global.set("releaseConcertId", "1");
+    client.global.set("releaseSectionId", "1");
+    client.global.set("releaseSeatId", "1");
+%}
+
+### 2. 로그인 - 그 공연에 티켓이 없는 계정이어야 선점까지 갈 수 있다
+POST {{baseUrl}}/api/v1/auth/login
+X-Device-Id: 33333333-3333-3333-3333-333333333333
+Content-Type: application/json
+
+{
+  "username": "seed111",
+  "password": "timo1234!"
+}
+
+> {%
+    client.test("로그인된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+    client.global.set("releaseToken", response.body.accessToken);
+%}
+
+### 3. 해제 전 좌석표 - 취소된 자리가 선점과 똑같이 HELD 로 보인다
+GET {{baseUrl}}/api/v1/seats?sectionId={{releaseSectionId}}&concertId={{releaseConcertId}}
+Authorization: Bearer {{releaseToken}}
+
+> {%
+    client.test("해제 대기 중인 자리는 HELD 다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        var target = response.body.seats.find(function (seat) {
+            return String(seat.id) === client.global.get("releaseSeatId");
+        });
+        client.assert(target !== undefined, "픽스처가 알려준 좌석이 이 구역에 없다");
+        client.assert(target.status === "HELD", "status: " + target.status);
+    });
+
+    client.test("응답에 해제 시각이 들어 있지 않다", function () {
+        var body = JSON.stringify(response.body);
+        client.assert(body.indexOf("releaseAt") === -1, "해제 시각이 새어 나온다");
+        client.assert(body.indexOf("seatReleaseAt") === -1, "해제 시각이 새어 나온다");
+    });
+%}
+
+### 4. 해제 전 선점 시도 - 409. 화면에서 잠긴 자리는 API 로도 잠겨 있어야 한다
+POST {{baseUrl}}/api/v1/seats/{{releaseSeatId}}/hold?concertId={{releaseConcertId}}
+Authorization: Bearer {{releaseToken}}
+
+> {%
+    client.test("409 SeatNotHoldableException", function () {
+        client.assert(response.status === 409, "status: " + response.status);
+        client.assert(response.body.exception === "SeatNotHoldableException", "exception: " + response.body.exception);
+    });
+%}
+
+###############################################################################
+# 여기서 해제 시각을 과거로 당긴 뒤 3번과 4번을 다시 돌린다.
+#
+#   docker exec timo-mysql mysql -utimo -ptimo1234 timo -e \
+#     "UPDATE reservation SET seat_release_at = NOW(6) - INTERVAL 1 SECOND \
+#      WHERE seat_id = <releaseSeatId> AND status = 'CANCELLED';"
+#
+# 3번은 AVAILABLE, 4번은 200 이 되어야 한다.
+###############################################################################

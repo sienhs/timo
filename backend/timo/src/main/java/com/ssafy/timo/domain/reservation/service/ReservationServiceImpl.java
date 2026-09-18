@@ -8,7 +8,6 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
-import com.ssafy.timo.domain.offer.service.CancelOfferService;
 import com.ssafy.timo.domain.reservation.dto.CreateReservationRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationDetailResponseDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationListRequestDto;
@@ -33,11 +32,13 @@ import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.global.storage.ImageStorage;
 import java.math.BigInteger;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,6 +66,15 @@ public class ReservationServiceImpl implements ReservationService {
 
     private static final int CANCELLATION_CUTOFF_HOURS = 24;
 
+    /**
+     * 취소된 자리를 다시 열기까지의 지연. 3분에 1~720초를 더해 3분 1초에서 15분 사이에 풀린다.
+     *
+     * <p>고정값이 아닌 이유는 풀리는 순간을 겨냥해 대기하는 것을 막기 위해서다. 그래서 이 값은
+     * 어떤 응답에도 싣지 않는다 - 내려 주는 순간 랜덤으로 둔 의미가 없어진다.
+     */
+    private static final Duration RELEASE_BASE_DELAY = Duration.ofMinutes(3);
+    private static final int RELEASE_JITTER_SECONDS = 720;
+
     private final MemberRepository memberRepository;
     private final ConcertRepository concertRepository;
     private final SeatHoldRepository seatHoldRepository;
@@ -72,12 +82,12 @@ public class ReservationServiceImpl implements ReservationService {
     private final TicketRepository ticketRepository;
     private final TicketTradeRepository ticketTradeRepository;
     private final TicketListingRepository ticketListingRepository;
-    private final CancelOfferService cancelOfferService;
     private final WalletService walletService;
     private final TicketVaultClient ticketVaultClient;
     private final TicketNftClient ticketNftClient;
     private final ImageStorage imageStorage;
     private final ApplicationEventPublisher eventPublisher;
+    private final RandomGenerator random;
     private final Clock clock;
 
     @Override
@@ -121,9 +131,6 @@ public class ReservationServiceImpl implements ReservationService {
         Ticket ticket = ticketRepository.save(Ticket.builder()
                 .reservation(reservation)
                 .build());
-
-        // 취소표 구매 기회를 쓴 결제면 기회를 닫는다. 기한이 지난 뒤의 결제는 영향 행 0 이라 일반 예매다.
-        cancelOfferService.acceptIfActive(concertId, seatId, memberId, reservation.getId());
 
         eventPublisher.publishEvent(new ReservationCreatedEvent(reservation.getId()));
 
@@ -185,17 +192,19 @@ public class ReservationServiceImpl implements ReservationService {
      * 예매를 취소한다. 발행이 끝난 티켓이 정상 소유({@link TicketStatus#OWNED}) 상태일 때만, 공연
      * 시작 24시간 전까지만 성립한다.
      *
-     * <p>좌석을 별도로 "풀어" 주지 않는다 - {@code SeatStatus}는 {@code reservation.status}에서
-     * 유도되므로, {@link Reservation#cancel}이 곧 좌석 반환이다.
+     * <p>좌석을 별도로 "풀어" 주지 않는다 - {@code SeatStatus}는 이 주문 행에서 유도되므로
+     * {@link Reservation#cancel}이 곧 좌석 반환이다. 다만 즉시가 아니라 해제 시각부터다.
      *
      * <p><b>양도된 티켓은 취소하지 못한다.</b> 체결은 예매 행도 {@code ticket.status} 도 바꾸지 않아
      * 여기 검사만으로는 판 사람이 그대로 통과한다 — 그러면 산 사람의 티켓이 회수되고 환불은 판 사람이
      * 받는다. 등록 중인 티켓도 막는다. 회수된 티켓이 매물로 남으면 그걸 사는 사람이 생긴다.
      * 두 검사는 온체인 호출보다 앞에 둔다.
      *
-     * <p>회수한 자리는 곧바로 취소표가 된다. 이 공연을 찜한 회원 중 한 명을 뽑아 1시간 구매 기회를
-     * 주고({@link CancelOfferService#offerRevokedSeat}), 뽑을 사람이 없거나 기한이 지나면 자리는 누구나
-     * 예매할 수 있게 열린다. 추첨은 같은 트랜잭션이라 취소가 롤백되면 기회도 함께 사라진다.
+     * <p>회수한 자리는 <b>즉시 열리지 않는다.</b> 취소 시점에 3분 1초에서 15분 사이의 해제 시각을
+     * 뽑아 두고, 그때까지는 누구도 잡을 수 없다. 풀리는 순간을 겨냥해 대기하는 것을 막으려는 것이라
+     * 이 시각은 어떤 응답에도 싣지 않는다.
+     *
+     * <p>취소 자체는 이 트랜잭션에서 끝난다. 사용자는 지연과 무관하게 즉시 취소 완료 응답을 받는다.
      */
     @Override
     public ReservationDetailResponseDto cancel(Long memberId, Long reservationId) {
@@ -230,11 +239,15 @@ public class ReservationServiceImpl implements ReservationService {
         ticketVaultClient.refund(buyerAddress, organizerAddress, price, ContractClient.keccak256(refundRefId(reservation)));
 
         ticket.revoke();
-        reservation.cancel(now);
+        reservation.cancel(now, now.plus(RELEASE_BASE_DELAY).plusSeconds(releaseJitterSeconds()));
 
-        cancelOfferService.offerRevokedSeat(concert.getId(), reservation.getSeat().getId(), reservationId, memberId);
-
+        // 응답은 취소 전과 같다. 해제 시각은 여기서 정해지지만 밖으로 내보내지 않는다.
         return ReservationDetailResponseDto.from(reservation, ticket, imageStorage);
+    }
+
+    /** 1 이상 720 이하. 0 을 빼는 이유는 지연 하한을 3분 1초로 두기 위해서다. */
+    private int releaseJitterSeconds() {
+        return random.nextInt(RELEASE_JITTER_SECONDS) + 1;
     }
 
     static String refundRefId(Reservation reservation) {

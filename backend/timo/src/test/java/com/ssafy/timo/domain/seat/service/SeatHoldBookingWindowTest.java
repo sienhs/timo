@@ -8,7 +8,6 @@ import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.exception.BookingClosedException;
 import com.ssafy.timo.domain.reservation.exception.BookingNotOpenException;
-import com.ssafy.timo.domain.offer.repository.CancelOfferRepository;
 import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
 import com.ssafy.timo.domain.reservation.exception.ReservationErrorCode;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
@@ -69,8 +68,6 @@ class SeatHoldBookingWindowTest {
     @Mock
     private ReservationRepository reservationRepository;
 
-    @Mock
-    private CancelOfferRepository cancelOfferRepository;
     @Mock
     private VenueRepository venueRepository;
     @Mock
@@ -152,7 +149,7 @@ class SeatHoldBookingWindowTest {
 
     private SeatServiceImpl serviceAt(LocalDateTime now) {
         return new SeatServiceImpl(sectionRepository, seatRepository, seatHoldRepository, reservationRepository,
-                cancelOfferRepository, venueRepository, concertRepository, memberRepository,
+                venueRepository, concertRepository, memberRepository,
                 Clock.fixed(now.atZone(ZONE).toInstant(), ZONE));
     }
 

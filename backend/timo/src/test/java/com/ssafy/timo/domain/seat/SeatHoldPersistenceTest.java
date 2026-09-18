@@ -182,7 +182,7 @@ class SeatHoldPersistenceTest {
         Reservation first = reservationRepository.save(reservation(concertA, seatOne, me));
         em.flush();
 
-        first.cancel(LocalDateTime.now());
+        first.cancel(LocalDateTime.now(), LocalDateTime.now());
         em.flush();
 
         assertThatCode(() -> {

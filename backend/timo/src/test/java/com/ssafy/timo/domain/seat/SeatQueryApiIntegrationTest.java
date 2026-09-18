@@ -152,19 +152,32 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소된 적이 있는 좌석은 열린 구매 기회가 없으면 잔여석에 든다")
-    void findSections_countsRevokedSeatsWithoutOfferAsAvailable() throws Exception {
+    @DisplayName("해제 시각이 지난 취소 좌석은 잔여석에 든다")
+    void findSections_countsReleasedSeatsAsAvailable() throws Exception {
         Section section = saveSection("1층 A블록", 150000, 3, 2);
-        revokeFirstSeats(section, 2);
+        revokeFirstSeats(section, 2, LocalDateTime.now().minusSeconds(1));
         flushAndClear();
 
-        // 취소표는 찜한 회원의 1시간 기회가 끝나면(혹은 없으면) 그냥 빈 자리다. 기회가 열린 동안
-        // 잔여석에서 빠지는 것은 CancelOfferFlowIntegrationTest 가 본다.
+        // 해제 시각이 지나면 그냥 빈 자리다. 지나기 전에 빠지는 것은 아래 테스트가 본다.
         mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[0].seatCount").value(6))
                 .andExpect(jsonPath("$.sections[0].availableCount").value(6))
                 .andExpect(jsonPath("$.totalAvailableCount").value(6));
+    }
+
+    @Test
+    @DisplayName("해제 시각 전인 취소 좌석은 잔여석에서 빠진다")
+    void findSections_excludesSeatsAwaitingRelease() throws Exception {
+        Section section = saveSection("1층 A블록", 150000, 3, 2);
+        revokeFirstSeats(section, 2, LocalDateTime.now().plusMinutes(10));
+        flushAndClear();
+
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(concertId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[0].seatCount").value(6))
+                .andExpect(jsonPath("$.sections[0].availableCount").value(4))
+                .andExpect(jsonPath("$.totalAvailableCount").value(4));
     }
 
     @Test
@@ -294,18 +307,34 @@ class SeatQueryApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소된 적이 있는 자리는 열린 구매 기회가 없으면 예매 가능으로 보인다")
-    void findSeats_showsCancelledSeatAsAvailableWithoutOffer() throws Exception {
+    @DisplayName("해제 시각이 지난 취소 자리는 예매 가능으로 보인다")
+    void findSeats_showsCancelledSeatAsAvailableAfterRelease() throws Exception {
         Section section = saveSection("1층 A블록", 150000, 2, 2);
-        revokeFirstSeats(section, 1);
+        revokeFirstSeats(section, 1, LocalDateTime.now().minusSeconds(1));
         flushAndClear();
 
-        // 회수 상태는 따로 없다. 기회가 열린 동안은 HELD, 끝나면 AVAILABLE 이다.
+        // 회수 상태는 따로 없다. 해제 전에는 HELD, 지나면 AVAILABLE 이다.
         mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seatCount").value(4))
                 .andExpect(jsonPath("$.availableCount").value(4))
                 .andExpect(jsonPath("$.seats[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.seats[1].status").value("AVAILABLE"));
+    }
+
+    @Test
+    @DisplayName("해제 시각 전인 취소 자리는 선점과 똑같이 HELD 로 보이고 잔여석에서 빠진다")
+    void findSeats_showsCancelledSeatAsHeldBeforeRelease() throws Exception {
+        Section section = saveSection("1층 A블록", 150000, 2, 2);
+        revokeFirstSeats(section, 1, LocalDateTime.now().plusMinutes(10));
+        flushAndClear();
+
+        // 선점과 구분되는 표시를 주면 곧 풀릴 자리가 어디인지 그대로 드러난다.
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", String.valueOf(section.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.seatCount").value(4))
+                .andExpect(jsonPath("$.availableCount").value(3))
+                .andExpect(jsonPath("$.seats[0].status").value("HELD"))
                 .andExpect(jsonPath("$.seats[1].status").value("AVAILABLE"));
     }
 
@@ -440,7 +469,7 @@ class SeatQueryApiIntegrationTest {
      * 만들고 바로 취소한다. 결제 확정 → 취소 흐름 전체가 아니라 "취소된 행이 있으면 어떻게
      * 보이는가" 만 보는 테스트라 이 정도로 충분하다.
      */
-    private void revokeFirstSeats(Section section, int count) {
+    private void revokeFirstSeats(Section section, int count, LocalDateTime seatReleaseAt) {
         List<Seat> seats = seatRepository
                 .findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId())
                 .subList(0, count);
@@ -458,7 +487,7 @@ class SeatQueryApiIntegrationTest {
                     .member(buyer)
                     .seat(seats.get(i))
                     .build());
-            reservation.cancel(LocalDateTime.now());
+            reservation.cancel(LocalDateTime.now(), seatReleaseAt);
         }
     }
 

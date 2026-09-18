@@ -38,17 +38,17 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
      * <p>선점 쪽 조인에 {@code expiresAt > :now} 를 건다. 만료된 선점은 아직 {@code HELD} 로 남아
      * 있어도 자리를 붙들지 않으므로 좌석표에서는 빈 자리로 보여야 한다.
      *
-     * <p>취소표 구매 기회는 스칼라 서브쿼리로 본다. 열린 기회는 좌석당 하나뿐이지만
-     * ({@code uk_offer_seat_active}) 집계로 받아 두면 제약이 흔들려도 행이 중복되지 않는다.
+     * <p>해제 대기 중인 취소 주문은 스칼라 서브쿼리로 본다. 같은 자리에 취소가 여러 번 쌓일 수
+     * 있어 집계로 받는다 - 조인으로 붙이면 좌석 행이 취소 횟수만큼 늘어난다.
      */
     @Query("""
             select new com.ssafy.timo.domain.seat.repository.SeatWithStatus(
                        s.id, s.seatNo, s.seatCol, h.id, r.id,
-                       (select max(o.id) from CancelOffer o
-                        where o.seat = s
-                          and o.concert.id = :concertId
-                          and o.status = com.ssafy.timo.domain.offer.entity.OfferStatus.OFFERED
-                          and o.expiresAt > :now))
+                       (select max(rc.id) from Reservation rc
+                        where rc.seat = s
+                          and rc.concert.id = :concertId
+                          and rc.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.CANCELLED
+                          and rc.seatReleaseAt > :now))
             from Seat s
             left join SeatHold h
                    on h.seat = s
@@ -76,8 +76,8 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
      * <p>예매 가능 좌석이 하나도 없는 구역은 결과에 포함되지 않는다. 읽는 쪽에서 0 으로 채운다 —
      * 빠뜨리면 매진 구역이 목록에서 사라진다.
      *
-     * <p>취소표 구매 기회가 열린 자리도 뺀다. 당첨자 한 사람 몫이라 잔여석이 아니다. 기회가 끝나면
-     * 조건에서 빠져 저절로 잔여석으로 돌아온다.
+     * <p>취소됐지만 해제 시각이 아직 오지 않은 자리도 뺀다. 지금 살 수 없으니 잔여석이 아니다.
+     * 시각이 지나면 조건에서 빠져 저절로 잔여석으로 돌아온다.
      */
     @Query("""
             select new com.ssafy.timo.domain.seat.repository.SectionAvailableCount(
@@ -96,11 +96,11 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
                       and r.concert.id = :concertId
                       and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID)
               and not exists (
-                    select 1 from CancelOffer o
-                    where o.seat = s
-                      and o.concert.id = :concertId
-                      and o.status = com.ssafy.timo.domain.offer.entity.OfferStatus.OFFERED
-                      and o.expiresAt > :now)
+                    select 1 from Reservation rc
+                    where rc.seat = s
+                      and rc.concert.id = :concertId
+                      and rc.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.CANCELLED
+                      and rc.seatReleaseAt > :now)
             group by s.section.id
             """)
     List<SectionAvailableCount> countAvailableGroupedBySection(
@@ -130,11 +130,11 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
                       and r.concert.id = :concertId
                       and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID)
               and not exists (
-                    select 1 from CancelOffer o
-                    where o.seat = s
-                      and o.concert.id = :concertId
-                      and o.status = com.ssafy.timo.domain.offer.entity.OfferStatus.OFFERED
-                      and o.expiresAt > :now)
+                    select 1 from Reservation rc
+                    where rc.seat = s
+                      and rc.concert.id = :concertId
+                      and rc.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.CANCELLED
+                      and rc.seatReleaseAt > :now)
             """)
     long countAvailable(@Param("concertId") Long concertId, @Param("now") LocalDateTime now);
 }
