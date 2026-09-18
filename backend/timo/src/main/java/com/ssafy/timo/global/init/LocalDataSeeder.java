@@ -110,7 +110,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-@Profile({"local", "demo"})
+@Profile({"local", "demo" , "prod"})
 @RequiredArgsConstructor
 public class LocalDataSeeder implements ApplicationRunner {
 
