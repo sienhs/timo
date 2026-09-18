@@ -42,7 +42,7 @@ void main() {
     'venueId': 1,
     'venueName': '고척돔',
     'artists': [
-      {'id': 1, 'name': '김필', 'profileImage': 'artist/artist_kim_feel.jpg'},
+      {'id': 1, 'name': '김필', 'profileImageUrl': 'artist/artist_kim_feel.jpg'},
     ],
     'sectionPrices': [
       {'sectionId': 1, 'sectionName': '1층 A블록', 'price': 150000},
