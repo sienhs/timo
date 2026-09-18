@@ -1,0 +1,85 @@
+###############################################################################
+# 회원가입 인증 - 성공 흐름
+#
+# auth-common.http 를 먼저 실행해 {{newPhone}}, {{newUsername}}, {{newNickname}},
+# {{deviceId}} 를 채워 둬야 한다.
+#
+# 2번 요청 전에 손이 한 번 들어간다. 콘솔의 "[SMS NOT SENT] ... code=NNNNNN" 에서
+# 여섯 자리를 읽어 아래 smsCode 자리에 직접 넣는다.
+#
+# 한 번 끝까지 돌면 그 번호와 아이디는 가입된 상태가 된다. 다시 돌리려면
+# auth-common.http 의 번호와 아이디를 바꾼다.
+###############################################################################
+
+### 1. 인증번호 발송 - 가입되지 않은 번호
+POST {{baseUrl}}/api/v1/auth/sms/send
+Content-Type: application/json
+
+{
+  "phoneNumber": "{{newPhone}}"
+}
+
+> {%
+    client.test("200 과 유효시간이 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.expiresInSeconds === 180, "expiresInSeconds: " + response.body.expiresInSeconds);
+    });
+    client.log("콘솔에서 [SMS NOT SENT] 줄의 code 를 읽어 다음 요청에 넣는다");
+%}
+
+### 2. 인증번호 검증 - code 는 콘솔에서 읽어 직접 바꾼다
+POST {{baseUrl}}/api/v1/auth/sms/verify
+Content-Type: application/json
+
+{
+  "phoneNumber": "{{newPhone}}",
+  "code": "000000"
+}
+
+> {%
+    client.test("검증에 통과하면 티켓이 온다", function () {
+        client.assert(response.status === 200, "status: " + response.status + " - code 를 콘솔 값으로 바꿨는지 확인한다");
+        client.assert(response.body.verificationTicket.length > 0, "티켓이 비어 있다");
+    });
+    client.global.set("ticket", response.body.verificationTicket);
+%}
+
+### 3. 가입 - 티켓을 다시 제출한다
+POST {{baseUrl}}/api/v1/auth/signup
+X-Device-Id: {{deviceId}}
+Content-Type: application/json
+
+{
+  "verificationTicket": "{{ticket}}",
+  "phoneNumber": "{{newPhone}}",
+  "name": "정희성",
+  "username": "{{newUsername}}",
+  "password": "timo1234!",
+  "nickname": "{{newNickname}}"
+}
+
+> {%
+    client.test("201 과 함께 토큰까지 내려온다", function () {
+        client.assert(response.status === 201, "status: " + response.status);
+        client.assert(response.body.memberId > 0, "memberId: " + response.body.memberId);
+        client.assert(response.body.accessTokenExpiresIn === 1800, "ttl: " + response.body.accessTokenExpiresIn);
+    });
+    client.global.set("newToken", response.body.accessToken);
+    client.global.set("newRefreshToken", response.body.refreshToken);
+%}
+
+### 4. 방금 만든 계정으로 로그인된다
+POST {{baseUrl}}/api/v1/auth/login
+X-Device-Id: {{deviceId}}
+Content-Type: application/json
+
+{
+  "username": "{{newUsername}}",
+  "password": "timo1234!"
+}
+
+> {%
+    client.test("가입한 계정으로 로그인된다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+    });
+%}

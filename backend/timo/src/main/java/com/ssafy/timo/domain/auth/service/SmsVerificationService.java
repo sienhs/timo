@@ -4,11 +4,13 @@ import com.ssafy.timo.domain.auth.dto.SmsSendRequestDto;
 import com.ssafy.timo.domain.auth.dto.SmsSendResponseDto;
 import com.ssafy.timo.domain.auth.dto.SmsVerifyRequestDto;
 import com.ssafy.timo.domain.auth.dto.SmsVerifyResponseDto;
+import com.ssafy.timo.domain.auth.exception.PhoneNumberDuplicatedException;
 import com.ssafy.timo.domain.auth.exception.SmsAttemptExceededException;
 import com.ssafy.timo.domain.auth.exception.SmsCodeMismatchException;
 import com.ssafy.timo.domain.auth.exception.SmsCodeNotFoundException;
 import com.ssafy.timo.domain.auth.exception.SmsSendLimitExceededException;
 import com.ssafy.timo.domain.auth.repository.SmsVerificationStore;
+import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.global.util.PhoneNumbers;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -50,11 +52,23 @@ public class SmsVerificationService {
 
     private final SmsVerificationStore smsVerificationStore;
     private final SmsSender smsSender;
+    private final MemberRepository memberRepository;
 
     public SmsSendResponseDto sendCode(SmsSendRequestDto request, String clientIp) {
         String phoneNumber = PhoneNumbers.normalize(request.phoneNumber());
 
         checkSendLimit(phoneNumber, clientIp);
+
+        /*
+         * 가입할 수 없는 번호에 문자를 쏘지 않는다. 가입 단계까지 가서야 알려 주면 사용자는
+         * 인증과 입력을 다 마친 뒤에 튕기고, 발송 비용도 버린다.
+         *
+         * 제한 검사보다 뒤에 둔다. 이 응답은 "가입된 번호인가" 를 알려 주는 셈이라, 앞에 두면
+         * 쿨다운과 횟수 제한을 건너뛴 채 번호를 긁을 수 있다.
+         */
+        if (memberRepository.existsByPhoneNumber(phoneNumber)) {
+            throw new PhoneNumberDuplicatedException();
+        }
 
         String code = generateCode();
         smsSender.sendVerificationCode(phoneNumber, code);
