@@ -11,7 +11,7 @@ class ShowArtist {
   /// 공연 상세 응답의 아티스트 한 건을 읽는다.
   factory ShowArtist.fromJson(Map<String, dynamic> json) => ShowArtist(
     name: json['name'] as String,
-    photoUrl: json['profileImage'] as String?,
+    photoUrl: json['profileImageUrl'] as String?,
   );
 
   final String name;

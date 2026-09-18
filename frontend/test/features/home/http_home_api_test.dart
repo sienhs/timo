@@ -139,12 +139,12 @@ void main() {
     });
   });
 
-  /// 백엔드 `ArtistSummaryResponseDto` 모양. 사진 키가 `profileImage` 다.
+  /// 백엔드 `ArtistSummaryResponseDto` 모양. 사진 키가 `profileImageUrl` 다.
   Map<String, Object?> artist({
     int id = 1,
     String name = '아이유',
-    Object? profileImage = 'artist/iu.jpg',
-  }) => {'id': id, 'name': name, 'profileImage': profileImage};
+    Object? profileImageUrl = 'artist/iu.jpg',
+  }) => {'id': id, 'name': name, 'profileImageUrl': profileImageUrl};
 
   group('검색', () {
     test('검색어를 keyword 로 공연 목록에 보낸다', () async {
@@ -214,7 +214,7 @@ void main() {
 
     test('사진이 없어도 읽는다', () async {
       final api = build(
-        (_) => jsonResponse(paged([artist(profileImage: null)])),
+        (_) => jsonResponse(paged([artist(profileImageUrl: null)])),
       );
 
       final artists = await api.searchArtists('아이');

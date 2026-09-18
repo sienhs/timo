@@ -3,15 +3,15 @@
 /// 이름과 사진만 받는다. 아티스트 상세 화면이 없어 id 를 쓸 곳이 없고, 홈
 /// 격자는 이 둘만 그린다. 상세가 생기면 그때 id 를 더한다.
 ///
-/// 백엔드 `ArtistSummaryResponseDto` 는 사진을 `profileImage` 로 준다. 아직
-/// 저장소 key 가 아니라 저장된 값 그대로라 그대로 주소로 쓴다 — 프로필이
-/// S3 로 옮겨지면 서버가 URL 로 바꿔 내려 주기로 했다.
+/// 백엔드 `ArtistSummaryResponseDto` 는 사진을 `profileImageUrl` 로 준다. 포스터와
+/// 같이 서버의 `ImageStorage` 를 거친 값이라 지금은 저장소 key(상대 경로), S3 로
+/// 옮겨지면 완전한 URL 이다. 어느 쪽이든 `ApiClient.imageUrl` 이 처리한다.
 class ArtistSummary {
   const ArtistSummary({required this.name, this.profileImageUrl});
 
   factory ArtistSummary.fromJson(Map<String, dynamic> json) => ArtistSummary(
     name: json['name'] as String,
-    profileImageUrl: json['profileImage'] as String?,
+    profileImageUrl: json['profileImageUrl'] as String?,
   );
 
   final String name;
