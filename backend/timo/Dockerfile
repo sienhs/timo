@@ -34,11 +34,13 @@ WORKDIR /app
 
 COPY --from=builder /app/app.jar app.jar
 
-# 기본 실행 환경.
-# 필요하면 docker run / ECS 환경변수로 덮어쓸 수 있음.
+# 기본 실행 환경 - 필요하면 docker run / ECS 환경변수로 덮어쓸 수 있음.
 ENV SPRING_PROFILES_ACTIVE=prod
-# Wallet.createStandard()의 scrypt는 한 번에 큰 힙을 요구한다. t3.medium(4GiB)에서
-# 시더의 주최자 지갑 생성과 일반 회원 지갑 생성을 안정적으로 처리하도록 상한을 명시한다.
+
+# 로그 타임스탬프용 타임존 보정(도메인 로직은 ClockConfig의 Asia/Seoul 고정이라 영향 없음).
+ENV TZ=Asia/Seoul
+
+# Wallet.createStandard()의 scrypt가 큰 힙을 요구해 t3.medium(4GiB) 기준 상한을 명시한다.
 ENV JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 
 EXPOSE 8080
