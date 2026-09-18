@@ -12,54 +12,124 @@ import 'package:timo/features/resale/models/market_sort.dart';
 /// 깨진다.
 void main() {
   group('마켓 운영 시간', () {
-    test('여는 시각부터 창이 끝날 때까지는 열려 있다', () {
-      final opensAt = DateTime(2026, 5, 20, ResaleMetrics.marketOpensAtHour);
-      final hours = MarketHours.at(opensAt.add(const Duration(minutes: 30)));
+    /// 응답을 받은 기기 시각. 서버 시각과 같다고 두고, 시차가 있는 경우만 따로 준다.
+    final received = DateTime(2026, 9, 17, 21, 25, 17);
+
+    /// 서버 `GET /market/hours` 응답. 실제 응답 예시의 값이다.
+    MarketHours hoursOf({
+      required bool open,
+      required String serverTime,
+      DateTime? receivedAt,
+    }) => MarketHours.fromJson({
+      'open': open,
+      'serverTime': serverTime,
+      'opensAt': '2026-09-17T20:00:00',
+      'closesAt': '2026-09-17T23:59:59',
+    }, receivedAt: receivedAt ?? received);
+
+    test('서버 응답을 읽고 여는 시각을 두 자리로 적는다', () {
+      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
 
       expect(hours.isOpen, isTrue);
-      expect(hours.nextBoundary, opensAt.add(ResaleMetrics.marketOpenDuration));
+      expect(hours.serverTime, DateTime(2026, 9, 17, 21, 25, 17));
+      expect(hours.opensAt, DateTime(2026, 9, 17, 20));
+      expect(hours.closesAt, DateTime(2026, 9, 17, 23, 59, 59));
+      expect(hours.receivedAt, received);
+      expect(hours.opensAtLabel, '20:00');
+    });
+
+    test('열려 있으면 닫히는 순간(closesAt 1초 뒤)까지 센다', () {
+      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
+
+      expect(hours.nextBoundary, DateTime(2026, 9, 18));
       expect(
-        hours.remaining,
-        ResaleMetrics.marketOpenDuration - const Duration(minutes: 30),
+        hours.remainingAt(received),
+        const Duration(hours: 2, minutes: 34, seconds: 43),
       );
     });
 
-    test('여는 시각 전이면 닫혀 있고 그날 오픈까지 센다', () {
-      final hours = MarketHours.at(DateTime(2026, 5, 20, 16, 37, 48));
+    test('닫혀 있으면 다음 오픈까지 센다', () {
+      final hours = hoursOf(open: false, serverTime: '2026-09-17T16:37:00');
 
-      expect(hours.isOpen, isFalse);
+      expect(hours.nextBoundary, DateTime(2026, 9, 17, 20));
       expect(
-        hours.nextBoundary,
-        DateTime(2026, 5, 20, ResaleMetrics.marketOpensAtHour),
-      );
-      expect(hours.remaining.inMinutes, 202);
-    });
-
-    test('창이 끝난 뒤면 다음 날 오픈까지 센다', () {
-      final closedAt = DateTime(
-        2026,
-        5,
-        20,
-        ResaleMetrics.marketOpensAtHour,
-      ).add(ResaleMetrics.marketOpenDuration);
-
-      final hours = MarketHours.at(closedAt);
-
-      expect(hours.isOpen, isFalse);
-      // 자정을 넘겨 닫히는 창이라 '다음 오픈' 은 날짜가 바뀐 그날 저녁이다.
-      expect(
-        hours.nextBoundary,
-        DateTime(
-          closedAt.year,
-          closedAt.month,
-          closedAt.day,
-          ResaleMetrics.marketOpensAtHour,
-        ),
+        hours.remainingAt(received),
+        const Duration(hours: 3, minutes: 23),
       );
     });
 
-    test('여는 시각 표시는 두 자리로 맞춘다', () {
-      expect(MarketHours.opensAtLabel, '20:00');
+    test('남은 시간은 기기 시계가 아니라 서버 시계로 센다', () {
+      // 기기 시계가 서버보다 10분 빠르다.
+      final deviceAtReceipt = received.add(const Duration(minutes: 10));
+      final hours = hoursOf(
+        open: true,
+        serverTime: '2026-09-17T21:25:17',
+        receivedAt: deviceAtReceipt,
+      );
+
+      expect(
+        hours.serverNow(deviceAtReceipt),
+        DateTime(2026, 9, 17, 21, 25, 17),
+      );
+      // 기기에서 1분이 흐르면 서버에서도 1분이 흐른다.
+      final aMinuteLater = deviceAtReceipt.add(const Duration(minutes: 1));
+      expect(hours.serverNow(aMinuteLater), DateTime(2026, 9, 17, 21, 26, 17));
+      expect(
+        hours.remainingAt(aMinuteLater),
+        const Duration(hours: 2, minutes: 33, seconds: 43),
+      );
+    });
+
+    test('경계를 지났으면 0 이다', () {
+      final hours = hoursOf(open: false, serverTime: '2026-09-17T19:59:59');
+
+      expect(
+        hours.remainingAt(received.add(const Duration(seconds: 5))),
+        Duration.zero,
+      );
+    });
+
+    test('매물은 등록 다음 날 여는 시각에 올라간다', () {
+      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
+
+      expect(
+        hours.visibleFrom(DateTime(2026, 9, 17, 21, 30)),
+        DateTime(2026, 9, 18, 20),
+      );
+      // 월말도 날짜가 넘어간다.
+      expect(
+        hours.visibleFrom(DateTime(2026, 9, 30, 3)),
+        DateTime(2026, 10, 1, 20),
+      );
+    });
+
+    test('오늘 등록한 매물은 아직 안 보이고, 어제 등록한 매물은 보인다', () {
+      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
+
+      expect(
+        hours.isListingVisible(DateTime(2026, 9, 17, 0, 0), received),
+        isFalse,
+      );
+      expect(
+        hours.isListingVisible(DateTime(2026, 9, 16, 23, 59), received),
+        isTrue,
+      );
+    });
+
+    test('보이는지는 기기 날짜가 아니라 서버 날짜로 가른다', () {
+      // 서버는 아직 9월 17일 23:30 인데 기기 시계는 이미 18일 00:30 이다.
+      final deviceAtReceipt = DateTime(2026, 9, 18, 0, 30);
+      final hours = hoursOf(
+        open: true,
+        serverTime: '2026-09-17T23:30:00',
+        receivedAt: deviceAtReceipt,
+      );
+
+      // 17일에 등록한 매물은 서버 기준 아직 오늘 것이라 안 보인다.
+      expect(
+        hours.isListingVisible(DateTime(2026, 9, 17, 10), deviceAtReceipt),
+        isFalse,
+      );
     });
   });
 

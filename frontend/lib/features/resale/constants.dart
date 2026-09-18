@@ -13,15 +13,6 @@ class ResaleMetrics {
   /// 서버에 없는 순서라 앱이 다시 세우는데, 그러려면 어차피 다 받아야 한다.
   static const pageSize = 100;
 
-  /// 마켓이 열리는 시각(하루 한 번)과 열려 있는 길이.
-  ///
-  /// **서버에 이 규칙이 없다.** 마켓 API 어디에도 운영 시간이 없어 앱이 시계로
-  /// 판정한다. 시안의 '다음 오픈은 20:00' 한 줄이 정해 준 것은 여는 시각뿐이고
-  /// 닫는 시각은 정해진 바가 없어 네 시간으로 잡았다. 서버가 운영 시간을
-  /// 내려주게 되면 [MarketHours] 가 그 값을 받고 이 두 상수는 지운다.
-  static const marketOpensAtHour = 20;
-  static const marketOpenDuration = Duration(hours: 4);
-
   /// 남은 시간 표시를 갱신하는 주기.
   static const countdownTick = Duration(seconds: 1);
 
@@ -101,7 +92,25 @@ class ResaleStrings {
   // 마켓 닫힘
   static const closedTitle = '지금은 마켓이 닫혀 있어요';
   static String closedNextOpen(String time) => '다음 오픈은 $time으로 예정되어 있어요';
-  static const closedRegisterNotice = '양도 등록은 가능해요!';
+
+  /// 등록 버튼 위의 한 줄. 등록은 시간과 무관하게 받지만, 올린 매물은 **등록
+  /// 다음 날** 여는 시각에 한꺼번에 목록에 드러난다(백엔드 `MarketApi` 주석).
+  /// 열린 시간에 올려도 그날은 안 보이므로 열림·닫힘 가리지 않고 알린다.
+  static String registerNotice(String time) => '등록한 매물은 다음 날 $time에 마켓에 올라가요';
+
+  /// 운영 시간 밖 요청을 서버가 거절했을 때(409 `MarketClosedException`).
+  /// 열린 채로 보다가 닫힌 뒤 구매를 눌렀을 때 받는다.
+  static const marketClosedError = '지금은 마켓이 닫혀 있어요. 오픈 후에 다시 시도해주세요.';
+
+  /// 운영 시간 중에 가격을 바꾸려 했을 때(409 `MarketOpenException`). 거래가
+  /// 열려 있는 동안 가격은 고정이다. 화면이 버튼을 감추지만, 닫힌 채로 보다가
+  /// 열린 뒤 눌렀으면 받는다.
+  static const marketOpenError = '마켓이 열려 있는 동안은 가격을 바꿀 수 없어요. 마감 후에 바꿔주세요.';
+
+  /// 아직 올라오지 않은 매물을 사려 했을 때(409 `ListingNotOpenYetException`).
+  /// 목록에는 없지만 번호로는 닿을 수 있어 서버가 구매에서 막는다.
+  static const listingNotOpenYetError =
+      '아직 마켓에 올라오지 않은 매물이에요. 다음 오픈 시간부터 살 수 있어요.';
 
   /// 카운트다운은 눈으로만 읽히므로 화면 읽기 프로그램에는 말로 준다.
   static String openRemainingSemantics(String remaining) =>
@@ -171,7 +180,10 @@ class ResaleStrings {
   static const registerTitle = '양도 등록';
   static const registerNext = '다음으로';
   static const registerSubmit = '마켓에 등록하기';
-  static const registerSucceeded = '마켓에 등록했어요';
+
+  /// 등록 직후. 방금 올린 매물이 목록에 없는 이유를 함께 말한다 — 시각은 서버
+  /// 규칙이라 여기 박지 않고, 정확한 시각은 공연 목록 아래 줄이 서버 값으로 적는다.
+  static const registerSucceeded = '마켓에 등록했어요. 다음 날 오픈 시간에 올라가요';
 
   static const priceSectionTitle = '판매 가격';
   static const priceHint = '정가 이하만 등록할 수 있어요';

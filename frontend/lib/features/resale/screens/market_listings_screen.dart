@@ -6,11 +6,10 @@ import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../models/listing.dart';
 import '../models/market_concert.dart';
-import '../models/market_hours.dart';
 import '../models/market_sort.dart';
 import '../state/resale_api_scope.dart';
 import '../widgets/listing_row_card.dart';
-import '../widgets/market_countdown.dart';
+import '../widgets/market_hours_countdown.dart';
 import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_empty_view.dart';
 import '../widgets/sort_tab_row.dart';
@@ -29,7 +28,7 @@ class MarketListingsScreen extends StatefulWidget {
 
   final MarketConcert concert;
 
-  /// 지금 시각을 읽는 함수. 상단 바의 마감 시간이 이 값을 본다.
+  /// 기기 시각을 읽는 함수. 상단 바의 마감 시간이 서버 시각을 이어 셀 때 쓴다.
   final DateTime Function() clock;
 
   @override
@@ -72,27 +71,16 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hours = MarketHours.at(widget.clock());
-
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: ResaleAppBar(
         title: widget.concert.title,
-        trailing: hours.isOpen
-            ? MarketCountdown(
-                until: hours.nextBoundary,
-                clock: widget.clock,
-                // 마감하면 첫 화면으로 돌려보낸다. 그 화면이 닫힘 상태를 다시
-                // 판정해 안내와 다음 오픈 시간을 보여 준다.
-                onElapsed: () => Navigator.maybePop(context),
-                semanticsLabel: ResaleStrings.openRemainingSemantics,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              )
-            : null,
+        trailing: MarketClosingCountdown(
+          clock: widget.clock,
+          // 마감하면 첫 화면으로 돌려보낸다. 그 화면이 서버에 다시 물어 닫힘
+          // 안내와 다음 오픈 시간을 보여 준다.
+          onElapsed: () => Navigator.maybePop(context),
+        ),
       ),
       body: SafeArea(
         child: Column(

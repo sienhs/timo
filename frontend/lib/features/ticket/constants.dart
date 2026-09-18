@@ -244,6 +244,14 @@ class TicketStrings {
   // 양도 목록 카드. 내가 마켓에 올린 매물 하나다.
   static const listingBadge = '판매중';
   static const soldBadge = '판매 완료';
+
+  /// 등록은 됐지만 아직 남에게 안 보이는 매물. 매물은 등록 다음 날 여는 시각에
+  /// 올라간다(백엔드 `MarketApi` 주석). `판매중` 대신 붙어, 마켓 목록에 왜 없는지
+  /// 카드가 먼저 말한다.
+  static const pendingExposureBadge = '노출 대기';
+
+  /// 그 매물이 마켓에 올라가는 시각. (예: `09.16 20:00 마켓 노출`)
+  static String exposureAt(String time) => '$time 마켓 노출';
   static const editPrice = '가격 수정';
   static const delist = '등록 취소';
 

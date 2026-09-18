@@ -8,9 +8,11 @@ import '../models/listable_ticket.dart';
 import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/market_concert.dart';
+import '../models/market_hours.dart';
 import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
+import '../utils/market_error.dart';
 import 'resale_api.dart';
 
 /// 백엔드 양도 마켓 API(`/api/v1/market`)에 실제로 요청하는 [ResaleApi].
@@ -25,11 +27,14 @@ import 'resale_api.dart';
 ///
 /// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
 /// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
-/// [ApiException] 이 맡는다.
+/// [ApiException] 이 맡는다. 운영 시간 거절처럼 마켓만의 문구 손질은
+/// [translateResaleError] 가 한 번 더 한다.
 ///
-/// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
+/// [dio] 와 [clock] 은 테스트를 위해 받는다. 앱에서는 넘기지 않아
+/// [ApiClient.dio] 와 기기 시계를 쓴다.
 class HttpResaleApi implements ResaleApi {
-  HttpResaleApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
+  HttpResaleApi({Dio? dio, this.clock = DateTime.now})
+    : _dio = dio ?? ApiClient.dio;
 
   static const basePath = '/api/v1/market';
 
@@ -37,6 +42,18 @@ class HttpResaleApi implements ResaleApi {
   static const myTicketsPath = '/api/v1/tickets/me';
 
   final Dio _dio;
+
+  /// 기기 시각을 읽는 함수. 운영 상태 응답을 받은 시각([MarketHours.receivedAt])
+  /// 을 찍는 데 쓴다.
+  final DateTime Function() clock;
+
+  /// 응답을 받은 기기 시각을 함께 넘긴다. 카운트다운이 서버 시각을 이어 셀
+  /// 기준점이라, 요청 전이 아니라 응답이 온 뒤에 읽는다.
+  @override
+  Future<MarketHours> fetchMarketHours() async {
+    final response = await _guard(() => _dio.get<dynamic>('$basePath/hours'));
+    return MarketHours.fromJson(_body(response), receivedAt: clock());
+  }
 
   @override
   Future<List<MarketConcert>> fetchConcerts() async {
@@ -171,6 +188,10 @@ class HttpResaleApi implements ResaleApi {
 
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
   ///
+  /// 운영 시간 거절의 문구는 여기서 앱 문구로 바꾼다([translateResaleError]).
+  /// 화면마다 바꾸면 스낵바는 고쳐지고 목록의 오류 화면은 서버 문구 그대로
+  /// 나오는 식으로 한 곳이 빠진다.
+  ///
   /// `HttpAuthApi` · `HttpHomeApi` · `HttpTicketApi` 와 같은 코드다. 네 곳이
   /// 같은 것을 들고 있으니 `core/network` 로 올릴 때가 됐다 — 이 작업(화면
   /// 구현)에서 네 도메인의 API 구현을 함께 건드리지 않으려고 미뤄 둔다.
@@ -178,7 +199,7 @@ class HttpResaleApi implements ResaleApi {
     try {
       return await request();
     } on DioException catch (e) {
-      throw ApiException.from(e);
+      throw translateResaleError(ApiException.from(e));
     }
   }
 

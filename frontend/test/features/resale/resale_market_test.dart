@@ -29,13 +29,13 @@ import 'package:timo/features/resale/widgets/listing_row_card.dart';
 import 'package:timo/features/resale/widgets/market_concert_card.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 마켓이 열려 있는 시각과 닫혀 있는 시각. 화면이 시계를 보고 갈리므로
-/// 테스트는 시각을 고정해 넣는다.
+/// 마켓이 열려 있는 시각과 닫혀 있는 시각. 열림 판정은 가짜 서버(목)가 제
+/// 시계로 하므로, 화면과 목에 같은 시각을 고정해 넣는다.
 final _whileOpen = DateTime(
   2026,
   5,
   20,
-  ResaleMetrics.marketOpensAtHour,
+  MockResaleApi.opensAtHour,
 ).add(const Duration(minutes: 30));
 final _whileClosed = DateTime(2026, 5, 20, 16, 37);
 
@@ -102,8 +102,9 @@ void main() {
       expect(find.text('2026 BIGBANG'), findsOneWidget);
       // 첫 공연에 매물 넷을 몰아 둔 목 데이터.
       expect(find.text(ResaleStrings.listingCount(4)), findsOneWidget);
-      // 등록 입구는 늘 있다.
+      // 등록 입구는 늘 있고, 열려 있어도 올린 매물은 다음 날에 보인다고 알린다.
       expect(find.text(ResaleStrings.registerAction), findsOneWidget);
+      expect(find.text(ResaleStrings.registerNotice('20:00')), findsOneWidget);
 
       await closeScreen(tester);
     });
@@ -119,18 +120,17 @@ void main() {
       );
 
       expect(find.text(ResaleStrings.closedTitle), findsOneWidget);
-      expect(
-        find.text(ResaleStrings.closedNextOpen(MarketHours.opensAtLabel)),
-        findsOneWidget,
-      );
+      expect(find.text(ResaleStrings.closedNextOpen('20:00')), findsOneWidget);
       // 다음 오픈까지 남은 시간(16:37 -> 20:00).
       expect(find.text('03:23:00'), findsOneWidget);
       expect(find.byType(MarketConcertCard), findsNothing);
-      // 닫혀 있는 동안에는 목록을 부르지도 않는다.
+      // 닫혀 있는 동안에는 목록을 부르지도 않는다. 운영 상태만 묻는다.
       expect(api.concertCalls, 0);
+      expect(api.hoursCalls, 1);
 
-      // 등록은 닫혀 있어도 되므로 버튼이 살아 있고, 그 사정을 한 줄로 알린다.
-      expect(find.text(ResaleStrings.closedRegisterNotice), findsOneWidget);
+      // 등록은 닫혀 있어도 되므로 버튼이 살아 있고, 올린 매물이 언제 보이는지
+      // 한 줄로 알린다.
+      expect(find.text(ResaleStrings.registerNotice('20:00')), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
@@ -157,7 +157,8 @@ void main() {
       expect(find.text(ResaleStrings.loginPrompt), findsOneWidget);
       expect(find.text(AuthStrings.login), findsOneWidget);
       expect(find.byType(MarketConcertCard), findsNothing);
-      // 비로그인으로 부르면 401 만 받는다. 아예 부르지 않는다.
+      // 비로그인으로 부르면 401 만 받는다. 운영 상태도 목록도 아예 부르지 않는다.
+      expect(api.hoursCalls, 0);
       expect(api.concertCalls, 0);
 
       await closeScreen(tester);
@@ -342,15 +343,23 @@ void main() {
       await tester.tap(find.text(ResaleStrings.registerSubmit));
       await settle(tester);
 
-      // 등록한 티켓은 목록에서 빠지고, 그 값으로 매물이 생긴다. 목의 응답은
+      // 등록한 티켓은 목록에서 빠지고, 그 값으로 매물이 생긴다. 다만 마켓
+      // 목록에는 다음 날에야 올라가므로 내 거래 내역에서 확인한다. 목의 응답은
       // 타이머를 타므로(fake async) 시간을 조금 흘려야 돌아온다.
       final tickets = api.fetchListableTickets();
+      final trades = api.fetchMyTrades();
       final listings = api.fetchListings(4);
       await tester.pump(const Duration(milliseconds: 1));
       expect(await tickets, hasLength(1));
       expect(
-        (await listings).where((listing) => listing.price == 176000),
+        (await trades).where(
+          (trade) => trade.isOnSale && trade.price == 176000,
+        ),
         hasLength(1),
+      );
+      expect(
+        (await listings).where((listing) => listing.price == 176000),
+        isEmpty,
       );
 
       await closeScreen(tester);
@@ -401,7 +410,7 @@ void main() {
   });
 }
 
-/// 공연 목록을 몇 번 요청받았는지 세는 껍데기.
+/// 운영 상태와 공연 목록을 몇 번 요청받았는지 세는 껍데기.
 ///
 /// "닫혀 있거나 로그인하지 않았으면 서버를 부르지 않는다" 는 화면에 드러나지
 /// 않는 약속이라 이렇게만 확인할 수 있다. 나머지는 그대로 넘긴다.
@@ -410,7 +419,14 @@ class _CountingResaleApi implements ResaleApi {
 
   final ResaleApi _delegate;
 
+  int hoursCalls = 0;
   int concertCalls = 0;
+
+  @override
+  Future<MarketHours> fetchMarketHours() {
+    hoursCalls++;
+    return _delegate.fetchMarketHours();
+  }
 
   @override
   Future<List<MarketConcert>> fetchConcerts() {

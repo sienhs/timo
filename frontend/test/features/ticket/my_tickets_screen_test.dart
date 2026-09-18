@@ -185,6 +185,49 @@ void main() {
       expect(find.text(ResaleStrings.editPriceSubmit), findsOneWidget);
     });
 
+    // 매물은 등록 다음 날 여는 시각에 올라간다. 방금 올린 매물은 마켓 목록에
+    // 없는데, 그 이유와 시각을 카드가 먼저 말해야 한다.
+    testWidgets('오늘 올린 매물은 판매중 대신 노출 대기 배지와 노출 시각이 붙는다', (tester) async {
+      // 목의 시안 매물은 어제 것이라, 오늘(9월 15일) 올린 매물을 하나 더 만든다.
+      final resaleApi = MockResaleApi(latency: Duration.zero, clock: now);
+      // 목의 응답은 타이머를 타므로(fake async) 시간을 조금 흘려야 돌아온다.
+      final listed = resaleApi.createListing(ticketId: 101, price: 190000);
+      await tester.pump(const Duration(milliseconds: 1));
+      await listed;
+
+      await pumpScreen(tester, resaleApi: resaleApi);
+      await tester.pumpAndSettle();
+      await openListings(tester);
+
+      // 어제 올린 매물은 판매중, 오늘 올린 매물은 노출 대기다.
+      expect(find.text(TicketStrings.listingBadge), findsOneWidget);
+      expect(find.text(TicketStrings.pendingExposureBadge), findsOneWidget);
+      expect(
+        find.text(TicketStrings.exposureAt('09.16 20:00')),
+        findsOneWidget,
+      );
+      // 노출 대기여도 팔리는 중이라 버튼은 그대로다.
+      expect(find.text(TicketStrings.delist), findsNWidgets(2));
+    });
+
+    // 마켓이 열려 있는 동안은 거래 중 가격이 고정이라 서버가 수정을 거절한다.
+    // 눌러서 거절당하게 두지 않고 버튼을 안 낸다. 등록 취소는 그대로다.
+    testWidgets('마켓이 열려 있으면 가격 수정 버튼이 없고 등록 취소만 남는다', (tester) async {
+      await pumpScreen(
+        tester,
+        resaleApi: MockResaleApi(
+          latency: Duration.zero,
+          clock: () => DateTime(2026, 9, 15, 21),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await openListings(tester);
+
+      expect(find.text(TicketStrings.listingBadge), findsOneWidget);
+      expect(find.text(TicketStrings.editPrice), findsNothing);
+      expect(find.text(TicketStrings.delist), findsOneWidget);
+    });
+
     testWidgets('올린 매물이 없으면 0 과 빈 안내가 나온다', (tester) async {
       await pumpScreen(tester, resaleScenario: ResaleMockScenario.empty);
       await tester.pumpAndSettle();

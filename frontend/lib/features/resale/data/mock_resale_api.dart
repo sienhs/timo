@@ -5,9 +5,11 @@ import '../models/listing.dart';
 import '../models/listing_detail.dart';
 import '../models/listing_status.dart';
 import '../models/market_concert.dart';
+import '../models/market_hours.dart';
 import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
 import '../models/trade_status.dart';
+import '../utils/market_error.dart';
 import 'resale_api.dart';
 
 /// 가짜 [ResaleApi] 가 무엇을 돌려줄지.
@@ -53,6 +55,12 @@ class MockResaleApi implements ResaleApi {
   /// 테스트가 시각을 고정할 수 있게 받는다(`MockTicketApi` 와 같은 이유다).
   final DateTime Function() clock;
 
+  /// 마켓이 여는 시각과 닫는 시각(포함). 서버 `market.hours` 기본값
+  /// (20:00:00~23:59:59)을 흉내 낸다. 실제 규칙은 서버 설정이고 앱은 응답으로만
+  /// 안다 — 이 값은 목이 그 응답을 만드는 데만 쓴다.
+  static const opensAtHour = 20;
+  static const closesAt = (hour: 23, minute: 59, second: 59);
+
   /// 내가 산 체결이 온체인까지 끝난 것으로 보이기까지의 시간.
   ///
   /// 결제 완료 화면이 '티켓 양도 중' 에서 '티켓 양도 완료' 로 바뀌는 것을
@@ -66,16 +74,73 @@ class MockResaleApi implements ResaleApi {
   int _nextListingId = 100;
   int _nextTradeId = 1;
 
+  /// 서버 `MarketHoursService.status()` 와 같은 판정이다. 서버 시각은 이 목의
+  /// 시계라 응답을 받은 시각과 같다 — 시차가 없는 서버다.
+  @override
+  Future<MarketHours> fetchMarketHours() async {
+    await _respond();
+    return _hoursAt(clock());
+  }
+
+  MarketHours _hoursAt(DateTime now) {
+    var opensAt = DateTime(now.year, now.month, now.day, opensAtHour);
+    var closesAt = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      MockResaleApi.closesAt.hour,
+      MockResaleApi.closesAt.minute,
+      MockResaleApi.closesAt.second,
+    );
+    if (now.isAfter(closesAt)) {
+      // 오늘 창은 끝났다. 다음 창은 내일이다.
+      opensAt = opensAt.add(const Duration(days: 1));
+      closesAt = closesAt.add(const Duration(days: 1));
+    }
+    return MarketHours(
+      isOpen: !now.isBefore(opensAt) && !now.isAfter(closesAt),
+      serverTime: now,
+      opensAt: opensAt,
+      closesAt: closesAt,
+      receivedAt: now,
+    );
+  }
+
+  /// 닫혀 있으면 409. 서버 `MarketHoursService.requireOpen()` 이다 — 공연
+  /// 목록·공연별 매물·구매가 다른 검사보다 먼저 이걸 지난다.
+  void _requireOpen() {
+    if (!_hoursAt(clock()).isOpen) {
+      throw const ApiException(
+        ResaleStrings.marketClosedError,
+        status: 409,
+        exceptionName: marketClosedExceptionName,
+      );
+    }
+  }
+
+  /// 열려 있으면 409. 서버 `MarketHoursService.requireClosed()` 다 — 가격 수정만
+  /// 이걸 지난다. 거래 중 가격은 고정이다.
+  void _requireClosed() {
+    if (_hoursAt(clock()).isOpen) {
+      throw const ApiException(
+        ResaleStrings.marketOpenError,
+        status: 409,
+        exceptionName: marketOpenExceptionName,
+      );
+    }
+  }
+
   @override
   Future<List<MarketConcert>> fetchConcerts() async {
     await _respond();
+    _requireOpen();
     if (scenario == ResaleMockScenario.empty) return const [];
 
     // 매물이 있는 공연만, 공연마다 매물 수와 최저가를 모은다. 서버가 group by
     // 한 번으로 하는 일이다 — 매물 0 인 공연은 내보내지 않는다. 시안의 공연
     // 카드에는 `0 건` 이 있지만, 들어가 봐야 빈 화면인 공연은 서버가 주지 않는다.
     final grouped = <int, List<_MockListing>>{};
-    for (final listing in _openListings) {
+    for (final listing in _visibleListings) {
       grouped.putIfAbsent(listing.concertId, () => []).add(listing);
     }
 
@@ -100,8 +165,9 @@ class MockResaleApi implements ResaleApi {
   @override
   Future<List<Listing>> fetchListings(int concertId) async {
     await _respond();
+    _requireOpen();
     return [
-      for (final listing in _openListings)
+      for (final listing in _visibleListings)
         if (listing.concertId == concertId) listing.toSummary(),
     ];
   }
@@ -120,10 +186,19 @@ class MockResaleApi implements ResaleApi {
     required String idempotencyKey,
   }) async {
     await _respond();
+    _requireOpen();
     final listing = _find(listingId);
     // 검사 순서는 서버와 같다. 매물 상태 -> 가격 -> 내 매물.
     if (listing.status != ListingStatus.listed) {
       throw const ApiException('이미 팔렸거나 내려간 매물이에요.', status: 409);
+    }
+    if (!_isVisible(listing)) {
+      // 목록에는 없지만 번호로는 닿는다. 하루 먼저 파는 통로가 되면 안 된다.
+      throw const ApiException(
+        ResaleStrings.listingNotOpenYetError,
+        status: 409,
+        exceptionName: listingNotOpenYetExceptionName,
+      );
     }
     if (listing.price != expectedPrice) {
       throw const ApiException('가격이 바뀌었어요. 다시 확인해주세요.', status: 409);
@@ -279,6 +354,7 @@ class MockResaleApi implements ResaleApi {
     required int price,
   }) async {
     await _respond();
+    _requireClosed();
     final listing = _find(listingId);
     // 검사 순서는 서버와 같다. 내 매물 -> 매물 상태 -> 가격.
     if (!listing.mine) {
@@ -297,6 +373,19 @@ class MockResaleApi implements ResaleApi {
 
   Iterable<_MockListing> get _openListings => (_listings ??= _initialListings())
       .where((listing) => listing.status == ListingStatus.listed);
+
+  /// 남에게 보이는 매물. 팔리는 중이고 **어제까지** 등록된 것이다.
+  ///
+  /// 서버 `MarketHoursService.visibleBefore()` 와 같다 — 매물은 등록 다음 날
+  /// 여는 시각에 올라가는데, 목록은 어차피 그 시각에만 열리니 "오늘 00:00 이전
+  /// 등록" 하나로 판정이 끝난다. 오늘 올린 매물은 내 거래 내역에만 있다.
+  Iterable<_MockListing> get _visibleListings =>
+      _openListings.where(_isVisible);
+
+  bool _isVisible(_MockListing listing) {
+    final now = clock();
+    return listing.listedAt.isBefore(DateTime(now.year, now.month, now.day));
+  }
 
   _MockListing _find(int listingId) {
     final listings = _listings ??= _initialListings();
@@ -373,7 +462,9 @@ class MockResaleApi implements ResaleApi {
   /// (176,000원)와 맞지 않는다. 할인율은 서버가 정가와 등록가에서 계산해 주는
   /// 값이라 여기서도 계산해 넣어, 화면의 세 숫자가 서로 맞게 한다.
   List<_MockListing> _initialListings() {
-    final listedAt = clock().subtract(const Duration(hours: 5));
+    // 어제 등록된 것으로 둔다. 오늘 등록된 매물은 목록에 안 보이므로
+    // ([_visibleListings]), 오늘 시각으로 두면 시안 화면이 비어 버린다.
+    final listedAt = clock().subtract(const Duration(days: 1, hours: 5));
     return [
       _MockListing(
         listingId: 1,

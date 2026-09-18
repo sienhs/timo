@@ -4,7 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/timo_mascot.dart';
 import '../constants.dart';
 import '../models/market_hours.dart';
-import 'market_countdown.dart';
+import 'market_hours_countdown.dart';
 
 /// 마켓이 닫혀 있을 때의 본문. 다음 오픈까지 남은 시간을 센다.
 ///
@@ -22,9 +22,10 @@ class MarketClosedView extends StatelessWidget {
     this.clock = DateTime.now,
   });
 
+  /// 서버가 준 운영 상태. 닫혀 있는 상태여야 한다.
   final MarketHours hours;
 
-  /// 오픈 시각이 됐을 때. 화면이 다시 판정해 목록으로 바뀐다.
+  /// 오픈 시각이 됐을 때. 화면이 서버에 다시 물어 목록으로 바뀐다.
   final VoidCallback onOpened;
 
   final DateTime Function() clock;
@@ -51,15 +52,15 @@ class MarketClosedView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              ResaleStrings.closedNextOpen(MarketHours.opensAtLabel),
+              ResaleStrings.closedNextOpen(hours.opensAtLabel),
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 18),
-            MarketCountdown(
-              until: hours.nextBoundary,
+            MarketHoursCountdown(
+              hours: hours,
               clock: clock,
               onElapsed: onOpened,
               semanticsLabel: ResaleStrings.closeRemainingSemantics,

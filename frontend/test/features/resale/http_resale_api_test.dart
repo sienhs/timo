@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/features/resale/constants.dart';
 import 'package:timo/features/resale/data/http_resale_api.dart';
 import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/models/trade_status.dart';
@@ -17,12 +18,16 @@ void main() {
   late FakeHttpAdapter adapter;
   late HttpResaleApi api;
 
-  /// [handler] 가 돌려주는 응답으로 가짜 서버를 세운다.
-  void givenServer(FutureOr<ResponseBody> Function(RecordedRequest) handler) {
+  /// [handler] 가 돌려주는 응답으로 가짜 서버를 세운다. [clock] 은 응답을 받은
+  /// 기기 시각을 고정할 때만 준다.
+  void givenServer(
+    FutureOr<ResponseBody> Function(RecordedRequest) handler, {
+    DateTime Function() clock = DateTime.now,
+  }) {
     adapter = FakeHttpAdapter(handler);
     final dio = Dio(BaseOptions(baseUrl: 'http://fake.test'))
       ..httpClientAdapter = adapter;
-    api = HttpResaleApi(dio: dio);
+    api = HttpResaleApi(dio: dio, clock: clock);
   }
 
   /// 서버 내 거래 내역 응답 한 건. 실제 `MyTradeSummaryResponseDto` 모양이다.
@@ -61,6 +66,86 @@ void main() {
       'totalPages': 1,
     },
   };
+
+  group('운영 시간', () {
+    test('운영 시간 주소로 GET 하고, 응답을 받은 기기 시각을 함께 든다', () async {
+      final received = DateTime(2026, 9, 17, 21, 25, 20);
+      givenServer(
+        (_) => jsonResponse({
+          'open': true,
+          'serverTime': '2026-09-17T21:25:17',
+          'opensAt': '2026-09-17T20:00:00',
+          'closesAt': '2026-09-17T23:59:59',
+        }),
+        clock: () => received,
+      );
+
+      final hours = await api.fetchMarketHours();
+
+      final request = adapter.requests.single;
+      expect(request.method, 'GET');
+      expect(request.path, '/api/v1/market/hours');
+      expect(hours.isOpen, isTrue);
+      expect(hours.serverTime, DateTime(2026, 9, 17, 21, 25, 17));
+      expect(hours.opensAt, DateTime(2026, 9, 17, 20));
+      expect(hours.closesAt, DateTime(2026, 9, 17, 23, 59, 59));
+      expect(hours.receivedAt, received);
+    });
+  });
+
+  group('운영 시간 거절', () {
+    // 서버 문구 뒤에 `(opensAt=...)` 가 날것으로 붙어 온다. 스낵바든 목록의 오류
+    // 화면이든 받는 쪽이 그대로 보여도 되게, 요청 계층에서 앱 문구로 바꾼다.
+    test('닫혀 있어서 거절된 문구는 앱 문구로 바뀌고 예외 이름은 남는다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 409,
+          errorMessage: '양도 마켓 운영 시간이 아닙니다. (opensAt=2026-09-18T20:00:00)',
+          exception: 'MarketClosedException',
+        ),
+      );
+
+      await expectLater(
+        api.fetchConcerts(),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 409)
+              .having(
+                (e) => e.message,
+                'message',
+                ResaleStrings.marketClosedError,
+              )
+              .having(
+                (e) => e.exceptionName,
+                'exceptionName',
+                'MarketClosedException',
+              ),
+        ),
+      );
+    });
+
+    test('열려 있어서 거절된 가격 수정 문구도 앱 문구로 바뀐다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 409,
+          errorMessage:
+              '운영 시간 중에는 등록가를 바꿀 수 없습니다. (closesAt=2026-09-17T23:59:59)',
+          exception: 'MarketOpenException',
+        ),
+      );
+
+      await expectLater(
+        api.updateListingPrice(listingId: 8, price: 120000),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            ResaleStrings.marketOpenError,
+          ),
+        ),
+      );
+    });
+  });
 
   group('내 거래 내역', () {
     test('내 거래 내역 주소로 GET 하고 한 번에 다 받는다', () async {

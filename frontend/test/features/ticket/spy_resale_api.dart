@@ -5,6 +5,7 @@ import 'package:timo/features/resale/models/listable_ticket.dart';
 import 'package:timo/features/resale/models/listing.dart';
 import 'package:timo/features/resale/models/listing_detail.dart';
 import 'package:timo/features/resale/models/market_concert.dart';
+import 'package:timo/features/resale/models/market_hours.dart';
 import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/models/purchased_trade.dart';
 import 'package:timo/features/resale/models/trade_status.dart';
@@ -54,6 +55,9 @@ class SpyResaleApi implements ResaleApi {
     priceUpdates.add((listingId: listingId, price: price));
     return _base.updateListingPrice(listingId: listingId, price: price);
   }
+
+  @override
+  Future<MarketHours> fetchMarketHours() => _base.fetchMarketHours();
 
   @override
   Future<List<MyTrade>> fetchMyTrades() {

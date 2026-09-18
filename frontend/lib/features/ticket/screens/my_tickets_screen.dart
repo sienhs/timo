@@ -7,6 +7,7 @@ import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/constants.dart';
 import '../../auth/state/auth_session_scope.dart';
+import '../../resale/models/market_hours.dart';
 import '../../resale/models/my_trade.dart';
 import '../../resale/state/resale_api_scope.dart';
 import '../../resale/widgets/listing_price_sheet.dart';
@@ -68,6 +69,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 양도 목록 탭의 개수용. [_loaded] 와 같은 이유로 한 벌 기억해 둔다.
   List<MyTrade>? _sales;
 
+  /// 마켓 운영 상태. 카드가 두 가지에 쓴다 — 열려 있는 동안은 가격을 못
+  /// 바꾸므로(서버 409) 가격 수정 버튼을 빼고, 아직 안 올라간 매물에는 노출
+  /// 대기 배지와 노출 시각을 붙인다. 못 받았으면 null 이라 버튼은 그대로 두고
+  /// 배지는 안 붙인다 — 최종 판정은 서버 몫이고, 거절되면 그 문구를 보여 준다.
+  MarketHours? _hours;
+
   /// 목록을 그리는 기준 시각. D-day 와 QR 창이 이 값을 본다.
   ///
   /// 카드마다 `DateTime.now()` 를 부르면 같은 목록 안에서 기준이 미세하게
@@ -120,10 +127,26 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 시안이 그렇고, 산 티켓은 "내 티켓" 이라 예정 공연 탭이 맞다(지금 서버가
   /// 못 주는 사정은 [MyTrade] 주석). 팔린 것·내린 것은 남긴다. 지우면 결과가
   /// 안 보인다.
+  ///
+  /// 운영 상태도 함께 받는다. 카드가 가격 수정 버튼을 낼지가 이 값에 달려
+  /// 있어 목록과 같은 시점에 알아야 한다. 안내용 값이라 못 받아도 목록은 그대로
+  /// 보여 준다.
   Future<List<MyTrade>> _loadTrades() async {
-    final trades = await ResaleApiScope.of(context).fetchMyTrades();
+    final api = ResaleApiScope.of(context);
+    final trades = await api.fetchMyTrades();
     final sales = trades.where((trade) => trade.isSale).toList();
-    if (mounted) setState(() => _sales = sales);
+    MarketHours? hours;
+    try {
+      hours = await api.fetchMarketHours();
+    } on ApiException {
+      hours = null;
+    }
+    if (mounted) {
+      setState(() {
+        _sales = sales;
+        _hours = hours;
+      });
+    }
     return sales;
   }
 
@@ -431,7 +454,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         itemBuilder: (_, index) => ListingCard(
           trade: sales[index],
           now: _now,
-          onEditPrice: () => _editPrice(sales[index]),
+          hours: _hours,
+          // 마켓이 열려 있는 동안은 가격이 고정이라 버튼을 안 낸다.
+          onEditPrice: _hours?.isOpen ?? false
+              ? null
+              : () => _editPrice(sales[index]),
           onDelist: () => _delist(sales[index]),
         ),
       ),
