@@ -4,6 +4,7 @@ import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/models/favorite_artist.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/home_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
@@ -347,6 +348,21 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('검색 결과가 오면 이미 찜한 아티스트의 사진이 최신으로 맞춰진다', (tester) async {
+      await pumpSearch(tester, api: _PhotoArtistHomeApi());
+      // 사진 없이 찜해 둔 아티스트. 사진 필드명이 어긋났던 동안 찜한 경우다.
+      await favorites.toggleArtist(const FavoriteArtist(name: '아이유'));
+
+      await submit(tester, '아이유');
+
+      expect(favorites.favorites.artists, [
+        const FavoriteArtist(
+          name: '아이유',
+          profileImageUrl: _PhotoArtistHomeApi.iuPhoto,
+        ),
+      ]);
+    });
   });
 
   group('실패', () {
@@ -428,6 +444,41 @@ class _ManyResultsHomeApi extends MockHomeApi {
         status: ShowSummary.onSaleStatus,
       ),
   ]);
+}
+
+/// 아티스트 검색이 사진 달린 아이유 한 명을 돌려준다. 목 데이터의 아티스트는
+/// 모두 사진이 없어, 찜 스냅샷이 사진으로 갱신되는지 보려면 따로 필요하다.
+class _PhotoArtistHomeApi implements HomeApi {
+  static const iuPhoto = 'artist/iu.jpg';
+
+  static const _mock = MockHomeApi(latency: Duration.zero);
+
+  @override
+  Future<List<ArtistSummary>> searchArtists(String keyword) async => const [
+    ArtistSummary(name: '아이유', profileImageUrl: iuPhoto),
+  ];
+
+  @override
+  Future<List<ShowSummary>> search(String keyword) => _mock.search(keyword);
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenSoon() =>
+      _mock.fetchTicketOpenSoon();
+
+  @override
+  Future<List<ShowSummary>> fetchPopular() => _mock.fetchPopular();
+
+  @override
+  Future<List<ArtistSummary>> fetchPopularArtists() =>
+      _mock.fetchPopularArtists();
+
+  @override
+  Future<List<ArtistSummary>> fetchRecommendedArtists() =>
+      _mock.fetchRecommendedArtists();
+
+  @override
+  Future<TrendingKeywords> fetchTrendingKeywords() =>
+      _mock.fetchTrendingKeywords();
 }
 
 /// [failing] 인 동안 공연 검색만 서버 오류로 실패하고, 끄면 목 데이터로

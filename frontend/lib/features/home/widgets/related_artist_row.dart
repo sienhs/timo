@@ -42,7 +42,7 @@ class RelatedArtistRow extends StatelessWidget {
                 label: artist.name,
                 semanticLabel: HomeStrings.searchFor(artist.name),
                 onPressed: () => onArtistPressed(artist),
-                badge: _FavoriteBadge(
+                badge: _FavoriteHeart(
                   isFavorite: favoriteNames.contains(artist.name),
                   onPressed: () => onFavoritePressed(artist),
                 ),
@@ -55,31 +55,36 @@ class RelatedArtistRow extends StatelessWidget {
   }
 }
 
-/// 아바타 귀퉁이의 하트. 흰 원 위에 얹어 사진 위에서도 보이게 한다.
-class _FavoriteBadge extends StatelessWidget {
-  const _FavoriteBadge({required this.isFavorite, required this.onPressed});
+/// 아바타 원 테두리에 걸친 하트. 찜 전에는 초록 빈 하트, 찜하면 초록으로
+/// 채운다 — 채운 초록 하트가 곧 찜한 상태인 것은 공연 카드(`ShowBannerCard`)·
+/// 공연 상세 상단 바·찜리스트와 같다.
+///
+/// 공연 카드와 달리 빈 하트도 초록이다. 원 밖으로 반쯤 나가 흰 배경에 걸치는
+/// 자리라 흰 선 하트는 보이지 않는다.
+class _FavoriteHeart extends StatelessWidget {
+  const _FavoriteHeart({required this.isFavorite, required this.onPressed});
 
   final bool isFavorite;
   final VoidCallback onPressed;
 
-  static const _size = 28.0;
-  static const _iconSize = 16.0;
-
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      shape: const CircleBorder(side: BorderSide(color: AppColors.border)),
-      clipBehavior: Clip.antiAlias,
-      child: IconButton(
-        onPressed: onPressed,
-        tooltip: isFavorite ? HomeStrings.unfavorite : HomeStrings.favorite,
-        iconSize: _iconSize,
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: isFavorite ? HomeStrings.unfavorite : HomeStrings.favorite,
+      iconSize: HomeMetrics.artistFavoriteIconSize,
+      // 버튼 크기를 못 박는다. Material 3 의 IconButton 은 `constraints` 를
+      // 줘도 터치 타깃 규칙(tapTargetSize)으로 48 까지 부풀리는데, 그러면
+      // 아이콘 중심이 계산한 자리보다 안쪽으로 밀려 원 안에 들어가 버린다.
+      style: IconButton.styleFrom(
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints.tightFor(width: _size, height: _size),
-        color: AppColors.accent,
-        icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        fixedSize: const Size.square(HomeMetrics.artistFavoriteButtonSize),
+        minimumSize: const Size.square(HomeMetrics.artistFavoriteButtonSize),
+        maximumSize: const Size.square(HomeMetrics.artistFavoriteButtonSize),
+        foregroundColor: AppColors.primary,
       ),
+      icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
     );
   }
 }
