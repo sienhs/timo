@@ -87,7 +87,9 @@ import java.util.stream.Collectors;
  * 다른 하나는 {@code @PostConstruct} 가 프록시가 적용되기 전에 불려 {@code @Transactional} 이
  * 걸리지 않는 것이다. 컨텍스트가 다 뜬 뒤에 도는 러너에는 두 문제가 모두 없다.
  *
- * <p>{@code local}·{@code demo} 프로필에서만 등록된다. 운영에서 이 빈이 뜨면 기동할 때마다 가짜
+ * <p>{@code local}·{@code demo}·{@code prod} 프로필에서 등록된다. 운영에서는 RDS에 공연이 없을 때만
+ * 한 번 실행돼 초기 데모 카탈로그를 만든다. 공연이 이미 있으면 {@link #run}이 즉시 건너뛴다.
+ * 로컬·데모에서는 휘발성 DB를 전제로 매 기동 시 채워진다. 운영에서 이 빈이 무심코 다시 돌면 가짜
  * 공연이 쌓인다. {@code demo}는 실제 S3 버킷에 데모 이미지가 실제로 올라가는지 눈으로 확인하려고
  * 만든 프로필이다({@code application-demo.yml} 참고) - DB 는 {@code local} 과 같은 휘발성 도커
  * MySQL 을 그대로 쓰고 이미지 저장소만 실제 S3({@link com.ssafy.timo.global.storage.S3ImageStorage})로
@@ -110,7 +112,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-@Profile({"local", "demo"})
+@Profile({"local", "demo", "prod"})
 @RequiredArgsConstructor
 public class LocalDataSeeder implements ApplicationRunner {
 
@@ -737,6 +739,20 @@ public class LocalDataSeeder implements ApplicationRunner {
                 .filter(name -> !idsByName.containsKey(name))
                 .toList();
         if (!missing.isEmpty()) {
+            if (environment.matchesProfiles("prod")) {
+                // 운영 RDS의 init.sql은 스키마만 만들며 로컬 전용 seed-local.sql은 실행하지 않는다.
+                // 따라서 운영에서만 이 시더가 필요한 아티스트 원본도 함께 만든다. 이미 있는 아티스트는
+                // 건드리지 않아 부분적으로 초기화된 RDS에서도 안전하다.
+                for (String name : missing) {
+                    Artist artist = artistRepository.save(Artist.builder()
+                            .name(name)
+                            .profileImageKey(ARTIST_SEED_IMAGE_KEYS.get(name))
+                            .build());
+                    idsByName.put(name, artist.getId());
+                }
+                log.info("운영 시드: 아티스트 {}명을 추가했다.", missing.size());
+                return idsByName;
+            }
             throw new IllegalStateException(
                     "시드 아티스트가 없습니다. db/seed-local.sql 을 확인하세요. missing=" + missing);
         }

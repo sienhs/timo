@@ -37,6 +37,9 @@ COPY --from=builder /app/app.jar app.jar
 # 기본 실행 환경.
 # 필요하면 docker run / ECS 환경변수로 덮어쓸 수 있음.
 ENV SPRING_PROFILES_ACTIVE=prod
+# Wallet.createStandard()의 scrypt는 한 번에 큰 힙을 요구한다. t3.micro에서도
+# 시더의 주최자 지갑 생성과 일반 회원 지갑 생성을 처리할 수 있도록 상한을 명시한다.
+ENV JAVA_TOOL_OPTIONS="-Xms128m -Xmx512m"
 
 EXPOSE 8080
 
