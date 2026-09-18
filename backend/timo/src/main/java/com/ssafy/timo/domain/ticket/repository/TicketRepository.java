@@ -78,22 +78,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                             where l.ticket_id = t.ticket_id
                               and l.status = 'LISTED') as listed
               from (
-                    select t1.ticket_id as ticket_id,
-                           'BOOKING'    as acquired_by,
-                           r1.created_at as acquired_at
-                      from ticket t1
-                      join reservation r1 on r1.reservation_id = t1.reservation_id
-                     where r1.member_id = :memberId
-                       and not exists (select 1 from ticket_trade tt
-                                        where tt.ticket_id = t1.ticket_id)
-                    union
-                    select tt2.ticket_id  as ticket_id,
-                           'TRANSFER'     as acquired_by,
-                           tt2.traded_at  as acquired_at
-                      from ticket_trade tt2
-                     where tt2.buyer_member_id = :memberId
-                       and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
-                                            where x.ticket_id = tt2.ticket_id)
+            """ + TicketOwnershipSql.CURRENT_OWNER + """
                    ) owned
               join ticket t      on t.ticket_id = owned.ticket_id
               join reservation r on r.reservation_id = t.reservation_id
@@ -105,18 +90,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             """,
             countQuery = """
             select count(*) from (
-                    select t1.ticket_id
-                      from ticket t1
-                      join reservation r1 on r1.reservation_id = t1.reservation_id
-                     where r1.member_id = :memberId
-                       and not exists (select 1 from ticket_trade tt
-                                        where tt.ticket_id = t1.ticket_id)
-                    union
-                    select tt2.ticket_id
-                      from ticket_trade tt2
-                     where tt2.buyer_member_id = :memberId
-                       and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
-                                            where x.ticket_id = tt2.ticket_id)
+            """ + TicketOwnershipSql.CURRENT_OWNER + """
                    ) owned
             """,
             nativeQuery = true)
