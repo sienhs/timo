@@ -68,7 +68,7 @@ class ReservationSettlementRunner {
             ticket.markMintFailed(e.getMessage());
             // 이 시도는 없었던 일이니 주문을 취소해 "1인 1매"·좌석 점유를 풀어 준다.
             // 안 풀면 이 회원은 이 공연을 영영 다시 예매할 수 없다.
-            reservation.cancel(LocalDateTime.now(clock));
+            releaseNow(reservation);
             return;
         }
 
@@ -98,6 +98,18 @@ class ReservationSettlementRunner {
                 "구역이 소속 공연장의 구역 목록에 없습니다 (sectionId=" + section.getId() + ", venueId=" + section.getVenue().getId() + ")");
     }
 
+    /**
+     * 좌석을 지연 없이 곧바로 돌려주며 취소한다.
+     *
+     * <p>사용자 취소({@code ReservationServiceImpl.cancel})는 3분 1초에서 15분 사이의 랜덤 지연을
+     * 두지만 여기는 다르다. 결제나 발행이 실패해 <b>없었던 일로 되돌리는</b> 경로라, 지연을 두면
+     * 시스템이 실패한 대가를 사용자가 기다림으로 치르게 된다. 바로 다시 시도할 수 있어야 한다.
+     */
+    private void releaseNow(Reservation reservation) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        reservation.cancel(now, now);
+    }
+
     private void refundOrElseMarkFailed(Reservation reservation, String buyerAddress, String organizerAddress, Long reservationId,
                                         BigInteger facePrice, Ticket ticket, String mintFailureReason) {
         byte[] refundRefId = ContractClient.keccak256("reservation-" + reservationId + ":refund");
@@ -105,7 +117,7 @@ class ReservationSettlementRunner {
             ticketVaultClient.refund(buyerAddress, organizerAddress, facePrice, refundRefId);
             ticket.markRefunded(mintFailureReason);
             // 환불까지 끝나 돈은 원래대로다 - 위와 같은 이유로 주문도 취소해 다시 시도할 수 있게 한다.
-            reservation.cancel(LocalDateTime.now(clock));
+            releaseNow(reservation);
         } catch (ContractCallException refundError) {
             // 환불조차 실패하면 돈이 어중간하게 걸린 상태다. 여기서 함부로 취소하면 "1인 1매"가
             // 풀려 버려 같은 회원이 또 예매할 수 있게 되는데, 실제로는 아직 안 끝난 결제가 남아

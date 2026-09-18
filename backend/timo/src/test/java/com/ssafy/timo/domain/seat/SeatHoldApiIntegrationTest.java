@@ -434,20 +434,31 @@ class SeatHoldApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("취소된 적이 있는 좌석도 열린 구매 기회가 없으면 잡을 수 있다 - 취소표는 기회가 끝나면 풀린다")
-    void hold_allowsRevokedSeatWithoutOffer() throws Exception {
+    @DisplayName("해제 시각이 지난 취소 좌석은 잡을 수 있다")
+    void hold_allowsRevokedSeatAfterRelease() throws Exception {
         Long seatId = seatIdAt(1, 1);
-        revoke(concertA, seatId, someoneElse);
+        revoke(concertA, seatId, someoneElse, LocalDateTime.now().minusSeconds(1));
         flushAndClear();
 
-        // 취소 시 찜한 회원이 없으면 기회 없이 곧바로 열리고, 기회가 있었어도 1시간이 지나면 같은 상태다.
-        // 기회가 열린 동안의 잠금은 CancelOfferFlowIntegrationTest 가 본다.
         mvc.perform(holdBy(me, concertA, seatId))
                 .andExpect(status().isOk());
         flushAndClear();
 
         assertThat(seatHoldRepository.findActive(concertA.getId(), seatId, LocalDateTime.now()))
                 .isPresent();
+    }
+
+    @Test
+    @DisplayName("해제 시각 전인 취소 좌석은 아무도 잡을 수 없다")
+    void hold_rejectsRevokedSeatBeforeRelease() throws Exception {
+        Long seatId = seatIdAt(1, 2);
+        revoke(concertA, seatId, someoneElse, LocalDateTime.now().plusMinutes(10));
+        flushAndClear();
+
+        // 조회에서는 선점과 구분되지 않는 자리다. 여기서 막지 않으면 API 직접 호출로 뚫린다.
+        mvc.perform(holdBy(me, concertA, seatId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("SeatNotHoldableException"));
     }
 
     @Test
@@ -576,14 +587,19 @@ class SeatHoldApiIntegrationTest {
                 .build());
     }
 
-    /** 좌석을 취소된 적이 있는(회수된) 것으로 만든다. 취소 API 가 아직 없어 만들고 바로 취소한다. */
-    private void revoke(Concert concert, Long seatId, long memberId) {
+    /**
+     * 좌석을 취소된 적이 있는(회수된) 것으로 만든다. 취소 API 가 아직 없어 만들고 바로 취소한다.
+     *
+     * <p>{@code seatReleaseAt} 을 직접 받는다. 실제 취소는 3분 1초에서 15분 사이의 난수를 뽑지만,
+     * 여기서 보는 것은 "그 시각 전후에 어떻게 보이는가" 라 값을 고정해야 한다.
+     */
+    private void revoke(Concert concert, Long seatId, long memberId, LocalDateTime seatReleaseAt) {
         Reservation reservation = reservationRepository.save(Reservation.builder()
                 .concert(concert)
                 .member(memberRepository.getReferenceById(memberId))
                 .seat(seatRepository.getReferenceById(seatId))
                 .build());
-        reservation.cancel(LocalDateTime.now());
+        reservation.cancel(LocalDateTime.now(), seatReleaseAt);
     }
 
     private Long seatIdAt(int seatNo, int seatCol) {

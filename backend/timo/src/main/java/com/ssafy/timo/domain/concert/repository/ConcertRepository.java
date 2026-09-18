@@ -113,9 +113,8 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
      *
      * <p>판정은 "이 공연장의 좌석 수 = 이 공연에서 <b>결제된</b> 좌석 수" 다. 즉 {@code PAID} 만
      * 센다. 취소된 주문은 자리를 놓아 주므로({@code ReservationStatus} 주석) 팔린 자리가 아니고,
-     * 취소표 구매 기회({@code CancelOffer})가 열려 있는 자리도 그 회원이 사면 되는 자리라 남은
-     * 것으로 본다. 선점도 마찬가지다 - 결제 중인 자리를 팔렸다고 보면 5분 뒤 만료에 맞춰 되돌려야
-     * 한다.
+     * 해제를 기다리는 취소 자리도 곧 다시 팔 자리라 남은 것으로 본다. 선점도 마찬가지다 -
+     * 결제 중인 자리를 팔렸다고 보면 5분 뒤 만료에 맞춰 되돌려야 한다.
      *
      * <p>정리하면 세지 않는 것은 모두 <b>일시적인 잠금</b>이다. 잠금이 풀려 자리가 돌아오는 것과
      * 매진 판정이 엇갈리지 않으려면, 되돌릴 수 없는 사실인 {@code PAID} 만 세는 것이 맞다.
@@ -145,8 +144,8 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
      * {@code ConcertStatusScheduler} 가 부른다.
      *
      * <p>{@link #markSoldOut()} 을 그대로 뒤집은 조건이다 - 결제된 좌석이 전체 좌석보다 적으면
-     * 팔 자리가 남아 있다. 취소표 구매 기회가 열려 있는 동안에도 되돌린다. 그 자리는 뽑힌 회원이
-     * 살 수 있는 자리이고, 기회가 만료되면 아무나 살 수 있게 되므로 어느 쪽이든 매진이 아니다.
+     * 팔 자리가 남아 있다. 해제를 기다리는 동안에도 되돌린다. 그 자리는 해제 시각이 지나면
+     * 아무나 살 수 있게 되므로 매진이 아니다.
      *
      * <p>온체인 등록 조건을 {@link #openScheduled} 와 똑같이 건다. {@code SOLD_OUT} 이 되려면
      * {@code ON_SALE} 을 거쳤어야 하므로 이미 갖춰져 있는 것이 정상이지만, 시드나 부트스트랩 SQL 이

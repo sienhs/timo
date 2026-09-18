@@ -11,7 +11,6 @@ import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.dto.CreateReservationRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationDetailResponseDto;
-import com.ssafy.timo.domain.offer.service.CancelOfferService;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.exception.BookingClosedException;
 import com.ssafy.timo.domain.reservation.exception.ConcertNotOnSaleException;
@@ -40,6 +39,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigInteger;
 import java.time.Clock;
+import java.util.Random;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -85,8 +85,6 @@ class ReservationCreateBookingWindowTest {
     private TicketTradeRepository ticketTradeRepository;
     @Mock
     private TicketListingRepository ticketListingRepository;
-    @Mock
-    private CancelOfferService cancelOfferService;
     @Mock
     private WalletService walletService;
     @Mock
@@ -149,8 +147,8 @@ class ReservationCreateBookingWindowTest {
     private ReservationServiceImpl serviceAt(LocalDateTime now) {
         return new ReservationServiceImpl(memberRepository, concertRepository, seatHoldRepository,
                 reservationRepository, ticketRepository, ticketTradeRepository, ticketListingRepository,
-                cancelOfferService, walletService, ticketVaultClient, ticketNftClient, imageStorage, eventPublisher,
-                Clock.fixed(now.atZone(ZONE).toInstant(), ZONE));
+                walletService, ticketVaultClient, ticketNftClient, imageStorage, eventPublisher,
+                new Random(0), Clock.fixed(now.atZone(ZONE).toInstant(), ZONE));
     }
 
     private static CreateReservationRequestDto request() {

@@ -75,6 +75,15 @@ public class Reservation extends BaseEntity {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    /**
+     * 취소된 자리가 다시 예매 가능해지는 시각. 취소 시점에 정해지고 그 뒤로 바뀌지 않는다.
+     *
+     * <p>좌석 상태는 저장하지 않고 조회할 때마다 유도하므로({@code SeatStatus}) 이 값도 스케줄러가
+     * 소비하지 않는다. 지나면 조회 조건에서 저절로 빠진다.
+     */
+    @Column(name = "seat_release_at")
+    private LocalDateTime seatReleaseAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ReservationStatus status;
@@ -112,12 +121,18 @@ public class Reservation extends BaseEntity {
         return status == ReservationStatus.PAID;
     }
 
-    /** 주문을 취소한다. 이미 취소된 주문은 최초 취소 시각을 유지한다. */
-    public void cancel(LocalDateTime now) {
+    /**
+     * 주문을 취소한다. 이미 취소된 주문은 최초 취소 시각과 해제 시각을 유지한다.
+     *
+     * <p>해제 시각을 밖에서 받는 이유는 난수가 들어가기 때문이다. 엔티티가 직접 뽑으면 테스트에서
+     * 고정할 수 없고, 같은 주문을 두 번 취소할 때 값이 달라질 여지가 생긴다.
+     */
+    public void cancel(LocalDateTime now, LocalDateTime seatReleaseAt) {
         if (this.status != ReservationStatus.PAID) {
             return;
         }
         this.status = ReservationStatus.CANCELLED;
         this.cancelledAt = now;
+        this.seatReleaseAt = seatReleaseAt;
     }
 }

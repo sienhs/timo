@@ -254,7 +254,7 @@ class ConcertStatusSchedulerTest {
 
         // 스윕의 벌크 UPDATE 가 영속성 컨텍스트를 비워 first 는 준영속이다. 그대로 cancel() 하면
         // DB 에 닿지 않아 아무 일도 일어나지 않는다.
-        reservationRepository.findById(first.getId()).orElseThrow().cancel(LocalDateTime.now());
+        reservationRepository.findById(first.getId()).orElseThrow().cancel(LocalDateTime.now(), LocalDateTime.now());
         em.flush();
 
         scheduler.sweep();
@@ -335,7 +335,7 @@ class ConcertStatusSchedulerTest {
                 .member(newBuyer())
                 .seat(seat)
                 .build());
-        reservation.cancel(LocalDateTime.now());
+        reservation.cancel(LocalDateTime.now(), LocalDateTime.now());
         em.flush();
     }
 

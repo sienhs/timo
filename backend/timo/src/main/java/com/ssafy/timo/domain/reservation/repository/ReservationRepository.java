@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -28,6 +29,24 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
               and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID
             """)
     boolean existsPaidSeat(@Param("concertId") Long concertId, @Param("seatId") Long seatId);
+
+    /**
+     * 이 공연에서 이 좌석이 취소 뒤 해제를 기다리는 중인지.
+     *
+     * <p>취소된 주문은 좌석을 놓아 주지만 곧바로는 아니다. 해제 시각까지는 선점처럼 잠긴다.
+     * 좌석 조회가 같은 조건을 쓰므로({@code SeatRepository}) 둘이 갈리면 화면과 선점이 어긋난다.
+     */
+    @Query("""
+            select count(r) > 0
+            from Reservation r
+            where r.concert.id = :concertId
+              and r.seat.id = :seatId
+              and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.CANCELLED
+              and r.seatReleaseAt > :now
+            """)
+    boolean existsSeatAwaitingRelease(@Param("concertId") Long concertId,
+                                      @Param("seatId") Long seatId,
+                                      @Param("now") LocalDateTime now);
 
     /**
      * 이 공연에서 이 회원의 유효한 주문. "한 계정 한 공연 1매" 판정에 쓴다.
