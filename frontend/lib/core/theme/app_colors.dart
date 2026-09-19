@@ -42,10 +42,10 @@ class AppColors {
   /// 회색을 쓴다.
   static const swatch = Color(0xFFD3D3D3);
 
-  // 좌석 3상태. 시안 범례는 예매 가능을 흰색으로 그리지만, 흰 배치도 배경
-  // 위에서는 빈 칸과 구분이 안 가서 브랜드색을 아주 옅게 깐다.
-  static const seatAvailable = Color(0xFFEAF7EF);
-  static const seatSelected = primary;
+  // 구역색을 받지 못한 경우의 좌석 기본색. 가능 좌석은 진하게,
+  // 선택 좌석은 연한 배경과 진한 테두리로 표시한다.
+  static const seatAvailable = Color(0xFF7950B5);
+  static const seatSelected = Color(0xFFE7DFF2);
   static const seatSold = Color(0xFFD6D6D6);
 
   /// [primary] 위에 올리는 글자색. 대비가 3.43:1 이므로 굵은 큰 글자에만 쓴다.

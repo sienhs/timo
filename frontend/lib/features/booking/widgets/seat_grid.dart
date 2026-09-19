@@ -41,7 +41,9 @@ class SeatGrid extends StatefulWidget {
     required this.seatRows,
     required this.selectedSeatId,
     required this.onSeatTap,
+    this.zoneColor,
   });
+  final Color? zoneColor;
 
   /// 한 열에 들어가는 칸 수. 캔버스 폭을 정한다.
   ///
@@ -119,6 +121,7 @@ class _SeatGridState extends State<SeatGrid> {
                             row: row,
                             selectedSeatId: widget.selectedSeatId,
                             onSeatTap: widget.onSeatTap,
+                            zoneColor: widget.zoneColor,
                           ),
                       ],
                     ),
@@ -229,7 +232,9 @@ class _SeatRow extends StatelessWidget {
     required this.row,
     required this.selectedSeatId,
     required this.onSeatTap,
+    this.zoneColor,
   });
+  final Color? zoneColor;
 
   final List<Seat?> row;
   final int? selectedSeatId;
@@ -256,6 +261,7 @@ class _SeatRow extends StatelessWidget {
                       seat: seat,
                       state: seatCellStateOf(seat, selectedSeatId),
                       onTap: onSeatTap,
+                      zoneColor: zoneColor,
                     ),
             ),
         ],
@@ -270,7 +276,9 @@ class _SeatCell extends StatelessWidget {
     required this.seat,
     required this.state,
     required this.onTap,
+    this.zoneColor,
   });
+  final Color? zoneColor;
 
   final Seat seat;
   final SeatCellState state;
@@ -278,7 +286,7 @@ class _SeatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = seatCellColors(state);
+    final colors = seatCellColors(state, zoneColor: zoneColor);
 
     // 고를 수 없는 좌석도 탭은 받는다. 여기서 거르지 않고 화면(onTap)이
     // 판단하게 두는 것은, 자리마다 무엇을 할지가 화면의 사정이기 때문이다.
@@ -290,7 +298,10 @@ class _SeatCell extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.fill,
-            border: Border.all(color: colors.border),
+            border: Border.all(
+              color: colors.border,
+              width: state == SeatCellState.selected ? 2 : 1,
+            ),
             borderRadius: const BorderRadius.all(Radius.circular(4)),
           ),
         ),

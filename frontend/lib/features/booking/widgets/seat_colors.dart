@@ -7,25 +7,24 @@ import '../models/seat.dart';
 ///
 /// 범례와 배치도가 반드시 같은 색을 써야 하므로 한 곳에서만 정의한다.
 /// 위젯마다 색을 적으면 시안이 바뀔 때 한쪽만 고치는 사고가 난다.
-({Color fill, Color border}) seatCellColors(SeatCellState state) =>
-    switch (state) {
-      SeatCellState.available => (
-          fill: AppColors.seatAvailable,
-          border: AppColors.border,
-        ),
-      SeatCellState.selected => (
-          fill: AppColors.seatSelected,
-          border: AppColors.seatSelected,
-        ),
-      SeatCellState.sold => (
-          fill: AppColors.seatSold,
-          border: AppColors.seatSold,
-        ),
-    };
+({Color fill, Color border}) seatCellColors(
+  SeatCellState state, {
+  Color? zoneColor,
+}) => switch (state) {
+  SeatCellState.available => (
+    fill: zoneColor ?? AppColors.seatAvailable,
+    border: zoneColor ?? AppColors.seatAvailable,
+  ),
+  SeatCellState.selected => (
+    fill: (zoneColor ?? AppColors.seatAvailable).withValues(alpha: .18),
+    border: zoneColor ?? AppColors.seatAvailable,
+  ),
+  SeatCellState.sold => (fill: AppColors.seatSold, border: AppColors.seatSold),
+};
 
 /// 범례에 노출할 이름과 순서. 시안과 같은 3종이다.
 const seatLegendLabels = <SeatCellState, String>{
   SeatCellState.available: '예매가능',
   SeatCellState.selected: '선택됨',
-  SeatCellState.sold: '예매완료',
+  SeatCellState.sold: '선택불가',
 };

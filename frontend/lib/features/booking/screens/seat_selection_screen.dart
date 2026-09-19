@@ -18,6 +18,7 @@ import '../widgets/performance_header.dart';
 import '../widgets/seat_confirm_dialog.dart';
 import '../widgets/seat_grid.dart';
 import '../widgets/seat_legend.dart';
+import '../widgets/venue_map.dart';
 
 /// 시안 '좌석 상세 선택' 화면. 구역 하나의 좌석 배치도에서 한 석을 고른다.
 class SeatSelectionScreen extends StatefulWidget {
@@ -35,6 +36,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   late int _concertId;
   late BookingController _controller;
   late Future<ZoneSeats> _seats;
+  late int _zoneId;
+  List<Zone> _zones = [];
 
   /// 선점 요청이 나가 있는 동안 참. 결제하기 버튼을 잠가 둔다.
   ///
@@ -48,7 +51,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     _api = BookingApiScope.of(context);
     _controller = BookingScope.read(context);
     _concertId = _controller.concertId;
+    _zoneId = widget.zoneId;
     _seats = _fetch();
+    _loadZones();
   }
 
   @override
@@ -64,7 +69,79 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   }
 
   Future<ZoneSeats> _fetch() =>
-      _api.fetchSeats(concertId: _concertId, zoneId: widget.zoneId);
+      _api.fetchSeats(concertId: _concertId, zoneId: _zoneId);
+
+  Future<void> _loadZones() async {
+    try {
+      final zones = await _api.fetchZones(_concertId);
+      if (mounted) setState(() => _zones = zones);
+    } catch (_) {
+      // Seat selection remains usable if the optional navigation map fails.
+    }
+  }
+
+  void _changeZone(Zone zone) {
+    if (_holding || _controller.hold != null || zone.id == _zoneId) return;
+    _controller.clearSelection();
+    setState(() {
+      _zoneId = zone.id;
+      _seats = _fetch();
+    });
+  }
+
+  void _adjacentZone(int offset) {
+    final current = _zones.indexWhere((z) => z.id == _zoneId);
+    final next = current + offset;
+    if (current >= 0 && next >= 0 && next < _zones.length) {
+      _changeZone(_zones[next]);
+    }
+  }
+
+  Future<void> _showMap() async {
+    if (_zones.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+    final zone = await showModalBottomSheet<Zone>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('이동할 구역을 선택하세요'),
+                const SizedBox(height: 12),
+                VenueMap(
+                  zones: _zones,
+                  selectedZoneId: _zoneId,
+                  onZoneTap: (zone) => Navigator.pop(context, zone),
+                ),
+                for (final zone in _zones)
+                  ListTile(
+                    leading: Icon(
+                      Icons.circle,
+                      color: zoneColor(zone.id),
+                      size: 14,
+                    ),
+                    title: Text(zone.name),
+                    trailing: Text(
+                      zone.isSoldOut ? '매진' : '${zone.availableCount}석',
+                    ),
+                    selected: zone.id == _zoneId,
+                    onTap: () => Navigator.pop(context, zone),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (mounted && zone != null) _changeZone(zone);
+  }
 
   /// 좌석을 다시 받아 온다. 남이 잡았다 푼 자리가 이때 보인다.
   ///
@@ -86,6 +163,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     // 알려 줘야 하는 경우는 따로 있다. 초록 자리를 눌러 잡으려는데 그 사이
     // 남이 채 간 때다(409). 그건 [_onHoldFailed] 가 맡는다.
     if (!seat.isSelectable) return;
+    if (_holding) return;
     BookingScope.read(context).selectSeat(_zoneOf(zoneSeats), seat);
   }
 
@@ -228,25 +306,73 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       body: Column(
         children: [
           PerformanceHeader(performance: controller.performance),
-          const SeatLegend(),
+          SeatLegend(zoneColor: zoneColor(_zoneId)),
           Expanded(
             child: AsyncBoundary<ZoneSeats>(
+              key: ValueKey(_zoneId),
               future: _seats,
               onRetry: _refresh,
               builder: (context, zoneSeats) => Column(
                 children: [
-                  _ViewingZoneRow(
-                    zoneName: zoneSeats.zoneName,
-                    onChangeZone: () => Navigator.pop(context),
+                  GestureDetector(
+                    key: const ValueKey('zone-navigation'),
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragEnd: (details) {
+                      if ((details.primaryVelocity ?? 0).abs() > 100) {
+                        _adjacentZone(details.primaryVelocity! < 0 ? 1 : -1);
+                      }
+                    },
+                    child: _ViewingZoneRow(
+                      zoneName: zoneSeats.zoneName,
+                      onChangeZone: _showMap,
+                      minimap: _zones.isEmpty
+                          ? null
+                          : Semantics(
+                              button: true,
+                              excludeSemantics: true,
+                              label: '전체 배치도에서 구역 변경',
+                              onTap: _showMap,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _showMap,
+                                child: IgnorePointer(
+                                  child: VenueMap(
+                                    zones: _zones,
+                                    selectedZoneId: _zoneId,
+                                    compact: true,
+                                    onZoneTap: (_) {},
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
                   ),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: SeatGrid(
-                        seatsPerRow: _zoneOf(zoneSeats).seatsPerRow,
-                        seatRows: zoneSeats.rows,
-                        selectedSeatId: selectedSeat?.id,
-                        onSeatTap: (seat) => _onSeatTap(zoneSeats, seat),
+                      child: Column(
+                        children: [
+                          Container(
+                            height: 26,
+                            alignment: Alignment.center,
+                            margin: const EdgeInsets.only(bottom: 6),
+                            color: AppColors.stageFill,
+                            child: Text(
+                              'STAGE 방향',
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ),
+                          Expanded(
+                            child: SeatGrid(
+                              key: ValueKey(_zoneId),
+                              zoneColor: zoneColor(_zoneId),
+                              seatsPerRow: _zoneOf(zoneSeats).seatsPerRow,
+                              seatRows: zoneSeats.rows,
+                              selectedSeatId: selectedSeat?.id,
+                              onSeatTap: (seat) => _onSeatTap(zoneSeats, seat),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -268,9 +394,11 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                       color: AppColors.textSecondary,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      '두 손가락으로 확대·이동할 수 있어요',
-                      style: Theme.of(context).textTheme.labelSmall,
+                    Flexible(
+                      child: Text(
+                        '두 손가락으로 확대·이동 · 구역 이름을 밀어 구역 변경',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
                     ),
                   ],
                 ),
@@ -299,7 +427,12 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
 /// '지금 보고 있는 구역은 ... 입니다' + 구역 변경 버튼.
 class _ViewingZoneRow extends StatelessWidget {
-  const _ViewingZoneRow({required this.zoneName, required this.onChangeZone});
+  const _ViewingZoneRow({
+    required this.zoneName,
+    required this.onChangeZone,
+    this.minimap,
+  });
+  final Widget? minimap;
 
   final String zoneName;
   final VoidCallback onChangeZone;
@@ -312,6 +445,10 @@ class _ViewingZoneRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       child: Row(
         children: [
+          if (minimap != null) ...[
+            SizedBox(width: 48, height: 44, child: minimap),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Text.rich(
               TextSpan(
@@ -330,7 +467,7 @@ class _ViewingZoneRow extends StatelessWidget {
                 ],
               ),
               style: textTheme.bodySmall,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),

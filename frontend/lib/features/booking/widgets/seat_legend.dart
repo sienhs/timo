@@ -10,7 +10,8 @@ import 'seat_colors.dart';
 /// 지금 고를 수 없다는 점에서 같고, 나누면 "기다리면 풀리나" 라는 기대를
 /// 만든다.
 class SeatLegend extends StatelessWidget {
-  const SeatLegend({super.key});
+  const SeatLegend({super.key, this.zoneColor});
+  final Color? zoneColor;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +29,7 @@ class SeatLegend extends StatelessWidget {
           for (final entry in seatLegendLabels.entries)
             _LegendChip(
               label: entry.value,
-              colors: seatCellColors(entry.key),
+              colors: seatCellColors(entry.key, zoneColor: zoneColor),
               labelStyle: labelStyle,
             ),
         ],
