@@ -17,9 +17,9 @@ import '../widgets/duplicate_check_button.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 4/4 닉네임 설정. 회원가입의 마지막 입력 화면.
+/// 3/3 닉네임 설정. 회원가입의 마지막 입력 화면.
 ///
-/// 중복 확인 흐름은 아이디 화면과 같다. '인증하고 시작하기' 를 누르면 지금까지
+/// 중복 확인 흐름은 아이디 칸과 같다. 칸에서 포커스가 빠지면 저절로 확인한다. '인증하고 시작하기' 를 누르면 지금까지
 /// 모은 초안으로 가입을 요청하고 완료 화면으로 간다. 이때 입력 화면들은
 /// 스택에서 전부 지워서, 완료 화면에서 뒤로가기를 눌러도 입력 화면으로
 /// 돌아가지 않고 홈으로 간다.
@@ -47,6 +47,7 @@ class SignupNicknameScreen extends StatefulWidget {
 
 class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
   final _controller = TextEditingController();
+  final _focus = FocusNode();
   var _status = AvailabilityStatus.unchecked;
   var _busy = false;
 
@@ -77,9 +78,25 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
       _status == AvailabilityStatus.available ? AppColors.primary : null;
 
   @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_checkOnFocusLost);
+  }
+
+  @override
   void dispose() {
+    _focus.removeListener(_checkOnFocusLost);
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
+  }
+
+  /// 칸을 벗어나는 순간 중복 확인을 대신 눌러 준다. 아이디 칸과 같은 규칙이다
+  /// (SignupAccountScreen 참고). unchecked 일 때만 불러 같은 값을 다시 묻지 않는다.
+  void _checkOnFocusLost() {
+    if (_focus.hasFocus) return;
+    if (!_canCheck || _status != AvailabilityStatus.unchecked) return;
+    _check();
   }
 
   void _onChanged(String _) =>
@@ -127,7 +144,8 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
     if (!mounted) return;
     // 뒤로가기로 입력 화면에 돌아올 일이 없으니 _busy 는 풀지 않는다.
     //
-    // 스택을 [홈 탭, 완료 화면] 으로 다시 세운다. 로그인 화면과 같은 규칙 —
+    // 스택을 [홈 탭, 지갑 연출] 로 다시 세운다. 연출 화면이 제 자리를 완료
+    // 화면으로 바꿔치우므로(pushReplacement) 결국 [홈 탭, 완료 화면] 이 된다. 로그인 화면과 같은 규칙 —
     // 로그인이 끝나면 어디서 시작했든 홈으로 간다. 완료 화면 아래에 홈 탭을
     // 깔아 두면 '티켓 보러 가기' 든 뒤로가기든 홈 탭에 닿는다. 그냥 첫 화면까지
     // 걷어내면 가입을 시작한 탭(마이페이지)으로 돌아간다.
@@ -136,7 +154,7 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
       AppRoutes.home,
       (route) => false,
     );
-    Navigator.pushNamed(context, AppRoutes.signupComplete);
+    Navigator.pushNamed(context, AppRoutes.signupWallet);
   }
 
   /// 가입 거절 원인별 안내.
@@ -171,7 +189,7 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
   @override
   Widget build(BuildContext context) {
     return SignupStepPage(
-      step: 4,
+      step: 3,
       title: AuthStrings.nicknameTitle,
       subtitle: AuthStrings.nicknameSubtitle,
       buttonLabel: AuthStrings.startSignup,
@@ -181,6 +199,7 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
         label: AuthStrings.nicknameLabel,
         hint: AuthStrings.nicknameHint,
         controller: _controller,
+        focusNode: _focus,
         autofocus: true,
         keyboardType: TextInputType.text,
         textInputAction: TextInputAction.done,

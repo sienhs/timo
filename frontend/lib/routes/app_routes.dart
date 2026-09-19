@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import '../features/auth/models/signup_draft.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/signup_complete_screen.dart';
+import '../features/auth/screens/wallet_creating_screen.dart';
+import '../features/auth/screens/signup_account_screen.dart';
 import '../features/auth/screens/signup_nickname_screen.dart';
-import '../features/auth/screens/signup_password_screen.dart';
 import '../features/auth/screens/signup_phone_screen.dart';
-import '../features/auth/screens/signup_username_screen.dart';
 import '../features/booking/constants.dart';
 import '../features/booking/screens/seat_selection_screen.dart';
 import '../features/booking/screens/zone_selection_screen.dart';
@@ -104,9 +104,12 @@ class AppRoutes {
 
   /// 회원가입. 단계 화면은 앞 단계까지 채운 SignupDraft 를 arguments 로 받는다.
   static const signupPhone = '/signup/phone';
-  static const signupUsername = '/signup/username';
-  static const signupPassword = '/signup/password';
+
+  /// 아이디와 비밀번호를 한 화면에서 받는다. 예전에는 따로였다.
+  static const signupAccount = '/signup/account';
   static const signupNickname = '/signup/nickname';
+  /// 가입 직후 지갑을 준비하는 연출. 영상이 끝나면 스스로 완료 화면으로 바뀐다.
+  static const signupWallet = '/signup/wallet';
   static const signupComplete = '/signup/complete';
 
   static final Map<String, WidgetBuilder> routes = {
@@ -190,12 +193,11 @@ class AppRoutes {
     ),
     login: (_) => const LoginScreen(),
     signupPhone: (_) => const SignupPhoneScreen(),
-    signupUsername: (context) =>
-        SignupUsernameScreen(draft: _signupDraft(context)),
-    signupPassword: (context) =>
-        SignupPasswordScreen(draft: _signupDraft(context)),
+    signupAccount: (context) =>
+        SignupAccountScreen(draft: _signupDraft(context)),
     signupNickname: (context) =>
         SignupNicknameScreen(draft: _signupDraft(context)),
+    signupWallet: (_) => const WalletCreatingScreen(),
     signupComplete: (_) => const SignupCompleteScreen(),
   };
 

@@ -250,7 +250,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
       _codeTimer?.cancel();
       _resendTimer?.cancel();
     });
-    _goToUsername();
+    _goToAccount();
   }
 
   /// 이미 가입된 번호라고 거절당했을 때 로그인 화면으로 보낸다.
@@ -265,12 +265,12 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     Navigator.pushReplacementNamed(context, AppRoutes.login);
   }
 
-  void _goToUsername() {
+  void _goToAccount() {
     final ticket = _verificationTicket;
     if (ticket == null) return;
     Navigator.pushNamed(
       context,
-      AppRoutes.signupUsername,
+      AppRoutes.signupAccount,
       arguments: widget.draft.copyWith(
         name: _name,
         phoneNumber: _sentPhoneNumber,
@@ -341,7 +341,7 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
           : AuthStrings.requestCode,
       isBusy: _busy,
       onPressed: _verified
-          ? (_canContinue ? _goToUsername : null)
+          ? (_canContinue ? _goToAccount : null)
           : _codeRequested
           ? (_canVerify ? _verify : null)
           : (_canRequest ? _requestCode : null),

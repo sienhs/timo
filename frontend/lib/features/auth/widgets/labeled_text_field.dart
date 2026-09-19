@@ -23,6 +23,7 @@ class LabeledTextField extends StatelessWidget {
     super.key,
     required this.label,
     required this.hint,
+    this.labelNote,
     required this.controller,
     this.onChanged,
     this.onSubmitted,
@@ -47,6 +48,14 @@ class LabeledTextField extends StatelessWidget {
   static const _messageIndent = 14.0;
 
   final String label;
+
+  /// 라벨 오른쪽에 회색으로 붙는 짧은 보조 문구('가입 후 변경 불가').
+  ///
+  /// 칸 아래 한 줄은 오류·사용 가능 여부처럼 **입력에 따라 바뀌는** 안내가
+  /// 쓰고 있어, 입력과 무관하게 늘 사실인 주의사항은 자리를 다툰다. 라벨 옆은
+  /// 아무것도 덮지 않고 계속 보인다.
+  final String? labelNote;
+
   final String hint;
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
@@ -113,12 +122,27 @@ class LabeledTextField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          label,
-          style: textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              label,
+              style: textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (labelNote != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                labelNote!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 8),
         if (trailing == null)
