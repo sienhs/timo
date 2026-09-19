@@ -91,7 +91,7 @@ void main() {
     // 잔여좌석보기 패널: 매진 구역이 0석으로 찍힌다
     await tester.tap(find.text('잔여좌석보기'));
     await tester.pumpAndSettle();
-    expect(find.text('0석'), findsOneWidget);
+    expect(find.text('매진'), findsOneWidget);
 
     // 좌석가격보기 패널: 요구사항상 모든 구역이 동일 금액
     await tester.tap(find.text('좌석가격보기'));
@@ -109,7 +109,7 @@ void main() {
     // 시안 범례 3종. '선점중' 은 노출하지 않는다.
     expect(find.text('예매가능'), findsOneWidget);
     expect(find.text('선택됨'), findsOneWidget);
-    expect(find.text('예매완료'), findsOneWidget);
+    expect(find.text('선택불가'), findsOneWidget);
     expect(find.text('선점중'), findsNothing);
     expect(find.text('좌석을 선택해주세요'), findsOneWidget);
   });

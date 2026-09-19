@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/zone.dart';
 
+Color zoneColor(int id) => const [
+  Color(0xFF7950B5),
+  Color(0xFF356DB5),
+  Color(0xFF168577),
+  Color(0xFFAD6534),
+  Color(0xFFB64E79),
+][id.abs() % 5];
+
 /// 공연장 구역 배치도.
 ///
 /// 배치도는 STAGE 아래에 좌(A) · 우(B), 그 밑에 가로로 긴 구역(C), 맨 아래에
@@ -17,7 +25,15 @@ import '../models/zone.dart';
 /// 시안대로 매진 구역도 다른 구역과 같은 색으로 둔다. 매진 여부는 눌렀을 때
 /// 화면이 안내한다.
 class VenueMap extends StatelessWidget {
-  const VenueMap({super.key, required this.zones, required this.onZoneTap});
+  const VenueMap({
+    super.key,
+    required this.zones,
+    required this.onZoneTap,
+    this.selectedZoneId,
+    this.compact = false,
+  });
+  final int? selectedZoneId;
+  final bool compact;
 
   /// 서버에서 받은 구역들. 순서가 곧 배치도의 자리다.
   final List<Zone> zones;
@@ -34,12 +50,30 @@ class VenueMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    assert(zones.length >= 3, '시안 배치도는 1층 구역 셋을 전제로 한다');
+    if (compact) {
+      return FittedBox(
+        child: SizedBox(
+          width: 300,
+          child: VenueMap(
+            zones: zones,
+            onZoneTap: onZoneTap,
+            selectedZoneId: selectedZoneId,
+          ),
+        ),
+      );
+    }
     final balcony = zones.skip(3).toList();
 
     return Container(
       padding: const EdgeInsets.all(14),
-      color: AppColors.mapSurface,
+      decoration: BoxDecoration(
+        color: AppColors.mapSurface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(14),
+          bottom: Radius.circular(32),
+        ),
+      ),
       child: Column(
         // stretch 가 없으면 FLOOR C 처럼 Expanded 밖에 있는 구역이 글자 폭으로
         // 쪼그라든다(Column 기본 정렬이 center 라서).
@@ -58,30 +92,58 @@ class VenueMap extends StatelessWidget {
                   child: Padding(
                     // 무대와 띄운다. 붙여 두면 분홍 구역이 무대의 일부처럼 읽힌다.
                     padding: const EdgeInsets.only(top: _gap, right: _gap),
-                    child: _ZoneBlock(zone: zones[0], onTap: onZoneTap),
+                    child: zones.isEmpty
+                        ? const SizedBox()
+                        : _ZoneBlock(
+                            zone: zones[0],
+                            shape: _ZoneShape.left,
+                            onTap: onZoneTap,
+                            selected: selectedZoneId == zones[0].id,
+                          ),
                   ),
                 ),
                 // 무대 돌출부. STAGE 바와 이어져 시안의 T 자 형태를 만든다.
                 // 여기에만 위쪽 여백을 주지 않는 이유가 그것이다.
                 const Expanded(
                   flex: 28,
-                  child: ColoredBox(color: AppColors.stageFill),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.stageFill,
+                      borderRadius: BorderRadius.vertical(
+                        bottom: Radius.circular(10),
+                      ),
+                    ),
+                  ),
                 ),
                 Expanded(
                   flex: 36,
                   child: Padding(
                     padding: const EdgeInsets.only(top: _gap, left: _gap),
-                    child: _ZoneBlock(zone: zones[1], onTap: onZoneTap),
+                    child: zones.length < 2
+                        ? const SizedBox()
+                        : _ZoneBlock(
+                            zone: zones[1],
+                            shape: _ZoneShape.right,
+                            onTap: onZoneTap,
+                            selected: selectedZoneId == zones[1].id,
+                          ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: _gap),
-          SizedBox(
-            height: _bottomHeight,
-            child: _ZoneBlock(zone: zones[2], onTap: onZoneTap),
-          ),
+          if (zones.length >= 3) ...[
+            const SizedBox(height: _gap),
+            SizedBox(
+              height: _bottomHeight,
+              child: _ZoneBlock(
+                zone: zones[2],
+                shape: _ZoneShape.rear,
+                onTap: onZoneTap,
+                selected: selectedZoneId == zones[2].id,
+              ),
+            ),
+          ],
           // 2층 줄. C 와 같은 크기의 줄을 구역 수만큼 나눠 쓴다.
           if (balcony.isNotEmpty) ...[
             const SizedBox(height: _gap),
@@ -92,7 +154,16 @@ class VenueMap extends StatelessWidget {
                   for (var i = 0; i < balcony.length; i++) ...[
                     if (i > 0) const SizedBox(width: _gap),
                     Expanded(
-                      child: _ZoneBlock(zone: balcony[i], onTap: onZoneTap),
+                      child: _ZoneBlock(
+                        zone: balcony[i],
+                        shape: i == 0
+                            ? _ZoneShape.rearLeft
+                            : i == balcony.length - 1
+                            ? _ZoneShape.rearRight
+                            : _ZoneShape.rear,
+                        onTap: onZoneTap,
+                        selected: selectedZoneId == balcony[i].id,
+                      ),
                     ),
                   ],
                 ],
@@ -113,7 +184,10 @@ class _StageBar extends StatelessWidget {
     return Container(
       height: 40,
       alignment: Alignment.center,
-      color: AppColors.stageFill,
+      decoration: const BoxDecoration(
+        color: AppColors.stageFill,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+      ),
       child: Text(
         'STAGE',
         // TextStyle 을 새로 만들지 않고 테마를 경유한다. 직접 만들면
@@ -129,24 +203,34 @@ class _StageBar extends StatelessWidget {
 }
 
 class _ZoneBlock extends StatelessWidget {
-  const _ZoneBlock({required this.zone, required this.onTap});
+  const _ZoneBlock({
+    required this.zone,
+    required this.onTap,
+    this.selected = false,
+    this.shape = _ZoneShape.rear,
+  });
+  final _ZoneShape shape;
+  final bool selected;
 
   final Zone zone;
   final void Function(Zone zone) onTap;
 
   @override
   Widget build(BuildContext context) {
-    final block = ColoredBox(
-      color: AppColors.zoneFill,
-      child: Center(
-        child: Text(
-          zone.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-            color: AppColors.textPrimary,
+    final block = ClipPath(
+      clipper: _ZoneOutline(shape),
+      child: CustomPaint(
+        painter: _ZoneDetailPainter(shape, zoneColor(zone.id), selected),
+        child: Center(
+          child: Text(
+            zone.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ),
@@ -156,4 +240,94 @@ class _ZoneBlock extends StatelessWidget {
     // 매진 안내는 화면(onTap)이 띄운다.
     return GestureDetector(onTap: () => onTap(zone), child: block);
   }
+}
+
+enum _ZoneShape { left, right, rear, rearLeft, rearRight }
+
+/// 기존 구역 위치를 유지하고 외곽만 살짝 벌린 개략도다.
+class _ZoneOutline extends CustomClipper<Path> {
+  const _ZoneOutline(this.shape);
+  final _ZoneShape shape;
+
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    return switch (shape) {
+      _ZoneShape.left =>
+        Path()
+          ..moveTo(w * .09, 0)
+          ..lineTo(w, 0)
+          ..lineTo(w, h)
+          ..lineTo(w * .04, h)
+          ..quadraticBezierTo(0, h, 0, h * .9)
+          ..lineTo(w * .06, h * .1)
+          ..quadraticBezierTo(w * .07, 0, w * .09, 0)
+          ..close(),
+      _ZoneShape.right =>
+        Path()
+          ..moveTo(0, 0)
+          ..lineTo(w * .91, 0)
+          ..quadraticBezierTo(w * .93, 0, w * .94, h * .1)
+          ..lineTo(w, h * .9)
+          ..quadraticBezierTo(w, h, w * .96, h)
+          ..lineTo(0, h)
+          ..close(),
+      _ZoneShape.rear =>
+        Path()
+          ..moveTo(0, 0)
+          ..quadraticBezierTo(w * .5, h * .1, w, 0)
+          ..lineTo(w * .98, h * .85)
+          ..quadraticBezierTo(w * .5, h * 1.1, w * .02, h * .85)
+          ..close(),
+      _ZoneShape.rearLeft =>
+        Path()
+          ..moveTo(0, 0)
+          ..lineTo(w, h * .07)
+          ..lineTo(w, h)
+          ..quadraticBezierTo(w * .25, h, w * .08, h * .75)
+          ..quadraticBezierTo(w * .01, h * .5, 0, 0)
+          ..close(),
+      _ZoneShape.rearRight =>
+        Path()
+          ..moveTo(0, h * .07)
+          ..lineTo(w, 0)
+          ..quadraticBezierTo(w * .99, h * .5, w * .92, h * .75)
+          ..quadraticBezierTo(w * .75, h, 0, h)
+          ..close(),
+    };
+  }
+
+  @override
+  bool shouldReclip(_ZoneOutline oldClipper) => oldClipper.shape != shape;
+}
+
+/// 구역 블록의 면과 테두리를 그린다. 좌석열 질감을 내던 옅은 줄은 뺐다.
+class _ZoneDetailPainter extends CustomPainter {
+  const _ZoneDetailPainter(this.shape, this.color, this.selected);
+  final _ZoneShape shape;
+  final Color color;
+  final bool selected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final outline = _ZoneOutline(shape).getClip(size);
+    canvas.drawPath(
+      outline,
+      Paint()..color = color.withValues(alpha: selected ? .32 : .16),
+    );
+    canvas.drawPath(
+      outline,
+      Paint()
+        ..color = color.withValues(alpha: selected ? 1 : .22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = selected ? 4 : 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ZoneDetailPainter oldDelegate) =>
+      oldDelegate.shape != shape ||
+      oldDelegate.color != color ||
+      oldDelegate.selected != selected;
 }
