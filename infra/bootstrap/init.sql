@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS `reservation` (
     `member_id` BIGINT NOT NULL,
     `seat_id` BIGINT NOT NULL,
     `cancelled_at` DATETIME(6) NULL,
+    `seat_release_at` DATETIME(6) NULL,
     `status` VARCHAR(20) NOT NULL,
     `active_seat` BIGINT GENERATED ALWAYS AS (IF(`status` = 'PAID', `seat_id`, NULL)) STORED,
     `active_member` BIGINT GENERATED ALWAYS AS (IF(`status` = 'PAID', `member_id`, NULL)) STORED,
@@ -242,6 +243,34 @@ CREATE TABLE IF NOT EXISTS `reservation` (
     UNIQUE KEY `uk_rsv_seat` (`concert_id`, `active_seat`),
     UNIQUE KEY `uk_rsv_member` (`concert_id`, `active_member`),
     KEY `ix_rsv_member` (`member_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 입장 완료 티켓으로 만든 개인 소장품. 원본·합성 이미지 파일은 S3에, 그 key와 앱 렌더링
+-- 메타데이터만 RDS에 둔다. ticket 및 (member, client_goods_id) 유니크 제약이 동시 요청과
+-- 클라이언트 재시도를 각각 한 건으로 수렴시킨다.
+CREATE TABLE IF NOT EXISTS `goods` (
+    `goods_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `ticket_id` BIGINT NOT NULL,
+    `member_id` BIGINT NOT NULL,
+    `concert_id` BIGINT NOT NULL,
+    `client_goods_id` VARCHAR(64) NOT NULL,
+    `background_key` VARCHAR(512) NOT NULL,
+    `source_background_key` VARCHAR(512) NULL,
+    `person_composite_key` VARCHAR(512) NULL,
+    `depth_map_key` VARCHAR(512) NULL,
+    `preview_key` VARCHAR(512) NULL,
+    `effect_type` VARCHAR(20) NOT NULL,
+    `background_framing` JSON NULL,
+    `person_layers` JSON NOT NULL,
+    `transition_config` JSON NOT NULL,
+    `render_metadata` JSON NOT NULL,
+    `concert_snapshot` JSON NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`goods_id`),
+    UNIQUE KEY `uk_goods_ticket` (`ticket_id`),
+    UNIQUE KEY `uk_goods_member_client` (`member_id`, `client_goods_id`),
+    KEY `idx_goods_member_created` (`member_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 티켓 양도 매물. ticket_id는 응답에 내보내지 않는 내부 식별자다.
@@ -285,5 +314,49 @@ CREATE TABLE IF NOT EXISTS `ticket_trade` (
     KEY `idx_trade_buyer` (`buyer_member_id`, `traded_at`),
     KEY `idx_trade_ticket` (`ticket_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 초기 bootstrap에 없던 컬럼·엔티티 유니크 제약을 기존 운영 테이블에도 맞춘다. MySQL은
+-- ALTER TABLE ADD COLUMN/UNIQUE KEY에 IF NOT EXISTS를 지원하지 않으므로 메타데이터를 확인한
+-- 뒤에만 실행한다. 각 제약을 추가하기 전 운영 데이터의 중복 여부는 배포 점검에서 확인한다.
+DELIMITER //
+CREATE PROCEDURE ensure_entity_unique_constraints()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'reservation'
+          AND column_name = 'seat_release_at'
+    ) THEN
+        ALTER TABLE `reservation`
+            ADD COLUMN `seat_release_at` DATETIME(6) NULL AFTER `cancelled_at`;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'wallet'
+          AND index_name = 'uk_wallet_address'
+    ) THEN
+        ALTER TABLE `wallet` ADD UNIQUE KEY `uk_wallet_address` (`address`);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'venue'
+          AND index_name = 'uk_venue_name'
+    ) THEN
+        ALTER TABLE `venue` ADD UNIQUE KEY `uk_venue_name` (`venue_name`);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'concert_artist'
+          AND index_name = 'uk_concert_artist'
+    ) THEN
+        ALTER TABLE `concert_artist`
+            ADD UNIQUE KEY `uk_concert_artist` (`concert_id`, `artist_id`);
+    END IF;
+END //
+DELIMITER ;
+CALL ensure_entity_unique_constraints();
+DROP PROCEDURE ensure_entity_unique_constraints;
 
 -- 즉시 좌석 선점 부하 테스트를 할 수 있는 단일 공연장·공연·구역·좌석 1,000석.
