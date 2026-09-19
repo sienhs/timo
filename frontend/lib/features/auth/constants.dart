@@ -5,8 +5,8 @@
 class AuthMetrics {
   AuthMetrics._();
 
-  /// 회원가입 단계 수. 화면 오른쪽 위 'n/4' 의 분모.
-  static const totalSteps = 4;
+  /// 회원가입 단계 수. 화면 오른쪽 위 'n/3' 의 분모.
+  static const totalSteps = 3;
 
   static const pagePadding = 20.0;
   static const headerLogoHeight = 24.0;
@@ -48,6 +48,20 @@ class AuthMetrics {
 
   /// 목 API 응답 지연. 실제 서버처럼 잠깐 기다려야 로딩 상태를 눈으로 볼 수 있다.
   static const mockLatency = Duration(milliseconds: 400);
+
+  /// 지갑 준비 연출 영상의 재생 속도. 원본 8초는 가입 직후 기다리기에 길다.
+  static const walletClipSpeed = 2.0;
+
+  /// 영상이 끝나지 않아도 이만큼 지나면 완료 화면으로 넘어간다. 재생이 멎거나
+  /// 끝을 알리지 못했을 때 사용자가 그 화면에 갇히지 않게 하는 안전장치다.
+  /// 배속을 먹인 재생 길이(4초)보다 넉넉해야 정상 재생을 자르지 않는다.
+  static const walletCeremonyMaxWait = Duration(seconds: 6);
+
+  /// 영상을 못 읽었을 때 마스코트만 보여주고 넘어가기까지의 시간.
+  static const walletCeremonyFallback = Duration(milliseconds: 1500);
+
+  /// 연출 영상이 차지하는 가로세로 비. 원본이 1280×720 이다.
+  static const walletClipAspectRatio = 16 / 9;
 }
 
 /// 서버가 인증 실패 응답의 `errorCode` 에 싣는 이유.
@@ -152,10 +166,15 @@ class AuthStrings {
   /// 입력칸 안 남은 시간 표시를 스크린리더가 읽는 문구. 눈으로는 '02:59' 만 본다.
   static String remainingTime(String clock) => '남은 시간 $clock';
 
-  // 2/4 아이디
-  static const usernameTitle = '사용할 아이디를 정해주세요';
-  static const usernameSubtitle = '로그인할 때 사용할 아이디예요';
+  // 2/3 로그인 정보(아이디 + 비밀번호)
+  static const accountTitle = '로그인 정보를 만들어주세요';
+  static const accountSubtitle = '로그인할 때 쓸 아이디와 비밀번호예요';
   static const usernameLabel = '아이디';
+
+  /// 아이디 라벨 옆 주의 문구. 예전에는 '다음' 을 누를 때 팝업으로 물었는데,
+  /// 비밀번호까지 한 화면에서 받게 되면서 팝업이 뜨는 시점과 아이디를 정하는
+  /// 시점이 어긋났다. 늘 보이는 문구가 한 번 닫으면 끝인 팝업보다 오래 남는다.
+  static const usernameNote = '가입 후 변경 불가';
   static const usernameHint = '아이디';
   static const usernameRule =
       '영문 소문자로 시작 · '
@@ -163,17 +182,13 @@ class AuthStrings {
   static const usernameAvailable = '사용할 수 있는 아이디예요';
   static const usernameTaken = '이미 사용 중이에요';
 
-  // 아이디 확정 팝업. 2/4 에서 '다음' 을 누르면 뜬다.
-  static const confirmTitle = '이 아이디를 사용할까요?';
-  static const confirmBody = '가입한 뒤에는 아이디를 바꿀 수 없어요';
-  static const confirmAgree = '이 아이디 사용하기';
-  static const confirmEdit = '수정하기';
-
-  // 3/4 비밀번호
-  static const passwordTitle = '비밀번호를 설정해주세요';
-  static const passwordSubtitle =
-      '영문·숫자·특수문자를 포함해 ${AuthMetrics.passwordMinLength}~${AuthMetrics.passwordMaxLength}자로 입력해주세요';
   static const passwordLabel = '비밀번호';
+
+  /// 비밀번호 칸 아래 규칙 안내. 아이디 규칙과 달리 칸이 비어 있을 때도
+  /// 보여준다. 가리면 사용자가 다 친 뒤에야 조건을 알게 된다.
+  static const passwordRule =
+      '영문·숫자·특수문자 포함 · '
+      '${AuthMetrics.passwordMinLength}~${AuthMetrics.passwordMaxLength}자';
   static const passwordHint = '비밀번호 입력';
   static const passwordConfirmLabel = '비밀번호 확인';
   static const passwordConfirmHint = '비밀번호 한 번 더 입력';
@@ -181,7 +196,7 @@ class AuthStrings {
   static const showPassword = '비밀번호 보기';
   static const hidePassword = '비밀번호 숨기기';
 
-  // 4/4 닉네임
+  // 3/3 닉네임
   static const nicknameTitle = '사용할 닉네임을 정해주세요';
   static const nicknameSubtitle = '다른 사람에게 보이는 이름이에요';
   static const nicknameLabel = '닉네임';
@@ -194,6 +209,13 @@ class AuthStrings {
   static const startSignup = '가입하기';
 
   // 가입 완료
+  // 가입 직후 지갑 준비 연출
+  static const walletCreatingTitle = '지갑을 만들고 있어요';
+  static const walletCreatingSubtitle = '티켓을 담아 둘 지갑을 준비하는 중이에요';
+
+  /// 화면이 바뀐 걸 스크린리더가 읽어 주는 문구. 영상은 눈으로만 보인다.
+  static const walletCreatingSemantics = '지갑을 만들고 있어요. 잠시만 기다려 주세요';
+
   static const completeTitle = '가입이 완료됐어요';
   static const completeSubtitle = '이제 티켓을 예매할 수 있어요';
   static const goToTickets = '티켓 보러 가기';

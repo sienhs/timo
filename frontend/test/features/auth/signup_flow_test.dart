@@ -12,16 +12,17 @@ import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/models/signup_draft.dart';
 import 'package:timo/features/auth/screens/login_screen.dart';
+import 'package:timo/features/auth/screens/signup_account_screen.dart';
 import 'package:timo/features/auth/screens/signup_complete_screen.dart';
 import 'package:timo/features/auth/screens/signup_nickname_screen.dart';
-import 'package:timo/features/auth/screens/signup_password_screen.dart';
 import 'package:timo/features/auth/screens/signup_phone_screen.dart';
-import 'package:timo/features/auth/screens/signup_username_screen.dart';
+import 'package:timo/features/auth/screens/wallet_creating_screen.dart';
 import 'package:timo/features/auth/state/auth_api_scope.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/auth/widgets/duplicate_check_button.dart';
 import 'package:timo/core/widgets/timo_logo.dart';
+import 'package:timo/core/widgets/timo_mascot.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
@@ -79,6 +80,31 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// 지갑 연출 화면을 지나 완료 화면까지 간다.
+  ///
+  /// 그 화면은 진행 바가 쉬지 않고 도는데다 타이머로 다음 화면을 띄우므로
+  /// pumpAndSettle 이 영영 멈추지 않는다. 정해진 만큼만 시간을 흘린다. 테스트
+  /// 환경에는 영상 플러그인이 없어 읽기가 실패하고, 그때 쓰는 짧은 대기
+  /// (walletCeremonyFallback)가 걸린다.
+  /// 연출 화면의 대기가 끝나고 완료 화면으로 바뀌는 데까지 시간을 흘린다.
+  /// 전환이 다 끝나야 연출 화면이 스택에서 사라진다.
+  Future<void> finishWalletCeremony(WidgetTester tester) async {
+    await tester.pump(AuthMetrics.walletCeremonyMaxWait);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+  }
+
+  Future<void> passWalletCeremony(WidgetTester tester) async {
+    // 가입 응답 → 세션 저장 → 스택 재구성 → 연출 화면 전환. 단계마다 프레임이
+    // 필요한데, 연출 화면의 진행 바 때문에 pumpAndSettle 을 쓸 수 없다.
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(WalletCreatingScreen), findsOneWidget);
+    await finishWalletCeremony(tester);
+  }
+
   /// 인증번호 화면이 떠 있는 동안 쓴다. 그 화면은 남은 시간을 매초 다시 그리므로
   /// pumpAndSettle 을 쓰면 3분이 다 지나 만료될 때까지 돌아 버린다. 대신 목
   /// 응답과 화면 전환(300ms)이 끝날 만큼만 시간을 흘린다.
@@ -109,7 +135,7 @@ void main() {
       expect(nextEnabled(tester), isTrue);
     });
 
-    testWidgets('인증번호를 같은 화면에서 입력하고 성공하면 아이디 화면으로 간다', (tester) async {
+    testWidgets('인증번호를 같은 화면에서 입력하고 성공하면 로그인 정보 화면으로 간다', (tester) async {
       await pumpScreen(tester, const SignupPhoneScreen(api: api));
       var fields = find.byType(TextField);
       await tester.enterText(fields.at(0), '홍길동');
@@ -129,14 +155,14 @@ void main() {
       await tester.tap(nextButton());
       await settle(tester);
 
-      final next = tester.widget<SignupUsernameScreen>(
-        find.byType(SignupUsernameScreen),
+      final next = tester.widget<SignupAccountScreen>(
+        find.byType(SignupAccountScreen),
       );
       expect(next.draft.phoneNumber, '01012345678');
       expect(next.draft.name, '홍길동');
       expect(next.draft.verificationTicket, MockAuthApi.mockTicket);
 
-      Navigator.of(tester.element(find.byType(SignupUsernameScreen))).pop();
+      Navigator.of(tester.element(find.byType(SignupAccountScreen))).pop();
       await tester.pumpAndSettle();
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
       expect(find.text(AuthStrings.verificationComplete), findsOneWidget);
@@ -203,20 +229,24 @@ void main() {
     });
   });
 
-  group('아이디 화면', () {
-    testWidgets('형식이 맞아야 중복 확인이 눌리고, 대문자는 소문자로 받는다', (tester) async {
+  group('로그인 정보 화면', () {
+    testWidgets('아이디 형식이 맞아야 중복 확인이 눌리고, 대문자는 소문자로 받는다', (tester) async {
       await pumpScreen(
         tester,
-        const SignupUsernameScreen(draft: SignupDraft(), api: api),
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
       );
+      // 아이디 · 비밀번호 · 비밀번호 확인.
+      expect(find.byType(TextField), findsNWidgets(3));
+      // 팝업으로 묻던 주의 문구가 라벨 옆에 상시 붙는다.
+      expect(find.text(AuthStrings.usernameNote), findsOneWidget);
       expect(checkEnabled(tester), isFalse);
 
-      await tester.enterText(find.byType(TextField), 'abc');
+      await tester.enterText(find.byType(TextField).at(0), 'abc');
       await tester.pump();
       expect(find.text(AuthStrings.usernameRule), findsOneWidget);
       expect(checkEnabled(tester), isFalse);
 
-      await tester.enterText(find.byType(TextField), 'Timo');
+      await tester.enterText(find.byType(TextField).at(0), 'Timo');
       await tester.pump();
       expect(find.text('timo'), findsOneWidget);
       expect(find.text(AuthStrings.usernameRule), findsNothing);
@@ -225,13 +255,31 @@ void main() {
       expect(nextEnabled(tester), isFalse);
     });
 
+    testWidgets('아이디 칸을 벗어나면 중복 확인이 저절로 걸린다', (tester) async {
+      await pumpScreen(
+        tester,
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
+      );
+      final fields = find.byType(TextField);
+
+      await tester.enterText(fields.at(0), 'minsuk_01');
+      await tester.pump();
+      expect(find.text(AuthStrings.usernameAvailable), findsNothing);
+
+      // 비밀번호 칸으로 옮겨 가면 아이디 칸이 포커스를 잃는다. 버튼을 누르지
+      // 않았는데 결과가 나와 있어야 한다.
+      await tester.tap(fields.at(1));
+      await settle(tester);
+      expect(find.text(AuthStrings.usernameAvailable), findsOneWidget);
+    });
+
     testWidgets('이미 쓰는 아이디는 오류가 뜨고 다음으로가 잠긴다', (tester) async {
       await pumpScreen(
         tester,
-        const SignupUsernameScreen(draft: SignupDraft(), api: api),
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
       );
 
-      await tester.enterText(find.byType(TextField), 'timo');
+      await tester.enterText(find.byType(TextField).at(0), 'timo');
       await tester.pump();
       await tester.tap(find.byType(DuplicateCheckButton));
       await settle(tester);
@@ -240,80 +288,37 @@ void main() {
       expect(nextEnabled(tester), isFalse);
     });
 
-    testWidgets('사용 가능하면 다음으로가 켜지고, 글자를 고치면 다시 잠긴다', (tester) async {
+    testWidgets('아이디와 비밀번호가 모두 갖춰져야 다음으로가 켜진다', (tester) async {
       await pumpScreen(
         tester,
-        const SignupUsernameScreen(draft: SignupDraft(), api: api),
-      );
-
-      await tester.enterText(find.byType(TextField), 'minsuk_01');
-      await tester.pump();
-      await tester.tap(find.byType(DuplicateCheckButton));
-      await settle(tester);
-
-      expect(find.text(AuthStrings.usernameAvailable), findsOneWidget);
-      expect(nextEnabled(tester), isTrue);
-
-      await tester.enterText(find.byType(TextField), 'minsuk_012');
-      await tester.pump();
-      expect(find.text(AuthStrings.usernameAvailable), findsNothing);
-      expect(nextEnabled(tester), isFalse);
-    });
-
-    testWidgets('다음을 누르면 팝업이 뜨고, 수정하거나 아이디를 확정할 수 있다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupUsernameScreen(draft: SignupDraft(), api: api),
-      );
-      await tester.enterText(find.byType(TextField), 'minsuk_01');
-      await tester.pump();
-      await tester.tap(find.byType(DuplicateCheckButton));
-      await settle(tester);
-
-      await tester.tap(nextButton());
-      await tester.pumpAndSettle();
-      expect(find.text(AuthStrings.confirmTitle), findsOneWidget);
-
-      await tester.tap(find.text(AuthStrings.confirmEdit));
-      await tester.pumpAndSettle();
-      expect(find.text(AuthStrings.confirmTitle), findsNothing);
-      expect(find.byType(SignupUsernameScreen), findsOneWidget);
-      expect(nextEnabled(tester), isTrue);
-
-      await tester.tap(nextButton());
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(AuthStrings.confirmAgree));
-      await tester.pumpAndSettle();
-
-      final next = tester.widget<SignupPasswordScreen>(
-        find.byType(SignupPasswordScreen),
-      );
-      expect(next.draft.username, 'minsuk_01');
-    });
-  });
-
-  group('비밀번호 화면', () {
-    testWidgets('규칙 미달이면 잠기고, 두 칸이 다르면 오류, 같으면 켜진다', (tester) async {
-      await pumpScreen(
-        tester,
-        const SignupPasswordScreen(draft: SignupDraft()),
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
       );
       final fields = find.byType(TextField);
-      expect(fields, findsNWidgets(2));
 
-      await tester.enterText(fields.at(0), 'abcd1234'); // 특수문자 없음
+      await tester.enterText(fields.at(0), 'minsuk_01');
       await tester.pump();
+      await tester.tap(find.byType(DuplicateCheckButton));
+      await settle(tester);
+      expect(find.text(AuthStrings.usernameAvailable), findsOneWidget);
+      // 아이디만으로는 넘어갈 수 없다. 비밀번호 규칙은 칸이 빈 동안에도 보인다.
+      expect(nextEnabled(tester), isFalse);
+      expect(find.text(AuthStrings.passwordRule), findsOneWidget);
+
+      await tester.enterText(fields.at(1), 'abcd1234'); // 특수문자 없음
+      await tester.pump();
+      expect(find.text(AuthStrings.passwordRule), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
 
-      await tester.enterText(fields.at(0), 'abcd1234!');
+      await tester.enterText(fields.at(1), 'abcd1234!');
       await tester.pump();
+      expect(find.text(AuthStrings.passwordRule), findsNothing);
 
-      await tester.enterText(fields.at(1), 'abcd1234');
+      await tester.enterText(fields.at(2), 'abcd1234');
       await tester.pump();
       expect(find.text(AuthStrings.passwordMismatch), findsOneWidget);
       expect(nextEnabled(tester), isFalse);
 
-      await tester.enterText(fields.at(1), 'abcd1234!');
+      await tester.enterText(fields.at(2), 'abcd1234!');
       await tester.pump();
       expect(find.text(AuthStrings.passwordMismatch), findsNothing);
       expect(nextEnabled(tester), isTrue);
@@ -323,21 +328,44 @@ void main() {
       final next = tester.widget<SignupNicknameScreen>(
         find.byType(SignupNicknameScreen),
       );
+      expect(next.draft.username, 'minsuk_01');
       expect(next.draft.password, 'abcd1234!');
+    });
+
+    testWidgets('아이디를 고치면 확인 결과가 사라지고 다음으로가 다시 잠긴다', (tester) async {
+      await pumpScreen(
+        tester,
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
+      );
+      final fields = find.byType(TextField);
+
+      await tester.enterText(fields.at(0), 'minsuk_01');
+      await tester.pump();
+      await tester.tap(find.byType(DuplicateCheckButton));
+      await settle(tester);
+      await tester.enterText(fields.at(1), 'abcd1234!');
+      await tester.enterText(fields.at(2), 'abcd1234!');
+      await tester.pump();
+      expect(nextEnabled(tester), isTrue);
+
+      await tester.enterText(fields.at(0), 'minsuk_012');
+      await tester.pump();
+      expect(find.text(AuthStrings.usernameAvailable), findsNothing);
+      expect(nextEnabled(tester), isFalse);
     });
 
     testWidgets('눈 아이콘을 누르면 가려진 글자가 보인다', (tester) async {
       await pumpScreen(
         tester,
-        const SignupPasswordScreen(draft: SignupDraft()),
+        const SignupAccountScreen(draft: SignupDraft(), api: api),
       );
-      final first = find.byType(TextField).first;
-      expect(tester.widget<TextField>(first).obscureText, isTrue);
+      final password = find.byType(TextField).at(1);
+      expect(tester.widget<TextField>(password).obscureText, isTrue);
 
       await tester.tap(find.byTooltip(AuthStrings.showPassword).first);
       await tester.pump();
 
-      expect(tester.widget<TextField>(first).obscureText, isFalse);
+      expect(tester.widget<TextField>(password).obscureText, isFalse);
       expect(find.byTooltip(AuthStrings.hidePassword), findsOneWidget);
     });
   });
@@ -545,12 +573,12 @@ void main() {
     testWidgets('아이디: 중복 확인이 실패하면 스낵바를 띄우고 다시 누를 수 있다', (tester) async {
       await pumpScreen(
         tester,
-        const SignupUsernameScreen(
+        const SignupAccountScreen(
           draft: SignupDraft(),
           api: _FailingAuthApi(onCheck: networkError),
         ),
       );
-      await tester.enterText(find.byType(TextField), 'minsuk_01');
+      await tester.enterText(find.byType(TextField).at(0), 'minsuk_01');
       await tester.pump();
 
       await tester.tap(find.byType(DuplicateCheckButton));
@@ -665,6 +693,51 @@ void main() {
     });
   });
 
+  group('지갑 준비 연출', () {
+    // 테스트 환경에는 영상 플러그인이 없다. 초기화가 실패하는 길을 그대로
+    // 지나므로, 영상이 안 뜰 때도 화면이 제구실을 하는지 함께 보게 된다.
+    testWidgets('문구와 진행 바가 뜨고, 영상 자리는 마스코트가 채운다', (tester) async {
+      await pumpScreen(tester, const WalletCreatingScreen());
+      await tester.pump();
+
+      expect(find.text(AuthStrings.walletCreatingTitle), findsOneWidget);
+      expect(find.text(AuthStrings.walletCreatingSubtitle), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(TimoMascot), findsOneWidget);
+
+      // 남은 타이머를 흘려보내지 않으면 테스트가 '대기 중인 타이머' 로 실패한다.
+      await finishWalletCeremony(tester);
+    });
+
+    testWidgets('기다리면 완료 화면으로 스스로 넘어간다', (tester) async {
+      await pumpScreen(tester, const WalletCreatingScreen());
+      await tester.pump();
+      expect(find.byType(SignupCompleteScreen), findsNothing);
+
+      await finishWalletCeremony(tester);
+
+      expect(find.byType(SignupCompleteScreen), findsOneWidget);
+      // 제 자리를 내주고 사라진다. 완료 화면에서 뒤로가면 홈이어야 한다.
+      expect(
+        find.byType(WalletCreatingScreen, skipOffstage: false),
+        findsNothing,
+      );
+    });
+
+    testWidgets('연출 중에는 뒤로가기로 빠져나갈 수 없다', (tester) async {
+      await pumpScreen(tester, const WalletCreatingScreen());
+      await tester.pump();
+
+      // 다른 위젯이 제 PopScope 를 둘 수 있으므로 '못 나가게 막은 것' 만 고른다.
+      expect(
+        find.byWidgetPredicate((w) => w is PopScope && !w.canPop),
+        findsOneWidget,
+      );
+
+      await finishWalletCeremony(tester);
+    });
+  });
+
   group('로고', () {
     testWidgets('이미지 파일이 없으면 TIMO 글자로 대신 그린다', (tester) async {
       await tester.pumpWidget(
@@ -728,7 +801,7 @@ void main() {
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
       expect(find.text(AuthStrings.stepCounter(1)), findsOneWidget);
 
-      // 1/4 이름 + 전화번호 → 같은 화면의 인증번호
+      // 1/3 이름 + 전화번호 → 같은 화면의 인증번호
       var fields = find.byType(TextField);
       await tester.enterText(fields.at(0), '홍길동');
       await tester.enterText(fields.at(1), '01012345678');
@@ -742,34 +815,27 @@ void main() {
       await tapNext(tester, AuthStrings.verify);
       await settle(tester);
 
-      // 2/4 아이디 + 확정 팝업
+      // 2/3 아이디 + 비밀번호. 중복 확인은 비밀번호 칸으로 내려가면서 저절로
+      // 걸리므로 '중복 확인' 을 누르지 않는다.
       expect(find.text(AuthStrings.stepCounter(2)), findsOneWidget);
-      await tester.enterText(find.byType(TextField), 'minsuk_01');
-      await tester.pump();
-      await tester.tap(find.byType(DuplicateCheckButton));
+      fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'minsuk_01');
+      await tester.enterText(fields.at(1), 'abcd1234!');
+      await tester.enterText(fields.at(2), 'abcd1234!');
       await settle(tester);
       await tapNext(tester, AuthStrings.next);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(AuthStrings.confirmAgree));
-      await tester.pumpAndSettle();
 
-      // 3/4 비밀번호
+      // 3/3 닉네임 → 가입
       expect(find.text(AuthStrings.stepCounter(3)), findsOneWidget);
-      fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'abcd1234!');
-      await tester.enterText(fields.at(1), 'abcd1234!');
-      await tester.pump();
-      await tapNext(tester, AuthStrings.next);
-      await tester.pumpAndSettle();
-
-      // 4/4 닉네임 → 가입
-      expect(find.text(AuthStrings.stepCounter(4)), findsOneWidget);
       await tester.enterText(find.byType(TextField), '티모2');
       await tester.pump();
       await tester.tap(find.byType(DuplicateCheckButton));
       await settle(tester);
       await tapNext(tester, AuthStrings.startSignup);
-      await settle(tester);
+
+      // 지갑을 만드는 연출을 한 박자 보고 완료 화면으로 넘어간다.
+      await passWalletCeremony(tester);
 
       // 완료 화면만 남고 입력 화면들은 스택에서 사라졌다.
       expect(find.byType(SignupCompleteScreen), findsOneWidget);
@@ -779,6 +845,11 @@ void main() {
         findsNothing,
       );
       expect(find.byType(SignupPhoneScreen, skipOffstage: false), findsNothing);
+      // 연출 화면은 제 자리를 완료 화면에 내주고 사라진다(pushReplacement).
+      expect(
+        find.byType(WalletCreatingScreen, skipOffstage: false),
+        findsNothing,
+      );
       // 가입을 거쳐 왔으니 로그인 화면으로 되돌아갈 이유도 없다.
       expect(find.byType(LoginScreen, skipOffstage: false), findsNothing);
       // 가입 응답의 토큰이 세션에 담겨 바로 로그인 상태다.
