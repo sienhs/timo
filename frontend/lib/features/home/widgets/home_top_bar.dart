@@ -17,8 +17,8 @@ class HomeTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return SizedBox(
-      height: HomeMetrics.topBarHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: HomeMetrics.topBarHeight),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: HomeMetrics.horizontalPadding,
@@ -39,8 +39,13 @@ class HomeTopBar extends StatelessWidget {
                     HomeMetrics.searchFieldRadius,
                   ),
                   child: Container(
-                    height: HomeMetrics.searchFieldHeight,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    constraints: const BoxConstraints(
+                      minHeight: HomeMetrics.searchFieldHeight,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(

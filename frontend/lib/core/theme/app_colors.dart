@@ -56,6 +56,11 @@ class AppColors {
   static const border = Color(0xFFE3E3E3);
 
   static const textPrimary = Color(0xFF1B1B1B);
-  static const textSecondary = Color(0xFF8C8C8C);
+  static const textSecondary = Color(0xFF686868);
   static const textDisabled = Color(0xFFBDBDBD);
+
+  /// 상태 글자용 색. 장식·금액 강조색(accent)과 분리한다.
+  static const error = Color(0xFFB3261E);
+  static const warning = Color(0xFF805500);
+  static const success = primaryPressed;
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_action_button.dart';
 import '../constants.dart';
 
 /// 티켓 카드 한 장의 껍데기. 흰 바탕, 테두리, 둥근 모서리.
@@ -46,13 +47,11 @@ class TicketCardButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = Text(label);
-    return SizedBox(
-      width: double.infinity,
-      height: TicketMetrics.buttonHeight,
-      child: filled
-          ? FilledButton(onPressed: onPressed, child: child)
-          : OutlinedButton(onPressed: onPressed, child: child),
+    return AppActionButton(
+      label: label,
+      onPressed: onPressed,
+      compact: true,
+      variant: filled ? AppActionStyle.primary : AppActionStyle.secondary,
     );
   }
 }
