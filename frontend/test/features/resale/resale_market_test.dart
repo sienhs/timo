@@ -315,12 +315,12 @@ void main() {
             : tester.widget<FilledButton>(finder);
       }
 
-      // 고르기 전에는 다음으로 갈 수 없다(꽉 찬 버튼 자체가 없다).
-      expect(filledButton(ResaleStrings.registerNext), isNull);
+      // 고르기 전에도 주요 버튼 모양은 유지하되 다음으로 갈 수 없다.
+      expect(filledButton(ResaleStrings.registerNext)!.onPressed, isNull);
 
       await tester.tap(find.text('2027 RE:MIND'));
       await settle(tester);
-      expect(filledButton(ResaleStrings.registerNext), isNotNull);
+      expect(filledButton(ResaleStrings.registerNext)!.onPressed, isNotNull);
 
       await tester.tap(find.text(ResaleStrings.registerNext));
       await settle(tester);
@@ -334,12 +334,12 @@ void main() {
       await settle(tester);
 
       expect(find.text(ResaleStrings.priceOverFace), findsOneWidget);
-      expect(filledButton(ResaleStrings.registerSubmit), isNull);
+      expect(filledButton(ResaleStrings.registerSubmit)!.onPressed, isNull);
 
       await tester.enterText(find.byType(TextField), '176000');
       await settle(tester);
 
-      expect(filledButton(ResaleStrings.registerSubmit), isNotNull);
+      expect(filledButton(ResaleStrings.registerSubmit)!.onPressed, isNotNull);
       await tester.tap(find.text(ResaleStrings.registerSubmit));
       await settle(tester);
 
@@ -401,8 +401,12 @@ void main() {
 
       expect(find.byType(ListableTicketCard), findsNWidgets(2));
       expect(
-        find.widgetWithText(FilledButton, ResaleStrings.registerNext),
-        findsNothing,
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, ResaleStrings.registerNext),
+            )
+            .onPressed,
+        isNull,
       );
 
       await closeScreen(tester);

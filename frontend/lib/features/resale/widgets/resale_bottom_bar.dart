@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_action_button.dart';
 import '../constants.dart';
 
 /// 화면 맨 아래 고정되는 행동 자리. 안내 한 줄 + 버튼 하나.
@@ -58,9 +59,7 @@ class ResaleBottomBar extends StatelessWidget {
 
 /// 하단의 주요 버튼. 시안의 꽉 찬 초록 버튼과 테두리 버튼 두 가지다.
 ///
-/// [onPressed] 가 null 이면 테두리 버튼으로 그린다. 시안에서 아직 누를 수 없는
-/// 버튼(고른 티켓이 없는 `다음으로`, 정가를 넘긴 `마켓에 등록하기`)이 흰
-/// 버튼인 것과 같다 — 초록을 흐리게 칠하는 것보다 "아직 아니다" 가 분명하다.
+/// 비활성이어도 주요/보조 행동의 종류는 유지한다.
 class ResaleActionButton extends StatelessWidget {
   const ResaleActionButton({
     super.key,
@@ -77,13 +76,10 @@ class ResaleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = Text(label);
-    return SizedBox(
-      width: double.infinity,
-      height: ResaleMetrics.buttonHeight,
-      child: filled && onPressed != null
-          ? FilledButton(onPressed: onPressed, child: child)
-          : OutlinedButton(onPressed: onPressed, child: child),
+    return AppActionButton(
+      label: label,
+      onPressed: onPressed,
+      variant: filled ? AppActionStyle.primary : AppActionStyle.secondary,
     );
   }
 }

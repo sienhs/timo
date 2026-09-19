@@ -1,4 +1,5 @@
 import '../../core/utils/formatters.dart';
+import '../../core/theme/app_metrics.dart';
 import '../../core/widgets/timo_logo.dart';
 import 'models/refresh_hint.dart';
 
@@ -21,8 +22,8 @@ class HomeMetrics {
 
   // 상단 바 (로고 + 검색 입구)
   static const topBarHeight = 56.0;
-  static const searchFieldHeight = 40.0;
-  static const searchFieldRadius = 20.0;
+  static const searchFieldHeight = AppMetrics.searchMinHeight;
+  static const searchFieldRadius = AppMetrics.controlRadius;
   static const logoGap = 12.0;
 
   /// 상단 바 로고 높이. 로그인 헤더의 로고와 같다.

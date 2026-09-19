@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_metrics.dart';
 
 /// 앱 공통 테마. 색은 [AppColors], 크기·굵기는 여기서만 정의한다.
 ///
@@ -25,6 +26,9 @@ class AppTheme {
     onSecondary: Colors.white,
     surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
+    onSurfaceVariant: AppColors.textSecondary,
+    error: AppColors.error,
+    onError: Colors.white,
     surfaceContainerHighest: AppColors.surfaceMuted,
     outline: AppColors.border,
     outlineVariant: AppColors.border,
@@ -74,7 +78,7 @@ class AppTheme {
       fontSize: 16,
       height: 1.2,
       fontWeight: FontWeight.w700,
-      color: Colors.white,
+      color: AppColors.textPrimary,
     ),
     // 필드 라벨('선택한 좌석', '결제 금액'), 범례
     labelMedium: TextStyle(
@@ -103,104 +107,111 @@ class AppTheme {
   static final _textTheme = _baseTextTheme.apply(fontFamily: _fontFamily);
 
   static ThemeData get light => ThemeData(
-        useMaterial3: true,
-        fontFamily: _fontFamily,
-        colorScheme: _scheme,
-        textTheme: _textTheme,
-        scaffoldBackgroundColor: AppColors.surface,
-        appBarTheme: AppBarTheme(
-          backgroundColor: AppColors.surface,
-          surfaceTintColor: Colors.transparent,
-          foregroundColor: AppColors.textPrimary,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: true,
-          titleTextStyle: _textTheme.titleMedium,
-        ),
-        dividerTheme: const DividerThemeData(
-          color: AppColors.border,
-          thickness: 1,
-          space: 0,
-        ),
-        // 입력칸 공통 모양. 시안의 입력칸은 얇은 회색 테두리·모서리 6 이고,
-        // 포커스가 오면 브랜드색으로 바뀐다.
-        //
-        // Material 3 에서는 border 하나만 주면 포커스·오류 상태의 색이 따라오지
-        // 않고 ColorScheme 기본값(primary·error)이 쓰인다. 오류색을
-        // AppColors.accent 로 맞추려면 상태별 테두리를 전부 명시해야 한다.
-        inputDecorationTheme: InputDecorationThemeData(
-          isDense: true,
-          // 글자를 bodyMedium(14 × 1.5 = 21) 으로 두면 칸 높이가
-          // 13.5 × 2 + 21 = 48 이 되어 옆에 붙는 버튼 높이와 딱 맞는다.
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13.5,
-          ),
-          hintStyle: _textTheme.bodyMedium?.copyWith(
-            color: AppColors.textSecondary,
-          ),
-          helperStyle: _textTheme.labelMedium,
-          errorStyle: _textTheme.labelMedium?.copyWith(color: AppColors.accent),
-          border: _inputBorder(AppColors.border),
-          enabledBorder: _inputBorder(AppColors.border),
-          focusedBorder: _inputBorder(AppColors.primary, width: 1.5),
-          errorBorder: _inputBorder(AppColors.accent),
-          focusedErrorBorder: _inputBorder(AppColors.accent, width: 1.5),
-          disabledBorder: _inputBorder(AppColors.textDisabled),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.border,
-            disabledForegroundColor: AppColors.textDisabled,
-            minimumSize: const Size.fromHeight(52),
-            textStyle: _textTheme.labelLarge,
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(6)),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.textPrimary,
-            side: const BorderSide(color: AppColors.border),
-            minimumSize: const Size.fromHeight(46),
-            textStyle: _textTheme.labelLarge?.copyWith(
-              color: AppColors.textPrimary,
-            ),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(6)),
-            ),
+    useMaterial3: true,
+    fontFamily: _fontFamily,
+    colorScheme: _scheme,
+    textTheme: _textTheme,
+    scaffoldBackgroundColor: AppColors.surface,
+    appBarTheme: AppBarTheme(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: AppColors.textPrimary,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: true,
+      titleTextStyle: _textTheme.titleMedium,
+    ),
+    dividerTheme: const DividerThemeData(
+      color: AppColors.border,
+      thickness: 1,
+      space: 0,
+    ),
+    // 입력칸 공통 모양. 시안의 입력칸은 얇은 회색 테두리·모서리 12 이고,
+    // 포커스가 오면 브랜드색으로 바뀐다.
+    //
+    // Material 3 에서는 border 하나만 주면 포커스·오류 상태의 색이 따라오지
+    // 않고 ColorScheme 기본값(primary·error)이 쓰인다. 오류색을
+    // AppColors.error 로 맞추려면 상태별 테두리를 전부 명시해야 한다.
+    inputDecorationTheme: InputDecorationThemeData(
+      isDense: true,
+      // 글자를 bodyMedium(14 × 1.5 = 21) 으로 두면 칸 높이가
+      // 13.5 × 2 + 21 = 48 이 되어 옆에 붙는 버튼 높이와 딱 맞는다.
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 13.5,
+      ),
+      hintStyle: _textTheme.bodyMedium?.copyWith(
+        color: AppColors.textSecondary,
+      ),
+      helperStyle: _textTheme.labelMedium,
+      errorStyle: _textTheme.labelMedium?.copyWith(color: AppColors.error),
+      border: _inputBorder(AppColors.border),
+      enabledBorder: _inputBorder(AppColors.border),
+      focusedBorder: _inputBorder(AppColors.primary, width: 1.5),
+      errorBorder: _inputBorder(AppColors.error),
+      focusedErrorBorder: _inputBorder(AppColors.error, width: 1.5),
+      disabledBorder: _inputBorder(AppColors.textDisabled),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: AppColors.border,
+        disabledForegroundColor: AppColors.textSecondary,
+        minimumSize: const Size.fromHeight(AppMetrics.buttonMinHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        textStyle: _textTheme.labelLarge,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(AppMetrics.controlRadius),
           ),
         ),
-        // 시안의 다이얼로그는 얇은 그린 테두리를 가지는데, shape.side 로는
-        // Material 이 테두리를 그려주지 않는다. 테두리는 다이얼로그 위젯이
-        // 직접 그리므로 여기서는 모양만 잡는다.
-        dialogTheme: const DialogThemeData(
-          backgroundColor: AppColors.surface,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(14)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.textPrimary,
+        side: const BorderSide(color: AppColors.border),
+        disabledForegroundColor: AppColors.textSecondary,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        minimumSize: const Size.fromHeight(AppMetrics.buttonMinHeight),
+        textStyle: _textTheme.labelLarge?.copyWith(
+          color: AppColors.textPrimary,
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(AppMetrics.controlRadius),
           ),
         ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: AppColors.textPrimary,
-          contentTextStyle: _textTheme.bodyMedium?.copyWith(
-            color: Colors.white,
-          ),
-          behavior: SnackBarBehavior.floating,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
-          ),
-        ),
-      );
+      ),
+    ),
+    // 시안의 다이얼로그는 얇은 그린 테두리를 가지는데, shape.side 로는
+    // Material 이 테두리를 그려주지 않는다. 테두리는 다이얼로그 위젯이
+    // 직접 그리므로 여기서는 모양만 잡는다.
+    dialogTheme: const DialogThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.textPrimary,
+      contentTextStyle: _textTheme.bodyMedium?.copyWith(color: Colors.white),
+      behavior: SnackBarBehavior.floating,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+    ),
+  );
 
-  /// 입력칸 테두리. 색과 굵기만 다르고 모서리는 버튼과 같은 6 이다.
+  /// 입력칸 테두리. 색과 굵기만 다르고 모서리는 버튼과 같은 12 이다.
   static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
       OutlineInputBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(6)),
+        borderRadius: const BorderRadius.all(
+          Radius.circular(AppMetrics.controlRadius),
+        ),
         borderSide: BorderSide(color: color, width: width),
       );
 
@@ -211,8 +222,8 @@ class AppTheme {
   /// 테마와 짝이 맞지 않는다. 다크 시안이 나오면 [AppColors] 에 다크 토큰을
   /// 추가해 [light] 와 같은 방식으로 조립해야 한다.
   static ThemeData get dark => ThemeData(
-        colorSchemeSeed: seedColor,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      );
+    colorSchemeSeed: seedColor,
+    brightness: Brightness.dark,
+    useMaterial3: true,
+  );
 }

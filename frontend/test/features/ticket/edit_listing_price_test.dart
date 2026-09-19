@@ -88,8 +88,8 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).controller?.text,
         '132,000',
       );
-      // 같은 값으로는 보낼 게 없다. 꽉 찬 버튼 자체가 없다.
-      expect(submitButton(tester), isNull);
+      // 같은 값으로는 보낼 게 없다. 주요 버튼을 비활성으로 유지한다.
+      expect(submitButton(tester)!.onPressed, isNull);
     });
 
     testWidgets('정가를 넘기면 이유를 말하고 보낼 수 없다', (tester) async {
@@ -100,7 +100,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(ResaleStrings.priceOverFace), findsOneWidget);
-      expect(submitButton(tester), isNull);
+      expect(submitButton(tester)!.onPressed, isNull);
     });
   });
 
