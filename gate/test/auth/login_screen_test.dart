@@ -4,6 +4,7 @@ import 'package:timo_gate/core/network/api_exception.dart';
 import 'package:timo_gate/core/theme/app_theme.dart';
 import 'package:timo_gate/features/auth/constants.dart';
 import 'package:timo_gate/features/auth/data/mock_auth_api.dart';
+import 'package:timo_gate/core/storage/device_storage.dart';
 import 'package:timo_gate/features/auth/data/token_storage.dart';
 import 'package:timo_gate/features/auth/models/auth_tokens.dart';
 import 'package:timo_gate/features/auth/screens/login_screen.dart';
@@ -13,11 +14,11 @@ void main() {
   /// 지연 0 인 목 API. 응답을 바로 받아야 하는 화면 단위 테스트에 꽂는다.
   const api = MockAuthApi(latency: Duration.zero);
 
-  late InMemoryTokenStorage storage;
+  late InMemoryDeviceStorage storage;
   late AuthSession session;
 
   setUp(() {
-    storage = InMemoryTokenStorage();
+    storage = InMemoryDeviceStorage();
     session = AuthSession(storage: storage);
   });
 

@@ -23,14 +23,23 @@ class ScanMetrics {
   /// 조금 위에 오도록 가운데보다 올렸다.
   static const viewfinderTopFraction = 0.16;
 
-  /// 조준 틀 아랫변과 안내 문구 사이 간격.
-  static const viewfinderToGuideGap = 40.0;
-  static const viewfinderCornerLength = 28.0;
-  static const viewfinderStroke = 3.0;
+  /// 조준 틀 아랫변과 안내 패널 사이 간격.
+  static const viewfinderToGuideGap = 32.0;
 
-  static const resultIconSize = 180.0;
-  static const resultIconStroke = 3.0;
-  static const resultCardRadius = 12.0;
+  /// 조준 틀 구멍의 모서리 반경. 꺾쇠가 이 곡선을 따라 굽는다.
+  static const viewfinderRadius = 24.0;
+  static const viewfinderCornerLength = 36.0;
+  static const viewfinderStroke = 4.0;
+
+  /// 스캔 선의 두께와 위아래로 번지는 빛의 높이.
+  static const scanLineStroke = 2.0;
+  static const scanLineGlow = 28.0;
+
+  static const resultIconSize = 148.0;
+  static const resultCardRadius = 16.0;
+
+  /// 카메라 위 안내 패널의 모서리.
+  static const panelRadius = 16.0;
 
   static const horizontalPadding = 20.0;
 
@@ -65,6 +74,7 @@ class ScanStrings {
   static const verifying = '확인 중…';
   static const torchOn = '손전등 켜기';
   static const torchOff = '손전등 끄기';
+  static const changeTarget = '공연 변경';
   static const cameraUnavailable = '카메라를 열 수 없어요';
   static const cameraPermissionDenied =
       '카메라 권한이 없어요.\n설정에서 TIMO 게이트의 카메라 권한을 허용해주세요.';

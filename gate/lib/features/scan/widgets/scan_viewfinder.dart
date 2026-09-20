@@ -4,10 +4,11 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
 /// 카메라 위에 올리는 덮개. 조준 틀 안만 카메라가 보이고 나머지는 반투명
-/// 검정으로 덮는다. 틀에는 네 귀퉁이 꺾쇠와 위아래로 오가는 스캔 선을 그린다.
+/// 검정으로 덮는다. 틀에는 모서리를 따라 굽은 브랜드색 꺾쇠 넷과, 위아래로
+/// 오가며 빛이 번지는 스캔 선을 그린다.
 ///
-/// [child] 는 틀 아래에 놓이는 안내 문구다. 틀의 위치를 아는 곳이 여기뿐이라
-/// 문구도 여기서 자리를 잡아 준다.
+/// [child] 는 틀 아래에 놓이는 안내다. 틀의 위치를 아는 곳이 여기뿐이라
+/// 안내도 여기서 자리를 잡아 준다.
 ///
 /// 인식 영역을 제한하지는 않는다(카메라 전체에서 읽는다). 덮개는 관람객이 폰을
 /// 어디에 대야 할지 알려 주는 안내일 뿐이다. 실제로 영역을 좁히면 폰을 조금
@@ -68,7 +69,7 @@ class _ScanViewfinderState extends State<ScanViewfinder>
               builder: (context, _) => CustomPaint(
                 painter: _ViewfinderPainter(
                   window: window,
-                  lineOffset: _sweep.value,
+                  lineOffset: Curves.easeInOut.transform(_sweep.value),
                 ),
               ),
             ),
@@ -96,46 +97,95 @@ class _ViewfinderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final radius = const Radius.circular(ScanMetrics.viewfinderRadius);
+    final hole = RRect.fromRectAndRadius(window, radius);
+
     // 구멍을 뺀 나머지를 반투명 검정으로 덮는다.
     final scrim = Path.combine(
       PathOperation.difference,
       Path()..addRect(Offset.zero & size),
-      Path()..addRect(window),
+      Path()..addRRect(hole),
     );
     canvas.drawPath(scrim, Paint()..color = AppColors.scanScrim);
 
+    _paintScanLine(canvas, hole);
+    _paintCorners(canvas, radius.x);
+  }
+
+  /// 스캔 선. 가운데 밝은 선 하나와 위아래로 옅게 번지는 브랜드색 빛.
+  /// 구멍 안에서만 그린다 — 밖으로 새면 덮개가 뚫린 것처럼 보인다.
+  void _paintScanLine(Canvas canvas, RRect hole) {
+    final y = window.top + window.height * lineOffset;
+    canvas
+      ..save()
+      ..clipRRect(hole);
+
+    final glowRect = Rect.fromLTRB(
+      window.left,
+      y - ScanMetrics.scanLineGlow,
+      window.right,
+      y + ScanMetrics.scanLineGlow,
+    );
+    canvas.drawRect(
+      glowRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.primary.withValues(alpha: 0),
+            AppColors.primary.withValues(alpha: 0.35),
+            AppColors.primary.withValues(alpha: 0),
+          ],
+        ).createShader(glowRect),
+    );
+    canvas.drawLine(
+      Offset(window.left, y),
+      Offset(window.right, y),
+      Paint()
+        ..color = AppColors.primary
+        ..strokeWidth = ScanMetrics.scanLineStroke,
+    );
+    canvas.restore();
+  }
+
+  /// 네 귀퉁이 꺾쇠. 구멍의 둥근 모서리를 따라 굽는다. 변 전체를 그리지 않아
+  /// 구멍 경계가 답답해 보이지 않는다.
+  void _paintCorners(Canvas canvas, double radius) {
     final corner = Paint()
-      ..color = AppColors.onScan
+      ..color = AppColors.primary
       ..strokeWidth = ScanMetrics.viewfinderStroke
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
-    final length = ScanMetrics.viewfinderCornerLength;
+    // 곡선 뒤에 남는 직선 길이.
+    final straight = ScanMetrics.viewfinderCornerLength - radius;
     final l = window.left;
     final t = window.top;
     final r = window.right;
     final b = window.bottom;
 
-    // 네 귀퉁이 꺾쇠. 변 전체를 그리지 않아 구멍 경계가 답답해 보이지 않는다.
     final path = Path()
-      ..moveTo(l, t + length)
-      ..lineTo(l, t)
-      ..lineTo(l + length, t)
-      ..moveTo(r - length, t)
-      ..lineTo(r, t)
-      ..lineTo(r, t + length)
-      ..moveTo(r, b - length)
-      ..lineTo(r, b)
-      ..lineTo(r - length, b)
-      ..moveTo(l + length, b)
-      ..lineTo(l, b)
-      ..lineTo(l, b - length);
+      // 왼쪽 위
+      ..moveTo(l, t + radius + straight)
+      ..lineTo(l, t + radius)
+      ..arcToPoint(Offset(l + radius, t), radius: Radius.circular(radius))
+      ..lineTo(l + radius + straight, t)
+      // 오른쪽 위
+      ..moveTo(r - radius - straight, t)
+      ..lineTo(r - radius, t)
+      ..arcToPoint(Offset(r, t + radius), radius: Radius.circular(radius))
+      ..lineTo(r, t + radius + straight)
+      // 오른쪽 아래
+      ..moveTo(r, b - radius - straight)
+      ..lineTo(r, b - radius)
+      ..arcToPoint(Offset(r - radius, b), radius: Radius.circular(radius))
+      ..lineTo(r - radius - straight, b)
+      // 왼쪽 아래
+      ..moveTo(l + radius + straight, b)
+      ..lineTo(l + radius, b)
+      ..arcToPoint(Offset(l, b - radius), radius: Radius.circular(radius))
+      ..lineTo(l, b - radius - straight);
     canvas.drawPath(path, corner);
-
-    final line = Paint()
-      ..color = AppColors.primary
-      ..strokeWidth = 2;
-    final y = t + window.height * lineOffset;
-    canvas.drawLine(Offset(l, y), Offset(r, y), line);
   }
 
   @override

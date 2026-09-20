@@ -3,15 +3,23 @@ import 'package:flutter/material.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_exception.dart';
 import 'core/network/auth_interceptor.dart';
+import 'core/storage/device_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/data/auth_api.dart';
 import 'features/auth/data/http_auth_api.dart';
 import 'features/auth/data/mock_auth_api.dart';
-import 'features/auth/data/token_storage.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/state/auth_api_scope.dart';
 import 'features/auth/state/auth_session.dart';
 import 'features/auth/state/auth_session_scope.dart';
+import 'features/auth/widgets/logout_button.dart';
+import 'features/concert/data/concert_api.dart';
+import 'features/concert/data/http_concert_api.dart';
+import 'features/concert/data/mock_concert_api.dart';
+import 'features/concert/data/selected_concert_storage.dart';
+import 'features/concert/models/concert_summary.dart';
+import 'features/concert/screens/concert_picker_screen.dart';
+import 'features/concert/state/concert_api_scope.dart';
 import 'features/scan/constants.dart';
 import 'features/scan/data/http_scan_api.dart';
 import 'features/scan/data/mock_scan_api.dart';
@@ -54,8 +62,31 @@ AuthApi _authApiFor(String kind) => switch (kind) {
   _ => HttpAuthApi(),
 };
 
+/// 공연 선택이 어느 [ConcertApi] 를 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run                                       # 기본값. 실제 서버 공연 목록
+/// flutter run --dart-define=CONCERT_API=mock        # 서버 없이. 오늘·예정·지난 공연 네 개
+/// flutter run --dart-define=CONCERT_API=mock-error  # 매번 불러오기 실패
+/// ```
+const _concertApiKind = String.fromEnvironment('CONCERT_API');
+
+ConcertApi _concertApiFor(String kind) => switch (kind) {
+  'mock' => MockConcertApi(),
+  'mock-error' => MockConcertApi(failing: true),
+  _ => HttpConcertApi(),
+};
+
 class App extends StatefulWidget {
-  const App({super.key, this.session, this.authApi, this.scanApi, this.target});
+  const App({
+    super.key,
+    this.session,
+    this.authApi,
+    this.scanApi,
+    this.concertApi,
+    this.concertStorage,
+    this.initialConcert,
+  });
 
   /// 로그인 상태. main 이 기기 저장소에서 되살려 넘긴다. 안 넘기면(위젯 테스트)
   /// 메모리 저장소로 된 로그아웃 상태에서 시작한다.
@@ -67,9 +98,15 @@ class App extends StatefulWidget {
   /// 안 넘기면 [_scanApiKind] 가 고른다. 테스트는 목을 넣는다.
   final ScanApi? scanApi;
 
-  /// 검표할 공연. 안 넘기면 목 값. 공연 선택 화면이 붙으면 그 화면이 이 값을
-  /// 만들어 넘긴다.
-  final GateTarget? target;
+  /// 안 넘기면 [_concertApiKind] 가 고른다. 테스트는 목을 넣는다.
+  final ConcertApi? concertApi;
+
+  /// 고른 공연을 기억해 두는 곳. main 이 기기 저장소로 만들어 넘긴다. 안 넘기면
+  /// 메모리에만 둔다(위젯 테스트).
+  final SelectedConcertStorage? concertStorage;
+
+  /// 앱을 켤 때 되살린 "지난번에 고른 공연". 없으면 공연 선택 화면부터 시작한다.
+  final ConcertSummary? initialConcert;
 
   @override
   State<App> createState() => _AppState();
@@ -77,7 +114,7 @@ class App extends StatefulWidget {
 
 class _AppState extends State<App> {
   late final AuthSession _session =
-      widget.session ?? AuthSession(storage: InMemoryTokenStorage());
+      widget.session ?? AuthSession(storage: InMemoryDeviceStorage());
 
   /// 로그인 화면·로그아웃 버튼이 쓰는 인증 API. 앱에 하나만 두고 [AuthApiScope]
   /// 로 내려준다.
@@ -86,6 +123,15 @@ class _AppState extends State<App> {
   /// 앱에 하나만 두고 [ScanApiScope] 로 내려준다. 화면이 각자 만들면 목의
   /// "이미 입장" 기록이 화면마다 따로 놀고, 테스트에서 갈아끼울 자리도 없다.
   late final ScanApi _scanApi = widget.scanApi ?? _scanApiFor(_scanApiKind);
+
+  late final ConcertApi _concertApi =
+      widget.concertApi ?? _concertApiFor(_concertApiKind);
+
+  late final SelectedConcertStorage _concertStorage =
+      widget.concertStorage ?? SelectedConcertStorage(InMemoryDeviceStorage());
+
+  /// 지금 검표하는 공연. null 이면 아직 고르지 않았다.
+  late ConcertSummary? _concert = widget.initialConcert;
 
   /// 로그인 상태면 서버 요청에 토큰을 붙이고, 만료되면 재발급받아 요청을
   /// 이어가는 인터셉터. 공유 dio 에 꽂으므로 이 위젯이 사라질 때 빼 준다
@@ -116,6 +162,16 @@ class _AppState extends State<App> {
     return _session.isLoggedIn;
   }
 
+  /// 공연 선택 화면이 고른 공연을 넘기면 화면을 바꾸고 기기에 적어 둔다.
+  ///
+  /// 저장을 기다리지 않는다 — 화면은 바로 바뀌어야 하고, 저장이 실패해도
+  /// (키스토어 오류) 이번 실행에서 검표하는 데는 지장이 없다. 다음 실행에서
+  /// 다시 고르게 될 뿐이다.
+  void _selectConcert(ConcertSummary concert) {
+    setState(() => _concert = concert);
+    _concertStorage.write(concert).ignore();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -140,10 +196,16 @@ class _AppState extends State<App> {
         api: _authApi,
         child: ScanApiScope(
           api: _scanApi,
-          child: MaterialApp(
-            title: ScanStrings.appName,
-            theme: AppTheme.light,
-            home: _RootScreen(target: widget.target ?? MockScanApi.target),
+          child: ConcertApiScope(
+            api: _concertApi,
+            child: MaterialApp(
+              title: ScanStrings.appName,
+              theme: AppTheme.light,
+              home: _RootScreen(
+                concert: _concert,
+                onConcertSelected: _selectConcert,
+              ),
+            ),
           ),
         ),
       ),
@@ -151,22 +213,61 @@ class _AppState extends State<App> {
   }
 }
 
-/// 로그인 여부로 첫 화면을 고른다. 로그아웃 상태면 로그인, 아니면 스캔.
+/// 로그인 여부와 공연 선택 여부로 첫 화면을 고른다.
+/// 로그아웃 → 로그인, 공연 없음 → 공연 선택, 둘 다 있음 → 스캔.
 ///
-/// 라우트로 오가지 않고 세션을 구독해 바꿔 그린다. 화면이 둘뿐이고, 어느 쪽에서
+/// 라우트로 오가지 않고 세션·선택을 구독해 바꿔 그린다. 어느 화면에서
 /// 시작하든 "뒤로 가기" 로 돌아갈 곳이 없기 때문이다. 로그인 화면은 성공 시
-/// 세션에 담기만 하고, 스캔 화면의 로그아웃 버튼과 401 을 받은 인터셉터는 세션을
-/// 비우기만 한다 — 화면 전환은 전부 여기서 일어난다.
+/// 세션에 담기만 하고, 공연 선택 화면은 고른 공연을 콜백으로 알리기만 하며,
+/// 로그아웃 버튼과 401 을 받은 인터셉터는 세션을 비우기만 한다 — 화면 전환은
+/// 전부 여기서 일어난다.
+///
+/// 예외는 스캔 화면의 '공연 변경' 이다. 그때는 선택 화면을 **위에 띄운다** —
+/// 고르지 않고 돌아오면 원래 공연으로 계속 검표해야 하므로 뒤로 가기가 있어야
+/// 한다.
 class _RootScreen extends StatelessWidget {
-  const _RootScreen({required this.target});
+  const _RootScreen({required this.concert, required this.onConcertSelected});
 
-  final GateTarget target;
+  final ConcertSummary? concert;
+  final ValueChanged<ConcertSummary> onConcertSelected;
 
   @override
   Widget build(BuildContext context) {
     final session = AuthSessionScope.of(context);
-    return session.isLoggedIn
-        ? ScanScreen(target: target)
-        : const LoginScreen();
+    if (!session.isLoggedIn) return const LoginScreen();
+
+    final selected = concert;
+    if (selected == null) {
+      return ConcertPickerScreen(
+        onSelected: onConcertSelected,
+        trailing: const LogoutButton(),
+      );
+    }
+
+    return ScanScreen(
+      target: _targetOf(selected),
+      onChangeTarget: () => _pushPicker(context),
+      trailing: const LogoutButton(),
+    );
   }
+
+  Future<void> _pushPicker(BuildContext context) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (routeContext) => ConcertPickerScreen(
+        onSelected: (concert) {
+          onConcertSelected(concert);
+          Navigator.of(routeContext).pop();
+        },
+      ),
+    ),
+  );
+
+  /// 목록 모델을 스캔 화면이 아는 형태로. 두 기능은 서로를 모르고, 둘을 아는
+  /// 곳은 여기뿐이다.
+  static GateTarget _targetOf(ConcertSummary concert) => GateTarget(
+    concertId: concert.id,
+    concertTitle: concert.title,
+    venueName: concert.venueName,
+    whenLabel: concert.whenLabel,
+  );
 }

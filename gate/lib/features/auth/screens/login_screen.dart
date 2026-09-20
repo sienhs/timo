@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/error_snack_bar.dart';
+import '../../../core/widgets/timo_logo.dart';
 import '../constants.dart';
 import '../data/auth_api.dart';
 import '../models/access_token_claims.dart';
@@ -138,6 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 팬 앱 로그인과 같은 자리의 로고. 게이트 앱은 관리자 계정을 쓰는
+          // 운영자용이라 "TIMO 의 앱" 이라는 표식이 첫 화면에 있어야 한다 —
+          // 로고 없이 아이디·비밀번호 칸만 있으면 아무 앱의 로그인처럼 보인다.
+          const TimoLogo(),
+          const SizedBox(height: AuthMetrics.logoGap),
           Text(AuthStrings.loginTitle, style: textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(

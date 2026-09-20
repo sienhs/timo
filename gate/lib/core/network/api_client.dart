@@ -17,6 +17,16 @@ class ApiClient {
 
   static final Dio dio = _createDio();
 
+  /// 서버가 준 이미지 key 를 브라우저·이미지 위젯이 열 수 있는 주소로 바꾼다.
+  /// 없거나 빈 값이면 null 이라 부르는 쪽이 대체 자리를 그린다.
+  ///
+  /// 공연 목록 응답의 포스터가 `poster/xxx.png` 처럼 저장소 key 로만 온다.
+  /// 그대로 쓰면 한 장도 안 뜨므로 여기서 한 번에 [baseUrl] 을 붙인다
+  /// (팬 앱 `ApiClient.imageUrl` 과 같은 이유·같은 구현).
+  static String? imageUrl(String? key) => key == null || key.isEmpty
+      ? null
+      : Uri.parse(baseUrl).resolve(key).toString();
+
   static Dio _createDio() {
     final dio = Dio(
       BaseOptions(

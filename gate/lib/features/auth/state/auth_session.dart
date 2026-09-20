@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/device_storage.dart';
 import '../data/token_storage.dart';
 import '../models/auth_tokens.dart';
 import '../models/reissued_access_token.dart';
@@ -20,7 +21,7 @@ class AuthSession extends ChangeNotifier {
   AuthSession({required this._storage, DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
-  final TokenStorage _storage;
+  final DeviceStorage _storage;
   final DateTime Function() _now;
 
   int? _memberId;
