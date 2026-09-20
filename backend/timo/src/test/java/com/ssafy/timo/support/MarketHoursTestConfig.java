@@ -1,7 +1,7 @@
 package com.ssafy.timo.support;
 
 import com.ssafy.timo.domain.transfer.service.MarketHoursService;
-import com.ssafy.timo.global.config.MarketHoursProperties;
+import com.ssafy.timo.global.config.transfer.MarketHoursProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;

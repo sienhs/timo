@@ -14,7 +14,7 @@ import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.domain.wish.entity.ConcertWish;
 import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.time.Duration;

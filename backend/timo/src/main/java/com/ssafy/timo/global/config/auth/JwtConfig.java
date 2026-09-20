@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.auth;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.ssafy.timo.global.security.ExpiryAwareJwtValidator;

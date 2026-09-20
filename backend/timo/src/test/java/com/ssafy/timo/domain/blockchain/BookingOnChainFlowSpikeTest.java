@@ -3,7 +3,7 @@ package com.ssafy.timo.domain.blockchain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import com.ssafy.timo.global.config.DeployedContractAddresses;
+import com.ssafy.timo.global.config.blockchain.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.ssafy.timo.domain.ticket.service.EntryPassProvider.EntryPass;
 import com.ssafy.timo.domain.ticket.service.EntryPassProvider.EntryPassVerification;
 import com.ssafy.timo.domain.ticket.service.EntryPassProvider.EntryPassVerification.Status;
-import com.ssafy.timo.global.config.EntryPassProperties;
+import com.ssafy.timo.global.config.ticket.EntryPassProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

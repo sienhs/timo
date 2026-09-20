@@ -12,8 +12,8 @@ import com.ssafy.timo.domain.transfer.dto.NewListingRow;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.wish.dto.WishedConcertRow;
 import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
-import com.ssafy.timo.global.config.MarketHoursProperties;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.transfer.MarketHoursProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

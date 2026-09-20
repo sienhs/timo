@@ -14,7 +14,7 @@ import com.ssafy.timo.domain.ticket.exception.EntryWindowNotOpenException;
 import com.ssafy.timo.domain.ticket.exception.TicketNotFoundException;
 import com.ssafy.timo.domain.ticket.exception.TicketStatusNotIssuableException;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
-import com.ssafy.timo.global.config.EntryPassProperties;
+import com.ssafy.timo.global.config.ticket.EntryPassProperties;
 import java.math.BigInteger;
 import java.time.Clock;
 import java.time.Duration;

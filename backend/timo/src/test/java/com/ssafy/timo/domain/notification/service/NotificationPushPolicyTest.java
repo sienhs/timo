@@ -3,7 +3,7 @@ package com.ssafy.timo.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ssafy.timo.domain.notification.entity.NotificationType;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import com.ssafy.timo.global.firebase.PushDelivery;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;

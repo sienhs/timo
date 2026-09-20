@@ -6,7 +6,7 @@ import com.ssafy.timo.domain.auth.entity.LoginInfo;
 import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.blockchain.ContractCallException;
 import com.ssafy.timo.domain.blockchain.ShowRegistryClient;
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
 import com.ssafy.timo.domain.concert.entity.AgeRating;

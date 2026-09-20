@@ -9,7 +9,7 @@ import com.ssafy.timo.domain.notification.entity.PushDevice;
 import com.ssafy.timo.domain.notification.entity.PushPlatform;
 import com.ssafy.timo.domain.notification.repository.PushDeviceRepository;
 import com.ssafy.timo.domain.notification.service.PushDeviceCleaner;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;

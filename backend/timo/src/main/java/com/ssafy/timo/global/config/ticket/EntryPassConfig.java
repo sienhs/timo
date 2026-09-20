@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.ticket;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.wallet;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

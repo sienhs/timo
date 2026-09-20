@@ -1,7 +1,7 @@
 package com.ssafy.timo.domain.notification.service;
 
 import com.ssafy.timo.domain.notification.entity.NotificationType;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import com.ssafy.timo.global.firebase.PushDelivery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

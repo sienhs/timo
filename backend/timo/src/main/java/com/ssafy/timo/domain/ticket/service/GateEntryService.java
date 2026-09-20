@@ -11,7 +11,7 @@ import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.ticket.service.EntryPassProvider.EntryPassVerification;
 import com.ssafy.timo.domain.wallet.entity.Wallet;
 import com.ssafy.timo.domain.wallet.repository.WalletRepository;
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

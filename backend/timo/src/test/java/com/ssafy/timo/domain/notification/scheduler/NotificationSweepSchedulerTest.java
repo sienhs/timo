@@ -10,7 +10,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.ssafy.timo.domain.notification.scheduler.NotificationSweepScheduler.SweepResult;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;

@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.notification;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;

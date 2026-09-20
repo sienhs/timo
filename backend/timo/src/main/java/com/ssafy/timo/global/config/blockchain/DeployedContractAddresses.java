@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.blockchain;
 
 import java.math.BigInteger;
 

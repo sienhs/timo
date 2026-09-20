@@ -1,8 +1,8 @@
 package com.ssafy.timo.domain.notification.scheduler;
 
 import com.ssafy.timo.domain.notification.repository.NotificationRepository;
-import com.ssafy.timo.global.config.NotificationProperties;
-import com.ssafy.timo.global.config.NotificationRetentionProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationRetentionProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;

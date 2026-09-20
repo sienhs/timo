@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.wallet;
 
 import com.ssafy.timo.domain.wallet.crypto.MasterKey;
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -17,7 +17,7 @@ import com.ssafy.timo.domain.notification.entity.NotificationType;
 import com.ssafy.timo.domain.notification.repository.NotificationRepository;
 import com.ssafy.timo.domain.notification.service.MemberPushNotificationService.MemberPush;
 import com.ssafy.timo.domain.notification.service.MemberPushNotificationService.MemberPushResult;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import com.ssafy.timo.global.firebase.PushDelivery;
 import com.ssafy.timo.global.firebase.PushResult.Outcome;
 import java.util.List;

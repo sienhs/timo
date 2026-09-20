@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ssafy.timo.domain.auth.service.AccessTokenProvider.AccessToken;
 import com.ssafy.timo.domain.member.entity.Role;
-import com.ssafy.timo.global.config.JwtConfig;
-import com.ssafy.timo.global.config.JwtProperties;
+import com.ssafy.timo.global.config.auth.JwtConfig;
+import com.ssafy.timo.global.config.auth.JwtProperties;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;

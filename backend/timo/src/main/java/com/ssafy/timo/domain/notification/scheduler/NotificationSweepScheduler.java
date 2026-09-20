@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.notification.scheduler;
 
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
