@@ -104,7 +104,7 @@ describe("TicketNFT", () => {
     it("rejects a marketplace settlement to a buyer who already holds a ticket for that show", async () => {
       await mintToAlice(); // alice: tokenId 1, SHOW_ID
       await ticket.connect(organizer).mintTicket(bob.address, SHOW_ID, SEAT_ID + 1, SECTION_INDEX); // bob: tokenId 2, SHOW_ID
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
 
       await expect(ticket.connect(marketplace).settleTransfer(1, bob.address)).to.be.revertedWithCustomError(
         ticket,
@@ -150,9 +150,9 @@ describe("TicketNFT", () => {
   });
 
   describe("listing + marketplace settlement", () => {
-    it("lets the owner list at or below face price", async () => {
+    it("lets OPERATOR_ROLE list on the owner's behalf at or below face price", async () => {
       await mintToAlice();
-      await expect(ticket.connect(alice).listForTransfer(1, FACE_PRICE))
+      await expect(ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE))
         .to.emit(ticket, "TicketListed")
         .withArgs(1, FACE_PRICE);
       expect((await ticket.tickets(1)).status).to.equal(Status.LISTED);
@@ -160,27 +160,53 @@ describe("TicketNFT", () => {
 
     it("rejects listing above face price", async () => {
       await mintToAlice();
-      await expect(ticket.connect(alice).listForTransfer(1, FACE_PRICE + 1n)).to.be.revertedWithCustomError(
+      await expect(
+        ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE + 1n)
+      ).to.be.revertedWithCustomError(ticket, "ListPriceExceedsFacePrice");
+    });
+
+    it("rejects listing when the given owner doesn't actually hold the ticket", async () => {
+      await mintToAlice();
+      await expect(
+        ticket.connect(operator).listForTransferFor(1, bob.address, FACE_PRICE)
+      ).to.be.revertedWithCustomError(ticket, "NotTicketOwner");
+    });
+
+    it("rejects listing from anyone without OPERATOR_ROLE", async () => {
+      await mintToAlice();
+      await expect(
+        ticket.connect(alice).listForTransferFor(1, alice.address, FACE_PRICE)
+      ).to.be.revertedWithCustomError(ticket, "AccessControlUnauthorizedAccount");
+    });
+
+    it("delistFor returns it to OWNED", async () => {
+      await mintToAlice();
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
+      await ticket.connect(operator).delistFor(1, alice.address);
+      expect((await ticket.tickets(1)).status).to.equal(Status.OWNED);
+    });
+
+    it("rejects delisting when the given owner doesn't actually hold the ticket", async () => {
+      await mintToAlice();
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
+      await expect(ticket.connect(operator).delistFor(1, bob.address)).to.be.revertedWithCustomError(
         ticket,
-        "ListPriceExceedsFacePrice"
+        "NotTicketOwner"
       );
     });
 
-    it("rejects listing by a non-owner", async () => {
+    it("rejects delisting from anyone without OPERATOR_ROLE", async () => {
       await mintToAlice();
-      await expect(ticket.connect(bob).listForTransfer(1, FACE_PRICE)).to.be.revertedWithCustomError(ticket, "NotTicketOwner");
-    });
-
-    it("delist returns it to OWNED", async () => {
-      await mintToAlice();
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
-      await ticket.connect(alice).delist(1);
-      expect((await ticket.tickets(1)).status).to.equal(Status.OWNED);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
+      await expect(ticket.connect(alice).delistFor(1, alice.address)).to.be.revertedWithCustomError(
+        ticket,
+        "AccessControlUnauthorizedAccount"
+      );
     });
 
     it("settleTransfer moves ownership and returns to OWNED under the new owner", async () => {
       await mintToAlice();
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
 
       await expect(ticket.connect(marketplace).settleTransfer(1, bob.address))
         .to.emit(ticket, "TicketSettled")
@@ -194,7 +220,7 @@ describe("TicketNFT", () => {
 
     it("rejects settleTransfer from anyone without MARKETPLACE_ROLE", async () => {
       await mintToAlice();
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
       await expect(ticket.connect(alice).settleTransfer(1, bob.address)).to.be.revertedWithCustomError(
         ticket,
         "AccessControlUnauthorizedAccount"
@@ -221,7 +247,7 @@ describe("TicketNFT", () => {
 
     it("cannot revoke a LISTED ticket", async () => {
       await mintToAlice();
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
       await expect(ticket.connect(operator).revoke(1)).to.be.revertedWithCustomError(ticket, "UnexpectedStatus");
     });
 
@@ -257,7 +283,7 @@ describe("TicketNFT", () => {
 
     it("cannot mark a LISTED ticket used", async () => {
       await mintToAlice();
-      await ticket.connect(alice).listForTransfer(1, FACE_PRICE);
+      await ticket.connect(operator).listForTransferFor(1, alice.address, FACE_PRICE);
       await expect(ticket.connect(gate).markUsed(1)).to.be.revertedWithCustomError(ticket, "UnexpectedStatus");
     });
 
