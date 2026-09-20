@@ -1,6 +1,8 @@
 package com.ssafy.timo.domain.transfer.repository;
 
+import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.transfer.dto.MarketConcertRow;
+import com.ssafy.timo.domain.transfer.dto.NewListingRow;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import org.springframework.data.domain.Page;
@@ -13,6 +15,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -205,4 +209,31 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
      * 매물 테이블 자신이 지키는 편이 더 강하다. 티켓 상태가 어떻든 뚫리지 않는다.
      */
     boolean existsByTicketIdAndStatus(Long ticketId, ListingStatus status);
+
+    /**
+     * 지정한 기간에 등록돼 아직 팔리지 않은 매물. 새 매물 알림이 "어제 올라온 매물" 을 찾는 데 쓴다.
+     *
+     * <p>기간은 {@code listedAt >= from} 이고 {@code < to} 다. 마켓이 "오늘 00:00 이전에 등록된 매물만
+     * 보인다" 로 노출을 정하므로({@code MarketHoursService#visibleBefore}), 어제 00:00 부터 오늘 00:00 까지가
+     * 곧 오늘 오픈에 처음 보이는 매물이다. 발송을 한 번 놓쳐도 이 기준이 흔들리지 않는다.
+     *
+     * <p>{@code LISTED} 만 본다. 그 사이 팔렸거나 취소된 매물은 알릴 이유가 없다. 공연은 {@code excluded}
+     * 상태를 빼고, 시작이 {@code startAfter} 보다 뒤인 것만 남긴다. 곧 시작해서 더 사기 어려운 공연을 뺀다.
+     */
+    @Query("""
+            select c.id as concertId, c.title as title, c.startDate as startDate,
+                   l.sellerMemberId as sellerMemberId
+              from TicketListing l
+              join l.concert c
+             where l.status = com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED
+               and l.listedAt >= :from
+               and l.listedAt < :to
+               and c.status not in :excluded
+               and c.startDate > :startAfter
+             order by c.startDate, c.id
+            """)
+    List<NewListingRow> findNewListings(@Param("from") LocalDateTime from,
+                                        @Param("to") LocalDateTime to,
+                                        @Param("excluded") Collection<ConcertStatus> excluded,
+                                        @Param("startAfter") LocalDateTime startAfter);
 }

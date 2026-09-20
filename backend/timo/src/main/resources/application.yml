@@ -35,6 +35,28 @@ app:
     # 기본은 꺼 둔다. 서비스 계정이 없는 로컬·테스트 기동을 막지 않는다.
     messaging-enabled: ${FIREBASE_MESSAGING_ENABLED:false}
 
+  # 알림 스윕과 보존. 값은 코드의 기본값과 같다. 여기 적어 두는 것은 바꿀 자리를 한눈에 보이게 하려는 것이다.
+  notification:
+    # 스윕 하나가 한 주기(1분)에 새로 저장할 수 있는 알림의 최대 개수. 넘는 대상은 다음 주기에 이어서 나간다.
+    sweep-limit: 500
+    # 놓친 발송을 다시 찾아 주는 구간. 서버가 내려가 있거나 주기가 밀려도 이 안에서는 나간다. 이미 나간 것은
+    # 중복 방지가 막으므로 넉넉해도 안전하지만, 길면 철 지난 알림이 늦게 나간다.
+    catch-up: PT1H
+    # 이 일수가 지난 알림은 하루 한 번 지운다. catch-up 에 하루를 더한 것보다 길어야 한다(아니면 기동 실패).
+    # 법무나 개인정보 처리방침이 더 긴 보관을 요구하면 여기만 바꾼다.
+    retention-days: 90
+    # false 이면 아무것도 지우지 않는다.
+    retention-enabled: true
+
+  # 푸시 발송. 채널은 앱이 만든 안드로이드 알림 채널 이름이다. 비어 있으면 채널을 싣지 않아 앱의 기본 채널로
+  # 떨어진다. 앱이 만들지 않은 이름을 넣으면 안드로이드 8.0 이상에서는 알림이 아예 표시되지 않고 로그도 없다.
+  push:
+    channel:
+      entry: ${PUSH_CHANNEL_ENTRY:}
+      general: ${PUSH_CHANNEL_GENERAL:}
+    # 일시적으로 실패한 발송을 다시 시도하는 횟수. 처음 시도는 세지 않는다.
+    retry: 2
+
 # 비밀키(jwt.secret)는 프로파일마다 달라 application-{profile}.yml 에 있다.
 # 수명은 환경과 무관하게 같아야 앱 동작이 갈리지 않으므로 여기 한 곳에만 둔다.
 jwt:
@@ -53,12 +75,12 @@ entry-pass:
   ttl: 30s
 
 # 양도 마켓 운영 시간(매일, 양 끝 포함). 남의 매물 조회와 구매는 이 창 안에서만, 가격 수정은 창 밖에서만
-# 받고 판정은 서버 시계로 한다. 등록은 시간 무관 - 닫힌 시간에 올린 매물이 20:00 에 한꺼번에 드러난다.
+# 받고 판정은 서버 시계로 한다. 등록은 시간 무관 - 닫힌 시간에 올린 매물이 08:00 에 한꺼번에 드러난다.
 # 환경마다 다르면 "로컬은 되는데 배포하면 409" 가 나므로 여기 한 곳에만 둔다.
 market:
   hours:
-    open-at: "20:00:00"
-    close-at: "23:59:59"
+    open-at: "08:00:00"
+    close-at: "23:00:00"
 
 # SSAFY EC2에 올린 persistent Hardhat 노드. 컨트랙트 주소는 여기 없다 - admin-private-key로부터
 # 결정적으로 계산된다(DeployedContractAddresses 참고). admin-private-key 기본값은 빈 문자열 -
@@ -74,7 +96,7 @@ management:
     web:
       exposure:
         # health is public for the ALB. prometheus remains protected by the
-        # security filter chain and is intended for the monitoring collector.
+        # security filter chain and is inztended for the monitoring collector.
         include: health, prometheus
   endpoint:
     health:
