@@ -1,0 +1,4 @@
+.tmp/
+.tools/
+results/*
+!results/.gitkeep
