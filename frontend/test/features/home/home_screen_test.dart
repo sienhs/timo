@@ -13,6 +13,8 @@ import 'package:timo/features/home/data/mock_home_data.dart';
 import 'package:timo/features/home/models/artist_summary.dart';
 import 'package:timo/features/home/models/show_summary.dart';
 import 'package:timo/features/home/models/trending_keyword.dart';
+import 'package:timo/features/home/screens/all_shows_screen.dart';
+import 'package:timo/features/home/screens/open_soon_shows_screen.dart';
 import 'package:timo/features/home/screens/show_search_screen.dart';
 import 'package:timo/features/home/models/refresh_hint.dart';
 import 'package:timo/features/home/widgets/home_refresh_hint.dart';
@@ -338,20 +340,49 @@ void main() {
     expect(field.controller!.text, '옥주현');
   });
 
-  testWidgets('목록 화면이 없는 더보기를 누르면 준비 중 안내가 뜬다', (tester) async {
-    await pumpHome(tester);
+  testWidgets('오픈 예정 더보기는 오픈 예정 공연 목록으로 간다', (tester) async {
+    await pumpHome(tester, api: const MockHomeApi(latency: Duration.zero));
 
     await scrollTo(tester, find.text(HomeStrings.ticketOpenSection));
-
     await tester.tap(
       moreButtonOf(HomeStrings.ticketOpenSection, HomeStrings.ticketOpenMore),
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text(HomeStrings.moreNotReady(HomeStrings.ticketOpenSection)),
-      findsOneWidget,
+    expect(find.byType(OpenSoonShowsScreen), findsOneWidget);
+    expect(find.text(MockHomeApi.blackSkirt.title), findsOneWidget);
+  });
+
+  testWidgets('인기 공연 더보기는 공연 전체 조회로 간다', (tester) async {
+    await pumpHome(tester, api: const MockHomeApi(latency: Duration.zero));
+
+    await scrollTo(tester, find.text(HomeStrings.popularSection));
+    await tester.tap(
+      moreButtonOf(HomeStrings.popularSection, HomeStrings.popularMore),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AllShowsScreen), findsOneWidget);
+  });
+
+  testWidgets('오픈 시각이 지난 공연은 오픈 예정 줄에 세우지 않는다', (tester) async {
+    await pumpHome(tester, api: _StaleOpenHomeApi());
+
+    await scrollTo(tester, find.text(HomeStrings.ticketOpenSection));
+
+    // 서버가 아직 오픈 예정(SCHEDULED)으로 주지만 오픈 시각은 이미 지났다.
+    expect(find.text(_StaleOpenHomeApi.staleTitle), findsNothing);
+    expect(find.text(MockHomeApi.blackSkirt.title), findsOneWidget);
+  });
+
+  testWidgets('끝난 공연은 인기 공연 줄에도 배너에도 없다', (tester) async {
+    await pumpHome(tester);
+
+    // 목 데이터의 인기 목록에는 이미 끝난 페기구가 들어 있다.
+    expect(MockHomeApi.popular, contains(MockHomeApi.peggyGou));
+
+    await scrollTo(tester, find.text(HomeStrings.popularSection));
+    expect(find.text(MockHomeApi.peggyGou.title), findsNothing);
   });
 
   testWidgets('인기 공연 카드에는 순위 뱃지가 붙는다', (tester) async {
@@ -368,10 +399,17 @@ void main() {
   group('티켓 오픈 뱃지 문구', () {
     final now = DateTime(2026, 10, 20, 9);
 
-    test('오늘 오픈이면 시각을 읽어 준다', () {
+    test('오늘 오픈이면 시각을 말로 읽어 준다', () {
+      expect(
+        HomeStrings.ticketOpen(DateTime(2026, 10, 20, 11, 12), now: now),
+        '오늘 11시 12분 오픈',
+      );
+    });
+
+    test('오늘 정각 오픈이면 분을 떼고 읽어 준다', () {
       expect(
         HomeStrings.ticketOpen(DateTime(2026, 10, 20, 14), now: now),
-        '오늘 14:00 오픈',
+        '오늘 14시 오픈',
       );
     });
 
@@ -399,6 +437,28 @@ void main() {
   });
 }
 
+/// 오픈 시각이 지났는데도 오픈 예정(SCHEDULED)으로 남은 공연을 섞어 주는 서버.
+/// 온체인 등록이 끝나지 않아 상태가 안 밀린 공연이 실제로 이렇게 온다 —
+/// `ShowSummary.opensAfter` 주석 참고.
+class _StaleOpenHomeApi extends MockHomeApi {
+  _StaleOpenHomeApi() : super(latency: Duration.zero);
+
+  static const staleTitle = '상태가 안 밀린 공연';
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenSoon() async => [
+    ShowSummary(
+      id: 99,
+      title: staleTitle,
+      venueName: '고척돔',
+      status: ShowSummary.upcomingStatus,
+      startAt: DateTime(2026, 12, 1),
+      ticketOpenAt: DateTime.now().subtract(const Duration(hours: 3)),
+    ),
+    MockHomeApi.blackSkirt,
+  ];
+}
+
 /// 응답이 영원히 오지 않는 서버. 로딩 상태를 붙잡아 두는 데 쓴다.
 class _NeverRespondingHomeApi implements HomeApi {
   @override
@@ -407,6 +467,14 @@ class _NeverRespondingHomeApi implements HomeApi {
 
   @override
   Future<List<ShowSummary>> fetchPopular() =>
+      Completer<List<ShowSummary>>().future;
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() =>
+      Completer<List<ShowSummary>>().future;
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() =>
       Completer<List<ShowSummary>>().future;
 
   @override
@@ -450,6 +518,13 @@ class _FlakyHomeApi implements HomeApi {
 
   @override
   Future<List<ShowSummary>> fetchPopular() => _guard(_mock.fetchPopular);
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() =>
+      _guard(_mock.fetchTicketOpenAll);
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() => _guard(_mock.fetchAllShows);
 
   @override
   Future<List<ShowSummary>> search(String keyword) =>

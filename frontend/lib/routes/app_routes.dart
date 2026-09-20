@@ -13,6 +13,8 @@ import '../features/booking/screens/zone_selection_screen.dart';
 import '../features/booking/state/booking_scope.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/favorite/screens/favorite_list_screen.dart';
+import '../features/home/screens/all_shows_screen.dart';
+import '../features/home/screens/open_soon_shows_screen.dart';
 import '../features/home/screens/show_search_screen.dart';
 import '../features/memory/screens/collection_screen.dart';
 import '../features/mypage/screens/coin_charge_screen.dart';
@@ -56,6 +58,12 @@ class AppRoutes {
   /// 공연 검색. 홈 상단 검색 바에서 들어온다. 찜리스트의 아티스트처럼 검색어를
   /// 정해 두고 열 때는 그 말을 arguments 로 넘긴다.
   static const showSearch = '/search';
+
+  /// 오픈 예정 공연 목록. 홈의 "티켓 오픈 예정" 더보기에서 들어온다.
+  static const openSoonShows = '/shows/open-soon';
+
+  /// 공연 전체 조회. 홈의 "인기 공연" 더보기에서 들어온다.
+  static const allShows = '/shows';
 
   /// 찜리스트. 빠른 메뉴에서 들어온다.
   static const favorites = '/favorites';
@@ -129,6 +137,8 @@ class AppRoutes {
     showSearch: (context) => ShowSearchScreen(
       initialKeyword: ModalRoute.of(context)!.settings.arguments as String?,
     ),
+    openSoonShows: (_) => const OpenSoonShowsScreen(),
+    allShows: (_) => const AllShowsScreen(),
     favorites: (_) => const FavoriteListScreen(),
     myTickets: (_) => const MyTicketsScreen(),
     coinCharge: (_) => const CoinChargeScreen(),

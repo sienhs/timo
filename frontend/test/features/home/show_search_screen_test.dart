@@ -513,6 +513,12 @@ class _PhotoArtistHomeApi implements HomeApi {
   Future<List<ShowSummary>> fetchPopular() => _mock.fetchPopular();
 
   @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() => _mock.fetchTicketOpenAll();
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() => _mock.fetchAllShows();
+
+  @override
   Future<List<ArtistSummary>> fetchPopularArtists() =>
       _mock.fetchPopularArtists();
 
@@ -553,6 +559,12 @@ class _FlakySearchHomeApi implements HomeApi {
 
   @override
   Future<List<ShowSummary>> fetchPopular() => _mock.fetchPopular();
+
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() => _mock.fetchTicketOpenAll();
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() => _mock.fetchAllShows();
 
   @override
   Future<List<ArtistSummary>> fetchPopularArtists() =>

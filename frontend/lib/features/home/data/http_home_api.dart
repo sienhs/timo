@@ -56,6 +56,25 @@ class HttpHomeApi implements HomeApi {
     'size': HomeMetrics.showRowSize,
   });
 
+  /// 홈의 한 줄과 같은 조건이되 목록 화면이 쓸 만큼 받아 온다.
+  @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() => _shows({
+    'genre': _genre,
+    'status': ShowSummary.upcomingStatus,
+    'sort': _sortOpenSoon,
+    'size': HomeMetrics.showListPageSize,
+  });
+
+  /// 상태로 좁히지 않는다. `모두 보기` 탭이 종료된 공연까지 보여 주기 때문이다.
+  /// 정렬은 인기순이다 — 인기 공연 줄의 더보기로 들어오는 자리라 그 줄의
+  /// 순서가 이어져야 같은 목록의 나머지로 읽힌다.
+  @override
+  Future<List<ShowSummary>> fetchAllShows() => _shows({
+    'genre': _genre,
+    'sort': _sortPopular,
+    'size': HomeMetrics.showListPageSize,
+  });
+
   /// 상태로 좁히지 않는다. 서버의 `status` 는 값 하나만 받아 "오픈 예정 또는
   /// 예매중" 을 한 요청으로 물을 수 없다. 화면이 받은 뒤 거른다.
   @override

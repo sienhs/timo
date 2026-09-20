@@ -76,10 +76,25 @@ class ShowSummary {
   /// 티켓 예매 오픈 일시. 이미 오픈했거나 미정이면 null 이다.
   final DateTime? ticketOpenAt;
 
-  /// 예매를 앞두고 있거나 진행 중인가. 검색 결과의 "오픈 예정 / 예매중" 섹션이
-  /// 이걸로 거른다.
+  /// 예매를 앞두고 있거나 진행 중인가. 검색 결과의 "오픈 예정 / 예매중" 섹션과
+  /// 홈의 인기 공연 줄이 이걸로 거른다.
   bool get isOpenOrUpcoming =>
       status == upcomingStatus || status == onSaleStatus;
+
+  /// 오픈 시각이 아직 남았는가. 홈의 "티켓 오픈 예정" 줄이 이걸로 거른다.
+  ///
+  /// 상태만으로 가르지 않는 이유가 있다. 서버는 오픈 시각이 지나도 온체인
+  /// 등록이 끝나지 않은 공연을 `SCHEDULED` 로 남겨 둔다(백엔드
+  /// `ConcertRepository.openScheduled` 의 organizer·showId 조건). 그 공연을
+  /// 상태만 보고 그리면 오픈 예정 줄에 `오늘 11시 12분 오픈` 이 이미 지난
+  /// 시각인 채로 하루 종일 남는다. 상태는 서버 사정이고, 이 줄이 답해야 하는
+  /// 것은 "아직 열리지 않았는가" 다.
+  ///
+  /// 오픈 일시가 없으면(미정이거나 이미 오픈해 [fromJson] 이 버렸다) false 다.
+  bool opensAfter(DateTime now) {
+    final openAt = ticketOpenAt;
+    return openAt != null && openAt.isAfter(now);
+  }
 
   /// 카드에 찍는 기간 문구. (예: `2026.07.05 ~ 07.07`)
   String get periodLabel {
