@@ -89,7 +89,7 @@ class SeatQueryApiIntegrationTest {
                 .ageRating(AgeRating.ALL)
                 .startDate(LocalDateTime.now().plusDays(20))
                 .endDate(LocalDateTime.now().plusDays(20).plusHours(3))
-                .openAt(LocalDateTime.now().plusDays(10))
+                .openAt(LocalDateTime.now().minusDays(1))
                 .venue(venue)
                 .build()).getId();
 
@@ -373,6 +373,49 @@ class SeatQueryApiIntegrationTest {
                 .andExpect(jsonPath("$.errorMessage")
                         .value("존재하지 않는 구역입니다. (sectionId=" + missingSectionId + ")"))
                 .andExpect(jsonPath("$.exception").value("SectionNotFoundException"));
+    }
+
+    @Test
+    @DisplayName("오픈 전 공연의 구역 조회는 409 BookingNotOpenException 이다")
+    void findSections_isRejectedBeforeOpen() throws Exception {
+        Long beforeOpenId = saveConcertOpeningAt(LocalDateTime.now().plusDays(1));
+
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(beforeOpenId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("BookingNotOpenException"));
+    }
+
+    @Test
+    @DisplayName("오픈 전 공연의 좌석 조회는 409 BookingNotOpenException 이다")
+    void findSeats_isRejectedBeforeOpen() throws Exception {
+        Long beforeOpenId = saveConcertOpeningAt(LocalDateTime.now().plusDays(1));
+
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(beforeOpenId)).param("sectionId", "1"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("BookingNotOpenException"));
+    }
+
+    @Test
+    @DisplayName("오픈 시각이 없는 공연도 오픈 전으로 보고 조회를 막는다")
+    void findSections_isRejectedWhenOpenAtMissing() throws Exception {
+        Long noOpenAtId = saveConcertOpeningAt(null);
+
+        mvc.perform(get(SECTION_PATH).param("concertId", String.valueOf(noOpenAtId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("BookingNotOpenException"));
+    }
+
+    private Long saveConcertOpeningAt(LocalDateTime openAt) {
+        Venue venue = venueRepository.findById(venueId).orElseThrow();
+        return concertRepository.save(Concert.builder()
+                .title("오픈 전 공연")
+                .genre(ConcertGenre.CONCERT)
+                .ageRating(AgeRating.ALL)
+                .startDate(LocalDateTime.now().plusDays(20))
+                .endDate(LocalDateTime.now().plusDays(20).plusHours(3))
+                .openAt(openAt)
+                .venue(venue)
+                .build()).getId();
     }
 
     @Test

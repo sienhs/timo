@@ -187,6 +187,14 @@ public class Concert extends BaseEntity {
         return Optional.empty();
     }
 
+    /**
+     * 예매 오픈 전인지. 상태 컬럼이 아니라 시각만 본다 - 오픈 직후 최대 1분은 컬럼이 아직
+     * {@code SCHEDULED} 라도 열린 것으로 친다. 오픈 시각이 없으면 언제 열릴지 모르므로 오픈 전이다.
+     */
+    public boolean isBeforeOpen(LocalDateTime now) {
+        return openAt == null || now.isBefore(openAt);
+    }
+
     /** {@link #bookingBlockReason}이 비어 있는지를 boolean으로만 보고 싶을 때. */
     public boolean isBookableAt(LocalDateTime now) {
         return bookingBlockReason(now).isEmpty();

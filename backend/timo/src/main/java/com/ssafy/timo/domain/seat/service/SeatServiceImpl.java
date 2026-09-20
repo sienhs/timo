@@ -5,6 +5,7 @@ import com.ssafy.timo.domain.concert.exception.ConcertNotFoundException;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
+import com.ssafy.timo.domain.reservation.exception.BookingNotOpenException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.reservation.service.BookingWindowGuard;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
@@ -89,8 +90,10 @@ public class SeatServiceImpl implements SeatService {
     @Override
     @Transactional(readOnly = true)
     public SectionListResponseDto findSections(Long concertId) {
+        LocalDateTime now = LocalDateTime.now(clock);
         Concert concert = concertRepository.findByIdWithVenue(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        verifyOpened(concert, now);
         Venue venue = concert.getVenue();
 
         List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venue.getId());
@@ -99,8 +102,7 @@ public class SeatServiceImpl implements SeatService {
             return SectionListResponseDto.from(venue, sections, Map.of());
         }
 
-        return SectionListResponseDto.from(
-                venue, sections, availableCountsOf(concertId, sections, LocalDateTime.now(clock)));
+        return SectionListResponseDto.from(venue, sections, availableCountsOf(concertId, sections, now));
     }
 
     /**
@@ -112,15 +114,27 @@ public class SeatServiceImpl implements SeatService {
     @Override
     @Transactional(readOnly = true)
     public SectionSeatListResponseDto findSeats(Long concertId, Long sectionId) {
+        LocalDateTime now = LocalDateTime.now(clock);
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertNotFoundException(concertId));
+        verifyOpened(concert, now);
         Section section = sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new SectionNotFoundException(sectionId));
         verifySectionBelongsTo(concert, section);
 
         return SectionSeatListResponseDto.from(
-                section,
-                seatRepository.findSeatsWithStatus(concertId, sectionId, LocalDateTime.now(clock)));
+                section, seatRepository.findSeatsWithStatus(concertId, sectionId, now));
+    }
+
+    /**
+     * 오픈 전 공연의 구역·좌석 조회를 막는다. 상태 컬럼이 아니라 오픈 시각만 본다 - 컬럼은 스케줄러가
+     * 1분마다 미는 라벨이라 오픈 직후 잠깐 낡을 수 있고, 그 사이 조회를 막을 이유가 없다. 매진·마감
+     * 후·종료 공연은 좌석 현황을 그대로 보여 준다.
+     */
+    private void verifyOpened(Concert concert, LocalDateTime now) {
+        if (concert.isBeforeOpen(now)) {
+            throw new BookingNotOpenException(concert.getId(), concert.getOpenAt());
+        }
     }
 
     /**
