@@ -30,6 +30,17 @@ abstract class PushNotifications implements PushDeviceRegistrar {
   /// **한 번 가져가면 없어진다.** 로딩 화면이 홈으로 넘긴 직후 한 번만 묻고,
   /// 그 뒤에 앱을 다시 보게 돼도 같은 화면이 또 열리면 안 된다.
   NotificationDestination? takeLaunchDestination();
+
+  /// 로그인 상태면 이 기기를 서버에 등록한다. 로그아웃 상태면 아무것도 안 한다.
+  ///
+  /// **앱이 요청에 인증 헤더를 붙일 준비를 마친 뒤에 불러야 한다.** 푸시 서비스는
+  /// 앱보다 먼저 시작하는데, 헤더를 붙이는 인터셉터는 앱 위젯이 뜨면서 꽂힌다.
+  /// 그래서 서비스가 시작하면서 혼자 등록하면 헤더 없이 나가 401 로 튕기고,
+  /// 재발급도 그 인터셉터의 일이라 다시 시도되지 않는다.
+  ///
+  /// 로그인할 때는 세션이 바뀌면서 저절로 등록되므로 이 호출이 필요 없다. 저장된
+  /// 로그인으로 앱을 다시 켠 경우에만 빈자리가 생긴다.
+  Future<void> registerDevice();
 }
 
 /// 아무것도 하지 않는 구현. Firebase 를 띄우지 않는 실행(위젯 테스트 등)에서
@@ -42,6 +53,9 @@ class NoopPushNotifications implements PushNotifications {
 
   @override
   NotificationDestination? takeLaunchDestination() => null;
+
+  @override
+  Future<void> registerDevice() async {}
 }
 
 /// FCM 권한, 토큰 등록·해제, 앱이 열린 상태의 배너, 알림을 눌렀을 때의 화면 이동을
@@ -104,7 +118,10 @@ class PushNotificationService implements PushNotifications {
     await _initializeLocalNotifications();
     await _messaging.requestPermission();
     _token = await _messaging.getToken();
-    await _registerCurrentToken();
+    // 여기서 등록하지 않는다. 이 서비스는 앱보다 먼저 시작하는데, 요청에 인증
+    // 헤더를 붙이는 인터셉터는 앱 위젯이 뜨면서 꽂힌다. 지금 보내면 헤더 없이
+    // 나가 401 로 튕기고 재시도도 안 된다. 앱이 준비를 마친 뒤 [registerDevice]
+    // 로 부른다.
 
     // 앱이 꺼져 있을 때 온 알림을 눌러 켠 경우. 여기서 바로 화면을 바꾸면 안 된다 —
     // 로딩 화면이 끝나며 홈으로 갈아치우느라 방금 연 화면이 사라진다. 들고 있다가
@@ -134,6 +151,11 @@ class PushNotificationService implements PushNotifications {
     _launchDestination = null;
     return destination;
   }
+
+  /// 앱이 인증 헤더를 붙일 준비를 마친 뒤 부른다. [start] 는 토큰만 받아 두고
+  /// 등록은 여기까지 미룬다.
+  @override
+  Future<void> registerDevice() => _registerCurrentToken();
 
   /// 알림이 가리키는 화면을 연다. 갈 곳이 없으면 아무것도 하지 않는다.
   ///

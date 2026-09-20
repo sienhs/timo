@@ -65,6 +65,10 @@ class _RecordingPushRegistrar implements PushNotifications {
   /// 마이페이지는 이걸 쓰지 않는다. 알림으로 켜졌는지는 로딩 화면이 묻는다.
   @override
   NotificationDestination? takeLaunchDestination() => null;
+
+  /// 마이페이지는 이걸 쓰지 않는다. 기기 등록은 App 이 뜨면서 부른다.
+  @override
+  Future<void> registerDevice() async {}
 }
 
 /// 처음 몇 번은 실패하고 그다음부터 성공하는 목. 다시 시도를 검사한다.

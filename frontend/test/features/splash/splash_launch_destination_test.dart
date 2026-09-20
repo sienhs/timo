@@ -126,7 +126,10 @@ class _FakePush implements PushNotifications {
     return taken;
   }
 
-  /// 로딩 화면은 이걸 쓰지 않는다. 기기 해제는 마이페이지가 부른다.
+  /// 로딩 화면은 이 둘을 쓰지 않는다. 기기 해제는 마이페이지가, 등록은 App 이 부른다.
   @override
   Future<void> unregisterDevice() async {}
+
+  @override
+  Future<void> registerDevice() async {}
 }

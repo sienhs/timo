@@ -353,6 +353,12 @@ class _AppState extends State<App> {
     // 맨 앞에 꽂아야 그 뒤의 로그 인터셉터가 Authorization 헤더까지 찍는다.
     ApiClient.dio.interceptors.insert(0, _authInterceptor);
 
+    // 인터셉터를 꽂은 **바로 뒤**에 부른다. 푸시 서비스는 main 에서 앱보다 먼저
+    // 시작하는데, 그때는 이 인터셉터가 없어 인증이 필요한 요청을 보낼 수 없다.
+    // 그래서 기기 등록만 여기까지 미뤄 두었다. 순서가 바뀌면 등록이 401 로 튕기고,
+    // 저장된 로그인으로 앱을 다시 켠 사람은 푸시를 못 받는다(S15P21D206-358).
+    _push.registerDevice().ignore();
+
     // 아티스트 찜은 기기에 있다. 검색 결과의 하트가 빨리 맞아야 해서 바로
     // 읽되, 기다리지는 않는다 — 수 ms 뒤 저장소가 알리면 하트가 채워진다.
     _favoriteStore.restoreArtists().ignore();
