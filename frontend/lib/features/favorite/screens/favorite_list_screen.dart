@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../core/widgets/underline_tab_bar.dart';
 import '../../../routes/app_routes.dart';
+import '../../auth/state/auth_session_scope.dart';
 import '../../shell/constants.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
@@ -12,6 +16,7 @@ import '../models/favorite_artist.dart';
 import '../models/favorite_filters.dart';
 import '../models/favorite_show.dart';
 import '../state/favorite_scope.dart';
+import '../utils/toggle_favorite_show.dart';
 import '../widgets/favorite_artist_tile.dart';
 import '../widgets/favorite_empty_view.dart';
 import '../widgets/favorite_filter_chips.dart';
@@ -21,12 +26,16 @@ import '../widgets/favorite_summary_row.dart';
 
 /// 찜리스트. 빠른 메뉴의 '찜' 에서 들어온다.
 ///
-/// 공연 탭과 아티스트 탭 둘이다. 목록은 [FavoriteScope] 에서 읽는다 — 서버가
-/// 아니라 기기에 있는 것이라 기다리는 상태가 없고, 다른 화면에서 하트를
-/// 누르면 스코프가 알려 이 화면도 따라 바뀐다.
+/// 공연 탭과 아티스트 탭 둘인데 목록이 사는 곳이 다르다. **공연은 서버**라
+/// 화면에 들어올 때 받아 오고(기다림·실패는 [AsyncBoundary] 가 맡는다),
+/// 로그아웃 상태면 받을 것이 없어 로그인 안내를 대신 그린다. **아티스트는
+/// 기기**에 있어 기다리는 상태가 없다.
 ///
-/// 검색 칸·필터 칩·정렬은 모두 **기기에 있는 목록을 좁혀 보는 것**이다. 서버에
-/// 묻지 않으므로 글자를 칠 때마다 바로 거른다.
+/// 받아 온 목록은 [FavoriteScope] 에서 읽는다. 다른 화면에서 하트를 누르면
+/// 스코프가 알려 이 화면도 따라 바뀐다.
+///
+/// 검색 칸·필터 칩·정렬은 모두 **받아 둔 목록을 좁혀 보는 것**이다. 서버에
+/// 다시 묻지 않으므로 글자를 칠 때마다 바로 거른다.
 class FavoriteListScreen extends StatefulWidget {
   const FavoriteListScreen({super.key});
 
@@ -44,11 +53,41 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
   FavoriteShowSort _showSort = FavoriteShowSort.recent;
   FavoriteArtistSort _artistSort = FavoriteArtistSort.recent;
 
+  /// 진행 중인 찜 공연 조회. 로그인 상태일 때만 있다.
+  Future<List<FavoriteShow>>? _shows;
+
+  bool get _isLoggedIn =>
+      AuthSessionScope.maybeOf(context)?.isLoggedIn ?? false;
+
   @override
   void initState() {
     super.initState();
-    // 글자를 칠 때마다 목록을 다시 거른다. 기기에 있는 목록이라 비용이 없다.
+    // 글자를 칠 때마다 목록을 다시 거른다. 받아 둔 목록이라 비용이 없다.
     _search.addListener(_onSearchChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 로그인한 채로 들어왔거나 이 화면에서 로그인하고 돌아왔을 때 받아 온다.
+    // 로그아웃되면 들고 있던 것을 버린다 — 그러면 공연 탭이 로그인 안내로
+    // 바뀐다(양도마켓·충전 화면과 같은 방식).
+    if (_isLoggedIn) {
+      _shows ??= FavoriteScope.read(context).loadShows();
+    } else {
+      _shows = null;
+    }
+  }
+
+  /// 서버에 다시 묻는다. 실패 화면의 '다시 시도' 가 쓴다.
+  void _reloadShows() {
+    setState(() {
+      _shows = FavoriteScope.read(context).loadShows();
+    });
+  }
+
+  void _goToLogin() {
+    Navigator.pushNamed(context, AppRoutes.login);
   }
 
   @override
@@ -83,10 +122,20 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
 
   /// 목록에서 뺀다. 잘못 눌렀을 때를 위해 되돌리기를 같이 띄운다 — 목록에서
   /// 사라지는 것이 곧 결과라 확인 다이얼로그까지 세우면 매번 두 번 누르게 된다.
-  void _removeShow(FavoriteShow show) {
-    final store = FavoriteScope.read(context);
-    store.removeShow(show.id);
-    _showUndo(() => store.toggleShow(show));
+  ///
+  /// 카드는 서버 응답을 기다리지 않고 바로 빠진다. 서버가 거절하면 저장소가
+  /// 되돌려 카드가 다시 나타나므로, 되돌리기 안내 자리에 오류를 띄운다
+  /// (오류 스낵바가 앞의 안내를 걷어낸다).
+  Future<void> _removeShow(FavoriteShow show) async {
+    final removal = FavoriteScope.read(context).removeShow(show.id);
+    _showUndo(() => toggleFavoriteShow(context, show));
+    try {
+      await removal;
+    } on ApiException catch (e) {
+      if (mounted) showErrorSnackBar(context, e.message);
+    } catch (_) {
+      if (mounted) showErrorSnackBar(context, FavoriteStrings.toggleFailed);
+    }
   }
 
   void _removeArtist(FavoriteArtist artist) {
@@ -129,6 +178,39 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     );
   }
 
+  /// 공연 탭. 로그아웃이면 로그인 안내, 로그인 상태면 서버에서 받아 온 목록이다.
+  ///
+  /// [AsyncBoundary] 가 주는 값 대신 저장소가 들고 있는 [shows] 를 그린다.
+  /// 받아 온 뒤에도 하트를 누르면 목록이 바뀌는데, 그건 저장소가 알리는
+  /// 것이라 Future 가 준 값은 이미 낡았다.
+  Widget _showTabBody(List<FavoriteShow> shows) {
+    final pending = _shows;
+    if (pending == null) {
+      return FavoriteEmptyView(
+        title: FavoriteStrings.guestShows,
+        hint: FavoriteStrings.guestShowsHint,
+        actionLabel: FavoriteStrings.login,
+        onActionPressed: _goToLogin,
+      );
+    }
+
+    return AsyncBoundary<List<FavoriteShow>>(
+      future: pending,
+      onRetry: _reloadShows,
+      builder: (context, _) => _ShowTab(
+        shows: shows,
+        keyword: _search.text,
+        filter: _filter,
+        sort: _showSort,
+        onFilterSelected: (filter) => setState(() => _filter = filter),
+        onSortSelected: (sort) => setState(() => _showSort = sort),
+        onShowPressed: _openShowDetail,
+        onUnfavoritePressed: _removeShow,
+        onBrowsePressed: _browseShows,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final favorites = FavoriteScope.of(context).favorites;
@@ -166,18 +248,7 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
           const SizedBox(height: FavoriteMetrics.searchFieldBottomGap),
           Expanded(
             child: isShowTab
-                ? _ShowTab(
-                    shows: favorites.shows,
-                    keyword: _search.text,
-                    filter: _filter,
-                    sort: _showSort,
-                    onFilterSelected: (filter) =>
-                        setState(() => _filter = filter),
-                    onSortSelected: (sort) => setState(() => _showSort = sort),
-                    onShowPressed: _openShowDetail,
-                    onUnfavoritePressed: _removeShow,
-                    onBrowsePressed: _browseShows,
-                  )
+                ? _showTabBody(favorites.shows)
                 : _ArtistTab(
                     artists: favorites.artists,
                     keyword: _search.text,
@@ -239,7 +310,7 @@ class _ShowTab extends StatelessWidget {
       return FavoriteEmptyView(
         title: FavoriteStrings.noShows,
         hint: FavoriteStrings.noShowsHint,
-        onBrowsePressed: onBrowsePressed,
+        onActionPressed: onBrowsePressed,
       );
     }
 
@@ -322,7 +393,7 @@ class _ArtistTab extends StatelessWidget {
       return FavoriteEmptyView(
         title: FavoriteStrings.noArtists,
         hint: FavoriteStrings.noArtistsHint,
-        onBrowsePressed: onBrowsePressed,
+        onActionPressed: onBrowsePressed,
       );
     }
 

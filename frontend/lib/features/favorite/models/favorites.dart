@@ -9,29 +9,13 @@ import 'favorite_show.dart';
 /// 이 객체를 통째로 넣고 빼는 것만 알고, 화면은 이 객체의 메서드만 부른다.
 /// 불변 객체라 바꿀 때마다 새 객체를 돌려준다 — 최근 검색어(`RecentSearches`)
 /// 와 같은 짜임이다.
+///
+/// 공연과 아티스트가 한 객체에 있지만 남는 곳은 다르다. 공연은 서버(찜 API),
+/// 아티스트는 기기다. 화면은 둘을 한 화면(탭)에서 함께 그리므로 목록 자체는
+/// 하나로 두고, 어디에 남길지는 [FavoriteStore] 가 가른다.
 @immutable
 class Favorites {
   const Favorites({this.shows = const [], this.artists = const []});
-
-  /// 기기에 남긴 JSON 을 읽는다.
-  ///
-  /// 모양이 어긋난 항목은 건너뛴다. 기기 파일이라 앱을 올리며 모양이 바뀌었을
-  /// 수 있는데, 항목 하나 때문에 목록 전체를 잃는 것보다 그 항목만 버리는 쪽이
-  /// 낫다.
-  factory Favorites.fromJson(Map<String, dynamic> json) => Favorites(
-    shows: List.unmodifiable(
-      _entries(json['shows']).map(FavoriteShow.fromJson),
-    ),
-    artists: List.unmodifiable(
-      _entries(json['artists']).map(FavoriteArtist.fromJson),
-    ),
-  );
-
-  /// 목록이면 그 안의 객체만, 목록이 아니면 빈 목록.
-  static Iterable<Map<String, dynamic>> _entries(Object? raw) => switch (raw) {
-    final List list => list.whereType<Map<String, dynamic>>(),
-    _ => const [],
-  };
 
   final List<FavoriteShow> shows;
   final List<FavoriteArtist> artists;
@@ -42,38 +26,36 @@ class Favorites {
 
   /// 없으면 맨 앞에 넣고, 있으면 뺀다. 하트를 한 번 누르는 동작 그대로다.
   Favorites toggleShow(FavoriteShow show) =>
-      hasShow(show.id) ? removeShow(show.id) : _withShows([show, ...shows]);
+      hasShow(show.id) ? removeShow(show.id) : withShows([show, ...shows]);
 
   Favorites toggleArtist(FavoriteArtist artist) => hasArtist(artist.name)
       ? removeArtist(artist.name)
-      : _withArtists([artist, ...artists]);
+      : withArtists([artist, ...artists]);
 
   Favorites removeShow(int id) =>
-      _withShows(shows.where((show) => show.id != id));
+      withShows(shows.where((show) => show.id != id));
 
   Favorites removeArtist(String name) =>
-      _withArtists(artists.where((artist) => artist.name != name));
+      withArtists(artists.where((artist) => artist.name != name));
 
   /// 찜한 아티스트의 스냅샷을 [latest] 의 것으로 바꾼다. 순서는 그대로다.
   ///
-  /// 찜은 그 순간의 모습을 기기에 남기는 것이라, 서버가 나중에 사진을 붙이거나
-  /// 바꿔도 목록은 옛 모습에 머문다. 검색 결과처럼 서버가 준 최신 모습을 다시
-  /// 만났을 때 여기로 맞춘다. [latest] 에 없는 아티스트는 건드리지 않는다.
+  /// 아티스트 찜은 그 순간의 모습을 기기에 남기는 것이라, 서버가 나중에 사진을
+  /// 붙이거나 바꿔도 목록은 옛 모습에 머문다. 검색 결과처럼 서버가 준 최신
+  /// 모습을 다시 만났을 때 여기로 맞춘다. [latest] 에 없는 아티스트는 건드리지
+  /// 않는다.
   Favorites refreshArtists(Iterable<FavoriteArtist> latest) {
     final byName = {for (final artist in latest) artist.name: artist};
-    return _withArtists(artists.map((artist) => byName[artist.name] ?? artist));
+    return withArtists(artists.map((artist) => byName[artist.name] ?? artist));
   }
 
-  Favorites _withShows(Iterable<FavoriteShow> next) =>
+  /// 공연만 갈아 끼운다. 서버에서 받아 온 목록으로 통째로 바꿀 때 쓴다.
+  Favorites withShows(Iterable<FavoriteShow> next) =>
       Favorites(shows: List.unmodifiable(next), artists: artists);
 
-  Favorites _withArtists(Iterable<FavoriteArtist> next) =>
+  /// 아티스트만 갈아 끼운다. 기기에서 되살린 목록을 넣을 때 쓴다.
+  Favorites withArtists(Iterable<FavoriteArtist> next) =>
       Favorites(shows: shows, artists: List.unmodifiable(next));
-
-  Map<String, dynamic> toJson() => {
-    'shows': [for (final show in shows) show.toJson()],
-    'artists': [for (final artist in artists) artist.toJson()],
-  };
 
   @override
   bool operator ==(Object other) =>

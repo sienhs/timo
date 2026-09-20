@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../routes/app_routes.dart';
 import '../../favorite/state/favorite_scope.dart';
+import '../../favorite/utils/toggle_favorite_show.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
 import '../../shell/widgets/quick_menu_button.dart';
@@ -223,9 +224,9 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     Navigator.pushNamed(context, AppRoutes.showDetail, arguments: show.id);
   }
 
-  void _toggleFavoriteShow(ShowSummary show) {
-    FavoriteScope.read(context).toggleShow(show.toFavorite());
-  }
+  /// 공연 찜은 서버에 남는다. 로그인 안내와 실패 알림은 공통 동작이 맡는다.
+  Future<void> _toggleFavoriteShow(ShowSummary show) =>
+      toggleFavoriteShow(context, show.toFavorite());
 
   void _toggleFavoriteArtist(ArtistSummary artist) {
     FavoriteScope.read(context).toggleArtist(artist.toFavorite());

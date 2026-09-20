@@ -9,8 +9,9 @@ import '../constants.dart';
 /// 카드마다 적으면 테두리 색이나 모서리 반경이 조금씩 갈린다(내 티켓의
 /// `TicketCard` 와 같은 이유다).
 ///
-/// [selected] 는 등록 화면에서 티켓을 고른 상태다. 색만 바꾸지 않고 테두리도
-/// 두껍게 그린다 — 색으로만 구분하면 구별 못 하는 눈이 있다.
+/// [selected] 는 등록 화면에서 티켓을 고른 상태다. 바탕은 그대로 두고 테두리만
+/// 브랜드색으로 두껍게 그린다 — 바탕을 칠하면 그 위의 본문 글자가 대비를 잃고,
+/// 굵기가 함께 변하므로 색을 구별 못 하는 눈에도 고른 카드가 드러난다.
 class ResaleCard extends StatelessWidget {
   const ResaleCard({
     super.key,
@@ -33,7 +34,7 @@ class ResaleCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: ResaleMetrics.cardGap),
       decoration: BoxDecoration(
-        color: selected ? AppColors.seatAvailable : AppColors.surface,
+        color: AppColors.surface,
         border: Border.all(
           color: selected ? AppColors.primary : AppColors.border,
           width: selected ? ResaleMetrics.selectedBorderWidth : 1,

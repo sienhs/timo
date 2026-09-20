@@ -15,7 +15,9 @@ import 'package:timo/features/booking/state/booking_api_scope.dart';
 import 'package:timo/features/booking/screens/zone_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
+import 'package:timo/features/favorite/data/favorite_artist_store.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/data/mock_favorite_api.dart';
 import 'package:timo/features/favorite/state/favorite_scope.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
@@ -69,8 +71,11 @@ void main() {
   /// 기준 시각. 실제 시계를 쓰면 카운트다운 문구가 실행할 때마다 달라진다.
   final now = DateTime(2026, 5, 1, 10);
 
-  /// 상단 바 하트가 넣고 빼는 찜 목록.
-  late InMemoryFavoriteStore favorites;
+  /// 상단 바 하트가 넣고 빼는 찜 목록. 공연 찜은 서버(목)에 남는다.
+  late FavoriteStore favorites;
+
+  /// 공연 찜을 들고 있는 가짜 서버.
+  late MockFavoriteApi favoriteApi;
 
   ShowDetail detailOpening({
     Duration? after,
@@ -126,7 +131,11 @@ void main() {
     if (loggedIn) await session.signIn(tokens);
     addTearDown(session.dispose);
 
-    favorites = InMemoryFavoriteStore();
+    favoriteApi = MockFavoriteApi();
+    favorites = FavoriteStore(
+      api: favoriteApi,
+      artistStore: InMemoryFavoriteArtistStore(),
+    );
     addTearDown(favorites.dispose);
 
     await tester.pumpWidget(
@@ -367,6 +376,7 @@ void main() {
       await tester.pump();
 
       expect(favorites.favorites.hasShow(1), isTrue);
+      expect(favoriteApi.wishedIds, [1]);
       expect(favorites.favorites.shows.single.title, '2026 아이유 콘서트');
       expect(favorites.favorites.shows.single.isOnSale, isTrue);
       expect(

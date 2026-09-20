@@ -9,6 +9,7 @@ import '../../auth/state/auth_session_scope.dart';
 import '../../booking/models/performance.dart';
 import '../../booking/state/booking_scope.dart';
 import '../../favorite/state/favorite_scope.dart';
+import '../../favorite/utils/toggle_favorite_show.dart';
 import '../constants.dart';
 import '../data/show_api.dart';
 import '../models/show_detail.dart';
@@ -75,9 +76,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     });
   }
 
-  void _toggleFavorite(ShowDetail detail) {
-    FavoriteScope.read(context).toggleShow(detail.toFavorite());
-  }
+  /// 공연 찜은 서버에 남는다. 로그인 안내와 실패 알림은 공통 동작이 맡는다.
+  Future<void> _toggleFavorite(ShowDetail detail) =>
+      toggleFavoriteShow(context, detail.toFavorite());
 
   void _notify(String message) {
     ScaffoldMessenger.of(
