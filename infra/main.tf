@@ -18,6 +18,7 @@ module "backend_secret" {
     ADMIN_PRIVATE_KEY                    = var.admin_private_key
     WALLET_MASTER_KEY                    = var.wallet_master_key
     FIREBASE_MESSAGING_ENABLED           = "true"
+    PUSH_CHANNEL_GENERAL                 = "timo_general_notifications"
     FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = var.firebase_service_account_json_base64
   }, var.solapi_environment, module.image_storage.runtime_environment))
 }

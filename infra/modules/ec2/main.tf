@@ -172,7 +172,7 @@ resource "aws_instance" "this" {
               required = ("SPRING_PROFILES_ACTIVE", "DB_URL", "DB_USERNAME", "DB_PASSWORD", "JWT_SECRET", "ENTRY_PASS_SECRET", "WALLET_MASTER_KEY",
                           "ADMIN_PRIVATE_KEY", "SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "SMS_LIVE_TEST_TO",
                           "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_PUBLIC_BUCKET_NAME", "IMAGE_BASE_URL",
-                          "FIREBASE_MESSAGING_ENABLED", "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64")
+                          "FIREBASE_MESSAGING_ENABLED", "PUSH_CHANNEL_GENERAL", "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64")
               values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
               for key in required:
                   value = values.get(key)
