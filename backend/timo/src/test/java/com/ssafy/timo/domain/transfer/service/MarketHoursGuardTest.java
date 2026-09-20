@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
@@ -70,6 +71,8 @@ class MarketHoursGuardTest {
     private ImageStorage imageStorage;
     @Mock
     private MarketHoursService marketHoursService;
+    @Mock
+    private ListingSoldNotifier listingSoldNotifier;
 
     private ListingService listingService;
     private PurchaseService purchaseService;
@@ -80,7 +83,7 @@ class MarketHoursGuardTest {
         listingService = new ListingService(ticketRepository, ticketListingRepository, ticketTradeRepository,
                 imageStorage, marketHoursService, CLOCK);
         purchaseService = new PurchaseService(ticketListingRepository, ticketTradeRepository, ticketRepository,
-                marketHoursService, CLOCK);
+                marketHoursService, listingSoldNotifier, CLOCK);
         marketQueryService = new MarketQueryService(concertRepository, ticketListingRepository,
                 ticketTradeRepository, imageStorage, marketHoursService, CLOCK);
     }
@@ -113,7 +116,7 @@ class MarketHoursGuardTest {
         assertThatThrownBy(() -> purchaseService.purchase(LISTING_ID, new PurchaseRequestDto(PRICE), MEMBER_ID))
                 .isInstanceOf(MarketClosedException.class);
         // 먼저 SOLD 로 바꾸고 나서 거절하면, 롤백되기까지 그 매물이 남에게 잠깐 사라진다.
-        verifyNoInteractions(ticketListingRepository, ticketTradeRepository, ticketRepository);
+        verifyNoInteractions(ticketListingRepository, ticketTradeRepository, ticketRepository, listingSoldNotifier);
     }
 
     @Test
@@ -128,7 +131,7 @@ class MarketHoursGuardTest {
     }
 
     @Test
-    @DisplayName("등록은 운영 시간을 묻지 않는다 - 닫힌 시간에 올린 매물이 20:00 에 드러난다")
+    @DisplayName("등록은 운영 시간을 묻지 않는다 - 닫힌 시간에 올린 매물이 08:00 에 드러난다")
     void registerIgnoresMarketHours() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.empty());
 

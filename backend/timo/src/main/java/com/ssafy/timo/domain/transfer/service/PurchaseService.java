@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.transfer.service;
 
+import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
@@ -49,6 +50,7 @@ public class PurchaseService {
     private final TicketTradeRepository ticketTradeRepository;
     private final TicketRepository ticketRepository;
     private final MarketHoursService marketHoursService;
+    private final ListingSoldNotifier listingSoldNotifier;
     private final Clock clock;
 
     /**
@@ -60,13 +62,15 @@ public class PurchaseService {
      *   <li>운영 시간인가 → 409. 닫힌 마켓에서 자리를 먼저 잡는 일이 없도록 UPDATE 앞에 둔다</li>
      *   <li>매물이 있는가 → 404</li>
      *   <li>{@code LISTED} 인 행만 {@code SOLD} 로 조건부 UPDATE. 영향 행 0 이면 → 409</li>
-     *   <li>마켓에 올라온 매물인가(등록 다음 날 20:00 부터) → 409. 목록에 없어도 번호로 닿을 수 있다</li>
+     *   <li>마켓에 올라온 매물인가(등록 다음 날 08:00 부터) → 409. 목록에 없어도 번호로 닿을 수 있다</li>
      *   <li>{@code expectedPrice} 가 등록가와 같은가 → 409</li>
      *   <li>내 매물이 아닌가 → 409</li>
      *   <li>등록가가 정가 이하인가(재검증) → 422</li>
      *   <li>티켓이 아직 {@code OWNED} 인가 → 409. 예매 취소가 등록 중인 티켓을 막으므로 정상 경로에서는
      *       안 걸리지만, 회수된 티켓이 매물로 남는 경로를 이쪽에서도 닫는다</li>
      *   <li>체결 기록 INSERT. 상태는 {@code PENDING}</li>
+     *   <li>판매자에게 판매 완료 알림. 소유권이 마지막 거래 행으로 계산되므로 9 번이 곧 DB 상 소유권
+     *       이전이다. 온체인 연동이 붙으면 이 호출은 체결 확정({@code TicketTrade.confirm()}) 뒤로 옮긴다</li>
      * </ol>
      *
      * <p><b>3번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
@@ -122,6 +126,9 @@ public class PurchaseService {
         }
 
         TicketTrade trade = ticketTradeRepository.save(TicketTrade.record(listing, buyerId, now));
+
+        // 같은 트랜잭션이라 구매가 되돌아가면 알림도 함께 사라지고, 푸시는 커밋 뒤에 나간다.
+        listingSoldNotifier.notifySold(listing.getSellerMemberId(), trade.getId(), listing.getConcert().getTitle());
 
         return PurchaseResponseDto.from(trade);
     }

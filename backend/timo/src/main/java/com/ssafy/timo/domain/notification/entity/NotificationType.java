@@ -51,8 +51,8 @@ public enum NotificationType {
      * 이동한다. 템플릿 인자는 공연명이다. 구매자를 알 수 있는 정보는 본문에 넣지 않는다. 판매자와 구매자는
      * 서로를 알 수 없어야 한다.
      *
-     * <p>아직 이 알림을 내보내는 곳이 없다. 체결을 확정으로 넘기는 경로가 코드에 없기 때문이다.
-     * {@code ListingSoldNotifier} 가 그 경로에 붙을 자리다.
+     * <p>{@code PurchaseService} 가 체결 기록을 넣을 때 {@code ListingSoldNotifier} 로 내보낸다. 온체인 연동이
+     * 붙으면 그 호출이 체결 확정 뒤로 옮겨진다.
      */
     LISTING_SOLD(LinkType.TRADE, "LISTING_SOLD",
             "%s 티켓이 판매됐어요");
