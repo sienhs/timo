@@ -28,12 +28,14 @@ public class DeployedContractAddresses {
     private final String showRegistryAddress;
     private final String ticketNftAddress;
     private final String ticketVaultAddress;
+    private final String marketplaceAddress;
 
     public DeployedContractAddresses(Credentials adminCredentials) {
         String adminAddress = adminCredentials.getAddress();
         this.showRegistryAddress = ContractUtils.generateContractAddress(adminAddress, BigInteger.valueOf(0));
         this.ticketNftAddress = ContractUtils.generateContractAddress(adminAddress, BigInteger.valueOf(1));
         this.ticketVaultAddress = ContractUtils.generateContractAddress(adminAddress, BigInteger.valueOf(2));
+        this.marketplaceAddress = ContractUtils.generateContractAddress(adminAddress, BigInteger.valueOf(3));
     }
 
     public String showRegistryAddress() {
@@ -46,5 +48,9 @@ public class DeployedContractAddresses {
 
     public String ticketVaultAddress() {
         return ticketVaultAddress;
+    }
+
+    public String marketplaceAddress() {
+        return marketplaceAddress;
     }
 }
