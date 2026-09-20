@@ -6,6 +6,7 @@ import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldResponseDto;
 import com.ssafy.timo.domain.seat.dto.SectionSeatListResponseDto;
 import com.ssafy.timo.domain.seat.service.SeatService;
+import com.ssafy.timo.domain.seat.service.SeatHoldRetryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,7 @@ public class SeatController implements SeatApi {
     static final String BASE_PATH = "/api/v1/seats";
 
     private final SeatService seatService;
+    private final SeatHoldRetryService seatHoldRetryService;
 
     @Override
     public ResponseEntity<SectionSeatListResponseDto> findSeats(Long concertId, Long sectionId) {
@@ -41,7 +43,7 @@ public class SeatController implements SeatApi {
 
     @Override
     public ResponseEntity<SeatHoldResponseDto> hold(Long seatId, Long concertId, Long memberId) {
-        return ResponseEntity.ok(seatService.hold(memberId, concertId, seatId));
+        return ResponseEntity.ok(seatHoldRetryService.hold(memberId, concertId, seatId));
     }
 
     @Override
