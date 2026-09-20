@@ -45,7 +45,14 @@ Future<void> main() async {
 
   // 권한·토큰은 기기 단위, 서버 등록은 로그인 회원 단위다. 로그인/로그아웃을
   // 구독하므로 앱을 켠 뒤 로그인해도, FCM 토큰이 바뀌어도 자동으로 동기화된다.
-  final pushNotificationService = PushNotificationService(session);
+  // 알림을 눌렀을 때 푸시 쪽도 화면을 바꿔야 한다. 앱이 혼자 만들면 푸시가 그
+  // 열쇠에 닿을 수 없어, 여기서 하나 만들어 앱과 푸시 양쪽에 같은 것을 준다.
+  final navigatorKey = GlobalKey<NavigatorState>();
+
+  final pushNotificationService = PushNotificationService(
+    session,
+    navigatorKey: navigatorKey,
+  );
   await pushNotificationService.start();
 
   // 소장품(메모리 티켓) 저장소. 컬렉션 화면이 열리자마자 목록을 그려야 해서
@@ -77,6 +84,12 @@ Future<void> main() async {
       // App 이 켜지면서 읽는다 — 여기서 기다릴 만큼 급하지 않다.
       favoriteArtistStore: SharedPreferencesFavoriteArtistStore(),
       ticketStore: ticketStore,
+      // 로그아웃할 때 이 기기의 푸시 토큰을 서버에서 지우려면 화면이 이 서비스에
+      // 닿아야 한다. 등록은 서비스가 세션을 구독해 알아서 하지만, 해제는 세션을
+      // 비우기 전에 일어나야 해서 로그아웃하는 쪽이 직접 불러야 한다. 로딩 화면도
+      // 알림으로 켜진 것인지 여기에 묻는다.
+      push: pushNotificationService,
+      navigatorKey: navigatorKey,
     ),
   );
 }

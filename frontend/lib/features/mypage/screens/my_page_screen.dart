@@ -8,12 +8,14 @@ import '../../auth/constants.dart';
 import '../../auth/state/auth_api_scope.dart';
 import '../../auth/state/auth_session.dart';
 import '../../auth/state/auth_session_scope.dart';
+import '../../notification/push_notification_scope.dart';
+import '../../notification/push_notification_service.dart';
 import '../constants.dart';
 import '../models/member_profile.dart';
 import '../models/wallet_summary.dart';
 import '../state/my_page_api_scope.dart';
 import '../widgets/mushroom_balance_card.dart';
-import '../widgets/my_page_top_bar.dart';
+import '../widgets/my_page_top_bar_host.dart';
 import '../widgets/transaction_history_card.dart';
 
 /// 마이페이지 홈. `MainShellScreen` 의 두 번째 탭 본문이다.
@@ -40,10 +42,8 @@ class MyPageScreen extends StatelessWidget {
       bottom: false,
       child: Column(
         children: [
-          MyPageTopBar(
+          MyPageTopBarHost(
             onBackPressed: onBackPressed ?? () => Navigator.maybePop(context),
-            onNotificationsPressed: () =>
-                _notifyNotReady(context, MyPageStrings.notifications),
           ),
           Expanded(
             child: isLoggedIn
@@ -119,13 +119,20 @@ class _MemberViewState extends State<_MemberView> {
   ///
   /// 세션([AuthSession.signOut]) 안에 서버 호출을 넣지 않은 이유: 그 메서드는
   /// 401 을 받은 인터셉터도 부르는데, 그때는 토큰이 이미 안 통하는 상태라 서버에
-  /// 알릴 게 없다. 로그아웃 진입점이 늘면 이 세 단계를 헬퍼로 뺀다.
+  /// 알릴 게 없다. 로그아웃 진입점이 늘면 이 단계들을 헬퍼로 뺀다.
+  ///
+  /// 푸시 토큰 해제만 세션을 비우기 **전에** 한다. 서버가 인증 헤더로 요청자를
+  /// 알아내는 API 라, 세션을 먼저 비우면 401 로 튕기고 이 기기에 직전 회원의
+  /// 알림이 계속 온다([PushDeviceRegistrar.unregisterDevice]).
   Future<void> _logout() async {
     // await 앞에서 context 를 다 쓴다. 뒤에서 쓰면 화면이 사라진 뒤일 수 있다.
     final api = AuthApiScope.of(context);
+    // 스코프 없이 화면만 띄우는 테스트에서는 null 이라 해제를 건너뛴다.
+    final pushRegistrar = PushNotificationScope.maybeOf(context);
     final session = widget.session;
     final refreshToken = session.refreshToken;
 
+    await pushRegistrar?.unregisterDevice();
     await session.signOut();
 
     if (refreshToken == null) return;

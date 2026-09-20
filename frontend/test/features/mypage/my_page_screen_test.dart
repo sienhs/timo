@@ -23,6 +23,9 @@ import 'package:timo/features/mypage/screens/coin_charge_screen.dart';
 import 'package:timo/features/mypage/screens/my_page_screen.dart';
 import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/features/mypage/widgets/transaction_tile.dart';
+import 'package:timo/features/notification/notification_destination.dart';
+import 'package:timo/features/notification/push_notification_scope.dart';
+import 'package:timo/features/notification/push_notification_service.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 서버에 로그아웃을 알렸는지 기록하는 목. 나머지 동작은 [MockAuthApi] 그대로다.
@@ -37,6 +40,31 @@ class _RecordingAuthApi extends MockAuthApi {
     loggedOutWith.add(refreshToken);
     return super.logout(refreshToken);
   }
+}
+
+/// 푸시 토큰 해제를 기록하는 가짜. 진짜 구현은 만들 때 Firebase 를 건드려
+/// 테스트에서 못 만든다.
+///
+/// 불린 횟수만이 아니라 **불린 시점에 아직 로그인 상태였는지**를 함께 남긴다.
+/// 해제 API 는 인증 헤더로 요청자를 알아내므로 세션을 비운 뒤에 부르면 401 로
+/// 튕긴다. 순서가 뒤집혀도 호출 횟수만 세면 통과해 버린다.
+class _RecordingPushRegistrar implements PushNotifications {
+  _RecordingPushRegistrar(this._session);
+
+  final AuthSession _session;
+
+  int calls = 0;
+  bool? loggedInWhenCalled;
+
+  @override
+  Future<void> unregisterDevice() async {
+    calls++;
+    loggedInWhenCalled = _session.isLoggedIn;
+  }
+
+  /// 마이페이지는 이걸 쓰지 않는다. 알림으로 켜졌는지는 로딩 화면이 묻는다.
+  @override
+  NotificationDestination? takeLaunchDestination() => null;
 }
 
 /// 처음 몇 번은 실패하고 그다음부터 성공하는 목. 다시 시도를 검사한다.
@@ -73,7 +101,13 @@ class _FlakyMyPageApi implements MyPageApi {
 }
 
 void main() {
-  final routes = Map.of(AppRoutes.routes)..remove(AppRoutes.home);
+  // 알림함은 서버 API 를 쓰는 별도 화면이라 여기서는 빈 화면으로 바꿔 끼운다.
+  // 여기서 볼 것은 알림 아이콘이 그 화면을 여느냐지 그 화면의 내용이 아니다.
+  const notificationsLabel = '알림함';
+  final routes = Map.of(AppRoutes.routes)
+    ..remove(AppRoutes.home)
+    ..[AppRoutes.notifications] = (_) =>
+        const Scaffold(body: Text(notificationsLabel));
 
   /// 서버에 닿지 못하는 상황을 흉내 내는 토큰으로 로그인한 상태.
   const offlineTokens = AuthTokens(
@@ -84,6 +118,7 @@ void main() {
   );
 
   late _RecordingAuthApi authApi;
+  late _RecordingPushRegistrar pushRegistrar;
 
   /// 360 x 800 dp. 시안 폭에서 글자가 넘치지 않는지 함께 본다.
   void usePhoneSize(WidgetTester tester) {
@@ -102,6 +137,7 @@ void main() {
     usePhoneSize(tester);
     authApi = _RecordingAuthApi();
     final session = AuthSession(storage: InMemoryTokenStorage());
+    pushRegistrar = _RecordingPushRegistrar(session);
     if (loggedIn) await session.signIn(tokens);
     await tester.pumpWidget(
       AuthSessionScope(
@@ -110,10 +146,15 @@ void main() {
           api: authApi,
           child: MyPageApiScope(
             api: api,
-            child: MaterialApp(
-              theme: AppTheme.light,
-              home: Scaffold(body: MyPageScreen(onBackPressed: onBackPressed)),
-              routes: routes,
+            child: PushNotificationScope(
+              push: pushRegistrar,
+              child: MaterialApp(
+                theme: AppTheme.light,
+                home: Scaffold(
+                  body: MyPageScreen(onBackPressed: onBackPressed),
+                ),
+                routes: routes,
+              ),
             ),
           ),
         ),
@@ -329,17 +370,14 @@ void main() {
       );
     });
 
-    testWidgets('알림을 누르면 준비 중 안내가 뜬다', (tester) async {
+    testWidgets('알림을 누르면 알림함이 열린다', (tester) async {
       await pumpMyPage(tester, loggedIn: true);
       await settle(tester);
 
       await tester.tap(find.byTooltip(MyPageStrings.notifications));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text(MyPageStrings.notReady(MyPageStrings.notifications)),
-        findsOneWidget,
-      );
+      expect(find.text(notificationsLabel), findsOneWidget);
     });
 
     testWidgets('뒤로가기는 넘겨받은 콜백을 부른다', (tester) async {
@@ -387,6 +425,21 @@ void main() {
       expect(find.text(AuthStrings.login), findsOneWidget);
       // 시도는 했다. 실패를 무시한 것이지 건너뛴 게 아니다.
       expect(authApi.loggedOutWith, [MockAuthApi.offlineRefreshToken]);
+    });
+
+    testWidgets('로그아웃하면 이 기기의 푸시 토큰도, 세션을 비우기 전에 지운다', (tester) async {
+      final session = await pumpMyPage(tester, loggedIn: true);
+      await settle(tester);
+
+      await scrollTo(tester, find.text(AuthStrings.logout));
+      await tester.tap(find.text(AuthStrings.logout));
+      await tester.pumpAndSettle();
+
+      expect(pushRegistrar.calls, 1);
+      // 순서가 핵심이다. 세션을 먼저 비우면 해제 요청에 인증 헤더가 붙지 않아
+      // 401 로 튕기고, 이 기기에 직전 회원의 알림이 계속 온다.
+      expect(pushRegistrar.loggedInWhenCalled, isTrue);
+      expect(session.isLoggedIn, isFalse);
     });
   });
 }

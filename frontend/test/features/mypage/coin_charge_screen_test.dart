@@ -67,7 +67,13 @@ class _RecordingMyPageApi implements MyPageApi {
 }
 
 void main() {
-  final routes = Map.of(AppRoutes.routes)..remove(AppRoutes.home);
+  // 알림함은 서버 API 를 쓰는 별도 화면이라 여기서는 빈 화면으로 바꿔 끼운다.
+  // 여기서 볼 것은 알림 아이콘이 그 화면을 여느냐지 그 화면의 내용이 아니다.
+  const notificationsLabel = '알림함';
+  final routes = Map.of(AppRoutes.routes)
+    ..remove(AppRoutes.home)
+    ..[AppRoutes.notifications] = (_) =>
+        const Scaffold(body: Text(notificationsLabel));
 
   /// 금액 칸 하나를 가리키는 finder. 같은 글자가 요약 줄에도 나오므로 버튼으로
   /// 좁힌다.
@@ -343,15 +349,12 @@ void main() {
     expect(find.text('열기'), findsOneWidget);
   });
 
-  testWidgets('알림을 누르면 준비 중 안내가 뜬다', (tester) async {
+  testWidgets('알림을 누르면 알림함이 열린다', (tester) async {
     await pumpCharge(tester, api: _RecordingMyPageApi());
 
     await tester.tap(find.byTooltip(MyPageStrings.notifications));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text(MyPageStrings.notReady(MyPageStrings.notifications)),
-      findsOneWidget,
-    );
+    expect(find.text(notificationsLabel), findsOneWidget);
   });
 }
