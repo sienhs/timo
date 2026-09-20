@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_metrics.dart';
 import '../constants.dart';
 import '../models/verification_result.dart';
 
@@ -44,46 +45,65 @@ class ScanResultView extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: ColoredBox(
           color: spec.color,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ScanMetrics.horizontalPadding,
-              vertical: 24,
-            ),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
-                _ResultIcon(icon: spec.icon),
-                const SizedBox(height: 40),
-                _ResultCard(title: spec.title, detail: spec.detail),
-                const SizedBox(height: 20),
-                if (spec.guide != null)
-                  Text(
-                    spec.guide!,
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: AppColors.onScan,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ScanMetrics.horizontalPadding,
+                vertical: 24,
+              ),
+              child: Column(
+                children: [
+                  const Spacer(flex: 2),
+                  _ResultIcon(icon: spec.icon),
+                  const SizedBox(height: 36),
+                  _ResultCard(
+                    title: spec.title,
+                    detail: spec.detail,
+                    color: spec.color,
+                  ),
+                  if (spec.guide != null) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: AppColors.onScanMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          spec.guide!,
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: AppColors.onScan,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                const Spacer(flex: 3),
-                if (spec.hasButtons)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ResultButton(
-                          label: ScanStrings.nextQr,
-                          onPressed: onDismiss,
+                  ],
+                  const Spacer(flex: 3),
+                  if (spec.hasButtons)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ResultButton(
+                            label: ScanStrings.nextQr,
+                            onPressed: onDismiss,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ResultButton(
-                          label: ScanStrings.confirm,
-                          onPressed: onDismiss,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ResultButton(
+                            label: ScanStrings.confirm,
+                            onPressed: onDismiss,
+                            filled: false,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -142,6 +162,8 @@ class _SpecOf {
   final bool hasButtons;
 }
 
+/// 결과 아이콘. 반투명 흰 원 위에 흰 아이콘. 테두리만 있는 원보다 멀리서
+/// 덩어리로 읽힌다.
 class _ResultIcon extends StatelessWidget {
   const _ResultIcon({required this.icon});
 
@@ -154,9 +176,10 @@ class _ResultIcon extends StatelessWidget {
       height: ScanMetrics.resultIconSize,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: AppColors.onScan.withValues(alpha: 0.18),
         border: Border.all(
-          color: AppColors.onScan,
-          width: ScanMetrics.resultIconStroke,
+          color: AppColors.onScan.withValues(alpha: 0.6),
+          width: 2,
         ),
       ),
       child: Icon(
@@ -168,18 +191,28 @@ class _ResultIcon extends StatelessWidget {
   }
 }
 
+/// 흰 카드. 제목은 결과 색으로 적어 배경과 짝이 맞게 한다 — 카드가 흰색이라
+/// 제목까지 검정이면 무슨 결과인지 카드만 봐서는 모른다.
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.title, required this.detail});
+  const _ResultCard({
+    required this.title,
+    required this.detail,
+    required this.color,
+  });
 
   final String title;
   final String detail;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppMetrics.cardPadding,
+        vertical: 28,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(ScanMetrics.resultCardRadius),
@@ -189,14 +222,16 @@ class _ResultCard extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: textTheme.displaySmall,
+            style: textTheme.displaySmall?.copyWith(color: color),
           ),
           if (detail.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
               detail,
               textAlign: TextAlign.center,
-              style: textTheme.bodyLarge,
+              style: textTheme.bodyLarge?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -205,15 +240,33 @@ class _ResultCard extends StatelessWidget {
   }
 }
 
-/// 결과 화면의 흰 버튼. 색 바탕 위라 테마의 초록 버튼은 쓸 수 없다.
+/// 결과 화면의 버튼. 색 바탕 위라 테마의 초록 버튼은 쓸 수 없다.
+/// [filled] 면 흰 채움(주 동작), 아니면 흰 테두리(보조).
 class _ResultButton extends StatelessWidget {
-  const _ResultButton({required this.label, required this.onPressed});
+  const _ResultButton({
+    required this.label,
+    required this.onPressed,
+    this.filled = true,
+  });
 
   final String label;
   final VoidCallback onPressed;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
+    if (!filled) {
+      return OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.onScan,
+          side: BorderSide(color: AppColors.onScan.withValues(alpha: 0.7)),
+          textStyle: Theme.of(context).textTheme.labelLarge
+              ?.copyWith(color: AppColors.onScan),
+        ),
+        child: Text(label),
+      );
+    }
     return FilledButton(
       onPressed: onPressed,
       style: FilledButton.styleFrom(

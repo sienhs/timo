@@ -7,6 +7,9 @@ class AuthMetrics {
 
   static const pagePadding = 20.0;
 
+  /// 로고와 제목 사이 간격.
+  static const logoGap = 28.0;
+
   /// 헤더(제목·설명)와 입력칸 사이 간격.
   static const headerGap = 32.0;
 
@@ -54,7 +57,7 @@ class AuthStrings {
   AuthStrings._();
 
   // 로그인 화면
-  static const loginTitle = '운영자 로그인';
+  static const loginTitle = '게이트 검표 로그인';
   static const loginSubtitle = '관리자 계정으로 로그인해주세요';
   static const usernameLabel = '아이디';
   static const usernameHint = '아이디';

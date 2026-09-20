@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/device_storage.dart';
 import 'token_storage.dart';
 
 /// 로그인·로그아웃·재발급 요청의 `X-Device-Id` 헤더 값. 팬 앱의 같은 파일과 같다.
@@ -22,7 +23,7 @@ class DeviceId {
   static String get value => _value ??= generate();
 
   /// 저장된 식별자를 되살린다. 없으면 새로 만들어 저장한다.
-  static Future<void> restore(TokenStorage storage) async {
+  static Future<void> restore(DeviceStorage storage) async {
     final saved = await storage.read(TokenStorageKeys.deviceId);
     if (saved != null && saved.isNotEmpty) {
       _value = saved;

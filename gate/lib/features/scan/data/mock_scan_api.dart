@@ -33,7 +33,8 @@ class MockScanApi implements ScanApi {
   static const revokedDivisor = 7;
   static const wrongConcertDivisor = 11;
 
-  /// 공연 선택이 붙기 전까지 헤더에 보이고 검표 요청에 실리는 대상.
+  /// 테스트가 검표 요청에 실어 보내는 공연. 앱에서는 공연 선택 화면에서 고른
+  /// 공연이 대신 실리므로 실행 중에는 쓰이지 않는다.
   static const target = GateTarget(concertId: 1, concertTitle: '2026 ㅇㅇㅇ 콘서트');
 
   @override

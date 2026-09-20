@@ -20,3 +20,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # 팬 앱(`frontend/assets/images/`)과 같은 파일이다. 두 앱이 같은 브랜드를
+  # 쓰므로 로고·마스코트는 같은 그림이어야 한다. 팬 앱에서 그림이 바뀌면
+  # 여기도 함께 갈아 준다.
+  assets:
+    - assets/images/

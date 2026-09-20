@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_metrics.dart';
 
-/// 앱 공통 테마. 색은 [AppColors], 크기·굵기는 여기서만 정의한다.
+/// 앱 공통 테마. 색은 [AppColors], 치수는 [AppMetrics], 글자는 여기서 정의한다.
 ///
 /// 화면 코드에서는 `Theme.of(context).textTheme.xxx` 로 가져다 쓴다.
 /// 게이트 운영자는 서서, 밝은 곳에서, 급하게 본다. 팬 앱보다 글자를 한 단계
@@ -17,6 +18,7 @@ class AppTheme {
     onSecondary: Colors.white,
     surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
+    onSurfaceVariant: AppColors.textSecondary,
     surfaceContainerHighest: AppColors.surfaceMuted,
     outline: AppColors.border,
     outlineVariant: AppColors.border,
@@ -81,10 +83,14 @@ class AppTheme {
       height: 1.3,
       color: AppColors.textSecondary,
     ),
+    // 뱃지·칩 안의 작은 글자
+    labelSmall: TextStyle(
+      fontSize: 12,
+      height: 1.3,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textSecondary,
+    ),
   );
-
-  static const buttonHeight = 52.0;
-  static const fieldRadius = 10.0;
 
   static ThemeData get light => ThemeData(
     useMaterial3: true,
@@ -116,9 +122,11 @@ class AppTheme {
         foregroundColor: Colors.white,
         disabledBackgroundColor: AppColors.textDisabled,
         disabledForegroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(buttonHeight),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(fieldRadius),
+        minimumSize: const Size.fromHeight(AppMetrics.buttonMinHeight),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(AppMetrics.controlRadius),
+          ),
         ),
         textStyle: _textTheme.labelLarge,
       ),
@@ -127,43 +135,75 @@ class AppTheme {
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.textPrimary,
         side: const BorderSide(color: AppColors.border),
-        minimumSize: const Size.fromHeight(buttonHeight),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(fieldRadius),
+        minimumSize: const Size.fromHeight(AppMetrics.buttonMinHeight),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(
+            Radius.circular(AppMetrics.controlRadius),
+          ),
         ),
         textStyle: _textTheme.labelLarge?.copyWith(
           color: AppColors.textPrimary,
         ),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primaryPressed,
+        textStyle: _textTheme.labelLarge?.copyWith(
+          color: AppColors.primaryPressed,
+        ),
+      ),
+    ),
+    // 확인 팝업(로그아웃·공연 변경). 팬 앱과 같은 모서리 14 를 쓴다.
+    dialogTheme: const DialogThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+      ),
+      titleTextStyle: TextStyle(
+        fontSize: 18,
+        height: 1.4,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      ),
+      contentTextStyle: TextStyle(
+        fontSize: 15,
+        height: 1.5,
+        color: AppColors.textSecondary,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.textPrimary,
+      contentTextStyle: _textTheme.bodyMedium?.copyWith(color: Colors.white),
+      behavior: SnackBarBehavior.floating,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surfaceMuted,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(fieldRadius),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(fieldRadius),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(fieldRadius),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(fieldRadius),
-        borderSide: const BorderSide(color: AppColors.rejected),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(fieldRadius),
-        borderSide: const BorderSide(color: AppColors.rejected, width: 1.5),
-      ),
+      border: _inputBorder(AppColors.border),
+      enabledBorder: _inputBorder(AppColors.border),
+      focusedBorder: _inputBorder(AppColors.primary, width: 1.5),
+      errorBorder: _inputBorder(AppColors.rejected),
+      focusedErrorBorder: _inputBorder(AppColors.rejected, width: 1.5),
       labelStyle: _textTheme.labelMedium,
       hintStyle: _textTheme.bodyMedium?.copyWith(
         color: AppColors.textSecondary,
       ),
     ),
   );
+
+  /// 입력칸 테두리. 색과 굵기만 다르고 모서리는 버튼과 같다.
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(AppMetrics.controlRadius),
+        ),
+        borderSide: BorderSide(color: color, width: width),
+      );
 }

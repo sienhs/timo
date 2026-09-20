@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo_gate/core/theme/app_theme.dart';
 import 'package:timo_gate/features/auth/constants.dart';
 import 'package:timo_gate/features/auth/data/mock_auth_api.dart';
-import 'package:timo_gate/features/auth/data/token_storage.dart';
+import 'package:timo_gate/core/storage/device_storage.dart';
 import 'package:timo_gate/features/auth/models/auth_tokens.dart';
 import 'package:timo_gate/features/auth/state/auth_api_scope.dart';
 import 'package:timo_gate/features/auth/state/auth_session.dart';
@@ -11,12 +11,12 @@ import 'package:timo_gate/features/auth/state/auth_session_scope.dart';
 import 'package:timo_gate/features/auth/widgets/logout_button.dart';
 
 void main() {
-  late InMemoryTokenStorage storage;
+  late InMemoryDeviceStorage storage;
   late AuthSession session;
   late _RecordingAuthApi api;
 
   setUp(() async {
-    storage = InMemoryTokenStorage();
+    storage = InMemoryDeviceStorage();
     session = AuthSession(storage: storage);
     api = _RecordingAuthApi();
     await session.signIn(MockAuthApi.adminTokens);
