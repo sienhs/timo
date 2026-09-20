@@ -44,6 +44,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.ssafy.timo.domain.reservation.exception.BookingNotOpenException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -275,6 +277,13 @@ class LocalDataSeederTest {
         assertThat(concerts).hasSize(4);
 
         for (Concert concert : concerts) {
+            if (concert.getStatus() == ConcertStatus.SCHEDULED) {
+                // 오픈 전 공연은 구역·좌석 조회가 막힌다.
+                assertThatThrownBy(() -> seatService.findSections(concert.getId()))
+                        .as("오픈 전 %s 의 구역 조회", concert.getTitle())
+                        .isInstanceOf(BookingNotOpenException.class);
+                continue;
+            }
             Long sectionId = firstSectionId(concert.getId());
             int available = seatService.findSeats(concert.getId(), sectionId).availableCount();
 
