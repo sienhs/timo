@@ -1,5 +1,7 @@
 package com.ssafy.timo.domain.concert.repository;
 
+import com.ssafy.timo.domain.concert.dto.ConcertOpenRow;
+import com.ssafy.timo.domain.concert.dto.ConcertStartRow;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
@@ -12,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -27,6 +30,40 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
      */
     @Query("select c from Concert c join fetch c.venue where c.id = :id")
     Optional<Concert> findByIdWithVenue(@Param("id") Long id);
+
+    /**
+     * 시작 시각이 {@code from} 이상 {@code to} 이하인 공연을, 지정한 상태만 빼고, 시작이 빠른 순으로.
+     * 알림 스윕이 "지금 알릴 공연" 을 찾는 데 쓴다. 경계는 양쪽 다 포함한다. 경계에 걸친 공연이 빠지는 것보다
+     * 한 번 더 걸리는 편이 낫고, 중복은 알림 저장이 막는다.
+     *
+     * <p>알림 시각을 시작 시각에서 역산한 범위로 바꿔서 넘긴다. 컬럼에 함수를 걸어 계산하면 인덱스를 못 탄다.
+     */
+    @Query("""
+            select c.id as id, c.title as title, c.startDate as startDate
+              from Concert c
+             where c.startDate between :from and :to
+               and c.status <> :excluded
+             order by c.startDate, c.id
+            """)
+    List<ConcertStartRow> findStartRowsBetween(@Param("from") LocalDateTime from,
+                                               @Param("to") LocalDateTime to,
+                                               @Param("excluded") ConcertStatus excluded);
+
+    /**
+     * 예매 오픈 시각이 {@code from} 이상 {@code to} 이하인 공연을, 지정한 상태만 빼고, 오픈이 빠른 순으로.
+     * 경계는 양쪽 다 포함한다. 알림 스윕이 곧 열릴 공연 후보를 좁히는 데 쓰고, 알림 시각이 정확히 지금
+     * 범위에 드는지는 호출부가 하나씩 가린다.
+     */
+    @Query("""
+            select c.id as id, c.title as title, c.openAt as openAt
+              from Concert c
+             where c.openAt between :from and :to
+               and c.status <> :excluded
+             order by c.openAt, c.id
+            """)
+    List<ConcertOpenRow> findOpenRowsBetween(@Param("from") LocalDateTime from,
+                                             @Param("to") LocalDateTime to,
+                                             @Param("excluded") ConcertStatus excluded);
 
     /**
      * 조건에 맞는 공연을 한 페이지 조회한다. 조건은 모두 선택값이라 {@code null} 이면 무시한다.

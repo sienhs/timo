@@ -36,7 +36,7 @@ FCM HTTP v1 API도 Firebase Console의 Cloud Messaging 설정에서 활성화한
 
 ```java
 memberPushNotificationService.send(memberId,
-        new PushMessage("예매 완료", "내 티켓에서 확인해 보세요.",
+        new PushMessage("예매가 완료됐어요. 내 티켓에서 확인해 보세요.",
                 Map.of("route", "/my-tickets", "reservationId", reservationId.toString())));
 ```
 

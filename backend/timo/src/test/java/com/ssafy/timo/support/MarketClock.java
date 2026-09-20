@@ -20,7 +20,7 @@ public final class MarketClock extends Clock {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
     private static final LocalTime INSIDE_WINDOW = LocalTime.of(21, 0);
-    private static final LocalTime OUTSIDE_WINDOW = LocalTime.of(12, 0);
+    private static final LocalTime OUTSIDE_WINDOW = LocalTime.of(3, 0);
 
     private volatile Instant now;
 
@@ -33,7 +33,7 @@ public final class MarketClock extends Clock {
         at(INSIDE_WINDOW);
     }
 
-    /** 오늘 12:00. */
+    /** 오늘 03:00. */
     public void closed() {
         at(OUTSIDE_WINDOW);
     }

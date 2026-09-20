@@ -178,8 +178,8 @@ class MarketApiIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.open").value(true))
                     .andExpect(jsonPath("$.serverTime").value(endsWith("T21:00:00")))
-                    .andExpect(jsonPath("$.opensAt").value(endsWith("T20:00:00")))
-                    .andExpect(jsonPath("$.closesAt").value(endsWith("T23:59:59")));
+                    .andExpect(jsonPath("$.opensAt").value(endsWith("T08:00:00")))
+                    .andExpect(jsonPath("$.closesAt").value(endsWith("T23:00:00")));
         }
 
         @Test
@@ -190,7 +190,7 @@ class MarketApiIntegrationTest {
             mvc.perform(get(MARKET_PATH + "/hours"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.open").value(false))
-                    .andExpect(jsonPath("$.opensAt").value(endsWith("T20:00:00")));
+                    .andExpect(jsonPath("$.opensAt").value(endsWith("T08:00:00")));
         }
 
         @Test
@@ -204,7 +204,7 @@ class MarketApiIntegrationTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("LISTED"));
 
-            // 닫힌 동안은 목록 자체가 막히고, 열려도 오늘 등록한 매물은 다음 날 20:00 까지 안 보인다.
+            // 닫힌 동안은 목록 자체가 막히고, 열려도 오늘 등록한 매물은 다음 날 08:00 까지 안 보인다.
             mvc.perform(get(MARKET_PATH + "/concerts/{concertId}/listings", concert.getId()))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.exception").value("MarketClosedException"));
@@ -215,7 +215,7 @@ class MarketApiIntegrationTest {
         }
 
         @Test
-        @DisplayName("어제 등록한 매물은 보이고 오늘 등록한 매물은 보이지 않는다 - 등록 다음 날 20:00 노출")
+        @DisplayName("어제 등록한 매물은 보이고 오늘 등록한 매물은 보이지 않는다 - 등록 다음 날 08:00 노출")
         void listingsBecomeVisibleTheDayAfter() throws Exception {
             TicketListing yesterday = openListingAt(othersTicket, LIST_PRICE, LocalDateTime.now().minusDays(1));
             TicketListing today = openListingAt(myTicket, LIST_PRICE - 10_000, LocalDateTime.now());
