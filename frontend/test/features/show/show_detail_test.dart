@@ -17,6 +17,7 @@ import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
 import 'package:timo/features/favorite/data/favorite_artist_store.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/constants.dart';
 import 'package:timo/features/favorite/data/mock_favorite_api.dart';
 import 'package:timo/features/favorite/state/favorite_scope.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
@@ -89,7 +90,7 @@ void main() {
     title: title,
     venue: '고척스카이돔',
     // 단일 회차 공연이라 종료일을 읽지 않는다. 화면에는 하루로 찍힌다.
-    startAt: DateTime(2026, 5, 20),
+    startAt: DateTime(2026, 5, 20, 19),
     ticketOpenAt: after == null ? null : now.add(after),
     status:
         status ?? (after == null ? ShowStatus.onSale : ShowStatus.scheduled),
@@ -198,13 +199,55 @@ void main() {
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
 
-    testWidgets('알림 버튼은 준비 중이라고 알려 준다', (tester) async {
+    // 서버는 '그 공연을 찜한 회원' 에게 오픈 알림을 보낸다. 알림 신청은 찜과
+    // 같은 일이라, 버튼이 상단 하트와 같은 곳을 건드려야 한다.
+    testWidgets('알림 버튼이 공연을 찜하고, 하트도 같이 채워진다', (tester) async {
       await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
 
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
 
-      expect(find.text(ShowDetailStrings.notifyNotReady), findsOneWidget);
+      expect(favorites.favorites.hasShow(1), isTrue);
+      expect(favoriteApi.wishedIds, [1]);
+      expect(find.text(ShowDetailStrings.openAlarmOn), findsOneWidget);
+      expect(
+        find.byTooltip(ShowDetailStrings.unfavoriteAction),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('이미 찜했으면 버튼이 해제로 바뀌고, 누르면 찜이 빠진다', (tester) async {
+      await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
+
+      await tester.tap(find.text(ShowDetailStrings.notifyAction));
+      await tester.pump();
+
+      expect(find.text(ShowDetailStrings.unnotifyAction), findsOneWidget);
+      expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
+
+      await tester.tap(find.text(ShowDetailStrings.unnotifyAction));
+      await tester.pump();
+
+      expect(favorites.favorites.shows, isEmpty);
+      expect(find.text(ShowDetailStrings.openAlarmOff), findsOneWidget);
+      expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
+    });
+
+    // 찜은 서버에 남으므로 로그인해야 한다. 안내만 띄우고 버튼은 그대로다.
+    testWidgets('로그아웃 상태면 찜하지 않고 로그인하라고 알린다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(after: const Duration(hours: 1)),
+        loggedIn: false,
+      );
+
+      await tester.tap(find.text(ShowDetailStrings.notifyAction));
+      await tester.pump();
+
+      expect(favorites.favorites.shows, isEmpty);
+      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
+      expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
   });
 
@@ -244,14 +287,14 @@ void main() {
 
     // 잠긴 버튼이 이미 끝났다고 말한다. 그 위에 공연 날짜만 남으면 무슨 날인지
     // 헷갈린다(위쪽 '일시:' 줄에는 그대로 있다).
-    testWidgets('하단 바에 공연 날짜를 적지 않는다', (tester) async {
+    testWidgets('하단 바에 공연 일시를 적지 않는다', (tester) async {
       await pumpDetail(tester, detailOpening(status: ShowStatus.closed));
 
-      expect(find.text('2026.05.20'), findsNothing);
       expect(
-        find.text(ShowDetailStrings.periodLine('2026.05.20')),
+        find.text(ShowDetailStrings.periodLine('2026.05.20 (수) 19:00')),
         findsOneWidget,
       );
+      expect(find.text('2026.05.20 (수) 19:00'), findsNothing);
     });
 
     testWidgets('취소된 공연도 같이 잠근다', (tester) async {
@@ -282,12 +325,18 @@ void main() {
   });
 
   group('오픈 후', () {
-    testWidgets('공연 기간과 예매 버튼을 보여 준다', (tester) async {
+    testWidgets('예매 버튼만 세우고 그 위에 공연 일시를 겹쳐 적지 않는다', (tester) async {
       await pumpDetail(tester, detailOpening());
 
       expect(find.text(ShowDetailStrings.onSaleBadge), findsOneWidget);
-      expect(find.text('2026.05.20'), findsOneWidget);
       expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
+      // 공연 일시는 위쪽 '일시:' 줄 한 곳에만 있다. 버튼 바로 위에 또 찍으면
+      // 예매 마감일처럼 읽힌다.
+      expect(
+        find.text(ShowDetailStrings.periodLine('2026.05.20 (수) 19:00')),
+        findsOneWidget,
+      );
+      expect(find.text('2026.05.20 (수) 19:00'), findsNothing);
     });
 
     testWidgets('예매 버튼이 좌석 선택으로 보낸다', (tester) async {
@@ -359,7 +408,8 @@ void main() {
 
     expect(find.text('2026 아이유 콘서트'), findsOneWidget);
     expect(find.text('공연 장소: 고척스카이돔'), findsOneWidget);
-    expect(find.text('일시: 2026.05.20'), findsOneWidget);
+    // 날짜만 적으면 그날 몇 시에 가야 하는지 알 길이 없다.
+    expect(find.text('일시: 2026.05.20 (수) 19:00'), findsOneWidget);
     expect(find.text(ShowDetailStrings.zonePriceSection), findsOneWidget);
     expect(find.text('1층 A블록'), findsOneWidget);
     expect(find.text('154,000원'), findsOneWidget);

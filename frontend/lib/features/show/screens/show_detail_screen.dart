@@ -80,10 +80,38 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Future<void> _toggleFavorite(ShowDetail detail) =>
       toggleFavoriteShow(context, detail.toFavorite());
 
+  /// 하단 바의 오픈 알림 버튼. 찜을 켜고 끄는 것과 같은 일을 한다.
+  ///
+  /// 서버에 '알림만 신청' 하는 길이 없다. 오픈 알림은 백엔드
+  /// `ConcertOpenSweep` 이 **그 공연을 찜한 회원**에게 보내므로, 알림을 받는
+  /// 방법은 찜뿐이다. 상단 하트와 같은 동작을 부르는 것도 그래서다 — 둘이
+  /// 다른 일을 하면 하트로 찜을 뺀 사람에게 알림이 안 가는 이유를 설명할 수
+  /// 없다.
+  Future<void> _toggleOpenAlarm(ShowDetail detail) async {
+    final store = FavoriteScope.read(context);
+    final wasWished = store.favorites.hasShow(detail.id);
+
+    await _toggleFavorite(detail);
+
+    if (!mounted) return;
+    // 로그인 안내와 실패는 위에서 이미 알렸다. 찜이 실제로 바뀌었을 때만
+    // 결과를 덧붙인다 — 실패한 뒤에 '신청했어요' 가 뜨면 거짓말이 된다.
+    if (store.favorites.hasShow(detail.id) == wasWished) return;
+    _notify(
+      wasWished
+          ? ShowDetailStrings.openAlarmOff
+          : ShowDetailStrings.openAlarmOn,
+    );
+  }
+
+  /// 알림 신청 결과를 한 줄로 알린다.
+  ///
+  /// 띄우기 전에 떠 있던 것을 걷어낸다. 켜고 바로 끄면 먼저 뜬 '신청했어요' 가
+  /// 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에 신청했다는 말이 남는다.
   void _notify(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -99,8 +127,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       body: AsyncBoundary<ShowDetail>(
         future: _detail,
         onRetry: _reload,
-        builder: (context, detail) =>
-            _LoadedShow(detail: detail, clock: widget.clock, onNotify: _notify),
+        builder: (context, detail) => _LoadedShow(
+          detail: detail,
+          clock: widget.clock,
+          onNotifyPressed: () => _toggleOpenAlarm(detail),
+        ),
       ),
     );
   }
@@ -115,12 +146,14 @@ class _LoadedShow extends StatefulWidget {
   const _LoadedShow({
     required this.detail,
     required this.clock,
-    required this.onNotify,
+    required this.onNotifyPressed,
   });
 
   final ShowDetail detail;
   final DateTime Function() clock;
-  final void Function(String message) onNotify;
+
+  /// 오픈 알림 버튼을 눌렀을 때. 화면이 찜을 켜고 끈다.
+  final VoidCallback onNotifyPressed;
 
   @override
   State<_LoadedShow> createState() => _LoadedShowState();
@@ -257,9 +290,11 @@ class _LoadedShowState extends State<_LoadedShow> {
           builder: (context, now, _) => ShowDetailBottomBar(
             detail: detail,
             now: now,
+            // 상단 하트와 같은 값을 본다. 알림 버튼으로 켠 찜이 하트에도
+            // 채워져야 둘이 같은 것을 가리킨다는 게 보인다.
+            isFavorite: FavoriteScope.of(context).favorites.hasShow(detail.id),
             onBookPressed: _startBooking,
-            onNotifyPressed: () =>
-                widget.onNotify(ShowDetailStrings.notifyNotReady),
+            onNotifyPressed: widget.onNotifyPressed,
           ),
         ),
       ],
