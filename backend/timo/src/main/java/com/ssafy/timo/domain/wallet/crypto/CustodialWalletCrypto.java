@@ -2,7 +2,7 @@ package com.ssafy.timo.domain.wallet.crypto;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.timo.global.config.WalletProperties;
+import com.ssafy.timo.global.config.wallet.WalletProperties;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;

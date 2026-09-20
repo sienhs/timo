@@ -26,7 +26,7 @@ import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.math.BigInteger;

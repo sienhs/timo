@@ -135,7 +135,7 @@ class LocalDataSeederTest {
     private com.ssafy.timo.domain.wallet.service.WalletService walletService;
 
     @Autowired
-    private com.ssafy.timo.global.config.BlockchainProperties blockchainProperties;
+    private com.ssafy.timo.global.config.blockchain.BlockchainProperties blockchainProperties;
 
     @Autowired
     private com.ssafy.timo.global.storage.ImageStorage imageStorage;

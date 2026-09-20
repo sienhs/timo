@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ssafy.timo.global.config.WalletProperties;
+import com.ssafy.timo.global.config.wallet.WalletProperties;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

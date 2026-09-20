@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.blockchain;
 
-import com.ssafy.timo.global.config.DeployedContractAddresses;
+import com.ssafy.timo.global.config.blockchain.DeployedContractAddresses;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.List;

@@ -29,7 +29,7 @@ import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.domain.wish.entity.ConcertWish;
 import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import com.ssafy.timo.global.firebase.PushDelivery;
 import com.ssafy.timo.global.firebase.PushNotificationSender;
 import com.ssafy.timo.global.firebase.PushResult;

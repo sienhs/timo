@@ -2,9 +2,9 @@ package com.ssafy.timo.domain.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.ssafy.timo.global.config.NotificationProperties;
-import com.ssafy.timo.global.config.NotificationRetentionProperties;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationRetentionProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import com.ssafy.timo.support.IntegrationTest;
 import java.io.IOException;
 import java.time.Duration;

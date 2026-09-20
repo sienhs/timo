@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.ticket.service;
 
-import com.ssafy.timo.global.config.EntryPassProperties;
+import com.ssafy.timo.global.config.ticket.EntryPassProperties;
 import com.ssafy.timo.global.util.Masked;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;

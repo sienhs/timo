@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.ticket;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

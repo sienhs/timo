@@ -1,7 +1,7 @@
 package com.ssafy.timo.domain.ticket.service;
 
 import com.ssafy.timo.domain.blockchain.TicketNftClient;
-import com.ssafy.timo.global.config.BlockchainProperties;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;

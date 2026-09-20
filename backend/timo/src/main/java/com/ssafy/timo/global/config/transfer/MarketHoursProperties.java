@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.transfer;
 
 import java.time.LocalTime;
 import org.springframework.boot.context.properties.ConfigurationProperties;

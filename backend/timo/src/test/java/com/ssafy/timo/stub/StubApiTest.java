@@ -10,7 +10,7 @@ import com.ssafy.timo.stub.seat.SeatStateStore;
 import com.ssafy.timo.stub.seat.SeatStubController;
 import com.ssafy.timo.stub.seat.SectionStubController;
 import com.ssafy.timo.domain.transfer.service.MarketHoursService;
-import com.ssafy.timo.global.config.MarketHoursProperties;
+import com.ssafy.timo.global.config.transfer.MarketHoursProperties;
 import com.ssafy.timo.stub.transfer.MarketStubController;
 import com.ssafy.timo.stub.transfer.MarketTicketStore;
 import com.ssafy.timo.stub.venue.VenueStubController;

@@ -1,7 +1,7 @@
 package com.ssafy.timo.domain.auth.service;
 
 import com.ssafy.timo.domain.member.entity.Role;
-import com.ssafy.timo.global.config.JwtProperties;
+import com.ssafy.timo.global.config.auth.JwtProperties;
 import com.ssafy.timo.global.util.Masked;
 import java.time.Instant;
 import java.util.List;

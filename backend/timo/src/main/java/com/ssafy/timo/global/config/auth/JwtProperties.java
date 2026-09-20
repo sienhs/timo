@@ -1,4 +1,4 @@
-package com.ssafy.timo.global.config;
+package com.ssafy.timo.global.config.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

@@ -1,6 +1,6 @@
 package com.ssafy.timo.domain.wallet.crypto;
 
-import com.ssafy.timo.global.config.WalletProperties;
+import com.ssafy.timo.global.config.wallet.WalletProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

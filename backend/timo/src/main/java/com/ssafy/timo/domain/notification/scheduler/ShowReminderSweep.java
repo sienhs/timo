@@ -8,7 +8,7 @@ import com.ssafy.timo.domain.notification.entity.NotificationType;
 import com.ssafy.timo.domain.notification.service.NotificationMessages;
 import com.ssafy.timo.domain.notification.service.NotificationRecorder;
 import com.ssafy.timo.domain.notification.service.TicketOwnerReader;
-import com.ssafy.timo.global.config.NotificationProperties;
+import com.ssafy.timo.global.config.notification.NotificationProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

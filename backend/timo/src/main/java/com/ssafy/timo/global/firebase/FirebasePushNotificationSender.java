@@ -11,7 +11,7 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
-import com.ssafy.timo.global.config.PushProperties;
+import com.ssafy.timo.global.config.notification.PushProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

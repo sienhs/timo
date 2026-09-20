@@ -3,7 +3,7 @@ package com.ssafy.timo.domain.transfer.service;
 import com.ssafy.timo.domain.transfer.dto.MarketHoursResponseDto;
 import com.ssafy.timo.domain.transfer.exception.MarketClosedException;
 import com.ssafy.timo.domain.transfer.exception.MarketOpenException;
-import com.ssafy.timo.global.config.MarketHoursProperties;
+import com.ssafy.timo.global.config.transfer.MarketHoursProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
