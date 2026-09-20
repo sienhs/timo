@@ -90,7 +90,7 @@ public class ListingService {
      * 사용자가 가격을 고쳐 다시 시도하게 되기 때문이다. 고쳐도 결과는 같다.
      *
      * <p><b>운영 시간을 보지 않는다.</b> 닫힌 시간에 올린 매물은 저장만 되고, 남에게는 조회가 열리는
-     * 20:00 에 드러난다({@link MarketHoursService}). 등록을 창 안으로 묶으면 정각에 등록 요청이 몰린다.
+     * 08:00 에 드러난다({@link MarketHoursService}). 등록을 창 안으로 묶으면 정각에 등록 요청이 몰린다.
      */
     @Transactional
     public ListingDetailResponseDto register(CreateListingRequestDto request, Long memberId) {

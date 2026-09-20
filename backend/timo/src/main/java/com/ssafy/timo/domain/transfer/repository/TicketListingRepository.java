@@ -69,7 +69,7 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
 
     /**
      * 공연 하나의 구매 가능한 매물 목록. {@code visibleBefore} 보다 먼저 등록된 것만이다 — 매물은
-     * 등록 다음 날 20:00 에 올라가므로 오늘 등록된 매물은 빠진다.
+     * 등록 다음 날 08:00 에 올라가므로 오늘 등록된 매물은 빠진다.
      *
      * <p>정렬(낮은 가격순, 동가는 {@code listingId} 오름차순)은 {@code Pageable} 로 받는다.
      * 동가에 유일 키를 덧붙이지 않으면 페이지를 넘길 때 같은 매물이 두 번 나오거나 건너뛴다.

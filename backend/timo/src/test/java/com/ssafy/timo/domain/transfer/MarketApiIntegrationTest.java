@@ -6,6 +6,10 @@ import com.ssafy.timo.domain.concert.entity.ConcertGenre;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
+import com.ssafy.timo.domain.notification.entity.LinkType;
+import com.ssafy.timo.domain.notification.entity.Notification;
+import com.ssafy.timo.domain.notification.entity.NotificationType;
+import com.ssafy.timo.domain.notification.repository.NotificationRepository;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.seat.entity.Seat;
@@ -17,6 +21,7 @@ import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
+import com.ssafy.timo.domain.transfer.entity.TicketTrade;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
@@ -117,6 +122,9 @@ class MarketApiIntegrationTest {
 
     @Autowired
     private TicketTradeRepository ticketTradeRepository;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     @Autowired
     private EntityManager em;
@@ -681,6 +689,42 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.seatCol").value(othersTicket.getReservation().getSeat().getSeatCol()))
                     .andExpect(jsonPath("$.txHash").doesNotExist())
                     .andExpect(jsonPath("$.ticketId").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("매물이 팔리면 판매자 알림함에 판매 완료가 한 건 남고 구매자에게는 없다")
+        void sellerIsNotified() throws Exception {
+            // othersTicket 의 주인은 buyer 다. 요청자(seller)가 buyer 의 매물을 사는 그림이다.
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+
+            purchase(othersListing, LIST_PRICE).andExpect(status().isAccepted());
+
+            Long tradeId = ticketTradeRepository.findAll().stream()
+                    .filter(trade -> trade.getListing().getId().equals(othersListing.getId()))
+                    .map(TicketTrade::getId)
+                    .findFirst().orElseThrow();
+            String dedupKey = NotificationType.LISTING_SOLD.tradeKey(tradeId);
+
+            Long notificationId = notificationRepository.findIdByMemberIdAndDedupKey(buyer.getId(), dedupKey)
+                    .orElseThrow(() -> new AssertionError("판매자에게 판매 완료 알림이 없다"));
+            Notification notification = notificationRepository.findById(notificationId).orElseThrow();
+            assertThat(notification.getType()).isEqualTo(NotificationType.LISTING_SOLD);
+            assertThat(notification.getLinkType()).isEqualTo(LinkType.TRADE);
+            assertThat(notification.getLinkId()).isEqualTo(tradeId);
+            assertThat(notification.getBody()).isEqualTo("아이유 콘서트 티켓이 판매됐어요");
+            // 판매자와 구매자는 서로를 몰라야 한다. 구매자 쪽에는 아무것도 남지 않는다.
+            assertThat(notificationRepository.findIdByMemberIdAndDedupKey(seller.getId(), dedupKey)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("구매가 거절되면 판매 완료 알림도 남지 않는다 - 알림은 체결 기록 뒤에만 나간다")
+        void rejectedPurchaseLeavesNoNotification() throws Exception {
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+
+            purchase(othersListing, LIST_PRICE - 10_000).andExpect(status().isConflict());
+
+            assertThat(notificationRepository.findAll())
+                    .noneMatch(n -> n.getType() == NotificationType.LISTING_SOLD);
         }
 
         @Test

@@ -4,11 +4,11 @@
 # 실행 순서: market-common.http -> market-success.http -> market-fail.http
 # local 프로필로 띄우고 우측 상단에서 env 를 local 로 고른다({{baseUrl}}).
 #
-# 마켓은 매일 20:00:00~23:59:59 에만 열린다(application.yml 의 market.hours).
+# 마켓은 매일 08:00:00~23:00:00 에만 열린다(application.yml 의 market.hours).
 #   열린 시간에만: 공연 목록, 공연별 매물, 구매
 #   닫힌 시간에만: 가격 수정 (거래 중 가격 고정)
 #   시간 무관:     등록, 취소, 상세, 내 내역, 운영 시간
-# 등록은 언제나 되고, 올린 매물은 등록 다음 날 20:00 에 목록에 한꺼번에 드러난다.
+# 등록은 언제나 되고, 올린 매물은 등록 다음 날 08:00 에 목록에 한꺼번에 드러난다.
 # 오늘 등록한 매물로 구매까지 돌리려면 market-fixture.sql 로 등록 시각을 하루 당긴다.
 # success 는 열린 시간에, fail 은 닫힌 시간에 돌린다. 시간을 기다리기 싫으면
 # application-local.yml 에 market.hours 를 덮어쓰고 다시 띄운다 - 판정은 서버

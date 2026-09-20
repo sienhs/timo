@@ -353,7 +353,7 @@ public class MarketStubController implements MarketApi {
         listing.closedAt = LocalDateTime.now(clock);
     }
 
-    /** 남에게 보이는 매물인가. 열려 있고, 등록 다음 날 20:00 이 지났어야 한다(v1 과 같은 규칙). */
+    /** 남에게 보이는 매물인가. 열려 있고, 등록 다음 날 08:00 이 지났어야 한다(v1 과 같은 규칙). */
     private boolean isVisible(StubListing listing) {
         return listing.status == ListingStatus.LISTED
                 && listing.listedAt.isBefore(marketHoursService.visibleBefore());
