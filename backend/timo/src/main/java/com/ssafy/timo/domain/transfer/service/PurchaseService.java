@@ -1,11 +1,13 @@
 package com.ssafy.timo.domain.transfer.service;
 
+import com.ssafy.timo.domain.blockchain.ContractCallException;
 import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.entity.TicketTrade;
 import com.ssafy.timo.domain.transfer.exception.CannotBuyOwnListingException;
@@ -14,9 +16,12 @@ import com.ssafy.timo.domain.transfer.exception.ListingNotOpenYetException;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
 import com.ssafy.timo.domain.transfer.exception.ListingPriceMismatchException;
 import com.ssafy.timo.domain.transfer.exception.TradePriceExceedsFaceValueException;
+import com.ssafy.timo.domain.transfer.exception.TransferFailedException;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,24 +29,14 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 
 /**
- * 양도 매물 체결.
+ * 양도 매물 체결. 선착순이며 응모·추첨·가격제안은 없다.
  *
- * <p>선착순이며 응모·추첨·가격제안은 없다.
+ * <p>온체인 체결(마켓)은 DB 변경 전에 동기로 부른다 - 실패해도 DB는 그대로라 보상 흐름이
+ * 필요 없고, 동시 구매도 체인의 {@code status == LISTED} 조건이 막아 준다.
  *
- * <h2>아직 하지 않는 것</h2>
- *
- * <p><b>코인 전송과 NFT 소유권 이전이 없다.</b> 둘 다 온체인이고 연동 방식이 정해지지 않았다
- * ({@code TicketTransferService} 는 인터페이스만 있고 구현체가 없다). 그래서 체결은 DB 상태만 바꾸고
- * 끝나며, 모든 거래가 {@code PENDING} 에 머문다. 체결 API 가 200 이 아니라 <b>202</b> 인 이유다.
- *
- * <p>결과적으로 <b>잔액을 확인하지 않는다.</b> 코인이 움직이지 않으므로 잔액 부족 거절도 없다.
- * 온체인이 붙으면 {@code TicketVault} 가 막는다.
- *
- * <p><b>멱등키를 저장하지 않는다.</b> 규약은 {@code Idempotency-Key} 헤더를 필수로 받지만, 저장 대상인
- * {@code balance_transaction} 은 지갑 도메인이고 Redis 도 아직 쓰지 않는다. 지금은 형식만 검증하고
- * 버린다 — <b>같은 키로 재시도하면 멱등이 아니라 409 가 나간다.</b> 재시도가 결제를 두 번 일으키지는
- * 않지만(매물이 이미 {@code SOLD}), 앱이 기대하는 "같은 응답" 은 아니다. 연동 시 함께 채운다.
+ * <p>{@code Idempotency-Key}는 형식만 검증하고 저장하지 않는다 - 저장소(Redis)가 아직 없다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PurchaseService {
@@ -51,6 +46,8 @@ public class PurchaseService {
     private final TicketRepository ticketRepository;
     private final MarketHoursService marketHoursService;
     private final ListingSoldNotifier listingSoldNotifier;
+    private final TicketTransferService ticketTransferService;
+    private final BlockchainProperties blockchainProperties;
     private final Clock clock;
 
     /**
@@ -59,30 +56,24 @@ public class PurchaseService {
      * <p>처리 순서가 규약의 핵심이다.
      *
      * <ol>
-     *   <li>운영 시간인가 → 409. 닫힌 마켓에서 자리를 먼저 잡는 일이 없도록 UPDATE 앞에 둔다</li>
-     *   <li>매물이 있는가 → 404</li>
-     *   <li>{@code LISTED} 인 행만 {@code SOLD} 로 조건부 UPDATE. 영향 행 0 이면 → 409</li>
+     *   <li>운영 시간인가 → 409</li>
+     *   <li>매물이 있는가 → 404, 아직 {@code LISTED} 인가 → 409</li>
      *   <li>마켓에 올라온 매물인가(등록 다음 날 08:00 부터) → 409. 목록에 없어도 번호로 닿을 수 있다</li>
      *   <li>{@code expectedPrice} 가 등록가와 같은가 → 409</li>
      *   <li>내 매물이 아닌가 → 409</li>
      *   <li>등록가가 정가 이하인가(재검증) → 422</li>
-     *   <li>티켓이 아직 {@code OWNED} 인가 → 409. 예매 취소가 등록 중인 티켓을 막으므로 정상 경로에서는
-     *       안 걸리지만, 회수된 티켓이 매물로 남는 경로를 이쪽에서도 닫는다</li>
-     *   <li>체결 기록 INSERT. 상태는 {@code PENDING}</li>
-     *   <li>판매자에게 판매 완료 알림. 소유권이 마지막 거래 행으로 계산되므로 9 번이 곧 DB 상 소유권
-     *       이전이다. 온체인 연동이 붙으면 이 호출은 체결 확정({@code TicketTrade.confirm()}) 뒤로 옮긴다</li>
+     *   <li>티켓이 아직 {@code LISTED} 인가(등록 시 반영된 상태) → 409</li>
+     *   <li><b>온체인 체결({@code TicketTransferService.transfer}) - 여기서 실패하면 예외가 그대로
+     *       응답을 끝낸다. 아직 DB를 하나도 안 바꿨으므로 롤백할 것도 없다</b></li>
+     *   <li>여기까지 왔으면 체인이 확정됐다는 뜻이다. {@code TicketListing}을 {@code SOLD}로,
+     *       {@code Ticket}을 {@code markSold()}로, 체결 기록을 {@code CONFIRMED}로 남긴다</li>
+     *   <li>판매자에게 판매 완료 알림</li>
      * </ol>
      *
-     * <p><b>3번이 동시 구매 방어의 전부다.</b> 조회해서 {@code LISTED} 인지 확인한 뒤 UPDATE 하면 두
-     * 요청이 같은 매물을 통과한다. 확인과 전이가 한 문장 안에서 일어나야 선착순이 성립한다.
-     *
-     * <p>그래서 검증이 전이보다 <b>뒤에</b> 온다. 순서가 거꾸로 보이지만 안전하다 — 4~8 번에서
-     * 예외가 나면 트랜잭션이 통째로 되돌아가 {@code SOLD} 도 함께 풀린다. 먼저 자리를 잡고 나서
-     * 따지는 쪽이, 따지는 동안 남에게 자리를 빼앗기는 것보다 낫다.
-     *
-     * <p>2 번을 따로 두는 이유는 <b>404 와 409 를 구분하기 위해서다.</b> 없는 매물도 조건부 UPDATE 의
-     * 영향 행은 0 이라, 존재 확인을 건너뛰면 "없는 매물" 이 "이미 팔린 매물" 로 보인다. 앱은 둘을
-     * 다르게 안내해야 한다.
+     * <p>2번에서 존재와 상태를 함께 보는 이유는 <b>404와 409를 구분하기 위해서다.</b> 이제
+     * {@code markSoldIfListed}로 선점하지 않으므로(8번 이후로 미룸) 읽기만으로 판정할 수 있다.
+     * 동시 구매는 더 이상 이 read-check가 아니라 체인이 막는다(클래스 주석 참고) - 두 요청이 동시에
+     * 이 지점을 통과해도, 체결 트랜잭션 중 먼저 확정된 쪽만 8번을 통과한다.
      */
     @Transactional
     public PurchaseResponseDto purchase(Long listingId, PurchaseRequestDto request, Long buyerId) {
@@ -90,18 +81,12 @@ public class PurchaseService {
 
         LocalDateTime now = LocalDateTime.now(clock);
 
-        if (!ticketListingRepository.existsById(listingId)) {
-            throw new ListingNotFoundException(listingId);
-        }
-        if (ticketListingRepository.markSoldIfListed(listingId, now) == 0) {
-            throw new ListingAlreadyClosedException(listingId);
-        }
-
-        // 조건부 UPDATE 가 영속성 컨텍스트를 비우므로 여기서 다시 읽는다. 응답이 공연·공연장·구역을
-        // 쓰므로 상세용 조회로 함께 읽어 둔다.
+        // 상세 조회가 공연·공연장·구역을 함께 읽으므로 존재 확인과 겸한다.
         TicketListing listing = ticketListingRepository.findDetailById(listingId)
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
-
+        if (listing.getStatus() != ListingStatus.LISTED) {
+            throw new ListingAlreadyClosedException(listingId);
+        }
         if (!listing.getListedAt().isBefore(marketHoursService.visibleBefore())) {
             throw new ListingNotOpenYetException(listingId, marketHoursService.visibleFrom(listing.getListedAt()));
         }
@@ -121,13 +106,36 @@ public class PurchaseService {
         }
         Ticket ticket = ticketRepository.findById(listing.getTicketId())
                 .orElseThrow(() -> new ListingAlreadyClosedException(listingId, "티켓이 없다"));
-        if (ticket.getStatus() != TicketStatus.OWNED) {
+        if (ticket.getStatus() != TicketStatus.LISTED) {
             throw new ListingAlreadyClosedException(listingId, "티켓 상태가 " + ticket.getStatus() + " 다");
         }
 
-        TicketTrade trade = ticketTradeRepository.save(TicketTrade.record(listing, buyerId, now));
+        if (blockchainProperties.hasRealAdminPrivateKey()) {
+            try {
+                ticketTransferService.transfer(
+                        listingId, ticket.getId(), listing.getSellerMemberId(), buyerId, listing.getPrice());
+            } catch (ContractCallException e) {
+                // 원인(revert·일시적 오류)은 사용자에게 알릴 이유가 없는 내부 값이라 로그로만 남긴다.
+                // DB는 아직 아무것도 안 바꿨으므로 그냥 실패로 끝내면 된다 - 되돌릴 것도 없다.
+                log.warn("양도 체결 실패 (listingId={}, ticketId={})", listingId, ticket.getId(), e);
+                throw new TransferFailedException(listingId);
+            }
+        } else {
+            log.debug("체인 미연결 - 양도 체결을 건너뛴다 (listingId={})", listingId);
+        }
 
-        // 같은 트랜잭션이라 구매가 되돌아가면 알림도 함께 사라지고, 푸시는 커밋 뒤에 나간다.
+        if (ticketListingRepository.markSoldIfListed(listingId, now) == 0) {
+            // 체인은 확정됐는데 DB가 이미 SOLD가 아니다 - 이론상 있을 수 없다(체인 자체가 동시
+            // 체결을 막으므로). 실제로 나면 체인/DB가 어긋난 것이라 그대로 알린다.
+            throw new ListingAlreadyClosedException(listingId);
+        }
+        ticket.markSold();
+
+        TicketTrade trade = TicketTrade.record(listing, buyerId, now);
+        trade.confirm();
+        trade = ticketTradeRepository.save(trade);
+
+        // 같은 트랜잭션이라 이후 예외가 나면 알림도 함께 사라지고, 푸시는 커밋 뒤에 나간다.
         listingSoldNotifier.notifySold(listing.getSellerMemberId(), trade.getId(), listing.getConcert().getTitle());
 
         return PurchaseResponseDto.from(trade);

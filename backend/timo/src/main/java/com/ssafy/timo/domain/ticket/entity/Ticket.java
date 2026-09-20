@@ -108,6 +108,21 @@ public class Ticket extends BaseEntity {
         this.status = TicketStatus.REVOKED;
     }
 
+    /** 양도 등록으로 매물이 열렸을 때. 온체인 {@code listForTransferFor}도 {@code OWNED}에서만 성립한다. */
+    public void markListed() {
+        this.status = TicketStatus.LISTED;
+    }
+
+    /** 판매자가 등록을 취소했을 때. */
+    public void markDelisted() {
+        this.status = TicketStatus.OWNED;
+    }
+
+    /** 양도 체결이 온체인까지 확정됐을 때. 소유자는 {@code TicketOwnershipSql}이 체결 이력에서 유도한다. */
+    public void markSold() {
+        this.status = TicketStatus.OWNED;
+    }
+
     /**
      * 게이트에서 입장 처리한다. 온체인 {@code markUsed}도 {@code OWNED}에서만 성립한다.
      *

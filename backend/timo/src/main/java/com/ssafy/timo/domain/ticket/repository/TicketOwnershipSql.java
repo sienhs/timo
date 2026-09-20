@@ -27,6 +27,10 @@ public final class TicketOwnershipSql {
     /**
      * 컬럼은 {@code ticket_id}, {@code acquired_by}({@code BOOKING}/{@code TRANSFER}),
      * {@code acquired_at} 셋이다. 안 쓰는 쪽은 무시하면 된다.
+     *
+     * <p>{@code FAILED} 거래는 없었던 셈 친다 - 온체인 정산이 revert돼 되돌아간 거래라 소유권이
+     * 실제로 넘어간 적이 없다. 두 갈래 다 {@code status <> 'FAILED'}로 걸러야, 실패한 구매가
+     * 최신 거래로 잡혀 엉뚱한 사람을 소유자로 보여주는 일이 없다.
      */
     public static final String CURRENT_OWNER = """
             select t1.ticket_id   as ticket_id,
@@ -36,15 +40,18 @@ public final class TicketOwnershipSql {
               join reservation r1 on r1.reservation_id = t1.reservation_id
              where r1.member_id = :memberId
                and not exists (select 1 from ticket_trade tt
-                                where tt.ticket_id = t1.ticket_id)
+                                where tt.ticket_id = t1.ticket_id
+                                  and tt.status <> 'FAILED')
             union
             select tt2.ticket_id  as ticket_id,
                    'TRANSFER'     as acquired_by,
                    tt2.traded_at  as acquired_at
               from ticket_trade tt2
              where tt2.buyer_member_id = :memberId
+               and tt2.status <> 'FAILED'
                and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
-                                    where x.ticket_id = tt2.ticket_id)
+                                    where x.ticket_id = tt2.ticket_id
+                                      and x.status <> 'FAILED')
             """;
 
     private TicketOwnershipSql() {

@@ -1,5 +1,7 @@
 package com.ssafy.timo.domain.transfer.service;
 
+import com.ssafy.timo.domain.blockchain.TicketNftClient;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.seat.entity.Seat;
@@ -7,6 +9,7 @@ import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
@@ -24,10 +27,12 @@ import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
@@ -48,20 +53,18 @@ import java.time.LocalDateTime;
  * 제약도 이것을 막지 못한다 — 먼저 판 매물은 이미 {@code SOLD} 로 닫혀 있어 "열려 있는 매물 하나"
  * 규칙에 걸리지 않는다. 현재 소유자는 {@link #currentOwnerId} 가 체결 이력에서 유도한다.
  *
- * <p>온체인 연동이 붙으면 실제로 자산이 움직이기 직전에 {@code ownerOf(tokenId)} 대조가 함께
- * 들어가야 한다. 이 판정은 DB 미러이지 정본이 아니다.
+ * <p>{@link #currentOwnerId} 는 DB 미러일 뿐이라, 등록·취소 모두 컨트랙트 쪽에서
+ * {@code ownerOf(tokenId)}를 다시 대조한다({@code listForTransferFor}/{@code delistFor}의
+ * {@code owner} 파라미터 검증).
  *
- * <h2>티켓 상태는 바꾸지 않는다</h2>
+ * <h2>티켓 상태도 함께 바뀐다</h2>
  *
- * <p>등록해도 {@code ticket.status} 는 {@link TicketStatus#OWNED} 에 머문다. {@code Ticket} 에
- * {@code LISTED} 로 가는 전이 메서드가 없고, 티켓 도메인은 이쪽 소관이 아니라 임의로 만들지 않는다.
- * 매물의 생명주기는 {@code ticket_listing.status} 가 정본이므로 등록·취소·체결 판정에는 지장이 없다.
- *
- * <p>대신 <b>온체인 연동 전까지 구멍이 하나 남는다</b> — 등록 중인 티켓의 예매를 취소할 수 있다.
- * 예매 취소는 티켓이 {@code OWNED} 일 때만 성립하는데({@code ReservationServiceImpl.cancel}) 등록해도
- * {@code OWNED} 그대로이기 때문이다. 온체인 {@code listForTransfer} 가 붙으면 컨트랙트의
- * {@code revoke} 가 {@code LISTED} 티켓을 거부하므로 저절로 닫힌다.
+ * <p>등록·취소 시 온체인 {@code listForTransferFor}/{@code delistFor}를 호출하고
+ * {@code ticket.markListed()}/{@code markDelisted()}로 {@code ticket.status}도 맞춘다. 등록 중인
+ * 티켓의 예매 취소·입장 QR 발급·게이트 통과가 전부 이 상태로 막힌다 - 안 맞추면 판매자가 판 티켓으로
+ * 먼저 입장해버리는 이중 입장이 생긴다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ListingService {
@@ -71,6 +74,9 @@ public class ListingService {
     private final TicketTradeRepository ticketTradeRepository;
     private final ImageStorage imageStorage;
     private final MarketHoursService marketHoursService;
+    private final TicketNftClient ticketNftClient;
+    private final WalletService walletService;
+    private final BlockchainProperties blockchainProperties;
     private final Clock clock;
 
     /**
@@ -100,8 +106,7 @@ public class ListingService {
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
 
         if (!currentOwnerId(ticket).equals(memberId)) {
-            // 남의 티켓이다. 존재 자체는 이미 위에서 드러났지만, 그 이상(어느 공연·어느 좌석인지)은
-            // 알려주지 않는다.
+            // 남의 티켓이다. 존재 자체는 이미 위에서 드러났지만, 그 이상(어느 공연·어느 좌석인지)은 알려주지 않는다.
             throw new NotTicketOwnerException(ticketId);
         }
         if (ticket.getStatus() != TicketStatus.OWNED) {
@@ -122,6 +127,14 @@ public class ListingService {
         if (price > sectionPrice) {
             throw new ListPriceExceedsFacePriceException(price, sectionPrice);
         }
+
+        if (blockchainProperties.hasRealAdminPrivateKey()) {
+            String ownerAddress = walletService.getAddress(memberId);
+            ticketNftClient.listForTransferFor(ticket.getTokenId(), ownerAddress, BigInteger.valueOf(price));
+        } else {
+            log.debug("체인 미연결 - listForTransferFor 를 건너뛴다 (ticketId={})", ticketId);
+        }
+        ticket.markListed();
 
         TicketListing listing = TicketListing.open(
                 ticketId,
@@ -168,8 +181,8 @@ public class ListingService {
      * <p>바뀐 값이 없어도(같은 가격을 다시 보내도) 그대로 UPDATE 한다. 재시도가 안전해야 해서
      * 절댓값을 받는 API 이고, 같은 값이면 {@code updatedAt} 만 움직인다.
      *
-     * <p>온체인 가격 갱신은 부르지 않는다. 등록·취소와 같은 사정이다 — 판매자 지갑 서명이 필요한데
-     * 커스터디얼이라 step-up 인증이 선행돼야 한다.
+     * <p>온체인 가격 갱신은 아직 부르지 않는다 - {@code listPrice}는 컨트랙트에도 있지만 갱신
+     * 엔트리포인트가 없다. 등록가 자체는 항상 정가 이하로만 열리므로 당장 급한 정합성은 아니다.
      */
     @Transactional
     public ListingDetailResponseDto updatePrice(Long listingId,
@@ -218,8 +231,7 @@ public class ListingService {
      * <p><b>취소 페널티는 없다.</b> 차감 규칙(D-7 100% / 하루 전 80% / 당일 10%)이 기획 미확정이라
      * 넣지 않았다. 정해지면 이 메서드가 잔액을 건드리게 되고 응답이 204 가 아니게 된다.
      *
-     * <p>온체인 {@code delist} 도 부르지 않는다. 판매자 지갑 서명이 필요한데 커스터디얼이라
-     * step-up 인증이 선행돼야 한다.
+     * <p>DB 취소가 확정된 뒤에 온체인 {@code delistFor}를 부르고 {@code ticket.markDelisted()}로 상태를 되돌린다.
      */
     @Transactional
     public void cancel(Long listingId, Long memberId) {
@@ -233,6 +245,15 @@ public class ListingService {
         if (closed == 0) {
             throw new ListingAlreadyClosedException(listingId);
         }
+
+        Ticket ticket = ticketRepository.findById(listing.getTicketId())
+                .orElseThrow(() -> new TicketNotFoundException(listing.getTicketId()));
+        if (blockchainProperties.hasRealAdminPrivateKey()) {
+            ticketNftClient.delistFor(ticket.getTokenId(), walletService.getAddress(memberId));
+        } else {
+            log.debug("체인 미연결 - delistFor 를 건너뛴다 (listingId={})", listingId);
+        }
+        ticket.markDelisted();
     }
 
     /**

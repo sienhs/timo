@@ -85,7 +85,12 @@ public enum TransferErrorCode implements BaseErrorCode {
      * <p>목록에는 안 보이지만 매물 번호를 알면 상세와 구매 경로로 닿을 수 있어 구매 쪽에서 막는다.
      * 판매자가 번호를 건네 하루 먼저 파는 통로가 되면 안 된다.
      */
-    LISTING_NOT_OPEN_YET(HttpStatus.CONFLICT, "아직 마켓에 올라오지 않은 매물입니다.");
+    LISTING_NOT_OPEN_YET(HttpStatus.CONFLICT, "아직 마켓에 올라오지 않은 매물입니다."),
+    /**
+     * 온체인 체결(Marketplace.buy)이 실패한 경우. revert·일시적 오류를 가리지 않는다 - 이 시점엔
+     * DB를 아무것도 바꾸기 전이라({@code PurchaseService}) 재시도하면 그대로 다시 시도될 뿐이다.
+     */
+    TRANSFER_FAILED(HttpStatus.CONFLICT, "구매 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;

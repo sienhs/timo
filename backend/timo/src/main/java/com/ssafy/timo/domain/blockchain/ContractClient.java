@@ -1,7 +1,9 @@
 package com.ssafy.timo.domain.blockchain;
 
 import java.math.BigInteger;
+
 import java.util.List;
+
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.datatypes.Function;
@@ -26,7 +28,8 @@ import org.web3j.utils.Numeric;
  *
  * <p>모든 쓰기 호출은 트랜잭션이 블록에 포함될 때까지 동기적으로 기다린다({@link #sendAndWait}) -
  * 정오는 논리적으로 감춰지고, 실패는 예외로만 드러난다. 호출부(비동기 정산 워커)가 재시도·보상
- * 로직을 결정한다.
+ * 로직을 결정한다. revert는 {@link ContractRevertException}, 그 외 실패는 {@link ContractCallException}
+ * 그대로 던진다.
  */
 public class ContractClient {
 
@@ -99,7 +102,7 @@ public class ContractClient {
                     new PollingTransactionReceiptProcessor(web3j, RECEIPT_POLL_INTERVAL_MS, RECEIPT_MAX_ATTEMPTS);
             TransactionReceipt receipt = receiptProcessor.waitForTransactionReceipt(sent.getTransactionHash());
             if (!receipt.isStatusOK()) {
-                throw new ContractCallException("트랜잭션이 온체인에서 revert됨(" + function.getName() + "): " + receipt.getTransactionHash());
+                throw new ContractRevertException("트랜잭션이 온체인에서 revert됨(" + function.getName() + "): " + receipt.getTransactionHash());
             }
             return receipt;
         } catch (ContractCallException e) {

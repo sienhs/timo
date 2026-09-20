@@ -1,9 +1,13 @@
 package com.ssafy.timo.domain.blockchain;
 
 import com.ssafy.timo.global.config.blockchain.DeployedContractAddresses;
+
 import java.math.BigInteger;
+
 import java.util.List;
+
 import org.springframework.stereotype.Component;
+
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Bool;
 import org.web3j.abi.datatypes.Function;
@@ -32,13 +36,7 @@ public class ShowRegistryClient extends ContractClient {
         super(web3j, adminTransactionManager, addresses.showRegistryAddress());
     }
 
-    /**
-     * 공연을 등록한다. sectionPrices는 반드시 {@link #SECTION_COUNT}개(구역 순서는
-     * {@code SectionRepository.findAllByVenueIdOrderByIdAsc}가 주는 순서와 일치해야 함) - 컨트랙트가
-     * 고정 크기 배열을 요구하므로 그 외 길이는 ABI 인코딩 단계에서부터 실패한다.
-     *
-     * @return 발급된 showId. 반환값은 영수증에 없어 {@code ShowRegistered} 이벤트 로그에서 읽는다.
-     */
+    /** 공연을 등록한다. sectionPrices는 SECTION_COUNT개, SectionRepository와 같은 순서여야 한다. */
     public BigInteger registerShow(List<BigInteger> sectionPrices, BigInteger totalSeats,
                                     long saleOpenTimeEpochSeconds, long showTimeEpochSeconds, String metadataUri) {
         if (sectionPrices.size() != SECTION_COUNT) {
