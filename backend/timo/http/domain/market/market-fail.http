@@ -5,7 +5,7 @@
 # 채워 둬야 한다. 앱을 다시 띄웠으면 시드가 새로 만들어져 매물이 없으니 success 부터 다시.
 #
 # 닫힌 시간에는 공연 목록, 공연별 매물, 구매가 409 MARKET_CLOSED 다.
-# 등록은 되고(다음 날 08:00 에 목록에 드러난다), 가격 수정은 닫힌 시간에만 된다. 취소와 상세, 내 내역도 된다.
+# 등록은 되고(다음 날 08:00 에 목록에 드러난다), 가격 수정은 닫힌 시간에만 된다. 취소와 상세, 거래 상세, 내 내역도 된다.
 # 도메인 예외 응답에는 errorCode 가 없고 exception 이 실린다(GlobalExceptionHandler).
 ###############################################################################
 
@@ -105,6 +105,28 @@ Authorization: Bearer {{buyerToken}}
     client.test("200 이고 여전히 LISTED 다", function () {
         client.assert(response.status === 200, "status: " + response.status);
         client.assert(response.body.status === "LISTED", "구매 거절이 매물 상태를 건드렸다: " + response.body.status);
+    });
+%}
+
+### 거래 상세 - 닫혀 있어도 된다. success 에서 체결된 거래를 판매자가 본다
+GET {{baseUrl}}/api/v1/market/trades/{{tradeId}}
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("200, SELLER", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.role === "SELLER", "role: " + response.body.role);
+    });
+%}
+
+### 거래 상세 - 없는 거래는 404. 남의 거래도 같은 404 라 존재 여부가 새지 않는다
+GET {{baseUrl}}/api/v1/market/trades/999999
+Authorization: Bearer {{buyerToken}}
+
+> {%
+    client.test("404 TradeNotFoundException", function () {
+        client.assert(response.status === 404, "status: " + response.status);
+        client.assert(response.body.exception === "TradeNotFoundException", "exception: " + response.body.exception);
     });
 %}
 

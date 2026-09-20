@@ -39,6 +39,11 @@ public enum TransferErrorCode implements BaseErrorCode {
     /** 온체인 {@code ListPriceExceedsFacePrice}. "등록가가 정가 이하일 때에만 등록이 성립한다." */
     LIST_PRICE_EXCEEDS_FACE_PRICE(HttpStatus.BAD_REQUEST, "등록가는 정가를 초과할 수 없습니다."),
     LISTING_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 양도 매물이 아닙니다."),
+    /**
+     * 없는 거래이거나 <b>남의 거래</b>. 둘을 구분하지 않는다. 거래는 판매자와 구매자 둘만의 기록이라
+     * 존재 여부 자체가 정보이고, 번호가 순차라 403 으로 가르면 체결 건수가 샌다.
+     */
+    TRADE_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다."),
     CANNOT_BUY_OWN_LISTING(HttpStatus.CONFLICT, "본인이 등록한 매물은 구매할 수 없습니다."),
 
     /** 남의 매물을 취소하려 한 경우. 티켓 소유자가 아니라 <b>매물 판매자</b>가 아닌 것이다. */

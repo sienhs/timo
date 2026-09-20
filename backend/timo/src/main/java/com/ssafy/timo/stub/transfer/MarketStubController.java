@@ -14,6 +14,8 @@ import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeType;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.dto.TradeDetailResponseDto;
+import com.ssafy.timo.domain.transfer.dto.TradeRole;
 import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TradeStatus;
@@ -27,6 +29,7 @@ import com.ssafy.timo.domain.transfer.exception.NotListingSellerException;
 import com.ssafy.timo.domain.transfer.exception.NotTicketOwnerException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotFoundException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotListableException;
+import com.ssafy.timo.domain.transfer.exception.TradeNotFoundException;
 import com.ssafy.timo.domain.transfer.service.MarketHoursService;
 import com.ssafy.timo.global.storage.ImageStorage;
 import com.ssafy.timo.stub.StubController;
@@ -204,6 +207,18 @@ public class MarketStubController implements MarketApi {
         return ResponseEntity.ok(toDetail(listing));
     }
 
+    /** 스텁은 사용자가 하나라 "남의 거래" 가 없다. 없는 번호만 404 다. 내 매물이 팔린 거래는 SELLER 로 온다. */
+    @Override
+    public synchronized ResponseEntity<TradeDetailResponseDto> findTrade(Long tradeId, Long memberId) {
+        settle();
+        StubTrade trade = trades.stream()
+                .filter(t -> t.tradeId == tradeId)
+                .findFirst()
+                .orElseThrow(() -> new TradeNotFoundException(tradeId));
+
+        return ResponseEntity.ok(toTradeDetail(trade));
+    }
+
     @Override
     public synchronized ResponseEntity<PagedModel<MyTradeSummaryResponseDto>> findMyTrades(
             MarketListRequestDto request, Long memberId) {
@@ -216,7 +231,10 @@ public class MarketStubController implements MarketApi {
             }
         }
         for (StubTrade trade : trades) {
-            matched.add(toMyPurchase(trade));
+            // 내 매물이 팔린 거래는 위의 SALE 항목이 SOLD 로 보여 준다. 실제 구현과 같다.
+            if (!trade.listing.listedByMe) {
+                matched.add(toMyPurchase(trade));
+            }
         }
 
         // 최신순. 동점은 listingId 내림차순으로 고정한다.
@@ -370,6 +388,8 @@ public class MarketStubController implements MarketApi {
                 listing.closedAt = now;
                 listing.ticket.changeOwnerToMe(false);
                 listing.ticket.currentListingId(null);
+                // 판매자 쪽 거래 상세가 닿을 수 있게 체결도 남긴다.
+                trades.add(new StubTrade(tradeSequence++, listing, now));
             }
         }
     }
@@ -464,6 +484,29 @@ public class MarketStubController implements MarketApi {
                 trade.tradedAt);
     }
 
+    private TradeDetailResponseDto toTradeDetail(StubTrade trade) {
+        StubListing listing = trade.listing;
+        ConcertFixture concert = concertOf(listing.ticket);
+
+        return new TradeDetailResponseDto(
+                trade.tradeId,
+                listing.listingId,
+                listing.listedByMe ? TradeRole.SELLER : TradeRole.BUYER,
+                trade.status,
+                concert.id(),
+                concert.title(),
+                imageStorage.getUrl(concert.posterImageKey()),
+                concert.startDate(),
+                concert.venueName(),
+                listing.ticket.seat().section().name(),
+                SeatGrade.COMMON,
+                listing.ticket.seat().seatNo(),
+                listing.ticket.seat().seatCol(),
+                listing.price,
+                listing.ticket.faceValue(),
+                trade.tradedAt);
+    }
+
     private int discountRate(StubListing listing) {
         long faceValue = listing.ticket.faceValue();
         if (faceValue <= 0) {
@@ -503,7 +546,7 @@ public class MarketStubController implements MarketApi {
         }
     }
 
-    /** 내가 사들인 체결 하나. 온체인이 없어 {@link TradeStatus#PENDING} 에서 움직이지 않는다. */
+    /** 체결 하나. 내가 산 것과 내 매물이 팔린 것 둘 다다. 온체인이 없어 {@link TradeStatus#PENDING} 에서 움직이지 않는다. */
     private static final class StubTrade {
 
         private final long tradeId;
