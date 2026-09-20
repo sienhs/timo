@@ -2,6 +2,7 @@ package com.ssafy.timo.domain.reservation.service;
 
 import com.ssafy.timo.domain.blockchain.ContractCallException;
 import com.ssafy.timo.domain.blockchain.ContractClient;
+import com.ssafy.timo.domain.blockchain.ContractRevertException;
 import com.ssafy.timo.domain.blockchain.MintResult;
 import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.blockchain.TicketVaultClient;
@@ -18,6 +19,7 @@ import java.math.BigInteger;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Supplier;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 class ReservationSettlementRunner {
+
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 500;
 
     private final ReservationRepository reservationRepository;
     private final TicketRepository ticketRepository;
@@ -62,7 +67,10 @@ class ReservationSettlementRunner {
         byte[] orderId = ContractClient.keccak256("reservation-" + reservationId);
 
         try {
-            ticketVaultClient.chargeForBooking(buyerAddress, organizerAddress, price, orderId);
+            withRetry("차감", reservationId, () -> {
+                ticketVaultClient.chargeForBooking(buyerAddress, organizerAddress, price, orderId);
+                return null;
+            });
         } catch (ContractCallException e) {
             log.warn("예매 차감 실패, 민팅 시도 안 함 (reservationId={})", reservationId, e);
             ticket.markMintFailed(e.getMessage());
@@ -73,12 +81,41 @@ class ReservationSettlementRunner {
         }
 
         try {
-            MintResult minted = ticketNftClient.mintTicket(
-                    buyerAddress, concert.getShowId(), BigInteger.valueOf(reservation.getSeat().getId()), sectionIndex);
+            MintResult minted = withRetry("민팅", reservationId, () -> ticketNftClient.mintTicket(
+                    buyerAddress, concert.getShowId(), BigInteger.valueOf(reservation.getSeat().getId()), sectionIndex));
             ticket.markMinted(minted.tokenId(), minted.transactionHash());
         } catch (ContractCallException e) {
             log.error("차감은 됐는데 민팅 실패, 환불 시도함 (reservationId={})", reservationId, e);
             refundOrElseMarkFailed(reservation, buyerAddress, organizerAddress, reservationId, price, ticket, e.getMessage());
+        }
+    }
+
+    /**
+     * revert({@link ContractRevertException})는 재시도해도 결과가 같으므로 즉시 위로 던진다.
+     * 그 외(RPC 타임아웃 등 일시적 실패)만 {@link #MAX_ATTEMPTS}번까지 짧게 대기하며 재시도한다.
+     */
+    private <T> T withRetry(String action, Long reservationId, Supplier<T> call) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return call.get();
+            } catch (ContractRevertException e) {
+                throw e;
+            } catch (ContractCallException e) {
+                if (attempt >= MAX_ATTEMPTS) {
+                    throw e;
+                }
+                log.warn("{} 일시적 실패, 재시도 {}/{} (reservationId={})", action, attempt, MAX_ATTEMPTS, reservationId, e);
+                sleep();
+            }
+        }
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(RETRY_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ContractCallException("재시도 대기 중 인터럽트됨", e);
         }
     }
 
@@ -114,7 +151,10 @@ class ReservationSettlementRunner {
                                         BigInteger facePrice, Ticket ticket, String mintFailureReason) {
         byte[] refundRefId = ContractClient.keccak256("reservation-" + reservationId + ":refund");
         try {
-            ticketVaultClient.refund(buyerAddress, organizerAddress, facePrice, refundRefId);
+            withRetry("환불", reservationId, () -> {
+                ticketVaultClient.refund(buyerAddress, organizerAddress, facePrice, refundRefId);
+                return null;
+            });
             ticket.markRefunded(mintFailureReason);
             // 환불까지 끝나 돈은 원래대로다 - 위와 같은 이유로 주문도 취소해 다시 시도할 수 있게 한다.
             releaseNow(reservation);
