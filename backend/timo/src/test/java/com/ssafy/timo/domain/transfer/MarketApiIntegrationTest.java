@@ -914,6 +914,8 @@ class MarketApiIntegrationTest {
     }
 
     private TicketListing openListingAt(Ticket ticket, long price, LocalDateTime listedAt) {
+        // ListingService.register()가 하는 것처럼 티켓도 LISTED로 맞춰 둔다 - 구매가 이걸 본다.
+        ticket.markListed();
         TicketListing listing = ticketListingRepository.saveAndFlush(TicketListing.open(
                 ticket.getId(),
                 ticket.getReservation().getMember().getId(),
