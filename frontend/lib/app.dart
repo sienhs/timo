@@ -40,6 +40,12 @@ import 'features/memory/widgets/creation_notification_host.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
 import 'features/mypage/state/my_page_api_scope.dart';
+import 'features/notification/data/http_notification_api.dart';
+import 'features/notification/data/mock_notification_api.dart';
+import 'features/notification/data/notification_api.dart';
+import 'features/notification/push_notification_scope.dart';
+import 'features/notification/push_notification_service.dart';
+import 'features/notification/state/notification_api_scope.dart';
 import 'features/resale/data/http_resale_api.dart';
 import 'features/resale/data/mock_resale_api.dart';
 import 'features/resale/data/resale_api.dart';
@@ -71,6 +77,9 @@ class App extends StatefulWidget {
     this.ticketStore,
     this.memoryConcertApi,
     this.resaleApi,
+    this.push,
+    this.navigatorKey,
+    this.notificationApi,
   });
 
   /// 처음 띄울 화면. 앱은 로딩 화면에서 시작해 애니메이션이 끝나면 홈으로
@@ -129,6 +138,18 @@ class App extends StatefulWidget {
   /// 양도마켓 화면이 쓰는 API. 안 넘기면 [_resaleApiKind] 가 고른다.
   final ResaleApi? resaleApi;
 
+  /// 화면이 푸시 쪽에 부탁하는 것들(로그아웃 시 기기 해제, 알림으로 켜졌는지).
+  /// main 이 푸시 서비스를 넘긴다. 안 넘기면(위젯 테스트) 아무것도 하지 않는
+  /// 구현을 쓴다 — 진짜 구현은 만들 때 Firebase 를 건드려 테스트에서 못 만든다.
+  final PushNotifications? push;
+
+  /// 화면 전환 열쇠. 알림을 눌렀을 때 푸시 쪽도 같은 것으로 화면을 바꿔야 해서
+  /// main 이 하나 만들어 앱과 푸시 양쪽에 준다. 안 넘기면 앱이 혼자 만들어 쓴다.
+  final GlobalKey<NavigatorState>? navigatorKey;
+
+  /// 알림함 화면이 쓰는 API. 안 넘기면 [_notificationApiKind] 가 고른다.
+  final NotificationApi? notificationApi;
+
   @override
   State<App> createState() => _AppState();
 }
@@ -152,6 +173,27 @@ TicketApi _ticketApiFor(String kind) => switch (kind) {
   'mock-empty' => MockTicketApi(scenario: TicketMockScenario.empty),
   'mock-error' => MockTicketApi(scenario: TicketMockScenario.error),
   _ => HttpTicketApi(),
+};
+
+/// 알림함이 어느 [NotificationApi] 를 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run --dart-define=NOTIFICATION_API=mock    # 시안 데이터로. 백엔드 불필요
+/// flutter run                                         # 기본값. 실제 서버(v1)
+/// ```
+///
+/// 내 티켓([_ticketApiKind])·마켓([_resaleApiKind])과 같은 장치인데, 알림함은
+/// 이유가 더 크다. **알림은 서버에 쌓일 때까지 기다려야 볼 수 있다** — 시드 공연
+/// 날짜가 알림이 나가는 시간 창에 걸리지 않아 새 계정에는 알림이 하나도 없다.
+/// 목록·안 읽음 점·모두 읽음 버튼·여러 줄 본문을 눈으로 확인할 길을 남긴다.
+const _notificationApiKind = String.fromEnvironment('NOTIFICATION_API');
+
+/// 실행 인자에 맞는 구현. 모르는 값이면 실제 서버로 간다.
+NotificationApi _notificationApiFor(String kind) => switch (kind) {
+  'mock' => MockNotificationApi(),
+  'mock-empty' => MockNotificationApi(scenario: MockNotificationScenario.empty),
+  'mock-error' => MockNotificationApi(scenario: MockNotificationScenario.error),
+  _ => HttpNotificationApi(),
 };
 
 /// 양도마켓 화면이 어느 [ResaleApi] 를 쓸지 고르는 실행 인자.
@@ -285,6 +327,16 @@ class _AppState extends State<App> {
   late final ResaleApi _resaleApi =
       widget.resaleApi ?? _resaleApiFor(_resaleApiKind);
 
+  /// 화면이 쓰는 푸시 쪽. main 이 넘긴 푸시 서비스이거나, 안 넘겼으면 아무것도
+  /// 하지 않는 구현이다. [PushNotificationScope] 로 내려준다.
+  late final PushNotifications _push =
+      widget.push ?? const NoopPushNotifications();
+
+  /// 알림함 화면이 쓰는 API. 다른 API 들과 같은 이유로 앱에 하나만 두고
+  /// [NotificationApiScope] 로 내려준다.
+  late final NotificationApi _notificationApi =
+      widget.notificationApi ?? _notificationApiFor(_notificationApiKind);
+
   /// '제작중' job. 제작 화면이 시작하고, 완료 배너가 결과를 받는다. 둘이 서로
   /// 다른 라우트라 라우트보다 위에서 만들어 [CreationJobScope] 로 내려준다.
   /// 예매 컨트롤러를 여기서 만드는 것과 같은 이유다.
@@ -292,7 +344,8 @@ class _AppState extends State<App> {
 
   /// 완료 배너가 소장품을 여는 데 쓴다. 배너는 [MaterialApp.builder] 자리에
   /// 있어서 그 아래의 Navigator 를 context 로는 못 찾는다.
-  final _navigatorKey = GlobalKey<NavigatorState>();
+  late final GlobalKey<NavigatorState> _navigatorKey =
+      widget.navigatorKey ?? GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -389,29 +442,35 @@ class _AppState extends State<App> {
                               job: _creationJob,
                               child: FavoriteScope(
                                 store: _favoriteStore,
-                                child: MaterialApp(
-                                  title: 'TIMO',
-                                  theme: AppTheme.light,
-                                  navigatorKey: _navigatorKey,
-                                  // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
-                                  initialRoute: widget.initialRoute,
-                                  onGenerateInitialRoutes:
-                                      _generateInitialRoutes,
-                                  routes: AppRoutes.routes,
-                                  // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                                  // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                                  // 라우트가 아니라 앱 전체를 감싼다.
-                                  //
-                                  // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                                  // 애니메이션 채널도 같이 멈춘다.
-                                  builder: (context, child) {
-                                    AmbientMotion.instance.enabled =
-                                        !Motion.reduced(context);
-                                    return CreationNotificationHost(
+                                child: NotificationApiScope(
+                                  api: _notificationApi,
+                                  child: PushNotificationScope(
+                                    push: _push,
+                                    child: MaterialApp(
+                                      title: 'TIMO',
+                                      theme: AppTheme.light,
                                       navigatorKey: _navigatorKey,
-                                      child: child!,
-                                    );
-                                  },
+                                      // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
+                                      initialRoute: widget.initialRoute,
+                                      onGenerateInitialRoutes:
+                                          _generateInitialRoutes,
+                                      routes: AppRoutes.routes,
+                                      // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                      // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                      // 라우트가 아니라 앱 전체를 감싼다.
+                                      //
+                                      // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                      // 애니메이션 채널도 같이 멈춘다.
+                                      builder: (context, child) {
+                                        AmbientMotion.instance.enabled =
+                                            !Motion.reduced(context);
+                                        return CreationNotificationHost(
+                                          navigatorKey: _navigatorKey,
+                                          child: child!,
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

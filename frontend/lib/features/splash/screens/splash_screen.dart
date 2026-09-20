@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/timo_logo.dart';
 import '../../../routes/app_routes.dart';
+import '../../notification/push_notification_scope.dart';
 import '../constants.dart';
 
 /// 앱을 켤 때 처음 보이는 로딩 화면.
@@ -73,9 +74,32 @@ class _SplashScreenState extends State<SplashScreen> {
         setState(() => _step++);
         _scheduleNext();
       } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.home);
+        _goHome();
       }
     });
+  }
+
+  /// 홈으로 넘기고, 알림을 눌러 앱이 켜진 것이면 그 화면까지 이어서 연다.
+  ///
+  /// **알림 목적지를 여기서 여는 이유.** 홈으로 갈 때 쓰는 `pushReplacementNamed`
+  /// 는 맨 위 화면을 갈아치운다. 푸시 쪽이 앱을 켜자마자 목적지를 열어 두면 이
+  /// 줄이 그걸 홈으로 덮어써 사라진다. 그래서 푸시 쪽은 목적지를 들고만 있고,
+  /// 홈을 세운 직후인 여기서 받아 위에 쌓는다.
+  ///
+  /// 홈을 덮지 않고 위에 쌓는 것은 뒤로가기로 홈에 돌아올 수 있게 하려는 것이다.
+  void _goHome() {
+    final destination = PushNotificationScope.maybeOf(
+      context,
+    )?.takeLaunchDestination();
+
+    Navigator.pushReplacementNamed(context, AppRoutes.home);
+    if (destination != null) {
+      Navigator.pushNamed(
+        context,
+        destination.routeName,
+        arguments: destination.arguments,
+      );
+    }
   }
 
   @override

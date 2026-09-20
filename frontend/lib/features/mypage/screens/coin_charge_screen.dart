@@ -14,7 +14,7 @@ import '../models/wallet_summary.dart';
 import '../state/my_page_api_scope.dart';
 import '../widgets/charge_amount_card.dart';
 import '../widgets/mushroom_balance_card.dart';
-import '../widgets/my_page_top_bar.dart';
+import '../widgets/my_page_top_bar_host.dart';
 
 /// 버섯 충전 화면. 마이페이지의 충전하기와 빠른 메뉴의 코인 충전에서 들어온다.
 ///
@@ -133,12 +133,6 @@ class _CoinChargeScreenState extends State<CoinChargeScreen> {
     }
   }
 
-  void _notifyNotReady(String label) => showInfoSnackBar(
-    context,
-    MyPageStrings.notReady(label),
-    fitContent: true,
-  );
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -148,11 +142,9 @@ class _CoinChargeScreenState extends State<CoinChargeScreen> {
           children: [
             ColoredBox(
               color: AppColors.surface,
-              child: MyPageTopBar(
+              child: MyPageTopBarHost(
                 title: MyPageStrings.chargeTitle,
                 onBackPressed: () => Navigator.maybePop(context),
-                onNotificationsPressed: () =>
-                    _notifyNotReady(MyPageStrings.notifications),
               ),
             ),
             const Divider(),

@@ -27,6 +27,7 @@ import '../features/payment/screens/payment_complete_screen.dart';
 import '../features/payment/screens/payment_screen.dart';
 import '../features/resale/models/market_concert.dart';
 import '../features/resale/models/purchased_trade.dart';
+import '../features/notification/screens/notification_screen.dart';
 import '../features/resale/screens/listing_purchase_complete_screen.dart';
 import '../features/resale/screens/listing_purchase_screen.dart';
 import '../features/resale/screens/listing_register_screen.dart';
@@ -61,6 +62,9 @@ class AppRoutes {
 
   /// 내 티켓. 빠른 메뉴에서 들어온다.
   static const myTickets = '/tickets';
+
+  /// 알림함. 마이페이지 상단의 알림 아이콘에서 들어온다.
+  static const notifications = '/notifications';
 
   /// 버섯 충전. 마이페이지의 충전하기와 빠른 메뉴에서 들어온다. 충전에
   /// 성공하면 결과로 true 를 넘기며 이전 화면으로 돌아간다.
@@ -128,6 +132,7 @@ class AppRoutes {
     favorites: (_) => const FavoriteListScreen(),
     myTickets: (_) => const MyTicketsScreen(),
     coinCharge: (_) => const CoinChargeScreen(),
+    notifications: (_) => const NotificationScreen(),
     collection: (_) => const CollectionScreen(),
     // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
     // 조회하면 입장 직전에 네트워크를 한 번 더 타게 된다.

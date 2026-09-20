@@ -132,7 +132,10 @@ void main() {
       expect(transaction.title, '버섯 충전');
       expect(transaction.amount, 1000000);
       expect(transaction.balanceAfter, 1000000);
-      expect(transaction.occurredAt, DateTime(2026, 9, 16, 13, 50, 1, 123, 456));
+      expect(
+        transaction.occurredAt,
+        DateTime(2026, 9, 16, 13, 50, 1, 123, 456),
+      );
       expect(transaction.source, 'PG 모의 결제');
       expect(transaction.isCredit, isTrue);
     });
