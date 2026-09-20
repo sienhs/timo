@@ -257,7 +257,7 @@ class _LoadedShowState extends State<_LoadedShow> {
                       valueListenable: _now,
                       builder: (context, now, _) => ShowDetailSummary(
                         detail: detail,
-                        isOpen: detail.isOpenAt(now),
+                        phase: detail.phaseAt(now),
                       ),
                     ),
                     // 가격은 구역 목록에서 따로 받아 오는데, 그 조회는 로그인해야

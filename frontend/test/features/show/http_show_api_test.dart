@@ -25,7 +25,11 @@ void main() {
   ///
   /// 가격(`sectionPrices`)이 이 안에 들어 있다. 예전에는 구역 목록을 따로
   /// 물어야 했다.
-  Map<String, dynamic> concertJson({String status = 'ON_SALE'}) => {
+  Map<String, dynamic> concertJson({
+    String status = 'ON_SALE',
+    bool bookable = true,
+    String? blockReason,
+  }) => {
     'id': 7,
     'title': '김필 단독 콘서트',
     'genre': 'CONCERT',
@@ -34,6 +38,10 @@ void main() {
     'description': '김필 단독 콘서트',
     'ageRating': 'AGE_7',
     'status': status,
+    // 예매 가능 여부는 서버가 응답을 만들 때 계산해서 함께 준다. 상태만으로는
+    // 알 수 없는 구간(마감 후 공연 종료 전 등)이 있어서다.
+    'bookable': bookable,
+    'blockReason': blockReason,
     'viewCount': 1203,
     'startDate': '2026-10-10T19:00:00',
     // 종료일이 시작일과 다르게 와도 화면은 하루만 쓴다.
@@ -51,8 +59,20 @@ void main() {
   };
 
   /// 공연을 제대로 돌려주는 서버.
-  void givenWorkingServer({String status = 'ON_SALE'}) {
-    givenServer((_) => jsonResponse(concertJson(status: status)));
+  void givenWorkingServer({
+    String status = 'ON_SALE',
+    bool bookable = true,
+    String? blockReason,
+  }) {
+    givenServer(
+      (_) => jsonResponse(
+        concertJson(
+          status: status,
+          bookable: bookable,
+          blockReason: blockReason,
+        ),
+      ),
+    );
   }
 
   group('요청', () {
@@ -132,14 +152,48 @@ void main() {
 
     test('끝난 공연과 취소된 공연을 구분한다', () async {
       givenWorkingServer(status: 'CLOSED');
-      expect((await api.fetchShowDetail(7)).isFinished, isTrue);
+      expect((await api.fetchShowDetail(7)).status, ShowStatus.closed);
 
       givenWorkingServer(status: 'CANCELED');
-      expect((await api.fetchShowDetail(7)).isFinished, isTrue);
+      expect((await api.fetchShowDetail(7)).status, ShowStatus.canceled);
 
       givenWorkingServer(status: 'SOLD_OUT');
       // 매진은 끝난 것이 아니다. 취소표가 돌아올 수 있어 들어가 볼 수 있다.
-      expect((await api.fetchShowDetail(7)).isFinished, isFalse);
+      expect((await api.fetchShowDetail(7)).status, ShowStatus.soldOut);
+    });
+
+    test('예매 가능 여부와 막힌 사유를 읽는다', () async {
+      givenWorkingServer(bookable: false, blockReason: 'NOT_ON_SALE');
+      var detail = await api.fetchShowDetail(7);
+      expect(detail.bookable, isFalse);
+      expect(detail.blockReason, ShowBlockReason.notOnSale);
+
+      // 서버의 `CLOSED` 는 공연 종료가 아니라 예매 마감이다.
+      givenWorkingServer(bookable: false, blockReason: 'CLOSED');
+      detail = await api.fetchShowDetail(7);
+      expect(detail.blockReason, ShowBlockReason.bookingClosed);
+
+      givenWorkingServer();
+      detail = await api.fetchShowDetail(7);
+      expect(detail.bookable, isTrue);
+      expect(detail.blockReason, isNull);
+    });
+
+    // 사유를 못 읽었다고 예매를 막으면, 서버가 사유를 하나 늘린 날 멀쩡한
+    // 공연이 앱에서만 닫힌다. 정말 못 파는 공연이면 좌석을 잡을 때 거절된다.
+    test('예매 가능 여부가 빠졌거나 모르는 사유면 막지 않는다', () async {
+      final json = concertJson()
+        ..remove('bookable')
+        ..remove('blockReason');
+      givenServer((_) => jsonResponse(json));
+
+      var detail = await api.fetchShowDetail(7);
+      expect(detail.bookable, isTrue);
+      expect(detail.blockReason, isNull);
+
+      givenWorkingServer(bookable: false, blockReason: 'SOMETHING_NEW');
+      detail = await api.fetchShowDetail(7);
+      expect(detail.blockReason, isNull);
     });
 
     test('모르는 상태는 예매 중으로 본다', () async {
@@ -150,7 +204,6 @@ void main() {
       // 팔고 있는 공연에 '종료' 가 붙는 쪽이 못 파는 공연을 열어 두는 쪽보다
       // 나쁘다. 정말 못 파는 공연이면 서버가 예매 단계에서 막는다.
       expect(detail.status, ShowStatus.onSale);
-      expect(detail.isFinished, isFalse);
     });
   });
 
