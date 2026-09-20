@@ -38,7 +38,10 @@ class ShowDetailSummary extends StatelessWidget {
         Text(detail.title, style: textTheme.headlineSmall),
         const SizedBox(height: ShowDetailMetrics.summaryLineGap),
         Text(ShowDetailStrings.venueLine(detail.venue), style: lineStyle),
-        Text(ShowDetailStrings.periodLine(detail.dateLabel), style: lineStyle),
+        Text(
+          ShowDetailStrings.periodLine(detail.dateTimeLabel),
+          style: lineStyle,
+        ),
       ],
     );
   }

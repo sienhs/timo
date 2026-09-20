@@ -99,17 +99,26 @@ class ShowDetailStrings {
   static const upcomingBadge = '오픈 예정';
   static const onSaleBadge = '예매중';
 
-  static const notifyAction = '오픈 알림 받기';
   static const bookAction = '예매하러 가기';
+
+  /// 오픈 알림 버튼. 알림은 서버가 **그 공연을 찜한 회원**에게 보낸다
+  /// (백엔드 `ConcertOpenSweep` — 7일 전·하루 전·1시간 전). 따로 신청할 곳이
+  /// 없어 이 버튼이 찜을 그대로 켜고 끈다. 문구에 둘을 같이 적는 이유도
+  /// 그래서다 — `오픈 알림 받기` 만 적으면 눌렀을 때 찜 목록에 들어가는 것이
+  /// 설명되지 않고, 상단 하트가 같이 채워지는 것도 오작동으로 읽힌다.
+  static const notifyAction = '오픈 알림 및 찜하기';
+  static const unnotifyAction = '오픈 알림 및 찜 해제';
+
+  /// 버튼을 눌러 찜이 실제로 바뀌었을 때의 안내. 로그인 안내·실패는 찜 공통
+  /// 동작(`toggleFavoriteShow`)이 따로 알린다.
+  static const openAlarmOn = '오픈 알림을 신청했어요. 예매가 열리기 전에 알려드릴게요.';
+  static const openAlarmOff = '오픈 알림을 껐어요.';
 
   /// 이미 끝난 공연의 하단 바. 버튼은 잠기고 이 문구가 대신 선다.
   ///
   /// 매진에는 붙이지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.
   static const closedNotice = '종료된 공연입니다';
   static const canceledNotice = '취소된 공연입니다';
-
-  /// 아직 화면이 없는 조작부. 시안대로 두고 안내만 띄운다.
-  static const notifyNotReady = '오픈 알림은 준비 중이에요.';
 
   static String venueLine(String venue) => '공연 장소: $venue';
   static String periodLine(String period) => '일시: $period';

@@ -121,13 +121,13 @@ void main() {
       expect(detail.zonePrices, isEmpty);
     });
 
-    test('공연일은 하루만 쓴다', () async {
+    test('공연일은 하루만 쓰고, 시작 시각까지 적는다', () async {
       givenWorkingServer();
 
       final detail = await api.fetchShowDetail(7);
 
       // 서버는 종료일(10/12)도 주지만 단일 회차 공연이라 읽지 않는다.
-      expect(detail.dateLabel, '2026.10.10');
+      expect(detail.dateTimeLabel, '2026.10.10 (토) 19:00');
     });
 
     test('끝난 공연과 취소된 공연을 구분한다', () async {

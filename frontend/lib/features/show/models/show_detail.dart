@@ -114,8 +114,12 @@ class ShowDetail {
   bool get isFinished =>
       status == ShowStatus.closed || status == ShowStatus.canceled;
 
-  /// 화면에 찍는 공연일. (예: `2026.11.01`)
-  String get dateLabel => formatShowPeriod(startAt);
+  /// 화면에 찍는 공연 일시. (예: `2026.11.01 (일) 19:00`)
+  ///
+  /// 날짜만으로는 그날 몇 시에 가야 하는지 알 길이 없다 — 상세가 공연 시각을
+  /// 적는 유일한 자리라 여기서 빠지면 예매를 마칠 때까지 나오지 않는다.
+  /// 요일까지 붙이는 것은 좌석 선택 화면의 공연 정보 바와 같은 형식이다.
+  String get dateTimeLabel => formatPerformedAtWithWeekday(startAt);
 
   /// [now] 기준으로 예매를 열었는지.
   ///

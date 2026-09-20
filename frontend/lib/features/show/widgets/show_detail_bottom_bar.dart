@@ -4,11 +4,16 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/show_detail.dart';
 
-/// 화면 맨 아래 고정 바. 예매 상태에 따라 안내 한 줄과 버튼이 갈린다.
+/// 화면 맨 아래 고정 바. 예매 상태에 따라 버튼이 갈린다.
 ///
-/// - 오픈 전: 남은 시간(또는 오픈 일시) + `오픈 알림 받기`
-/// - 오픈 후: 공연일 + `예매하러 가기`
+/// - 오픈 전: 남은 시간(또는 오픈 일시) + `오픈 알림 및 찜하기`
+/// - 오픈 후: `예매하러 가기` 만
 /// - 끝난 공연: 잠긴 버튼만(`종료된 공연입니다`)
+///
+/// 오픈된 공연에는 안내 문구를 얹지 않는다. 공연일은 바로 위 '일시:' 줄에 이미
+/// 있어서 같은 날짜가 한 화면에 두 번 찍히고, 버튼 바로 위에 붙은 날짜는
+/// 예매와 관련된 마감일처럼 읽힌다. 오픈 전 문구는 남긴다 — 저건 공연일이
+/// 아니라 언제부터 누를 수 있는지를 알리는 말이다.
 ///
 /// 매진은 잠그지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.
 ///
@@ -20,12 +25,18 @@ class ShowDetailBottomBar extends StatelessWidget {
     super.key,
     required this.detail,
     required this.now,
+    required this.isFavorite,
     required this.onBookPressed,
     required this.onNotifyPressed,
   });
 
   final ShowDetail detail;
   final DateTime now;
+
+  /// 이 공연을 찜했는가. 오픈 알림을 받는 상태와 같은 말이라
+  /// (`ShowDetailStrings.notifyAction` 주석) 알림 버튼이 이 값으로 갈린다.
+  final bool isFavorite;
+
   final VoidCallback onBookPressed;
   final VoidCallback onNotifyPressed;
 
@@ -33,7 +44,6 @@ class ShowDetailBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final finished = _finishedLabel();
     final isOpen = detail.isOpenAt(now);
-    final remaining = detail.remainingUntilOpenAt(now);
 
     return DecoratedBox(
       decoration: const BoxDecoration(
@@ -52,34 +62,48 @@ class ShowDetailBottomBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 끝난 공연에는 날짜를 적지 않는다. 잠긴 버튼이 이미 끝났다고
-              // 말하는데 그 위에 날짜만 남으면 무슨 날인지 헷갈린다.
-              if (finished == null) ...[
-                _Caption(
-                  text: isOpen ? detail.dateLabel : _upcomingCaption(remaining),
-                  // 시계는 남은 시간을 읽는 데 도움이 되지만, 이미 오픈한
-                  // 공연의 날짜 앞에 붙으면 '날이 끝나 간다'로 잘못 읽힌다.
-                  showClock: !isOpen,
+              // 끝난 공연에는 남은 시간을 적을 이유가 없다. 잠긴 버튼이 이미
+              // 끝났다고 말한다.
+              if (finished == null && !isOpen) ...[
+                _Countdown(
+                  text: _upcomingCaption(detail.remainingUntilOpenAt(now)),
                 ),
                 const SizedBox(height: ShowDetailMetrics.bottomBarGap),
               ],
-              FilledButton(
-                // 끝난 공연은 누를 곳이 없다. 버튼을 숨기지 않고 잠근 채
-                // 이유를 적는다 — 자리가 비면 왜 예매를 못 하는지 알 길이 없다.
-                onPressed: finished != null
-                    ? null
-                    : (isOpen ? onBookPressed : onNotifyPressed),
-                child: Text(
-                  finished ??
-                      (isOpen
-                          ? ShowDetailStrings.bookAction
-                          : ShowDetailStrings.notifyAction),
-                ),
-              ),
+              _action(finished: finished, isOpen: isOpen),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// 상태별 버튼 하나.
+  ///
+  /// 오픈 전 버튼이 찜 여부에 따라 채움/테두리로 갈린다. 이미 알림을 신청한
+  /// 사람에게까지 화면에서 가장 눈에 띄는 버튼으로 '해제' 를 들이밀 이유가
+  /// 없어서다.
+  Widget _action({required String? finished, required bool isOpen}) {
+    // 끝난 공연은 누를 곳이 없다. 버튼을 숨기지 않고 잠근 채 이유를 적는다 —
+    // 자리가 비면 왜 예매를 못 하는지 알 길이 없다.
+    if (finished != null) {
+      return FilledButton(onPressed: null, child: Text(finished));
+    }
+    if (isOpen) {
+      return FilledButton(
+        onPressed: onBookPressed,
+        child: const Text(ShowDetailStrings.bookAction),
+      );
+    }
+    if (isFavorite) {
+      return OutlinedButton(
+        onPressed: onNotifyPressed,
+        child: const Text(ShowDetailStrings.unnotifyAction),
+      );
+    }
+    return FilledButton(
+      onPressed: onNotifyPressed,
+      child: const Text(ShowDetailStrings.notifyAction),
     );
   }
 
@@ -100,33 +124,31 @@ class ShowDetailBottomBar extends StatelessWidget {
   }
 }
 
-class _Caption extends StatelessWidget {
-  const _Caption({required this.text, required this.showClock});
+/// 오픈까지 남은 시간 한 줄. 시계 아이콘이 앞에 선다.
+class _Countdown extends StatelessWidget {
+  const _Countdown({required this.text});
 
   final String text;
-  final bool showClock;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (showClock) ...[
-          const Icon(
-            Icons.schedule,
-            size: ShowDetailMetrics.countdownIconSize,
-            color: AppColors.primaryPressed,
-          ),
-          const SizedBox(width: 5),
-        ],
+        const Icon(
+          Icons.schedule,
+          size: ShowDetailMetrics.countdownIconSize,
+          color: AppColors.primaryPressed,
+        ),
+        const SizedBox(width: 5),
         Flexible(
           child: Text(
             text,
             // 흰 배경 위 진한 그린(4.98:1). 브랜드 그린(AppColors.primary)은
             // 3.43:1 이라 이 크기 글자에는 못 쓴다.
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppColors.primaryPressed,
-                ),
+              color: AppColors.primaryPressed,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
