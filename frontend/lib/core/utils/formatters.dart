@@ -89,13 +89,20 @@ String _twoDigits(int value) => value.toString().padLeft(2, '0');
 /// 하루 공연은 날짜 하나(`2026.11.15`), 기간 공연은 물결로 잇는다
 /// (`2026.07.05 ~ 07.07`). 끝 날짜의 연도는 시작과 같으면 생략한다 —
 /// 홈 카드는 폭이 좁아 `2026.07.05 ~ 2026.07.07` 이 두 줄로 접힌다.
+///
+/// 끝 날짜가 없을 때만이 아니라 **시작과 같은 날일 때도** 날짜 하나로 적는다.
+/// 서버는 하루짜리 공연에도 `endDate` 를 시작일과 같은 값으로 채워 주는데,
+/// 그대로 이으면 `2026.11.21 ~ 11.21` 처럼 같은 날을 두 번 읽게 된다.
 String formatShowPeriod(DateTime startAt, [DateTime? endAt]) {
-  if (endAt == null) return _formatDate(startAt);
+  if (endAt == null || _isSameDay(startAt, endAt)) return _formatDate(startAt);
   final end = startAt.year == endAt.year
       ? '${_twoDigits(endAt.month)}.${_twoDigits(endAt.day)}'
       : _formatDate(endAt);
   return '${_formatDate(startAt)} ~ $end';
 }
+
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// 연도를 뺀 월·일과 요일. (예: `10.25 (금)`)
 /// 올해 안의 가까운 일정처럼 연도가 자명한 자리에 쓴다.

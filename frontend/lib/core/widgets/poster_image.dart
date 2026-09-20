@@ -29,6 +29,7 @@ class PosterImage extends StatelessWidget {
     required String assetPath,
     this.borderRadius = 0,
     this.decodeWidth,
+    this.fit = BoxFit.cover,
   }) : _image = AssetImage(assetPath);
 
   /// 서버가 준 주소의 이미지. 주소가 없으면(포스터 없는 공연) 바로 회색
@@ -42,6 +43,7 @@ class PosterImage extends StatelessWidget {
     required String? url,
     this.borderRadius = 0,
     this.decodeWidth,
+    this.fit = BoxFit.cover,
   }) : _image = _networkImageOrNull(url);
 
   /// 서버 주소를 붙여 [NetworkImage] 를 만든다. 붙일 주소가 없으면 null 이라
@@ -57,6 +59,11 @@ class PosterImage extends StatelessWidget {
   /// 디코딩할 가로 픽셀 수의 기준이 되는 표시 폭. 포스터 원본이 표시
   /// 크기보다 훨씬 커서, 넘겨주면 메모리를 크게 아낀다.
   final double? decodeWidth;
+
+  /// 받은 칸을 어떻게 채울지. 기본은 꽉 채우는 [BoxFit.cover] 다 — 카드·아바타는
+  /// 칸에 빈 곳이 남으면 안 된다. [PosterStage] 처럼 포스터 비율을 그대로
+  /// 두고 남는 자리를 따로 메우는 자리에서만 [BoxFit.contain] 을 넘긴다.
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +81,7 @@ class PosterImage extends StatelessWidget {
                 null,
                 image,
               ),
-              fit: BoxFit.cover,
+              fit: fit,
               errorBuilder: (_, _, _) => const _Placeholder(),
             ),
     );

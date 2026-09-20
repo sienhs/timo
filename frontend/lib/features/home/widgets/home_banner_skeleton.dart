@@ -15,9 +15,9 @@ class HomeBannerSkeleton extends StatelessWidget {
       label: HomeStrings.loading,
       child: Column(
         children: [
-          const SizedBox(
-            height: HomeMetrics.bannerHeight,
-            child: Padding(
+          SizedBox(
+            height: HomeMetrics.bannerHeightOf(MediaQuery.sizeOf(context)),
+            child: const Padding(
               // 캐러셀이 배너 양옆에 두는 여백과 같다.
               padding: EdgeInsets.symmetric(
                 horizontal: HomeMetrics.bannerGap / 2,

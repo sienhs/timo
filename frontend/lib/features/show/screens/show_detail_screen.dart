@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/async_boundary.dart';
-import '../../../core/widgets/poster_image.dart';
+import '../../../core/widgets/poster_stage.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/state/auth_session_scope.dart';
 import '../../booking/models/performance.dart';
@@ -240,9 +240,9 @@ class _LoadedShowState extends State<_LoadedShow> {
             children: [
               AspectRatio(
                 aspectRatio: ShowDetailMetrics.posterAspectRatio,
-                child: PosterImage.network(
+                child: PosterStage(
                   url: detail.posterUrl,
-                  decodeWidth: MediaQuery.sizeOf(context).width,
+                  verticalInset: ShowDetailMetrics.posterVerticalInset,
                 ),
               ),
               Padding(

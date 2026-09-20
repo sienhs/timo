@@ -86,6 +86,11 @@ void main() {
 
   /// 홈은 ListView 라 화면 밖 섹션은 아직 만들어지지도 않았다. 찾으려는
   /// 위젯이 실제로 생길 때까지 내린다.
+  /// 세로 목록을 끌어 [target] 이 보이는 자리까지 올린다.
+  ///
+  /// 목록이 보이는 만큼만 만들기 때문에, 섹션 제목이 화면 끝에 걸친 채로
+  /// 멈추면 그 아래 카드 줄은 아직 없는 상태다. 마지막에 [WidgetTester.ensureVisible]
+  /// 로 목표를 위쪽에 붙여, 섹션 안쪽까지 만들어진 뒤에 확인하게 한다.
   Future<void> scrollTo(WidgetTester tester, Finder target) async {
     await tester.scrollUntilVisible(
       target,
@@ -97,6 +102,8 @@ void main() {
           )
           .first,
     );
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
   }
 
   /// '더보기' 는 오픈 임박 섹션과 인기 공연 섹션에 모두 있다. 어느 섹션의
@@ -269,8 +276,9 @@ void main() {
         );
       }
 
-      await scrollTo(tester, find.text(HomeStrings.popularSection));
-      // 인기 1위 카드에 순위 뱃지가 붙는다.
+      // 인기 1위 카드에 순위 뱃지가 붙는다. 카드 줄까지 끌어 올려야
+      // 뱃지가 만들어진다 — 섹션 제목만 보이는 자리에서는 아직 없다.
+      await scrollTo(tester, find.text(HomeStrings.rank(1)));
       expect(find.text(HomeStrings.rank(1)), findsOneWidget);
     });
 
@@ -287,8 +295,10 @@ void main() {
             .map((s) => s.id)
             .toList(),
       );
-      // 첫 배너에 공연 제목과 공연장이 찍힌다.
-      expect(find.text(MockHomeApi.popular.first.venueName), findsOneWidget);
+      // 첫 배너에 공연명 · 공연장 · 날짜가 쌓인다.
+      final first = MockHomeApi.popular.first;
+      expect(find.text(first.venueName), findsOneWidget);
+      expect(find.text(first.periodLabel), findsWidgets);
     });
 
     testWidgets('응답을 기다리는 동안 카드 자리에 빈 카드가 있다', (tester) async {

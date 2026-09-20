@@ -73,6 +73,10 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    // 스크롤은 카드가 '보이기 시작하면' 멈춘다. 배너가 커지면서 카드가 화면
+    // 끝에 걸친 채로 멈추는 일이 생겨, 누를 수 있는 자리까지 마저 올린다.
+    await tester.ensureVisible(card);
+    await tester.pumpAndSettle();
     await tester.tap(card);
     await tester.pumpAndSettle();
     await tester.tap(find.text('예매하러 가기'));

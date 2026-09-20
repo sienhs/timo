@@ -7,7 +7,7 @@ import 'show_poster_card.dart';
 /// 카드에 얹을 뱃지를 정한다. 뱃지가 없으면 null 을 준다.
 typedef ShowBadgeBuilder = Widget? Function(ShowSummary show, int index);
 
-/// 공연 카드를 가로로 늘어놓는 줄. 오픈 임박·인기 공연이 함께 쓴다.
+/// 공연 카드를 가로로 늘어놓는 줄. 오픈 예정·인기 공연이 함께 쓴다.
 ///
 /// 높이를 지정하지 않으려고 ListView 대신 가로 스크롤 + Row 로 짰다. 카드
 /// 높이는 포스터 비율과 글자 크기에서 나오는데, ListView 로 가면 그 높이를
