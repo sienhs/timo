@@ -151,12 +151,17 @@ contract TicketNFT is ERC721, AccessControl {
 
     // ------------------------------------------------------------------
     // Transfer market (listing is just a status flip; settlement is the
-    // only step that actually moves ownership, and only MARKETPLACE_ROLE
-    // - the future Marketplace contract - can call it)
+    // step that actually moves ownership). Every write here is
+    // OPERATOR_ROLE-gated, not msg.sender-signed - ticket owners are
+    // custodial wallets whose keys the backend holds, so there is no path
+    // where a real owner ever signs their own transaction. The backend
+    // passes `owner` and this contract re-checks it against ownerOf(tokenId)
+    // before acting, the same way it already trusts itself for mintTicket /
+    // revoke / markUsed.
     // ------------------------------------------------------------------
 
-    function listForTransfer(uint256 tokenId, uint256 askPrice) external {
-        if (ownerOf(tokenId) != msg.sender) revert NotTicketOwner();
+    function listForTransferFor(uint256 tokenId, address owner, uint256 askPrice) external onlyRole(OPERATOR_ROLE) {
+        if (ownerOf(tokenId) != owner) revert NotTicketOwner();
         Ticket storage t = tickets[tokenId];
         if (t.status != Status.OWNED) revert UnexpectedStatus(tokenId, t.status, Status.OWNED);
         if (askPrice > t.facePrice) revert ListPriceExceedsFacePrice(askPrice, t.facePrice);
@@ -166,8 +171,8 @@ contract TicketNFT is ERC721, AccessControl {
         emit TicketListed(tokenId, askPrice);
     }
 
-    function delist(uint256 tokenId) external {
-        if (ownerOf(tokenId) != msg.sender) revert NotTicketOwner();
+    function delistFor(uint256 tokenId, address owner) external onlyRole(OPERATOR_ROLE) {
+        if (ownerOf(tokenId) != owner) revert NotTicketOwner();
         Ticket storage t = tickets[tokenId];
         if (t.status != Status.LISTED) revert UnexpectedStatus(tokenId, t.status, Status.LISTED);
 

@@ -58,13 +58,16 @@ describe("Marketplace", () => {
     await ticketNFT.connect(admin).grantRole(await ticketNFT.MARKETPLACE_ROLE(), marketplaceAddress);
     await vault.connect(admin).grantRole(await vault.MARKETPLACE_ROLE(), marketplaceAddress);
     await ticketNFT.connect(admin).grantRole(await ticketNFT.ORGANIZER_ROLE(), organizer.address);
+    // listForTransferFor is OPERATOR_ROLE-gated on TicketNFT itself (custodial - the seller
+    // never signs their own listing), separate from Marketplace's own OPERATOR_ROLE below.
+    await ticketNFT.connect(admin).grantRole(await ticketNFT.OPERATOR_ROLE(), operator.address);
     await marketplace.connect(admin).grantRole(await marketplace.OPERATOR_ROLE(), operator.address);
   });
 
   async function mintAndListToAlice(seatId: number = SEAT_ID) {
     await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID, seatId, SECTION_INDEX);
     const tokenId = await ticketNFT.seatTokenId(await ticketNFT.seatKey(SHOW_ID, seatId));
-    await ticketNFT.connect(alice).listForTransfer(tokenId, FACE_PRICE);
+    await ticketNFT.connect(operator).listForTransferFor(tokenId, alice.address, FACE_PRICE);
     return tokenId;
   }
 
@@ -137,7 +140,7 @@ describe("Marketplace", () => {
       // show's seat to a different seller instead.
       await ticketNFT.connect(organizer).mintTicket(alice.address, SHOW_ID + 1, SEAT_ID, SECTION_INDEX);
       const tokenId2 = await ticketNFT.seatTokenId(await ticketNFT.seatKey(SHOW_ID + 1, SEAT_ID));
-      await ticketNFT.connect(alice).listForTransfer(tokenId2, FACE_PRICE);
+      await ticketNFT.connect(operator).listForTransferFor(tokenId2, alice.address, FACE_PRICE);
 
       await expect(
         marketplace.connect(operator).buy(tokenId2, bob.address, ref("trade-shared"))
