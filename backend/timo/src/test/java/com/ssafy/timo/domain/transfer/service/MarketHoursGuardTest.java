@@ -21,6 +21,7 @@ import com.ssafy.timo.domain.transfer.entity.TicketListing;
 import com.ssafy.timo.domain.transfer.exception.MarketClosedException;
 import com.ssafy.timo.domain.transfer.exception.MarketOpenException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotFoundException;
+import com.ssafy.timo.domain.transfer.exception.TradeNotFoundException;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
@@ -54,6 +55,7 @@ class MarketHoursGuardTest {
     private static final Long TICKET_ID = 11L;
     private static final Long LISTING_ID = 21L;
     private static final Long CONCERT_ID = 31L;
+    private static final Long TRADE_ID = 41L;
     private static final long PRICE = 90_000L;
     private static final Clock CLOCK = Clock.fixed(
             LocalDateTime.of(2026, 9, 17, 12, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant(),
@@ -152,6 +154,18 @@ class MarketHoursGuardTest {
 
         listingService.cancel(LISTING_ID, MEMBER_ID);
 
+        verify(marketHoursService, never()).requireOpen();
+        verify(marketHoursService, never()).requireClosed();
+    }
+
+    @Test
+    @DisplayName("거래 상세는 운영 시간을 묻지 않는다 - 자기 거래를 보는 경로다")
+    void findTradeIgnoresMarketHours() {
+        given(ticketTradeRepository.findDetailById(TRADE_ID)).willReturn(Optional.empty());
+
+        // 거래 조회까지 내려가 404 가 나면 시간 가드는 없는 것이다.
+        assertThatThrownBy(() -> marketQueryService.findTrade(TRADE_ID, MEMBER_ID))
+                .isInstanceOf(TradeNotFoundException.class);
         verify(marketHoursService, never()).requireOpen();
         verify(marketHoursService, never()).requireClosed();
     }

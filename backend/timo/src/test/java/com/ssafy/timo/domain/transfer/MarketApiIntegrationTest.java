@@ -482,6 +482,93 @@ class MarketApiIntegrationTest {
     }
 
     @Nested
+    @DisplayName("거래 상세")
+    class TradeDetail {
+
+        /** buyer 의 티켓을 seller(요청자)가 산다. 이 묶음에서 판매자는 buyer, 구매자는 seller 다. */
+        private Long tradeId;
+
+        @BeforeEach
+        void trade() throws Exception {
+            TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
+            purchase(othersListing, LIST_PRICE).andExpect(status().isAccepted());
+            tradeId = ticketTradeRepository.findByListingId(othersListing.getId()).orElseThrow().getId();
+        }
+
+        @Test
+        @DisplayName("구매자가 보면 200 이고 role 은 BUYER 다 - 나머지는 구매 응답과 같다")
+        void buyerSeesTrade() throws Exception {
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", tradeId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.tradeId").value(tradeId))
+                    .andExpect(jsonPath("$.role").value("BUYER"))
+                    .andExpect(jsonPath("$.status").value("PENDING"))
+                    .andExpect(jsonPath("$.concertId").value(concert.getId()))
+                    .andExpect(jsonPath("$.concertTitle").value("아이유 콘서트"))
+                    .andExpect(jsonPath("$.venueName").value("고척돔"))
+                    .andExpect(jsonPath("$.sectionName").value("1층 A블록"))
+                    .andExpect(jsonPath("$.grade").exists())
+                    .andExpect(jsonPath("$.seatNo").value(othersTicket.getReservation().getSeat().getSeatNo()))
+                    .andExpect(jsonPath("$.seatCol").value(othersTicket.getReservation().getSeat().getSeatCol()))
+                    .andExpect(jsonPath("$.price").value(LIST_PRICE))
+                    .andExpect(jsonPath("$.faceValue").value(FACE_PRICE))
+                    .andExpect(jsonPath("$.tradedAt").exists());
+        }
+
+        @Test
+        @DisplayName("판매자가 보면 200 이고 role 은 SELLER 다 - 내 거래 내역에는 없는 tradeId 로 닿는 유일한 길")
+        void sellerSeesTrade() throws Exception {
+            Authenticated.set(buyer.getId());
+
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", tradeId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.tradeId").value(tradeId))
+                    .andExpect(jsonPath("$.role").value("SELLER"))
+                    .andExpect(jsonPath("$.price").value(LIST_PRICE));
+        }
+
+        @Test
+        @DisplayName("거래 상대와 티켓 식별자는 어느 쪽에도 드러나지 않는다")
+        void counterpartyIsHidden() throws Exception {
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", tradeId))
+                    .andExpect(jsonPath("$.sellerMemberId").doesNotExist())
+                    .andExpect(jsonPath("$.buyerMemberId").doesNotExist())
+                    .andExpect(jsonPath("$.ticketId").doesNotExist())
+                    .andExpect(jsonPath("$.tokenId").doesNotExist())
+                    .andExpect(jsonPath("$.txHash").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("제3자는 404 - 남의 거래는 없는 거래와 같다")
+        void strangerGets404() throws Exception {
+            Member stranger = saveMember("01055556666", "구경꾼");
+            Authenticated.set(stranger.getId());
+
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", tradeId))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("TradeNotFoundException"));
+        }
+
+        @Test
+        @DisplayName("없는 거래면 404")
+        void missing() throws Exception {
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", 99_999L))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.exception").value("TradeNotFoundException"));
+        }
+
+        @Test
+        @DisplayName("닫힌 시간에도 200 - 자기 거래를 보는 경로라 운영 시간과 무관하다")
+        void visibleWhileClosed() throws Exception {
+            marketClock.closed();
+
+            mvc.perform(get(MARKET_PATH + "/trades/{tradeId}", tradeId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.role").value("BUYER"));
+        }
+    }
+
+    @Nested
     @DisplayName("가격 수정")
     class UpdatePrice {
 

@@ -22,6 +22,23 @@ public interface TicketTradeRepository extends JpaRepository<TicketTrade, Long> 
     Optional<TicketTrade> findByListingId(Long listingId);
 
     /**
+     * 거래 상세. 응답이 공연·공연장·구역을 쓰므로 매물을 거쳐 한 번에 읽는다(다대일만 fetch join).
+     *
+     * <p>요청자가 당사자인지는 여기서 거르지 않는다. 쿼리 조건에 넣으면 "없는 거래" 와 "남의 거래" 가 같은
+     * 빈 결과가 되어 로그로도 구분할 수 없다. 서비스가 가르고 응답만 같은 404 로 낸다.
+     */
+    @Query("""
+            select t
+              from TicketTrade t
+              join fetch t.listing l
+              join fetch l.concert c
+              join fetch c.venue
+              join fetch l.section
+             where t.id = :tradeId
+            """)
+    Optional<TicketTrade> findDetailById(@Param("tradeId") Long tradeId);
+
+    /**
      * 내 거래 내역. 판매({@code ticket_listing})와 구매({@code ticket_trade})를 한 목록으로 합친다.
      *
      * <p><b>네이티브 SQL 인 이유는 JPQL 에 {@code union} 이 없기 때문이다.</b> 두 테이블을 자바에서

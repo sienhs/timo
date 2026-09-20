@@ -12,8 +12,12 @@ import com.ssafy.timo.domain.transfer.dto.MyTradeRow;
 import com.ssafy.timo.domain.transfer.dto.MyTradeStatus;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeType;
+import com.ssafy.timo.domain.transfer.dto.TradeDetailResponseDto;
+import com.ssafy.timo.domain.transfer.dto.TradeRole;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
+import com.ssafy.timo.domain.transfer.entity.TicketTrade;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
+import com.ssafy.timo.domain.transfer.exception.TradeNotFoundException;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.global.storage.ImageStorage;
@@ -106,6 +110,27 @@ public class MarketQueryService {
                 .orElseThrow(() -> new ListingNotFoundException(listingId));
 
         return ListingDetailResponseDto.from(listing, imageStorage, requesterId);
+    }
+
+    /**
+     * 거래 한 건의 상세. <b>판매자와 구매자만 본다.</b> 그 밖의 요청자는 없는 거래와 똑같이 404 다 —
+     * 거래는 두 사람만의 기록이라 존재 여부도 알려 주지 않는다({@code TransferErrorCode.TRADE_NOT_FOUND}).
+     *
+     * <p>운영 시간을 보지 않는다. 자기 거래를 보는 경로라 매물 상세, 내 내역과 같은 부류다.
+     */
+    public TradeDetailResponseDto findTrade(Long tradeId, Long requesterId) {
+        TicketTrade trade = ticketTradeRepository.findDetailById(tradeId)
+                .orElseThrow(() -> new TradeNotFoundException(tradeId));
+
+        TradeRole role;
+        if (requesterId.equals(trade.getSellerMemberId())) {
+            role = TradeRole.SELLER;
+        } else if (requesterId.equals(trade.getBuyerMemberId())) {
+            role = TradeRole.BUYER;
+        } else {
+            throw new TradeNotFoundException(tradeId);
+        }
+        return TradeDetailResponseDto.from(trade, role, imageStorage);
     }
 
     /**

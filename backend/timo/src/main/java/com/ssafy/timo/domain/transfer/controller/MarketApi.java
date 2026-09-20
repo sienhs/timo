@@ -9,6 +9,7 @@ import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MyTradeSummaryResponseDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
+import com.ssafy.timo.domain.transfer.dto.TradeDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.global.security.CurrentMember;
 import jakarta.validation.Valid;
@@ -120,6 +121,17 @@ public interface MarketApi {
     @GetMapping("/listings/{listingId}")
     ResponseEntity<ListingDetailResponseDto> findListing(@PathVariable Long listingId,
                                                         @CurrentMember Long memberId);
+
+    /**
+     * 거래 한 건의 상세. 판매 완료 알림이 가리키는 화면이고, 구매 완료 화면의 상태 확인도 여기로 한다.
+     *
+     * <p><b>판매자와 구매자만 본다.</b> 남의 거래는 없는 거래와 같은 404 다 — 거래는 두 사람만의 기록이라
+     * 존재 여부도 알려 주지 않고, 번호가 순차라 403 으로 가르면 체결 건수가 샌다. {@code role} 이 요청자의
+     * 입장(SELLER/BUYER)이며 상대가 누구인지는 어느 쪽에도 나오지 않는다. 운영 시간과 무관하다.
+     */
+    @GetMapping("/trades/{tradeId}")
+    ResponseEntity<TradeDetailResponseDto> findTrade(@PathVariable Long tradeId,
+                                                    @CurrentMember Long memberId);
 
     /**
      * 내 거래 내역. 판매와 구매를 한 목록에 섞어 최신순으로 준다.

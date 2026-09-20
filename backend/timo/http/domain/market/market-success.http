@@ -5,7 +5,8 @@
 #
 # 흐름: 열림 확인 -> 공연 목록 -> 등록 -> 등록 직후 구매(409, 아직 안 올라옴)
 #       -> [market-fixture.sql 로 등록 시각을 하루 당김] -> 가격 수정(409, 열린 동안 가격 고정)
-#       -> 구매 -> 판 사람의 예매 취소(409) -> 다음 매물 등록(fail 에서 쓴다) -> 등록 중 예매 취소(409).
+#       -> 구매 -> 거래 상세(구매자 BUYER, 판매자 SELLER) -> 판 사람의 예매 취소(409)
+#       -> 다음 매물 등록(fail 에서 쓴다) -> 등록 중 예매 취소(409).
 # 매물은 등록 다음 날 08:00 에 올라간다. 오늘 등록한 매물을 오늘 사려면 fixture 로 등록 시각을
 # 당기는 수밖에 없다 - 판정이 서버 시계라 IDE 시계는 소용없다.
 # 마지막 매물은 일부러 열어 둔다. fail 이 닫힌 시간에 그 매물로 "구매는 막히고 가격
@@ -122,6 +123,35 @@ Content-Type: application/json
     client.test("202 이고 PENDING 이다", function () {
         client.assert(response.status === 202, "status: " + response.status);
         client.assert(response.body.status === "PENDING", "status: " + response.body.status);
+    });
+    client.global.set("tradeId", response.body.tradeId);
+%}
+
+### 거래 상세 - 산 사람이 보면 BUYER. 구매 완료 화면의 상태 확인은 내 거래 내역 대신 이걸 쓴다
+GET {{baseUrl}}/api/v1/market/trades/{{tradeId}}
+Authorization: Bearer {{buyerToken}}
+
+> {%
+    client.test("200, BUYER, 상대와 티켓 식별자는 없다", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.role === "BUYER", "role: " + response.body.role);
+        client.assert(response.body.status === "PENDING", "status: " + response.body.status);
+        client.assert(response.body.price === client.global.get("listedPrice"), "price: " + response.body.price);
+        client.assert(response.body.sellerMemberId === undefined, "sellerMemberId 가 새고 있다");
+        client.assert(response.body.buyerMemberId === undefined, "buyerMemberId 가 새고 있다");
+        client.assert(response.body.ticketId === undefined, "ticketId 가 새고 있다");
+    });
+%}
+
+### 거래 상세 - 판 사람이 보면 SELLER. 판매 완료 알림(linkType TRADE)이 여기로 온다
+GET {{baseUrl}}/api/v1/market/trades/{{tradeId}}
+Authorization: Bearer {{sellerToken}}
+
+> {%
+    client.test("200, SELLER", function () {
+        client.assert(response.status === 200, "status: " + response.status);
+        client.assert(response.body.role === "SELLER", "role: " + response.body.role);
+        client.assert(response.body.tradeId === client.global.get("tradeId"), "tradeId: " + response.body.tradeId);
     });
 %}
 
