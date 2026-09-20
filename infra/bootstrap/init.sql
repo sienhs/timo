@@ -30,6 +30,26 @@ CREATE TABLE IF NOT EXISTS `push_device` (
     KEY `idx_push_device_member` (`member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 푸시 발송 결과와 관계없이 회원이 확인할 수 있는 알림함. 같은 업무 이벤트가
+-- 재시도되어도 회원별 dedup_key가 한 건으로 수렴한다.
+CREATE TABLE IF NOT EXISTS `notification` (
+    `notification_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `member_id` BIGINT NOT NULL,
+    `type` VARCHAR(40) NOT NULL,
+    `body` VARCHAR(500) NOT NULL,
+    `link_type` VARCHAR(20) NULL,
+    `link_id` BIGINT NULL,
+    `dedup_key` VARCHAR(120) NOT NULL,
+    `read_at` DATETIME(6) NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`notification_id`),
+    UNIQUE KEY `uk_notification_dedup` (`member_id`, `dedup_key`),
+    KEY `idx_notification_member` (`member_id`, `notification_id` DESC),
+    KEY `idx_notification_unread` (`member_id`, `read_at`),
+    KEY `idx_notification_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 회원별 공연 찜. 같은 회원이 같은 공연을 중복해서 찜하지 못하게 한다.
 CREATE TABLE IF NOT EXISTS `concert_wish` (
     `wish_id` BIGINT NOT NULL AUTO_INCREMENT,
