@@ -42,6 +42,18 @@ class MockHomeApi implements HomeApi {
   }
 
   @override
+  Future<List<ShowSummary>> fetchTicketOpenAll() async {
+    await _respond();
+    return ticketOpenSoon;
+  }
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() async {
+    await _respond();
+    return all;
+  }
+
+  @override
   Future<List<ShowSummary>> search(String keyword) async {
     await _respond();
     final needle = keyword.trim().toLowerCase();
@@ -83,6 +95,18 @@ class MockHomeApi implements HomeApi {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day);
   }
+
+  /// 당일 오픈을 흉내 낼 시각. 지금으로부터 두 시간 뒤다.
+  ///
+  /// 오늘의 고정 시각(`_today + 22시간`)으로 두면 그 시각을 넘긴 뒤로는 이미
+  /// 오픈한 공연이 되어, 홈의 오픈 예정 줄이 걸러 버린다
+  /// ([ShowSummary.opensAfter]) — 밤에 돌린 테스트만 깨진다. 늘 앞으로의
+  /// 시각이어야 한다.
+  ///
+  /// 밤 10시가 넘으면 두 시간 뒤가 내일이 되어 뱃지가 `1일 후 오픈` 으로
+  /// 바뀐다. 당일 뱃지를 하루 내내 보여 주는 것보다 "오픈 예정인데 이미
+  /// 지났다" 는 어긋난 상태를 만들지 않는 쪽이 낫다.
+  static DateTime get _soon => DateTime.now().add(const Duration(hours: 2));
 
   /// 오픈이 빠른 순. 이미 오픈한 공연은 없다 — 서버도 `SCHEDULED` 만 준다.
   static final ticketOpenSoon = <ShowSummary>[blackSkirt, remind, bigbang];
@@ -137,8 +161,8 @@ class MockHomeApi implements HomeApi {
     venueName: '무신사 개러지',
     status: ShowSummary.upcomingStatus,
     startAt: DateTime(2026, 9, 20),
-    // 오늘 밤 오픈 — `오늘 HH:mm 오픈` 뱃지가 여기서 나온다.
-    ticketOpenAt: _today.add(const Duration(hours: 22)),
+    // 곧 오픈 — `오늘 HH시 MM분 오픈` 뱃지가 여기서 나온다.
+    ticketOpenAt: _soon,
   );
 
   static final xia = ShowSummary(

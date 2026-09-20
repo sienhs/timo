@@ -23,6 +23,16 @@ abstract class HomeApi {
   /// 많이 본 순. 목록 순서가 곧 순위다.
   Future<List<ShowSummary>> fetchPopular();
 
+  /// 오픈 예정 공연 전체. [fetchTicketOpenSoon] 과 조건은 같고 개수만 다르다 —
+  /// 저쪽은 홈의 가로 한 줄, 이쪽은 더보기로 들어가는 목록 화면이다. 메서드를
+  /// 나눠 두면 "한 줄에 몇 개" 와 "목록에 몇 개" 가 따로 움직인다.
+  Future<List<ShowSummary>> fetchTicketOpenAll();
+
+  /// 공연 전체. 예매 상태로 거르지 않으므로 종료·취소된 공연도 온다 —
+  /// 목록 화면의 `모두 보기` 탭이 그대로 보여 주고, `예매 가능` 탭이
+  /// [ShowSummary.status] 로 거른다.
+  Future<List<ShowSummary>> fetchAllShows();
+
   /// 공연명에 [keyword] 가 들어 있는 공연. 최근 등록순. 예매 상태로 거르지
   /// 않으므로 종료·취소 공연도 올 수 있다 — 화면이 [ShowSummary.status] 로 거른다.
   Future<List<ShowSummary>> search(String keyword);

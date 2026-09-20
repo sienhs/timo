@@ -140,6 +140,12 @@ class HomeMetrics {
   /// 검색 결과 한 번에 받아 오는 수. 서버 기본값과 같다.
   static const searchPageSize = 20;
 
+  /// 더보기로 들어가는 목록 화면이 한 번에 받아 오는 수. 서버가 허용하는
+  /// 최대치다. 검색과 탭 거르기를 모두 앱에서 하므로 한 번에 다 받아 둔다 —
+  /// 글자마다 서버에 다녀오면 늦게 온 앞 글자의 결과가 뒤를 덮는다. 공연이
+  /// 이보다 많아지면 그때 아래로 이어 받는 방식을 붙인다.
+  static const showListPageSize = 100;
+
   /// 홈 인기 아티스트 격자에 받아 오는 수. 두 줄을 꽉 채우는 칸 수다.
   static const popularArtistGridSize = artistColumns * 2;
 
@@ -188,11 +194,13 @@ class HomeMetrics {
   /// 순위 숫자를 강조색으로 찍는 상위 범위. 시안은 1~3위만 색이 다르다.
   static const trendingHighlightRanks = 3;
 
-  /// 검색 결과 카드 높이. 배너처럼 포스터를 자르지 않고 보여 주되
-  /// ([bannerAspectRatio] 대신 고정 높이), 한 화면에 결과가 두세 건은 보이는
-  /// 선에서 멈춘다. 목록은 훑어보는 화면이라 한 건이 화면을 다 먹으면
-  /// 무엇이 더 있는지 알 수 없다.
-  static const searchCardHeight = 230.0;
+  /// 목록 카드 높이. 검색 결과와 더보기로 들어가는 목록 화면이 함께 쓴다.
+  ///
+  /// 배너처럼 포스터를 자르지 않고 보여 주되([bannerAspectRatio] 대신 고정
+  /// 높이), 한 화면에 결과가 세 건은 보이는 선에서 멈춘다. 목록은 훑어보는
+  /// 화면이라 한 건이 자리를 많이 먹으면 무엇이 더 있는지 알 수 없다 —
+  /// 더보기 목록은 스무 건이 넘게 이어지므로 특히 그렇다.
+  static const searchCardHeight = 200.0;
 
   /// 검색 결과 카드 포스터의 위아래 여백. 배너와 같다.
   static const searchCardPosterInset = bannerPosterInset;
@@ -284,9 +292,25 @@ class HomeStrings {
     RefreshHint(before: '아직 좋은 자리가 ', highlight: '남아', after: ' 있을지 몰라요'),
   ];
 
-  /// 목록 화면이 아직 없는 '더보기' 를 눌렀을 때.
-  static String moreNotReady(String sectionTitle) =>
-      '$sectionTitle 목록은 준비 중이에요.';
+  // 더보기로 들어가는 목록 화면
+  /// 오픈 예정 공연 전체. 홈의 섹션 제목을 그대로 쓴다 — 더보기를 눌러 들어온
+  /// 화면의 제목이 눌렀던 섹션과 다르면 다른 곳에 온 것처럼 읽힌다.
+  static const openSoonListTitle = ticketOpenSection;
+
+  /// 공연 전체 조회.
+  static const allShowsListTitle = '공연 전체';
+
+  /// 전체 조회의 탭. 예매로 이어지는 공연만 보는 쪽이 기본이다.
+  static const bookableTab = '예매 가능';
+  static const allTab = '모두 보기';
+
+  /// 목록 화면의 검색 칸. 받아 둔 목록을 그 자리에서 거른다.
+  static const listSearchHint = '공연명으로 찾기';
+
+  /// 목록이 비었을 때. 검색 중이면 검색어를 되비춰 준다.
+  static const emptyOpenSoonList = '오픈 예정인 공연이 없어요.';
+  static const emptyAllShowsList = '아직 등록된 공연이 없어요.';
+  static const emptyBookableList = '지금 예매할 수 있는 공연이 없어요.';
 
   /// 순위 뱃지. (예: `1위`)
   static String rank(int rank) => '$rank위';
@@ -298,10 +322,19 @@ class HomeStrings {
   /// 두고, `now` 를 받아 테스트에서 시간을 고정할 수 있게 한다.
   static String ticketOpen(DateTime openAt, {required DateTime now}) {
     final daysLeft = _dayGap(from: now, to: openAt);
-    if (daysLeft <= 0) return '오늘 ${formatClock(openAt)} 오픈';
+    if (daysLeft <= 0) return '오늘 ${_clockInWords(openAt)} 오픈';
     if (daysLeft <= imminentDays) return '$daysLeft일 후 오픈';
     return '${formatMonthDayWithWeekday(openAt)} 오픈';
   }
+
+  /// 당일 오픈 시각을 말로 읽는다. (예: `11시 12분`, 정각이면 `14시`)
+  ///
+  /// 당일에만 이 표기를 쓴다. `11:12` 같은 시계 표기는 기간·공연 일시에도
+  /// 쓰여서, 오늘 열린다는 말 옆에 붙으면 공연 시각으로 읽힌다. 정각에 `0분`
+  /// 을 붙이지 않는 것은 읽는 대로 적기 위해서다 — 아무도 "열네시 영분" 이라고
+  /// 말하지 않는다.
+  static String _clockInWords(DateTime at) =>
+      at.minute == 0 ? '${at.hour}시' : '${at.hour}시 ${at.minute}분';
 
   /// `N일 후` 로 읽어 주는 범위. 이 밖은 날짜를 그대로 보여 준다 —
   /// `93일 후 오픈` 은 언제인지 감이 오지 않는다.

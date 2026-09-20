@@ -21,6 +21,10 @@ import '../widgets/show_card_badges.dart';
 import '../widgets/show_card_row.dart';
 import '../widgets/show_card_row_skeleton.dart';
 
+/// 받아 온 공연 중 줄에 세울 것만 고른다. 줄마다 기준이 달라(오픈 예정은
+/// 아직 안 열린 것, 인기는 예매로 이어지는 것) 섹션이 정해서 넘긴다.
+typedef _ShowSelector = List<ShowSummary> Function(List<ShowSummary> shows);
+
 /// 홈. `MainShellScreen` 의 첫 번째 탭 본문이다.
 ///
 /// Scaffold 를 두지 않는다 — 셸이 이미 Scaffold 와 하단 바를 들고 있고,
@@ -198,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
           loading: const HomeBannerSkeleton(),
           error: const SizedBox.shrink(),
           builder: (context, shows) => HomeBannerCarousel(
-            banners: shows.take(HomeMetrics.bannerCount).toList(),
+            banners: _bookable(shows).take(HomeMetrics.bannerCount).toList(),
             onBannerPressed: (show) => _openShowDetail(context, show.id),
           ),
         ),
@@ -219,12 +223,13 @@ class _HomeScreenState extends State<HomeScreen> {
           title: HomeStrings.ticketOpenSection,
           moreLabel: HomeStrings.ticketOpenMore,
           onMorePressed: () =>
-              _notifyMoreNotReady(context, HomeStrings.ticketOpenSection),
+              Navigator.pushNamed(context, AppRoutes.openSoonShows),
         ),
         const SizedBox(height: HomeMetrics.sectionTitleGap),
         _showRow(
           future: _ticketOpenSoon,
           onRetry: _reloadTicketOpenSoon,
+          select: _unopened,
           badgeBuilder: (show, _) {
             final openAt = show.ticketOpenAt;
             return openAt == null ? null : TicketOpenBadge(openAt: openAt);
@@ -234,14 +239,16 @@ class _HomeScreenState extends State<HomeScreen> {
         HomeSectionHeader(
           title: HomeStrings.popularSection,
           moreLabel: HomeStrings.popularMore,
-          onMorePressed: () =>
-              _notifyMoreNotReady(context, HomeStrings.popularSection),
+          onMorePressed: () => Navigator.pushNamed(context, AppRoutes.allShows),
         ),
         const SizedBox(height: HomeMetrics.sectionTitleGap),
         _showRow(
           future: _popular,
           onRetry: _reloadPopular,
-          // 목록 순서가 순위다. 1위부터 세므로 인덱스에 1을 더한다.
+          select: _bookable,
+          // 목록 순서가 순위다. 1위부터 세므로 인덱스에 1을 더한다. 거르고 난
+          // 뒤의 자리로 센다 — 끝난 공연을 빼 놓고 2위부터 시작하면 1위가
+          // 어디 갔는지 알 수 없다.
           badgeBuilder: (_, index) => RankBadge(rank: index + 1),
         ),
       ],
@@ -253,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _showRow({
     required Future<List<ShowSummary>> future,
     required VoidCallback onRetry,
+    required _ShowSelector select,
     required ShowBadgeBuilder badgeBuilder,
   }) {
     return AsyncBoundary<List<ShowSummary>>(
@@ -260,15 +268,29 @@ class _HomeScreenState extends State<HomeScreen> {
       onRetry: onRetry,
       loading: const ShowCardRowSkeleton(),
       builder: (context, shows) {
-        if (shows.isEmpty) return const _EmptyRow();
+        final selected = select(shows);
+        if (selected.isEmpty) return const _EmptyRow();
         return ShowCardRow(
-          shows: shows,
+          shows: selected,
           onShowPressed: (show) => _openShowDetail(context, show.id),
           badgeBuilder: badgeBuilder,
         );
       },
     );
   }
+
+  /// 아직 오픈하지 않은 공연만. 서버가 `status` 로 한 번 걸러 주지만, 오픈
+  /// 시각이 지나도 상태가 밀리지 않은 공연이 섞여 온다 —
+  /// [ShowSummary.opensAfter] 주석에 사정을 적어 두었다.
+  List<ShowSummary> _unopened(List<ShowSummary> shows) {
+    final now = DateTime.now();
+    return shows.where((show) => show.opensAfter(now)).toList();
+  }
+
+  /// 예매를 앞두었거나 진행 중인 공연만. 인기 줄과 배너가 함께 쓴다 —
+  /// 끝나거나 취소된 공연이 "인기" 로 올라오면 눌러 봐야 예매를 못 한다.
+  List<ShowSummary> _bookable(List<ShowSummary> shows) =>
+      shows.where((show) => show.isOpenOrUpcoming).toList();
 
   /// 검색 화면으로 보낸다. [keyword] 를 주면 그 말로 검색된 결과에서 시작한다 —
   /// 아티스트 상세 화면은 따로 두지 않고 검색 결과가 그 자리를 맡는다.
@@ -282,15 +304,6 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.pushNamed(context, AppRoutes.showDetail, arguments: showId);
   }
 
-  void _notifyMoreNotReady(BuildContext context, String sectionTitle) {
-    _notify(context, HomeStrings.moreNotReady(sectionTitle));
-  }
-
-  void _notify(BuildContext context, String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
 }
 
 class _EmptyRow extends StatelessWidget {
