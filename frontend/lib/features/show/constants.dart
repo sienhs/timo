@@ -125,6 +125,16 @@ class ShowDetailStrings {
   static const closedNotice = '종료된 공연입니다';
   static const canceledNotice = '취소된 공연입니다';
 
+  /// 공연 시작이 가까워 예매만 닫힌 공연의 하단 바.
+  ///
+  /// `종료된 공연입니다` 를 돌려쓰지 않는다. 마감은 공연 시작 몇 시간 전부터
+  /// 걸리는데, 그날 저녁 공연을 보러 갈 사람이 상세를 열었을 때 '종료' 가
+  /// 붙으면 공연이 없어진 줄 안다.
+  ///
+  /// 마감까지 몇 시간인지는 적지 않는다. 그 숫자는 서버가 정하고 응답에 담겨
+  /// 오지도 않아, 여기 적으면 서버가 바꾼 날 조용히 거짓말이 된다.
+  static const bookingClosedNotice = '예매가 마감되었습니다';
+
   static String venueLine(String venue) => '공연 장소: $venue';
   static String periodLine(String period) => '일시: $period';
 

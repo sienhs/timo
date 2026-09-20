@@ -81,6 +81,8 @@ void main() {
   ShowDetail detailOpening({
     Duration? after,
     ShowStatus? status,
+    bool bookable = true,
+    ShowBlockReason? blockReason,
     String title = '2026 아이유 콘서트',
     List<ZonePrice> zonePrices = const [
       ZonePrice(zoneName: '1층 A블록', price: 154000),
@@ -94,6 +96,8 @@ void main() {
     ticketOpenAt: after == null ? null : now.add(after),
     status:
         status ?? (after == null ? ShowStatus.onSale : ShowStatus.scheduled),
+    bookable: bookable,
+    blockReason: blockReason,
     zonePrices: zonePrices,
     artists: const [ShowArtist(name: '아이유')],
   );
@@ -316,11 +320,85 @@ void main() {
       expect(find.text(ShowDetailStrings.upcomingBadge), findsNothing);
     });
 
-    testWidgets('매진은 잠그지 않는다', (tester) async {
-      await pumpDetail(tester, detailOpening(status: ShowStatus.soldOut));
+    // 서버는 매진도 '예매 중이 아님(NOT_ON_SALE)' 으로 답한다. 그 말을 곧이
+    // 들으면 매진 공연이 잠기는데, 취소표가 돌아올 수 있어 들어가 볼 이유가
+    // 있다. 실제 응답과 같은 모양으로 먹여서 그 구분이 살아 있는지 본다.
+    testWidgets('매진은 서버가 막았다고 해도 잠그지 않는다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(
+          status: ShowStatus.soldOut,
+          bookable: false,
+          blockReason: ShowBlockReason.notOnSale,
+        ),
+      );
 
-      // 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.
       expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
+    });
+  });
+
+  // 서버가 예매를 막았는데 시각만 봐서는 알 수 없는 경우들. 이게 없으면
+  // 좌석을 다 고른 뒤 선점 단계에서야 막힌다.
+  group('서버가 막은 공연', () {
+    /// 오픈 시각은 지났는데 서버가 아직 열어 주지 않은 공연.
+    /// (온체인 등록이 안 끝나 상태가 `SCHEDULED` 에 머문 경우)
+    ShowDetail awaitingOpen() => detailOpening(
+      after: const Duration(hours: -2),
+      bookable: false,
+      blockReason: ShowBlockReason.notOnSale,
+    );
+
+    testWidgets('오픈 시각이 지났어도 서버가 안 열었으면 예매로 못 들어간다', (tester) async {
+      await pumpDetail(tester, awaitingOpen());
+
+      expect(find.text(ShowDetailStrings.bookAction), findsNothing);
+      expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
+      expect(find.text(ShowDetailStrings.upcomingBadge), findsOneWidget);
+      expect(find.text(ShowDetailStrings.onSaleBadge), findsNothing);
+    });
+
+    // 언제 열릴지를 앱이 모른다. 남은 시간을 적으면 0 에 멈춘 시계가 된다.
+    testWidgets('남은 시간은 적지 않는다', (tester) async {
+      await pumpDetail(tester, awaitingOpen());
+
+      expect(find.textContaining('오픈까지 남은 시간'), findsNothing);
+    });
+
+    testWidgets('마감된 공연은 버튼을 잠그고 마감이라고 적는다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(
+          bookable: false,
+          blockReason: ShowBlockReason.bookingClosed,
+        ),
+      );
+
+      expect(find.text(ShowDetailStrings.bookingClosedNotice), findsOneWidget);
+      expect(find.text(ShowDetailStrings.bookAction), findsNothing);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+    });
+
+    // 마감은 공연이 아직 남아 있는 구간이다. '종료' 가 붙으면 그날 저녁
+    // 공연을 보러 갈 사람이 공연이 없어진 줄 안다.
+    testWidgets('마감을 종료라고 적지 않는다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(
+          bookable: false,
+          blockReason: ShowBlockReason.bookingClosed,
+        ),
+      );
+
+      expect(find.text(ShowDetailStrings.closedNotice), findsNothing);
+      expect(find.text(ShowDetailStrings.onSaleBadge), findsNothing);
+      expect(find.text(ShowDetailStrings.upcomingBadge), findsNothing);
     });
   });
 

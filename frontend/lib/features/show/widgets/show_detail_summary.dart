@@ -10,13 +10,29 @@ class ShowDetailSummary extends StatelessWidget {
   const ShowDetailSummary({
     super.key,
     required this.detail,
-    required this.isOpen,
+    required this.phase,
   });
 
   final ShowDetail detail;
 
-  /// 상태 뱃지가 무엇을 달지. 화면이 기준 시각으로 판정해서 넘긴다.
-  final bool isOpen;
+  /// 이 공연이 지금 어느 단계인지. 화면이 기준 시각으로 판정해서 넘긴다.
+  ///
+  /// 하단 바와 **같은 값**을 받는다. 뱃지가 따로 판정하면 '예매중' 뱃지 밑에
+  /// 잠긴 버튼이 붙는 화면이 나온다.
+  final ShowBookingPhase phase;
+
+  /// 상태 뱃지를 달 단계인지.
+  ///
+  /// `default` 도 `_` 도 두지 않는 이유는 하단 바의 `_lockedLabel` 과 같다 -
+  /// 단계가 하나 늘었을 때 조용히 통과하는 대신 컴파일이 깨지게 둔다.
+  bool get _showsBadge => switch (phase) {
+    ShowBookingPhase.onSale ||
+    ShowBookingPhase.upcoming ||
+    ShowBookingPhase.awaitingOpen => true,
+    ShowBookingPhase.bookingClosed ||
+    ShowBookingPhase.finished ||
+    ShowBookingPhase.canceled => false,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +44,11 @@ class ShowDetailSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 끝난 공연에는 뱃지를 달지 않는다. 오픈 시각은 이미 지났으니 판정만
-        // 보면 '예매중' 이 되는데, 끝난 공연에 그 말이 붙으면 거짓말이 된다.
-        // 대신 하단 바가 잠긴 버튼으로 끝난 공연임을 알린다.
-        if (!detail.isFinished) ...[
-          ShowStatusBadge(isOpen: isOpen),
+        // 하단 바가 버튼을 잠그는 공연에는 뱃지를 달지 않는다. 마감·종료·취소
+        // 모두 오픈 시각은 이미 지났으니 시각만 보면 '예매중' 이 되는데, 살 수
+        // 없는 공연에 그 말이 붙으면 거짓말이 된다. 이유는 잠긴 버튼이 적는다.
+        if (_showsBadge) ...[
+          ShowStatusBadge(isOpen: phase == ShowBookingPhase.onSale),
           const SizedBox(height: ShowDetailMetrics.summaryLineGap),
         ],
         Text(detail.title, style: textTheme.headlineSmall),
