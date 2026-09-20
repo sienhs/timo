@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'core/network/api_client.dart';
@@ -16,7 +18,10 @@ import 'features/booking/data/mock_booking_data.dart';
 import 'features/booking/state/booking_api_scope.dart';
 import 'features/booking/state/booking_controller.dart';
 import 'features/booking/state/booking_scope.dart';
+import 'features/favorite/data/favorite_api.dart';
+import 'features/favorite/data/favorite_artist_store.dart';
 import 'features/favorite/data/favorite_store.dart';
+import 'features/favorite/data/http_favorite_api.dart';
 import 'features/favorite/state/favorite_scope.dart';
 import 'features/home/data/home_api.dart';
 import 'features/home/data/http_home_api.dart';
@@ -60,6 +65,8 @@ class App extends StatefulWidget {
     this.bookingApi,
     this.recentSearchStore,
     this.favoriteStore,
+    this.favoriteApi,
+    this.favoriteArtistStore,
     this.showApi,
     this.ticketStore,
     this.memoryConcertApi,
@@ -96,9 +103,16 @@ class App extends StatefulWidget {
   /// 넘기면(위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
   final RecentSearchStore? recentSearchStore;
 
-  /// 찜 목록 저장소. main 이 기기 저장소 구현을 되살려 넘긴다. 안 넘기면
-  /// (위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
+  /// 찜 목록 저장소. 통째로 넘기면 [favoriteApi]·[favoriteArtistStore] 는
+  /// 쓰이지 않는다. 저장소를 직접 세워 넣는 테스트를 위해 남겨 둔다.
   final FavoriteStore? favoriteStore;
+
+  /// 공연 찜 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는 목을 넣는다.
+  final FavoriteApi? favoriteApi;
+
+  /// 아티스트 찜을 남길 기기 저장소. main 이 기기 설정 저장소 구현을 넘긴다.
+  /// 안 넘기면(위젯 테스트) 메모리 구현이라 앱을 끄면 사라진다.
+  final FavoriteArtistStore? favoriteArtistStore;
 
   /// 공연 상세 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는 목을 넣는다.
   final ShowApi? showApi;
@@ -241,8 +255,22 @@ class _AppState extends State<App> {
 
   /// 찜 목록 저장소. 검색·상세·찜리스트가 같은 목록을 봐야 해서 앱에 하나만
   /// 두고 [FavoriteScope] 로 내려준다.
+  ///
+  /// 공연은 서버([FavoriteApi]), 아티스트는 기기([FavoriteArtistStore])에
+  /// 남는다. main 이 기기 저장소 구현을 넘기고, 안 넘기면(위젯 테스트) 앱을
+  /// 끄면 사라지는 구현을 쓴다.
   late final FavoriteStore _favoriteStore =
-      widget.favoriteStore ?? InMemoryFavoriteStore();
+      widget.favoriteStore ??
+      FavoriteStore(
+        api: widget.favoriteApi ?? HttpFavoriteApi(),
+        artistStore:
+            widget.favoriteArtistStore ?? InMemoryFavoriteArtistStore(),
+      );
+
+  /// 직전에 본 로그인 여부. 세션은 토큰을 새로 받을 때도 알리므로, 로그인
+  /// 여부가 실제로 바뀐 순간만 골라내야 찜 목록 요청이 한 번만 나간다.
+  /// 처음엔 로그아웃으로 두어, 이미 로그인된 채 시작해도 한 번은 받아 온다.
+  bool _wasLoggedIn = false;
 
   /// 소장품 저장소. API 들과 같은 이유로 앱에 하나만 두고 [TicketStoreScope] 로
   /// 내려준다.
@@ -271,6 +299,29 @@ class _AppState extends State<App> {
     super.initState();
     // 맨 앞에 꽂아야 그 뒤의 로그 인터셉터가 Authorization 헤더까지 찍는다.
     ApiClient.dio.interceptors.insert(0, _authInterceptor);
+
+    // 아티스트 찜은 기기에 있다. 검색 결과의 하트가 빨리 맞아야 해서 바로
+    // 읽되, 기다리지는 않는다 — 수 ms 뒤 저장소가 알리면 하트가 채워진다.
+    _favoriteStore.restoreArtists().ignore();
+
+    _session.addListener(_syncFavoriteShows);
+    _syncFavoriteShows();
+  }
+
+  /// 로그인하면 서버에서 찜 공연을 받아 두고, 로그아웃하면 버린다.
+  ///
+  /// 찜리스트를 열기 전에도 검색 결과·공연 상세의 하트가 맞아야 해서 미리
+  /// 받는다. 실패는 삼킨다 — 하트가 빈 채로 시작할 뿐이고, 찜리스트를 열면
+  /// 그 화면이 다시 물어 실패를 알린다.
+  void _syncFavoriteShows() {
+    final isLoggedIn = _session.isLoggedIn;
+    if (isLoggedIn == _wasLoggedIn) return;
+    _wasLoggedIn = isLoggedIn;
+    if (isLoggedIn) {
+      _favoriteStore.loadShows().ignore();
+    } else {
+      _favoriteStore.clearShows();
+    }
   }
 
   /// 첫 화면을 **하나만** 쌓는다.
@@ -295,6 +346,7 @@ class _AppState extends State<App> {
   @override
   void dispose() {
     ApiClient.dio.interceptors.remove(_authInterceptor);
+    _session.removeListener(_syncFavoriteShows);
     _bookingController.dispose();
     _creationJob.dispose();
     // 저장소는 우리가 만든 것(테스트·실패 대비 기본값)만 정리한다. main 이

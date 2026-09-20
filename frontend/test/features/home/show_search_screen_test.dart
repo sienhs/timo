@@ -3,7 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/favorite/constants.dart';
+import 'package:timo/features/favorite/data/favorite_artist_store.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/data/mock_favorite_api.dart';
 import 'package:timo/features/favorite/models/favorite_artist.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/home_api.dart';
@@ -34,8 +40,19 @@ void main() {
 
   late InMemoryRecentSearchStore store;
 
-  /// 하트가 넣고 빼는 찜 목록.
-  late InMemoryFavoriteStore favorites;
+  /// 하트가 넣고 빼는 찜 목록. 공연은 서버(목), 아티스트는 기기에 남는다.
+  late FavoriteStore favorites;
+
+  /// 공연 찜을 들고 있는 가짜 서버.
+  late MockFavoriteApi favoriteApi;
+
+  /// 로그인 상태를 만드는 토큰. 공연 찜은 로그인해야 된다.
+  const tokens = AuthTokens(
+    memberId: 1,
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    accessTokenExpiresIn: Duration(minutes: 30),
+  );
 
   /// 360 x 800 dp
   void usePhoneSize(WidgetTester tester) {
@@ -50,15 +67,26 @@ void main() {
     WidgetTester tester, {
     HomeApi? api,
     List<String>? recent,
+    bool loggedIn = true,
   }) async {
     usePhoneSize(tester);
     store = InMemoryRecentSearchStore(recent);
-    favorites = InMemoryFavoriteStore();
+    favoriteApi = MockFavoriteApi();
+    favorites = FavoriteStore(
+      api: favoriteApi,
+      artistStore: InMemoryFavoriteArtistStore(),
+    );
     addTearDown(favorites.dispose);
+    // 공연 하트는 서버에 남으므로 로그인 상태가 기본이다. 로그아웃 분기는
+    // 따로 검사한다.
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    if (loggedIn) await session.signIn(tokens);
+    addTearDown(session.dispose);
     await tester.pumpWidget(
       App(
         // 로딩 화면을 건너뛰고 홈에서 시작한다.
         initialRoute: AppRoutes.home,
+        session: session,
         homeApi: api ?? MockHomeApi(latency: Duration.zero, clock: () => now),
         recentSearchStore: store,
         favoriteStore: favorites,
@@ -316,12 +344,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(favorites.favorites.shows, hasLength(1));
+      // 서버에도 남는다. 기기를 바꿔도 찜이 따라오는 이유다.
+      expect(favoriteApi.wishedIds, hasLength(1));
       expect(find.byTooltip(HomeStrings.unfavorite), findsOneWidget);
 
       await tester.tap(find.byTooltip(HomeStrings.unfavorite));
       await tester.pumpAndSettle();
 
       expect(favorites.favorites.shows, isEmpty);
+      expect(favoriteApi.wishedIds, isEmpty);
+      expect(find.byTooltip(HomeStrings.unfavorite), findsNothing);
+    });
+
+    testWidgets('로그아웃 상태에서 공연 하트를 누르면 로그인하라고 알린다', (tester) async {
+      await pumpSearch(tester, loggedIn: false);
+      await submit(tester, '아이유');
+
+      await tester.tap(find.byTooltip(HomeStrings.favorite).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      // 서버에 보내지 않았고 하트도 채워지지 않았다.
+      expect(favoriteApi.wishedIds, isEmpty);
       expect(find.byTooltip(HomeStrings.unfavorite), findsNothing);
     });
 

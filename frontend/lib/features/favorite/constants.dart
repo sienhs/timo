@@ -68,6 +68,18 @@ class FavoriteMetrics {
   static const emptyTopGap = 48.0;
 }
 
+/// 찜 API 에 거는 한계값.
+class FavoriteLimits {
+  FavoriteLimits._();
+
+  /// 한 번에 받아 오는 찜 공연 수. 서버가 허용하는 최대치와 같다.
+  ///
+  /// 페이지를 더 넘기는 UI 는 두지 않았다. 100개를 넘게 찜한 사람은 최근
+  /// 100건만 보인다 — 무한 스크롤은 MVP 범위 밖이고, 그 전에 화면의 필터·정렬이
+  /// 기기에 받아 둔 목록을 기준으로 돈다는 점부터 바꿔야 한다.
+  static const showPageSize = 100;
+}
+
 /// 찜리스트 화면 문구.
 class FavoriteStrings {
   FavoriteStrings._();
@@ -108,6 +120,22 @@ class FavoriteStrings {
   /// 하트를 눌러 뺐을 때의 안내와 되돌리기.
   static const removed = '찜리스트에서 뺐어요';
   static const undo = '되돌리기';
+
+  /// 로그아웃 상태에서 공연 하트를 눌렀을 때. 아티스트 찜은 기기에 남으므로
+  /// 로그인 없이도 된다 — 이 안내는 공연에만 뜬다.
+  static const loginRequired = '로그인하고 찜해 보세요';
+  static const login = '로그인';
+
+  /// 찜리스트 공연 탭을 로그아웃 상태로 열었을 때.
+  static const guestShows = '로그인하면 찜한 공연이 보여요';
+  static const guestShowsHint = '찜한 공연은 계정에 저장돼 기기를 바꿔도 남아요';
+
+  /// 서버에 남기지 못했을 때. 서버가 준 문구가 있으면 그쪽을 먼저 쓰고,
+  /// 없을 때(예상 못 한 예외) 이 문구로 대신한다.
+  static const toggleFailed = '찜을 저장하지 못했어요. 잠시 후 다시 시도해주세요.';
+
+  /// 찜 목록 응답이 우리가 아는 모양이 아닐 때(프록시가 HTML 을 준 경우 등).
+  static const unreadableResponse = '찜 목록을 읽지 못했어요.';
 
   /// 아티스트 줄의 초록 보조 문구. 누르면 그 이름으로 공연을 검색한다.
   static const artistSearchAction = '공연 검색하기';

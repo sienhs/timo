@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/features/auth/models/auth_tokens.dart';
+import 'package:timo/features/auth/data/token_storage.dart';
+import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/favorite/constants.dart';
+import 'package:timo/features/favorite/data/favorite_artist_store.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/data/mock_favorite_api.dart';
 import 'package:timo/features/favorite/models/favorite_artist.dart';
 import 'package:timo/features/favorite/models/favorite_show.dart';
-import 'package:timo/features/favorite/models/favorites.dart';
 import 'package:timo/features/favorite/screens/favorite_list_screen.dart';
 import 'package:timo/features/favorite/widgets/favorite_artist_tile.dart';
 import 'package:timo/features/favorite/widgets/favorite_show_card.dart';
@@ -44,12 +49,19 @@ void main() {
   const bigbangArtist = FavoriteArtist(name: 'BIGBANG');
 
   /// 최근 찜한 순: 빅뱅 → 아이유 → 리센느.
-  final seeded = Favorites(
-    shows: [bigbang, iu, rescene],
-    artists: const [iuArtist, bigbangArtist],
+  final seededShows = [bigbang, iu, rescene];
+  const seededArtists = [iuArtist, bigbangArtist];
+
+  /// 로그인 상태를 만드는 토큰. 공연 찜은 서버에 있어 로그인해야 보인다.
+  const tokens = AuthTokens(
+    memberId: 1,
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    accessTokenExpiresIn: Duration(minutes: 30),
   );
 
-  late InMemoryFavoriteStore store;
+  late MockFavoriteApi api;
+  late FavoriteStore store;
   late InMemoryRecentSearchStore recent;
 
   /// 360 x 800 dp
@@ -60,18 +72,32 @@ void main() {
   }
 
   /// 홈 셸의 빠른 메뉴에서 '찜' 을 눌러 찜리스트까지 간다.
+  ///
+  /// [shows] 는 **서버가 들고 있는** 찜 공연, [artists] 는 기기에 남아 있던
+  /// 아티스트다. [loggedIn] 을 끄면 로그아웃 상태로 연다.
   Future<void> pumpFavorites(
     WidgetTester tester, {
-    Favorites favorites = const Favorites(),
+    List<FavoriteShow> shows = const [],
+    List<FavoriteArtist> artists = const [],
+    bool loggedIn = true,
+    bool serverFailing = false,
   }) async {
     usePhoneSize(tester);
-    store = InMemoryFavoriteStore(favorites);
+    api = MockFavoriteApi(shows: shows, failing: serverFailing);
+    store = FavoriteStore(
+      api: api,
+      artistStore: InMemoryFavoriteArtistStore(artists),
+    );
     addTearDown(store.dispose);
+    final session = AuthSession(storage: InMemoryTokenStorage());
+    if (loggedIn) await session.signIn(tokens);
+    addTearDown(session.dispose);
     recent = InMemoryRecentSearchStore();
     await tester.pumpWidget(
       App(
         // 로딩 화면을 건너뛰고 홈에서 시작한다.
         initialRoute: AppRoutes.home,
+        session: session,
         favoriteStore: store,
         recentSearchStore: recent,
         homeApi: MockHomeApi(latency: Duration.zero),
@@ -115,7 +141,7 @@ void main() {
     });
 
     testWidgets('아티스트 탭도 따로 비어 있다고 알린다', (tester) async {
-      await pumpFavorites(tester, favorites: Favorites(shows: [bigbang]));
+      await pumpFavorites(tester, shows: [bigbang]);
 
       await tester.tap(find.text('${FavoriteStrings.artistTab} 0'));
       await tester.pumpAndSettle();
@@ -127,7 +153,7 @@ void main() {
 
   group('공연 탭', () {
     testWidgets('찜한 공연이 최근 찜한 순으로 보이고 탭에 개수가 붙는다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       expect(find.text('${FavoriteStrings.showTab} 3'), findsOneWidget);
       expect(find.text('${FavoriteStrings.artistTab} 2'), findsOneWidget);
@@ -140,7 +166,7 @@ void main() {
     });
 
     testWidgets('판매 종료 칩을 누르면 끝난 공연만 남는다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       await tester.tap(find.text('${FavoriteStrings.filterClosed} 1'));
       await tester.pumpAndSettle();
@@ -155,7 +181,7 @@ void main() {
     });
 
     testWidgets('검색어를 치면 제목에 그 말이 든 공연만 남고, 없으면 검색어를 되비춘다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       await tester.enterText(find.byType(TextField), '아이유');
       await tester.pumpAndSettle();
@@ -172,7 +198,7 @@ void main() {
     });
 
     testWidgets('공연 임박 순으로 바꾸면 시작이 빠른 것부터, 일정 미정은 맨 뒤다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       await tester.tap(find.text(FavoriteStrings.sortRecent));
       await tester.pumpAndSettle();
@@ -183,12 +209,14 @@ void main() {
     });
 
     testWidgets('하트를 누르면 빠지고, 되돌리기로 살린다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       await tester.tap(find.byTooltip(FavoriteStrings.unfavorite).first);
       await tester.pumpAndSettle();
 
       expect(store.favorites.hasShow(bigbang.id), isFalse);
+      // 서버에서도 빠졌다. 화면만 바뀌면 다음에 열 때 되살아난다.
+      expect(api.wishedIds, isNot(contains(bigbang.id)));
       expect(cardTitles(tester), [iu.title, rescene.title]);
       expect(find.text('${FavoriteStrings.showTab} 2'), findsOneWidget);
       expect(find.text(FavoriteStrings.removed), findsOneWidget);
@@ -197,11 +225,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(store.favorites.hasShow(bigbang.id), isTrue);
+      expect(api.wishedIds, contains(bigbang.id));
       expect(find.byType(FavoriteShowCard), findsNWidgets(3));
     });
 
     testWidgets('카드를 누르면 공연 상세가 열린다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 
       await tester.tap(find.text(iu.title));
       await tester.pumpAndSettle();
@@ -210,9 +239,46 @@ void main() {
     });
   });
 
+  group('로그인·불러오기', () {
+    testWidgets('로그아웃 상태면 공연 탭에 로그인 안내가 뜬다', (tester) async {
+      // 서버에 찜이 있어도 물어볼 수 없다. 모든 찜 주소가 로그인을 요구한다.
+      await pumpFavorites(tester, shows: [bigbang], loggedIn: false);
+
+      expect(find.text(FavoriteStrings.guestShows), findsOneWidget);
+      expect(find.text(FavoriteStrings.login), findsOneWidget);
+      expect(find.byType(FavoriteShowCard), findsNothing);
+    });
+
+    testWidgets('로그아웃이어도 아티스트 탭은 그대로다', (tester) async {
+      // 아티스트 찜은 기기에 있다.
+      await pumpFavorites(
+        tester,
+        artists: seededArtists,
+        loggedIn: false,
+      );
+
+      await openArtistTab(tester);
+
+      expect(tileNames(tester), [iuArtist.name, bigbangArtist.name]);
+    });
+
+    testWidgets('목록을 못 받으면 다시 시도가 뜨고, 눌러 되살린다', (tester) async {
+      await pumpFavorites(tester, shows: [bigbang], serverFailing: true);
+
+      expect(find.text(AsyncBoundary.retryLabel), findsOneWidget);
+      expect(find.byType(FavoriteShowCard), findsNothing);
+
+      api.failing = false;
+      await tester.tap(find.text(AsyncBoundary.retryLabel));
+      await tester.pumpAndSettle();
+
+      expect(cardTitles(tester), [bigbang.title]);
+    });
+  });
+
   group('아티스트 탭', () {
     testWidgets('찜한 아티스트가 보이고, 검색어로 좁힐 수 있다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
       await openArtistTab(tester);
 
       expect(find.text(FavoriteStrings.artistCount(2)), findsOneWidget);
@@ -225,7 +291,7 @@ void main() {
     });
 
     testWidgets('탭을 바꾸면 검색어는 비워진다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
       await tester.enterText(find.byType(TextField), '아이유');
       await tester.pumpAndSettle();
 
@@ -239,7 +305,7 @@ void main() {
     });
 
     testWidgets('이름 순으로 바꿀 수 있다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
       await openArtistTab(tester);
 
       await tester.tap(find.text(FavoriteStrings.sortRecent));
@@ -251,7 +317,7 @@ void main() {
     });
 
     testWidgets('하트를 누르면 빠진다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
       await openArtistTab(tester);
 
       await tester.tap(find.byTooltip(FavoriteStrings.unfavorite).first);
@@ -263,7 +329,7 @@ void main() {
     });
 
     testWidgets('줄을 누르면 그 이름으로 검색된 화면이 열리고 최근 검색어에 남는다', (tester) async {
-      await pumpFavorites(tester, favorites: seeded);
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
       await openArtistTab(tester);
 
       await tester.tap(find.text(bigbangArtist.name));
@@ -283,7 +349,7 @@ void main() {
   });
 
   testWidgets('다른 곳에서 찜 목록이 바뀌면 화면도 따라 바뀐다', (tester) async {
-    await pumpFavorites(tester, favorites: Favorites(shows: [bigbang]));
+    await pumpFavorites(tester, shows: [bigbang]);
 
     await store.toggleShow(iu);
     await tester.pumpAndSettle();

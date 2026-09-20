@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/features/favorite/data/favorite_artist_store.dart';
 import 'package:timo/features/favorite/data/favorite_store.dart';
+import 'package:timo/features/favorite/data/mock_favorite_api.dart';
 import 'package:timo/features/favorite/models/favorite_artist.dart';
 import 'package:timo/features/favorite/models/favorite_filters.dart';
 import 'package:timo/features/favorite/models/favorite_show.dart';
@@ -93,26 +96,16 @@ void main() {
       expect(favorites.artists, hasLength(1));
     });
 
-    test('JSON 으로 내보내고 되살리면 같다', () {
-      final favorites = Favorites(
-        shows: [iu, rescene, bigbang],
-        artists: const [
-          FavoriteArtist(name: '아이유', profileImageUrl: 'iu.jpg'),
-          FavoriteArtist(name: 'BIGBANG'),
-        ],
+    test('서버에서 받은 목록으로 공연만 갈아 끼운다', () {
+      const favorites = Favorites(
+        shows: [bigbang],
+        artists: [FavoriteArtist(name: '아이유')],
       );
 
-      expect(Favorites.fromJson(favorites.toJson()), favorites);
-    });
+      final replaced = favorites.withShows([rescene]);
 
-    test('알 수 없는 항목이 섞인 JSON 은 그 항목만 건너뛴다', () {
-      final favorites = Favorites.fromJson({
-        'shows': [bigbang.toJson(), 'garbage', null],
-        'artists': 'not a list',
-      });
-
-      expect(favorites.shows, [bigbang]);
-      expect(favorites.artists, isEmpty);
+      expect(replaced.shows, [rescene]);
+      expect(replaced.artists, favorites.artists);
     });
   });
 
@@ -164,8 +157,23 @@ void main() {
   });
 
   group('FavoriteStore', () {
+    late MockFavoriteApi api;
+    late InMemoryFavoriteArtistStore artistStore;
+    late FavoriteStore store;
+
+    /// [shows] 는 서버가 들고 있는 찜 공연, [artists] 는 기기에 남아 있던 것.
+    void givenStore({
+      List<FavoriteShow> shows = const [],
+      List<FavoriteArtist> artists = const [],
+    }) {
+      api = MockFavoriteApi(shows: shows);
+      artistStore = InMemoryFavoriteArtistStore(artists);
+      store = FavoriteStore(api: api, artistStore: artistStore);
+      addTearDown(store.dispose);
+    }
+
     test('바꾸면 알리고, 같은 목록이면 알리지 않는다', () async {
-      final store = InMemoryFavoriteStore();
+      givenStore();
       var notified = 0;
       store.addListener(() => notified++);
 
@@ -179,8 +187,91 @@ void main() {
       // 찜하지 않은 아티스트의 최신 모습은 목록을 바꾸지 않는다.
       await store.refreshArtists(const [FavoriteArtist(name: '아이유')]);
       expect(notified, 1);
+    });
 
-      store.dispose();
+    test('공연을 찜하면 서버에도 남고, 다시 누르면 서버에서도 빠진다', () async {
+      givenStore();
+
+      await store.toggleShow(bigbang);
+      expect(api.wishedIds, [bigbang.id]);
+
+      await store.toggleShow(bigbang);
+      expect(api.wishedIds, isEmpty);
+      expect(store.favorites.shows, isEmpty);
+    });
+
+    test('하트는 서버 응답을 기다리지 않고 먼저 채워진다', () async {
+      givenStore();
+      api.failing = false;
+
+      final pending = store.toggleShow(iu);
+
+      // 응답 전에 이미 목록에 있다. 검색 결과의 하트가 바로 채워지는 이유다.
+      expect(store.favorites.hasShow(iu.id), isTrue);
+      await pending;
+    });
+
+    test('서버가 거절하면 하트를 되돌리고 그대로 알린다', () async {
+      givenStore();
+      api.failing = true;
+
+      await expectLater(
+        store.toggleShow(bigbang),
+        throwsA(isA<ApiException>()),
+      );
+
+      // 서버에 없는 찜이 채워진 채로 남으면 다음에 앱을 켤 때 조용히 사라진다.
+      expect(store.favorites.hasShow(bigbang.id), isFalse);
+    });
+
+    test('빼기가 실패하면 공연이 목록으로 되돌아온다', () async {
+      givenStore(shows: [bigbang]);
+      await store.loadShows();
+      api.failing = true;
+
+      await expectLater(store.removeShow(bigbang.id), throwsA(anything));
+
+      expect(store.favorites.hasShow(bigbang.id), isTrue);
+    });
+
+    test('서버 목록을 받아 공연만 바꾼다', () async {
+      givenStore(shows: [bigbang, iu], artists: const [
+        FavoriteArtist(name: '아이유'),
+      ]);
+      await store.restoreArtists();
+
+      final shows = await store.loadShows();
+
+      expect(shows.map((show) => show.id), [bigbang.id, iu.id]);
+      expect(store.favorites.shows.map((show) => show.id), [
+        bigbang.id,
+        iu.id,
+      ]);
+      // 아티스트는 기기 것이라 그대로다.
+      expect(store.favorites.artists.single.name, '아이유');
+    });
+
+    test('로그아웃하면 공연만 버리고 아티스트는 남긴다', () async {
+      givenStore(shows: [bigbang], artists: const [
+        FavoriteArtist(name: '아이유'),
+      ]);
+      await store.restoreArtists();
+      await store.loadShows();
+
+      store.clearShows();
+
+      expect(store.favorites.shows, isEmpty);
+      expect(store.favorites.artists, hasLength(1));
+    });
+
+    test('아티스트 찜은 기기에만 남는다', () async {
+      givenStore();
+
+      await store.toggleArtist(const FavoriteArtist(name: '아이유'));
+
+      expect(await artistStore.load(), [const FavoriteArtist(name: '아이유')]);
+      // 아티스트는 서버에 보내지 않는다.
+      expect(api.wishedIds, isEmpty);
     });
   });
 }
