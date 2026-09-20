@@ -22,6 +22,8 @@
 직접 입력하는 DB·JWT·SMS 설정은 Git에서 제외한 `terraform.tfvars`에 둡니다.
 이미지 키·버킷·CDN 주소는 `module.image_storage.runtime_environment`에서 생성하고
 `main.tf`가 기존 설정과 합쳐 Secrets Manager에 저장합니다. tfvars에 이미지 값을 복사하지 않습니다.
+Firebase 푸시는 `FIREBASE_MESSAGING_ENABLED=true` 및 일반 채널
+`PUSH_CHANNEL_GENERAL=timo_general_notifications`를 Terraform 기본값으로 저장하므로, 별도 tfvars 설정이 필요 없습니다.
 
 시크릿 변경은 다음 백엔드 배포 시 컨테이너에 반영됩니다.
 이미지 저장과 JSON 응답 규칙은 [이미지 가이드](docs/images.md)를 참고하세요.
