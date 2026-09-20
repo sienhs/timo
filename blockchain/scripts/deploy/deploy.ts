@@ -80,10 +80,18 @@ export async function deployContracts(
     // AccessControlUnauthorizedAccount and DB/chain state silently drift apart (TicketEntryOnChainService).
     await (await ticketNFT.grantRole(await ticketNFT.GATE_ROLE(), admin)).wait();
     console.log("Granted GATE_ROLE to admin on TicketNFT");
+
+    // Marketplace.buy() is gated by Marketplace's own OPERATOR_ROLE - a separate role instance
+    // from TicketNFT's/TicketVault's OPERATOR_ROLE granted above, even though the name is the
+    // same. Without this, every secondary-market purchase reverts with
+    // AccessControlUnauthorizedAccount.
+    await (await marketplace.grantRole(await marketplace.OPERATOR_ROLE(), admin)).wait();
+    console.log("Granted OPERATOR_ROLE to admin on Marketplace");
   } else {
     console.log(
       `admin (${admin}) is not the deploying account - grant MARKETPLACE_ROLE to ${await marketplace.getAddress()} ` +
-        "on TicketNFT and TicketVault, and ORGANIZER_ROLE/OPERATOR_ROLE to admin, manually before the backend will work"
+        "on TicketNFT and TicketVault, and ORGANIZER_ROLE/OPERATOR_ROLE/GATE_ROLE to admin on TicketNFT/TicketVault/ShowRegistry " +
+        "and OPERATOR_ROLE to admin on Marketplace, manually before the backend will work"
     );
   }
 

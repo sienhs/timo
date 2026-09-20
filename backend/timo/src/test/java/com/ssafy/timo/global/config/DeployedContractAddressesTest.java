@@ -40,6 +40,11 @@ class DeployedContractAddressesTest {
     }
 
     @Test
+    void computesMarketplaceAsTheFourthContractDeployedByThisAccount() {
+        assertThat(addresses.marketplaceAddress()).isEqualToIgnoringCase("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9");
+    }
+
+    @Test
     void differentAdminKeysComputeDifferentAddresses() {
         DeployedContractAddresses other = new DeployedContractAddresses(
                 Credentials.create("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"));
