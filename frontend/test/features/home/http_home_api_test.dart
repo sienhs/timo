@@ -121,6 +121,24 @@ void main() {
       expect(shows.single.ticketOpenAt, isNull);
     });
 
+    test('하루짜리 공연은 날짜를 한 번만 적는다', () async {
+      // 서버는 하루 공연에도 endDate 를 시작일과 같은 날로 채워 준다.
+      final api = build(
+        (_) => jsonResponse(
+          paged([
+            concert(
+              startDate: '2026-11-21T18:00:00',
+              endDate: '2026-11-21T21:00:00',
+            ),
+          ]),
+        ),
+      );
+
+      final show = (await api.fetchPopular()).single;
+
+      expect(show.periodLabel, '2026.11.21');
+    });
+
     test('포스터·일정이 비어 있어도 읽는다', () async {
       final api = build(
         (_) => jsonResponse(

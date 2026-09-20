@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' show Size;
+
 import '../../core/utils/formatters.dart';
 import '../../core/theme/app_metrics.dart';
 import '../../core/widgets/timo_logo.dart';
@@ -32,8 +35,39 @@ class HomeMetrics {
   // 배너 캐러셀
   /// 배너로 올리는 공연 수. 인기 공연 응답의 앞에서부터 이만큼 쓴다.
   static const bannerCount = 3;
-  static const bannerHeight = 160.0;
   static const bannerRadius = 12.0;
+
+  /// 배너 한 장의 비율(가로/세로).
+  ///
+  /// 납작한 배너는 세로 포스터를 심하게 잘라 낸다. 그렇다고 포스터 비율
+  /// (2:3)에 가깝게 세우면 배너 하나가 첫 화면을 다 먹는다. 정사각은 포스터를
+  /// 통째로 넣으면서도 배너가 화면의 절반을 넘지 않는 선이다 — 좌우에 남는
+  /// 자리는 `PosterStage` 가 같은 포스터를 흐리게 깔아 메운다.
+  static const bannerAspectRatio = 1.0;
+
+  /// 배너가 차지할 수 있는 화면 높이의 최대 비율. 세로로 짧은 기기에서
+  /// [bannerAspectRatio] 를 그대로 지키면 첫 화면이 배너로만 차서, 아래에
+  /// 섹션이 더 있다는 걸 알 수 없다.
+  static const bannerMaxHeightFraction = 0.45;
+
+  /// 배너 포스터의 위아래 여백. 상세보다 좁다 — 배너는 아래쪽에 제목 묶음이
+  /// 얹히므로 포스터가 칸을 더 채우는 편이 낫다.
+  static const bannerPosterInset = 10.0;
+
+  /// 배너 제목 묶음의 좌·하단 여백과 줄 간격.
+  static const bannerTextInset = 18.0;
+  static const bannerTextGap = 6.0;
+
+  /// 화면 크기에 맞춘 배너 높이. 카드 폭([bannerViewportFraction] 에서
+  /// 좌우 여백을 뺀 값)에 [bannerAspectRatio] 를 적용하되,
+  /// [bannerMaxHeightFraction] 을 넘지 않게 한다.
+  static double bannerHeightOf(Size screen) {
+    final cardWidth = screen.width * bannerViewportFraction - bannerGap;
+    return math.min(
+      cardWidth / bannerAspectRatio,
+      screen.height * bannerMaxHeightFraction,
+    );
+  }
 
   /// 다음 배너가 오른쪽에 살짝 걸쳐 보이게 하는 비율. 1.0 이면 꽉 차서
   /// 옆으로 넘길 수 있다는 걸 알 수 없다.
@@ -54,7 +88,7 @@ class HomeMetrics {
   /// 원이 그려진다. 칸 모양대로 덮는 둥근 사각형이 시안에 가깝다.
   static const artistCellRadius = 14.0;
 
-  // 공연 카드 (오픈 임박 · 인기 공연 공용)
+  // 공연 카드 (오픈 예정 · 인기 공연 공용)
   static const showCardWidth = 140.0;
   static const showCardGap = 12.0;
 
@@ -154,8 +188,14 @@ class HomeMetrics {
   /// 순위 숫자를 강조색으로 찍는 상위 범위. 시안은 1~3위만 색이 다르다.
   static const trendingHighlightRanks = 3;
 
-  /// 검색 결과 카드. 홈 배너와 같은 모양이되 더 높다.
-  static const searchCardHeight = 200.0;
+  /// 검색 결과 카드 높이. 배너처럼 포스터를 자르지 않고 보여 주되
+  /// ([bannerAspectRatio] 대신 고정 높이), 한 화면에 결과가 두세 건은 보이는
+  /// 선에서 멈춘다. 목록은 훑어보는 화면이라 한 건이 화면을 다 먹으면
+  /// 무엇이 더 있는지 알 수 없다.
+  static const searchCardHeight = 230.0;
+
+  /// 검색 결과 카드 포스터의 위아래 여백. 배너와 같다.
+  static const searchCardPosterInset = bannerPosterInset;
   static const searchCardGap = 12.0;
   static const favoriteIconSize = 24.0;
   static const favoriteButtonInset = 4.0;
@@ -186,13 +226,14 @@ class HomeStrings {
   static const searchEntry = '공연 검색';
 
   static const artistSection = '인기 아티스트';
-  static const ticketOpenSection = '티켓 오픈 임박';
+  static const ticketOpenSection = '티켓 오픈 예정';
   static const ticketOpenMore = '더보기';
   static const popularSection = '인기 공연';
 
-  /// 시안이 이 섹션만 영문 'More' 로 적혀 있다. 오타로 보고 통일하지 않고
-  /// 시안대로 둔다 — 기획 확인 후 [ticketOpenMore] 와 맞추면 된다.
-  static const popularMore = 'More';
+  /// 시안은 이 섹션만 영문 'More' 였다. 기획 확인 후 한글로 맞췄다 — 같은
+  /// 일을 하는 버튼이 섹션마다 다른 말로 불리면 읽는 쪽이 다른 기능인지
+  /// 의심한다. 상수는 섹션별로 남겨 둔다(한쪽만 바뀌는 날이 올 수 있다).
+  static const popularMore = '더보기';
 
   // 검색 화면
   static const back = '뒤로';

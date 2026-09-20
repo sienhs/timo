@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/show_summary.dart';
-import 'show_banner_card.dart';
+import 'home_banner_card.dart';
 
 /// 상단 배너 캐러셀. 옆으로 넘길 수 있다는 걸 알리려고 다음 배너가 오른쪽에
 /// 살짝 걸쳐 보이게 한다([HomeMetrics.bannerViewportFraction]).
+///
+/// 높이는 고정값이 아니라 화면 크기에서 뽑는다([HomeMetrics.bannerHeightOf]).
+/// 배너가 포스터를 자르지 않고 보여 주려면 세로로 길어야 하는데, 길이를
+/// 박아 두면 폭이 넓은 기기에서는 포스터 양옆이 휑하고 세로로 짧은 기기에서는
+/// 배너 하나가 첫 화면을 다 먹는다.
 ///
 /// 자동 넘김은 넣지 않았다. 읽는 중에 화면이 바뀌면 눌러야 할 배너가 도망가고,
 /// 접근성 측면에서도 사용자가 멈출 방법을 함께 줘야 한다. 기획에서 요구하면
@@ -44,7 +49,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
     return Column(
       children: [
         SizedBox(
-          height: HomeMetrics.bannerHeight,
+          height: HomeMetrics.bannerHeightOf(MediaQuery.sizeOf(context)),
           child: PageView.builder(
             controller: _controller,
             onPageChanged: (page) => setState(() => _currentPage = page),
@@ -55,7 +60,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               padding: const EdgeInsets.symmetric(
                 horizontal: HomeMetrics.bannerGap / 2,
               ),
-              child: ShowBannerCard(
+              child: HomeBannerCard(
                 show: widget.banners[index],
                 onPressed: () => widget.onBannerPressed(widget.banners[index]),
               ),
