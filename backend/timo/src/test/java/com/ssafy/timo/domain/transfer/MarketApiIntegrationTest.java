@@ -456,14 +456,14 @@ class MarketApiIntegrationTest {
 
             // 남의 매물을 내가 산다 - PURCHASE 항목이 되어야 한다.
             TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
-            purchase(othersListing, LIST_PRICE).andExpect(status().isAccepted());
+            purchase(othersListing, LIST_PRICE).andExpect(status().isOk());
 
             mvc.perform(get(MARKET_PATH + "/listings/me"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content.length()").value(2))
                     .andExpect(jsonPath("$.content[*].type", containsInAnyOrder("SALE", "PURCHASE")))
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].status", contains("LISTED")))
-                    .andExpect(jsonPath("$.content[?(@.type == 'PURCHASE')].status", contains("PENDING")))
+                    .andExpect(jsonPath("$.content[?(@.type == 'PURCHASE')].status", contains("CONFIRMED")))
                     .andExpect(jsonPath("$.content[?(@.type == 'SALE')].tradeId", contains((Object) null)))
                     .andExpect(jsonPath("$.content[*].seatNo", everyItem(notNullValue())))
                     // 거래 상대도 티켓 식별자도 드러나지 않는다.
@@ -491,7 +491,7 @@ class MarketApiIntegrationTest {
         @BeforeEach
         void trade() throws Exception {
             TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
-            purchase(othersListing, LIST_PRICE).andExpect(status().isAccepted());
+            purchase(othersListing, LIST_PRICE).andExpect(status().isOk());
             tradeId = ticketTradeRepository.findByListingId(othersListing.getId()).orElseThrow().getId();
         }
 
@@ -502,7 +502,7 @@ class MarketApiIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.tradeId").value(tradeId))
                     .andExpect(jsonPath("$.role").value("BUYER"))
-                    .andExpect(jsonPath("$.status").value("PENDING"))
+                    .andExpect(jsonPath("$.status").value("CONFIRMED"))
                     .andExpect(jsonPath("$.concertId").value(concert.getId()))
                     .andExpect(jsonPath("$.concertTitle").value("아이유 콘서트"))
                     .andExpect(jsonPath("$.venueName").value("고척돔"))
@@ -763,13 +763,13 @@ class MarketApiIntegrationTest {
     class Purchase {
 
         @Test
-        @DisplayName("매물을 사면 202 이고 거래는 PENDING 이다 - 온체인이 남아 있다")
+        @DisplayName("매물을 사면 200 이고 거래는 CONFIRMED 다 - 온체인 체결까지 응답 전에 끝난다")
         void purchaseListing() throws Exception {
             TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
 
             purchase(othersListing, LIST_PRICE)
-                    .andExpect(status().isAccepted())
-                    .andExpect(jsonPath("$.status").value("PENDING"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CONFIRMED"))
                     .andExpect(jsonPath("$.price").value(LIST_PRICE))
                     .andExpect(jsonPath("$.tradeId").exists())
                     .andExpect(jsonPath("$.seatNo").value(othersTicket.getReservation().getSeat().getSeatNo()))
@@ -784,7 +784,7 @@ class MarketApiIntegrationTest {
             // othersTicket 의 주인은 buyer 다. 요청자(seller)가 buyer 의 매물을 사는 그림이다.
             TicketListing othersListing = openListing(othersTicket, LIST_PRICE);
 
-            purchase(othersListing, LIST_PRICE).andExpect(status().isAccepted());
+            purchase(othersListing, LIST_PRICE).andExpect(status().isOk());
 
             Long tradeId = ticketTradeRepository.findAll().stream()
                     .filter(trade -> trade.getListing().getId().equals(othersListing.getId()))

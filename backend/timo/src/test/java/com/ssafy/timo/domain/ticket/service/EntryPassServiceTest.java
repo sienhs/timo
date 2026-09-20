@@ -57,6 +57,7 @@ class EntryPassServiceTest {
     @DisplayName("입장 시간대의 내 티켓이면 QR 과 남은 수명을 내려준다")
     void issuesPassForOwnedTicketWithinWindow() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket(CONCERT_START)));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         EntryPassResponseDto response = serviceAt(NOW).issue(MEMBER_ID, TICKET_ID);
 
@@ -90,6 +91,7 @@ class EntryPassServiceTest {
         Ticket ticket = ownedTicket(CONCERT_START);
         ticket.revoke();
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         assertThatThrownBy(() -> serviceAt(NOW).issue(MEMBER_ID, TICKET_ID))
                 .isInstanceOf(TicketStatusNotIssuableException.class);
@@ -100,6 +102,7 @@ class EntryPassServiceTest {
     void rejectsPendingMintTicket() {
         Ticket ticket = Ticket.builder().reservation(reservation(CONCERT_START)).build();
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         assertThatThrownBy(() -> serviceAt(NOW).issue(MEMBER_ID, TICKET_ID))
                 .isInstanceOf(TicketStatusNotIssuableException.class);
@@ -109,6 +112,7 @@ class EntryPassServiceTest {
     @DisplayName("입장 시작 전에는 발급하지 않는다")
     void rejectsBeforeEntryWindow() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket(CONCERT_START)));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         LocalDateTime tooEarly = CONCERT_START.minus(EntryPassService.ENTRY_OPENS_BEFORE_START).minusMinutes(1);
 
@@ -120,6 +124,7 @@ class EntryPassServiceTest {
     @DisplayName("입장 시작 정각부터는 발급된다")
     void issuesAtWindowOpen() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket(CONCERT_START)));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         LocalDateTime windowOpen = CONCERT_START.minus(EntryPassService.ENTRY_OPENS_BEFORE_START);
 
@@ -130,6 +135,7 @@ class EntryPassServiceTest {
     @DisplayName("입장 마감이 지나면 발급하지 않는다")
     void rejectsAfterEntryWindow() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket(CONCERT_START)));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         LocalDateTime tooLate = CONCERT_START.plus(EntryPassService.ENTRY_CLOSES_AFTER_START).plusMinutes(1);
 
@@ -141,6 +147,7 @@ class EntryPassServiceTest {
     @DisplayName("일정이 잡히지 않은 공연이면 시간 검사를 건너뛴다")
     void skipsWindowWhenConcertHasNoStartDate() {
         given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket(null)));
+        given(ticketRepository.countCurrentOwnership(MEMBER_ID, TICKET_ID)).willReturn(1L);
 
         assertThat(serviceAt(NOW).issue(MEMBER_ID, TICKET_ID).token()).isNotBlank();
     }

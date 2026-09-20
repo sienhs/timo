@@ -104,7 +104,7 @@ public class MarketController implements MarketApi {
     }
 
     /**
-     * {@code 202} 다. 응답 시점에는 DB 상 체결만 끝났고 코인 전송·NFT 이전은 아직이다.
+     * {@code 200} 이다. 온체인 체결까지 응답 전에 동기로 끝난다({@link PurchaseService} 참고).
      *
      * <p>{@code Idempotency-Key} 는 규약상 필수라 형식을 검증하지만 <b>아직 저장하지 않는다.</b>
      * 이유는 {@link PurchaseService} 주석을 본다.
@@ -112,6 +112,6 @@ public class MarketController implements MarketApi {
     @Override
     public ResponseEntity<PurchaseResponseDto> purchase(
             Long listingId, String idempotencyKey, PurchaseRequestDto request, Long memberId) {
-        return ResponseEntity.accepted().body(purchaseService.purchase(listingId, request, memberId));
+        return ResponseEntity.ok(purchaseService.purchase(listingId, request, memberId));
     }
 }

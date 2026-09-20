@@ -206,16 +206,17 @@ public interface MarketApi {
                                 @CurrentMember Long memberId);
 
     /**
-     * 매물을 구매한다. 선착순이며 응모·추첨·가격제안은 없다. <b>202</b> 다.
+     * 매물을 구매한다. 선착순이며 응모·추첨·가격제안은 없다. <b>200</b> 이다.
      *
-     * <p>200 이 아닌 이유는 코인 전송과 NFT 소유권 이전이 DB 트랜잭션 밖이기 때문이다. 응답
-     * 시점에는 DB 상 체결만 끝났고 온체인은 아직이다. 진행은 {@code ticket_trade.status} 로
-     * 추적하며, 확인은 별도 폴링 API 가 아니라 {@link #findMyTrades} 에서 읽는다.
+     * <p>온체인 체결(코인 전송 + NFT 소유권 이전)까지 응답 전에 동기로 끝난다 - 200을 받았다는
+     * 것 자체가 체결이 확정됐다는 뜻이다({@code PurchaseService} 참고). 실패하면 매물은 그대로
+     * {@code LISTED}로 남으므로 다시 구매를 시도하면 된다.
      *
      * <p>{@code Idempotency-Key} 로 재시도가 결제를 두 번 일으키지 않게 한다. 클라이언트가 구매
      * 시도마다 UUID 를 만들고, 재시도는 <b>같은 키</b>로 보낸다.
      *
-     * <p>이미 팔렸거나 취소됐으면 409, 가격이 다르면 409, 내 매물이면 409, 매물이 없으면 404 다.
+     * <p>이미 팔렸거나 취소됐으면 409, 가격이 다르면 409, 내 매물이면 409, 매물이 없으면 404,
+     * 온체인 체결이 실패하면 409 다.
      */
     @PostMapping("/listings/{listingId}/purchase")
     ResponseEntity<PurchaseResponseDto> purchase(

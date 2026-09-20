@@ -67,8 +67,9 @@ public class EntryPassService {
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
 
         Reservation reservation = ticket.getReservation();
-        if (!reservation.isOwnedBy(memberId)) {
-            // 남의 티켓은 "권한 없음" 이 아니라 "없음" 이다. TicketNotFoundException 주석 참고.
+        if (ticketRepository.countCurrentOwnership(memberId, ticketId) == 0) {
+            // 최초 예매자가 아니라 지금 소유자로 판정한다 - 양도로 주인이 바뀌면 판 사람은 더 이상
+            // 발급받을 수 없다. 남의 티켓은 "권한 없음" 이 아니라 "없음" 이다(TicketNotFoundException 주석).
             throw new TicketNotFoundException(ticketId);
         }
 

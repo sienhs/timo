@@ -10,9 +10,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.ssafy.timo.domain.blockchain.TicketNftClient;
+import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
+import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
@@ -75,6 +79,14 @@ class MarketHoursGuardTest {
     private MarketHoursService marketHoursService;
     @Mock
     private ListingSoldNotifier listingSoldNotifier;
+    @Mock
+    private TicketNftClient ticketNftClient;
+    @Mock
+    private WalletService walletService;
+    @Mock
+    private BlockchainProperties blockchainProperties;
+    @Mock
+    private TicketTransferService ticketTransferService;
 
     private ListingService listingService;
     private PurchaseService purchaseService;
@@ -83,9 +95,9 @@ class MarketHoursGuardTest {
     @BeforeEach
     void setUp() {
         listingService = new ListingService(ticketRepository, ticketListingRepository, ticketTradeRepository,
-                imageStorage, marketHoursService, CLOCK);
+                imageStorage, marketHoursService, ticketNftClient, walletService, blockchainProperties, CLOCK);
         purchaseService = new PurchaseService(ticketListingRepository, ticketTradeRepository, ticketRepository,
-                marketHoursService, listingSoldNotifier, CLOCK);
+                marketHoursService, listingSoldNotifier, ticketTransferService, blockchainProperties, CLOCK);
         marketQueryService = new MarketQueryService(concertRepository, ticketListingRepository,
                 ticketTradeRepository, imageStorage, marketHoursService, CLOCK);
     }
@@ -148,9 +160,12 @@ class MarketHoursGuardTest {
     @DisplayName("취소는 운영 시간을 묻지 않는다 - 내 매물을 내리는 것은 언제든 가능해야 한다")
     void cancelIgnoresMarketHours() {
         TicketListing listing = mock(TicketListing.class);
+        Ticket ticket = mock(Ticket.class);
         given(listing.isSeller(MEMBER_ID)).willReturn(true);
+        given(listing.getTicketId()).willReturn(TICKET_ID);
         given(ticketListingRepository.findById(LISTING_ID)).willReturn(Optional.of(listing));
         given(ticketListingRepository.markCanceledIfListed(anyLong(), any(LocalDateTime.class))).willReturn(1);
+        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
 
         listingService.cancel(LISTING_ID, MEMBER_ID);
 

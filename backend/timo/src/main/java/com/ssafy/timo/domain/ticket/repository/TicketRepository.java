@@ -96,6 +96,22 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             nativeQuery = true)
     Page<MyTicketRow> findMyTickets(@Param("memberId") Long memberId, Pageable pageable);
 
+    /**
+     * 이 회원이 <b>지금</b> 이 티켓을 가졌으면 1, 아니면 0. {@link com.ssafy.timo.domain.goods.repository.GoodsRepository#countCurrentOwnership}과 같은 조각.
+     *
+     * <p>{@code reservation.member}(최초 예매자)가 아니라 이걸로 판정해야, 양도로 주인이 바뀐 뒤에도
+     * 판 사람이 아니라 산 사람이 입장 QR을 받는다.
+     */
+    @Query(value = """
+            select count(*)
+              from (
+            """ + TicketOwnershipSql.CURRENT_OWNER + """
+                   ) owned
+             where owned.ticket_id = :ticketId
+            """,
+            nativeQuery = true)
+    long countCurrentOwnership(@Param("memberId") Long memberId, @Param("ticketId") Long ticketId);
+
     /** {@link #findTicketIdsByReservationIds}가 돌려주는 (주문, 티켓) 식별자 쌍. */
     interface ReservationTicketId {
 
