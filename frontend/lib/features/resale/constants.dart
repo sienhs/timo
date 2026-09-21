@@ -106,11 +106,6 @@ class ResaleStrings {
   static const closedTitle = '지금은 마켓이 닫혀 있어요';
   static String closedNextOpen(String time) => '다음 오픈은 $time으로 예정되어 있어요';
 
-  /// 등록 버튼 위의 한 줄. 등록은 시간과 무관하게 받지만, 올린 매물은 **등록
-  /// 다음 날** 여는 시각에 한꺼번에 목록에 드러난다(백엔드 `MarketApi` 주석).
-  /// 열린 시간에 올려도 그날은 안 보이므로 열림·닫힘 가리지 않고 알린다.
-  static String registerNotice(String time) => '등록한 매물은 다음 날 $time에 마켓에 올라가요';
-
   /// 운영 시간 밖 요청을 서버가 거절했을 때(409 `MarketClosedException`).
   /// 열린 채로 보다가 닫힌 뒤 구매를 눌렀을 때 받는다.
   static const marketClosedError = '지금은 마켓이 닫혀 있어요. 오픈 후에 다시 시도해주세요.';
@@ -211,9 +206,9 @@ class ResaleStrings {
   static const registerNext = '다음으로';
   static const registerSubmit = '마켓에 등록하기';
 
-  /// 등록 직후. 방금 올린 매물이 목록에 없는 이유를 함께 말한다 — 시각은 서버
-  /// 규칙이라 여기 박지 않고, 정확한 시각은 공연 목록 아래 줄이 서버 값으로 적는다.
-  static const registerSucceeded = '마켓에 등록했어요. 다음 날 오픈 시간에 올라가요';
+  /// 등록 직후. 매물은 등록 즉시 마켓에 올라간다(서버 `market.hours.listing-delay-enabled`
+  /// 가 꺼져 있다). 마켓이 닫힌 시간이면 그 사실은 마켓 화면이 따로 말한다.
+  static const registerSucceeded = '마켓에 등록했어요';
 
   static const priceSectionTitle = '판매 가격';
   static const priceHint = '정가 이하만 등록할 수 있어요';

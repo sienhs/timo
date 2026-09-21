@@ -189,9 +189,9 @@ void main() {
       expect(find.text(ResaleStrings.editPriceSubmit), findsOneWidget);
     });
 
-    // 매물은 등록 다음 날 여는 시각에 올라간다. 방금 올린 매물은 마켓 목록에
-    // 없는데, 그 이유와 시각을 카드가 먼저 말해야 한다.
-    testWidgets('오늘 올린 매물은 판매중 대신 노출 대기 배지와 노출 시각이 붙는다', (tester) async {
+    // 매물은 등록 즉시 마켓에 올라간다. 방금 올린 매물도 어제 올린 매물과
+    // 똑같이 판매중이다 — 따로 대기 상태를 두지 않는다.
+    testWidgets('오늘 올린 매물도 어제 올린 매물과 같이 판매중이다', (tester) async {
       // 목의 시안 매물은 어제 것이라, 오늘(9월 15일) 올린 매물을 하나 더 만든다.
       final resaleApi = MockResaleApi(latency: Duration.zero, clock: now);
       // 목의 응답은 타이머를 타므로(fake async) 시간을 조금 흘려야 돌아온다.
@@ -203,14 +203,7 @@ void main() {
       await tester.pumpAndSettle();
       await openListings(tester);
 
-      // 어제 올린 매물은 판매중, 오늘 올린 매물은 노출 대기다.
-      expect(find.text(TicketStrings.listingBadge), findsOneWidget);
-      expect(find.text(TicketStrings.pendingExposureBadge), findsOneWidget);
-      expect(
-        find.text(TicketStrings.exposureAt('09.16 08:00')),
-        findsOneWidget,
-      );
-      // 노출 대기여도 팔리는 중이라 버튼은 그대로다.
+      expect(find.text(TicketStrings.listingBadge), findsNWidgets(2));
       expect(find.text(TicketStrings.delist), findsNWidgets(2));
     });
 

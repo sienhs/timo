@@ -454,7 +454,6 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         itemBuilder: (_, index) => ListingCard(
           trade: sales[index],
           now: _now,
-          hours: _hours,
           // 마켓이 열려 있는 동안은 가격이 고정이라 버튼을 안 낸다.
           onEditPrice: _hours?.isOpen ?? false
               ? null

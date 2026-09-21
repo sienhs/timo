@@ -133,7 +133,7 @@ class MockResaleApi implements ResaleApi {
     // 한 번으로 하는 일이다 — 매물 0 인 공연은 내보내지 않는다. 시안의 공연
     // 카드에는 `0 건` 이 있지만, 들어가 봐야 빈 화면인 공연은 서버가 주지 않는다.
     final grouped = <int, List<_MockListing>>{};
-    for (final listing in _visibleListings) {
+    for (final listing in _openListings) {
       grouped.putIfAbsent(listing.concertId, () => []).add(listing);
     }
 
@@ -160,7 +160,7 @@ class MockResaleApi implements ResaleApi {
     await _respond();
     _requireOpen();
     return [
-      for (final listing in _visibleListings)
+      for (final listing in _openListings)
         if (listing.concertId == concertId) listing.toSummary(),
     ];
   }
@@ -184,14 +184,6 @@ class MockResaleApi implements ResaleApi {
     // 검사 순서는 서버와 같다. 매물 상태 -> 가격 -> 내 매물.
     if (listing.status != ListingStatus.listed) {
       throw const ApiException('이미 팔렸거나 내려간 매물이에요.', status: 409);
-    }
-    if (!_isVisible(listing)) {
-      // 목록에는 없지만 번호로는 닿는다. 하루 먼저 파는 통로가 되면 안 된다.
-      throw const ApiException(
-        ResaleStrings.listingNotOpenYetError,
-        status: 409,
-        exceptionName: listingNotOpenYetExceptionName,
-      );
     }
     if (listing.price != expectedPrice) {
       throw const ApiException('가격이 바뀌었어요. 다시 확인해주세요.', status: 409);
@@ -351,21 +343,10 @@ class MockResaleApi implements ResaleApi {
     return listing.toDetail(_concertOf(listing.concertId));
   }
 
+  /// 남에게 보이는 매물. 팔리는 중인 것 전부다 — 등록 즉시 목록에 올라간다
+  /// (서버 `market.hours.listing-delay-enabled` 가 꺼져 있다).
   Iterable<_MockListing> get _openListings => (_listings ??= _initialListings())
       .where((listing) => listing.status == ListingStatus.listed);
-
-  /// 남에게 보이는 매물. 팔리는 중이고 **어제까지** 등록된 것이다.
-  ///
-  /// 서버 `MarketHoursService.visibleBefore()` 와 같다 — 매물은 등록 다음 날
-  /// 여는 시각에 올라가는데, 목록은 어차피 그 시각에만 열리니 "오늘 00:00 이전
-  /// 등록" 하나로 판정이 끝난다. 오늘 올린 매물은 내 거래 내역에만 있다.
-  Iterable<_MockListing> get _visibleListings =>
-      _openListings.where(_isVisible);
-
-  bool _isVisible(_MockListing listing) {
-    final now = clock();
-    return listing.listedAt.isBefore(DateTime(now.year, now.month, now.day));
-  }
 
   _MockListing _find(int listingId) {
     final listings = _listings ??= _initialListings();
@@ -442,8 +423,7 @@ class MockResaleApi implements ResaleApi {
   /// (176,000원)와 맞지 않는다. 할인율은 서버가 정가와 등록가에서 계산해 주는
   /// 값이라 여기서도 계산해 넣어, 화면의 세 숫자가 서로 맞게 한다.
   List<_MockListing> _initialListings() {
-    // 어제 등록된 것으로 둔다. 오늘 등록된 매물은 목록에 안 보이므로
-    // ([_visibleListings]), 오늘 시각으로 두면 시안 화면이 비어 버린다.
+    // 어제 등록된 것으로 둔다. 시안의 "등록한 지 하루 된 매물" 모양이다.
     final listedAt = clock().subtract(const Duration(days: 1, hours: 5));
     return [
       _MockListing(

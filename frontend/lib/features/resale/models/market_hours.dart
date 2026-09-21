@@ -76,29 +76,4 @@ class MarketHours {
 
   /// 여는 시각을 `08:00` 처럼 적는다. 닫힘 화면의 안내 문구가 쓴다.
   String get opensAtLabel => formatClock(opensAt);
-
-  /// [listedAt] 에 등록된 매물이 남에게 처음 보이는 시각. 등록 다음 날의 여는
-  /// 시각이다. 서버 `MarketHoursService.visibleFrom()` 과 같다.
-  ///
-  /// 내 거래 내역 응답에는 이 값이 없어 앱이 등록 시각에서 계산한다. 여는
-  /// 시각의 시:분은 서버가 준 [opensAt] 에서 가져온다 — 규칙을 앱에 박지 않는다.
-  DateTime visibleFrom(DateTime listedAt) => DateTime(
-    listedAt.year,
-    listedAt.month,
-    listedAt.day + 1,
-    opensAt.hour,
-    opensAt.minute,
-    opensAt.second,
-  );
-
-  /// [listedAt] 에 등록된 매물이 기기 시각 [deviceNow] 에 남에게 보이는 상태인가.
-  ///
-  /// 서버는 "오늘 00:00 이전에 등록된 매물" 만 목록에 낸다
-  /// (`MarketHoursService.visibleBefore()`). 마켓이 닫혀 있어 지금 당장 목록이
-  /// 안 열리는 것은 모든 매물에 같이 걸리는 일이라 여기서 보지 않는다 — 이 값은
-  /// "이 매물만 아직 안 올라갔는가" 를 가른다. 오늘은 서버 시계 기준이다.
-  bool isListingVisible(DateTime listedAt, DateTime deviceNow) {
-    final today = serverNow(deviceNow);
-    return listedAt.isBefore(DateTime(today.year, today.month, today.day));
-  }
 }

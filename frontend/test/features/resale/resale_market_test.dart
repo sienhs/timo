@@ -126,9 +126,8 @@ void main() {
       expect(find.text('2026 BIGBANG'), findsOneWidget);
       // 첫 공연에 매물 넷을 몰아 둔 목 데이터.
       expect(find.text(ResaleStrings.listingCount(4)), findsOneWidget);
-      // 등록 입구는 늘 있고, 열려 있어도 올린 매물은 다음 날에 보인다고 알린다.
+      // 등록 입구는 늘 있다.
       expect(find.text(ResaleStrings.registerAction), findsOneWidget);
-      expect(find.text(ResaleStrings.registerNotice('08:00')), findsOneWidget);
 
       await closeScreen(tester);
     });
@@ -152,9 +151,7 @@ void main() {
       expect(api.concertCalls, 0);
       expect(api.hoursCalls, 1);
 
-      // 등록은 닫혀 있어도 되므로 버튼이 살아 있고, 올린 매물이 언제 보이는지
-      // 한 줄로 알린다.
-      expect(find.text(ResaleStrings.registerNotice('08:00')), findsOneWidget);
+      // 등록은 닫혀 있어도 되므로 버튼이 살아 있다.
       expect(
         tester
             .widget<FilledButton>(
@@ -458,9 +455,9 @@ void main() {
       await tester.tap(find.text(ResaleStrings.registerSubmit));
       await settle(tester);
 
-      // 등록한 티켓은 목록에서 빠지고, 그 값으로 매물이 생긴다. 다만 마켓
-      // 목록에는 다음 날에야 올라가므로 내 거래 내역에서 확인한다. 목의 응답은
-      // 타이머를 타므로(fake async) 시간을 조금 흘려야 돌아온다.
+      // 등록한 티켓은 목록에서 빠지고, 그 값으로 매물이 생겨 내 거래 내역과
+      // 마켓 목록에 바로 올라간다. 목의 응답은 타이머를 타므로(fake async)
+      // 시간을 조금 흘려야 돌아온다.
       final tickets = api.fetchListableTickets();
       final trades = api.fetchMyTrades();
       final listings = api.fetchListings(4);
@@ -474,7 +471,7 @@ void main() {
       );
       expect(
         (await listings).where((listing) => listing.price == 176000),
-        isEmpty,
+        hasLength(1),
       );
 
       await closeScreen(tester);
