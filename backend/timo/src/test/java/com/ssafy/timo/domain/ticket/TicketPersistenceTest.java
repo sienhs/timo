@@ -22,6 +22,8 @@ import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.support.IntegrationTest;
 import java.math.BigInteger;
+import java.time.LocalDateTime;
+import com.ssafy.timo.domain.ticket.dto.TicketAcquisition;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +70,9 @@ class TicketPersistenceTest {
         assertThat(ticket.getTokenId()).isNull();
         assertThat(ticket.getMintAttemptCount()).isZero();
         assertThat(ticket.getCreatedAt()).isNotNull();
+        assertThat(ticket.getOwnerMemberId()).isEqualTo(ticket.getReservation().getMember().getId());
+        assertThat(ticket.getAcquiredBy()).isEqualTo(TicketAcquisition.BOOKING);
+        assertThat(ticket.getAcquiredAt()).isEqualTo(ticket.getReservation().getCreatedAt());
     }
 
     @Test
@@ -139,6 +144,105 @@ class TicketPersistenceTest {
 
         assertThat(violatedConstraintOf(() -> ticketRepository.saveAndFlush(ticket(reservation))))
                 .isEqualTo("uk_ticket_reservation");
+    }
+
+    @Test
+    @DisplayName("소유자와 OWNED 상태를 DB에서 함께 갱신하며 재양도·되사기도 지원한다")
+    void transferPersistsOwnerAndStatusTogether() {
+        Ticket ticket = ticketRepository.save(ticket(reservation()));
+        Long originalOwner = ticket.getOwnerMemberId();
+        Long buyer = reservation().getMember().getId();
+        LocalDateTime now = LocalDateTime.of(2026, 9, 21, 12, 0);
+        ticket.markMinted(BigInteger.valueOf(777), "0xmint");
+        ticket.markListed();
+        ticketRepository.flush();
+        assertThat(ticketRepository.transferOwnershipIfListed(ticket.getId(), buyer, originalOwner, now)).isZero();
+        assertThat(ticketRepository.transferOwnershipIfListed(ticket.getId(), originalOwner, buyer, now)).isEqualTo(1);
+        Ticket transferred = ticketRepository.findById(ticket.getId()).orElseThrow();
+        assertThat(transferred.getOwnerMemberId()).isEqualTo(buyer);
+        assertThat(transferred.getStatus()).isEqualTo(TicketStatus.OWNED);
+        assertThat(transferred.getAcquiredBy()).isEqualTo(TicketAcquisition.TRANSFER);
+        assertThat(transferred.getAcquiredAt()).isEqualTo(now);
+        assertThat(transferred.getReservation().getMember().getId()).isEqualTo(originalOwner);
+        assertThat(ticketRepository.transferOwnershipIfListed(ticket.getId(), originalOwner, buyer, now)).isZero();
+        ticketRepository.findById(ticket.getId()).orElseThrow().markListed();
+        assertThat(ticketRepository.transferOwnershipIfListed(ticket.getId(), buyer, originalOwner, now.plusMinutes(1))).isEqualTo(1);
+        assertThat(ticketRepository.findById(ticket.getId()).orElseThrow().getOwnerMemberId()).isEqualTo(originalOwner);
+    }
+
+    @Test
+    @DisplayName("등록 상태가 아닌 티켓은 소유자를 이전하지 않는다")
+    void cannotTransferUnlistedTicket() {
+        Ticket ticket = ticketRepository.save(ticket(reservation()));
+        Long buyer = reservation().getMember().getId();
+        assertThat(ticketRepository.transferOwnershipIfListed(ticket.getId(), ticket.getOwnerMemberId(), buyer,
+                LocalDateTime.now())).isZero();
+        assertThat(ticketRepository.findById(ticket.getId()).orElseThrow().getOwnerMemberId()).isEqualTo(ticket.getOwnerMemberId());
+    }
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Test
+    @DisplayName("서로 다른 트랜잭션의 동시 이전은 하나만 커밋되고 새 조회에 반영된다")
+    void competingTransfersCommitOnlyOnce() throws Exception {
+        Ticket ticket = ticketRepository.save(ticket(reservation()));
+        ticket.markMinted(BigInteger.valueOf(991), "0xmint");
+        ticket.markListed();
+        Long ticketId = ticket.getId();
+        Reservation order = ticket.getReservation();
+        Long reservationId = order.getId();
+        Long ownerId = order.getMember().getId();
+        Long seatId = order.getSeat().getId();
+        Long sectionId = order.getSeat().getSection().getId();
+        Long concertId = order.getConcert().getId();
+        Long venueId = order.getConcert().getVenue().getId();
+        Member firstBuyer = memberRepository.save(Member.builder().name("buyer1")
+                .phoneNumber("010" + UUID.randomUUID().toString().substring(0, 8)).nickname("b1" + UUID.randomUUID().toString().substring(0, 8)).build());
+        Member secondBuyer = memberRepository.save(Member.builder().name("buyer2")
+                .phoneNumber("010" + UUID.randomUUID().toString().substring(0, 8)).nickname("b2" + UUID.randomUUID().toString().substring(0, 8)).build());
+        Long firstId = firstBuyer.getId(), secondId = secondBuyer.getId();
+        ticketRepository.flush();
+        org.springframework.test.context.transaction.TestTransaction.flagForCommit();
+        org.springframework.test.context.transaction.TestTransaction.end();
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        LocalDateTime acquiredAt = LocalDateTime.of(2026, 9, 21, 12, 0);
+        try {
+            var first = pool.submit(() -> {
+                start.await();
+                return tx.execute(status -> ticketRepository.transferOwnershipIfListed(ticketId, ownerId, firstId, acquiredAt));
+            });
+            var second = pool.submit(() -> {
+                start.await();
+                return tx.execute(status -> ticketRepository.transferOwnershipIfListed(ticketId, ownerId, secondId, acquiredAt));
+            });
+            start.countDown();
+            int firstResult = first.get(20, java.util.concurrent.TimeUnit.SECONDS);
+            int secondResult = second.get(20, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(firstResult + secondResult).isEqualTo(1);
+            tx.executeWithoutResult(status -> {
+                Ticket persisted = ticketRepository.findById(ticketId).orElseThrow();
+                assertThat(persisted.getOwnerMemberId()).isEqualTo(firstResult == 1 ? firstId : secondId);
+                assertThat(persisted.getStatus()).isEqualTo(TicketStatus.OWNED);
+                assertThat(persisted.getAcquiredAt()).isEqualTo(acquiredAt);
+            });
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+            // 이 테스트에서 커밋한 행만 삭제한다. 기본 롤백 테스트와 데이터를 공유하지 않는다.
+            tx.executeWithoutResult(status -> {
+                ticketRepository.deleteById(ticketId); ticketRepository.flush();
+                reservationRepository.deleteById(reservationId); reservationRepository.flush();
+                seatRepository.deleteById(seatId); seatRepository.flush();
+                sectionRepository.deleteById(sectionId); sectionRepository.flush();
+                concertRepository.deleteById(concertId); concertRepository.flush();
+                venueRepository.deleteById(venueId); venueRepository.flush();
+                memberRepository.deleteAllById(java.util.List.of(ownerId, firstId, secondId));
+            });
+        }
     }
 
     /** 저장을 터뜨리고, 위반된 유니크 제약의 이름을 꺼낸다. */

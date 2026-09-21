@@ -17,6 +17,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.math.BigInteger;
+import java.time.LocalDateTime;
+import jakarta.persistence.PrePersist;
+import com.ssafy.timo.domain.ticket.dto.TicketAcquisition;
 
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -28,7 +31,7 @@ import lombok.NoArgsConstructor;
  * 소유권 기록. {@code Reservation}이 생성되는 트랜잭션 안에서 {@link TicketStatus#PENDING_MINT}로
  * 함께 만들어지고, 비동기 정산({@code ReservationSettlementService})이 그 뒤를 이어받는다.
  *
- * <p>누가/어느 공연/어느 좌석인지는 다시 들고 있지 않는다 - {@link #getReservation()}을 거친다.
+ * <p>최초 주문·공연·좌석은 다시 들고 있지 않는다 - {@link #getReservation()}을 거친다.
  * 정가도 마찬가지로 {@code Reservation.getSeat().getSection().getPrice()}를 그때그때 읽는다
  * (발행 이후 정가는 바뀌지 않는다는 전제).
  *
@@ -55,6 +58,17 @@ public class Ticket extends BaseEntity {
     @JoinColumn(name = "reservation_id", nullable = false)
     private Reservation reservation;
 
+    /** 현재 귀속 회원. 회수·환불 후에는 마지막 귀속 회원을 보존한다. */
+    @Column(name = "owner_member_id", nullable = false)
+    private Long ownerMemberId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "acquired_by", nullable = false, length = 20)
+    private TicketAcquisition acquiredBy;
+
+    @Column(name = "acquired_at", nullable = false)
+    private LocalDateTime acquiredAt;
+
     /** 온체인 NFT의 tokenId. 발행 성공 전엔 null이다. */
     @Column(name = "token_id")
     private BigInteger tokenId;
@@ -78,8 +92,18 @@ public class Ticket extends BaseEntity {
     @Builder
     private Ticket(Reservation reservation) {
         this.reservation = reservation;
+        this.ownerMemberId = reservation.getMember().getId();
+        this.acquiredBy = TicketAcquisition.BOOKING;
+        this.acquiredAt = reservation.getCreatedAt();
         this.status = TicketStatus.PENDING_MINT;
         this.mintAttemptCount = 0;
+    }
+
+    /** 연관 주문의 persist/auditing이 완료된 시각을 취득 시각으로 사용한다. */
+    @PrePersist
+    private void initializeAcquisition() {
+        if (ownerMemberId == null) ownerMemberId = reservation.getMember().getId();
+        if (acquiredAt == null) acquiredAt = reservation.getCreatedAt();
     }
 
     /** 발행이 실제로 성공했을 때. */
@@ -115,11 +139,6 @@ public class Ticket extends BaseEntity {
 
     /** 판매자가 등록을 취소했을 때. */
     public void markDelisted() {
-        this.status = TicketStatus.OWNED;
-    }
-
-    /** 양도 체결이 온체인까지 확정됐을 때. 소유자는 {@code TicketOwnershipSql}이 체결 이력에서 유도한다. */
-    public void markSold() {
         this.status = TicketStatus.OWNED;
     }
 

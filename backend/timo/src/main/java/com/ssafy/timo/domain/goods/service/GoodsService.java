@@ -11,7 +11,7 @@ import com.ssafy.timo.domain.goods.repository.GoodsRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
-import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.ticket.service.TicketOwnershipService;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GoodsService {
 
     private final GoodsRepository goodsRepository;
-    private final TicketRepository ticketRepository;
+    private final TicketOwnershipService ticketOwnershipService;
     private final MemberRepository memberRepository;
     private final GoodsJson goodsJson;
     private final GoodsMapper goodsMapper;
@@ -64,12 +64,7 @@ public class GoodsService {
     }
 
     private GoodsCreateResult createInTransaction(Long memberId, Long ticketId, CreateGoodsCommand command) {
-        if (goodsRepository.countCurrentOwnership(memberId, ticketId) == 0) {
-            // 없는 티켓과 남의 티켓을 구분하지 않는다. GoodsErrorCode 주석 참고.
-            throw new GoodsTicketNotOwnedException(ticketId);
-        }
-
-        Ticket ticket = ticketRepository.findById(ticketId)
+        Ticket ticket = ticketOwnershipService.findAssignedTicket(memberId, ticketId)
                 .orElseThrow(() -> new GoodsTicketNotOwnedException(ticketId));
 
         if (ticket.getStatus() != TicketStatus.USED) {

@@ -5,6 +5,7 @@ import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.ticket.service.TicketOwnershipWriter;
 import com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto;
 import com.ssafy.timo.domain.transfer.dto.PurchaseResponseDto;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
@@ -49,6 +50,7 @@ public class PurchaseService {
     private final TicketTransferService ticketTransferService;
     private final BlockchainProperties blockchainProperties;
     private final Clock clock;
+    private final TicketOwnershipWriter ticketOwnershipWriter;
 
     /**
      * 매물을 산다.
@@ -66,7 +68,7 @@ public class PurchaseService {
      *   <li><b>온체인 체결({@code TicketTransferService.transfer}) - 여기서 실패하면 예외가 그대로
      *       응답을 끝낸다. 아직 DB를 하나도 안 바꿨으므로 롤백할 것도 없다</b></li>
      *   <li>여기까지 왔으면 체인이 확정됐다는 뜻이다. {@code TicketListing}을 {@code SOLD}로,
-     *       {@code Ticket}을 {@code markSold()}로, 체결 기록을 {@code CONFIRMED}로 남긴다</li>
+     *       {@code Ticket}의 소유자와 상태를 조건부 UPDATE로, 체결 기록을 {@code CONFIRMED}로 남긴다</li>
      *   <li>판매자에게 판매 완료 알림</li>
      * </ol>
      *
@@ -129,7 +131,10 @@ public class PurchaseService {
             // 체결을 막으므로). 실제로 나면 체인/DB가 어긋난 것이라 그대로 알린다.
             throw new ListingAlreadyClosedException(listingId);
         }
-        ticket.markSold();
+        if (!ticketOwnershipWriter.transferIfListed(
+                ticket.getId(), listing.getSellerMemberId(), buyerId, now)) {
+            throw new ListingAlreadyClosedException(listingId);
+        }
 
         TicketTrade trade = TicketTrade.record(listing, buyerId, now);
         trade.confirm();
