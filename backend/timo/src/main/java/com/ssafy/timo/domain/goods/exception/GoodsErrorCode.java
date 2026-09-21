@@ -30,7 +30,15 @@ public enum GoodsErrorCode implements BaseErrorCode {
     GOODS_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 굿즈를 만든 티켓입니다."),
 
     /** {@code personLayers} 가 배열이 아니거나, 3개 이상이거나, {@code layerOrder} 가 겹친다. */
-    GOODS_INVALID_LAYERS(HttpStatus.BAD_REQUEST, "인물 레이어 구성이 올바르지 않습니다.");
+    GOODS_INVALID_LAYERS(HttpStatus.BAD_REQUEST, "인물 레이어 구성이 올바르지 않습니다."),
+
+    /**
+     * 생성 요청이 청소 배치가 이미 지운 이미지 key 를 가리킨다. 다시 올리면 되는 상황이라 409 다.
+     *
+     * <p>업로드 API 의 티켓 거절은 새 코드를 만들지 않고 {@link #GOODS_TICKET_NOT_OWNED}·
+     * {@link #GOODS_TICKET_NOT_USED} 를 그대로 쓴다 - 같은 상황에 같은 코드가 나가는 편이 앱에 낫다.
+     */
+    GOODS_IMAGE_DELETED(HttpStatus.CONFLICT, "이미 삭제된 이미지입니다. 다시 올린 뒤 만들어 주세요.");
 
     private final HttpStatus status;
     private final String message;

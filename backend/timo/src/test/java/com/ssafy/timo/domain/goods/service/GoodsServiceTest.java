@@ -3,6 +3,8 @@ package com.ssafy.timo.domain.goods.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -16,18 +18,20 @@ import com.ssafy.timo.domain.goods.dto.CreateGoodsCommand;
 import com.ssafy.timo.domain.goods.dto.GoodsCreateResult;
 import com.ssafy.timo.domain.goods.entity.Goods;
 import com.ssafy.timo.domain.goods.entity.GoodsEffect;
+import com.ssafy.timo.domain.goods.entity.GoodsUploadStatus;
 import com.ssafy.timo.domain.goods.exception.GoodsAlreadyExistsException;
+import com.ssafy.timo.domain.goods.exception.GoodsImageDeletedException;
 import com.ssafy.timo.domain.goods.exception.GoodsInvalidLayersException;
 import com.ssafy.timo.domain.goods.exception.GoodsTicketNotOwnedException;
 import com.ssafy.timo.domain.goods.exception.GoodsTicketNotUsedException;
 import com.ssafy.timo.domain.goods.repository.GoodsRepository;
+import com.ssafy.timo.domain.goods.repository.GoodsUploadRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
-import com.ssafy.timo.domain.ticket.service.TicketOwnershipService;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.global.storage.PlaceholderImageStorage;
 import java.math.BigInteger;
@@ -69,6 +73,9 @@ class GoodsServiceTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private GoodsUploadRepository goodsUploadRepository;
+
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     private GoodsService service;
@@ -79,8 +86,9 @@ class GoodsServiceTest {
         GoodsJson goodsJson = new GoodsJson(mapper);
         GoodsMapper goodsMapper = new GoodsMapper(new PlaceholderImageStorage("https://cdn.example"), goodsJson);
         TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class));
-        service = new GoodsService(goodsRepository, new TicketOwnershipService(ticketRepository), memberRepository,
-                goodsJson, goodsMapper, transactionTemplate);
+        GoodsTicketGuard goodsTicketGuard = new GoodsTicketGuard(ticketRepository);
+        service = new GoodsService(goodsRepository, goodsUploadRepository, memberRepository,
+                goodsTicketGuard, goodsJson, goodsMapper, transactionTemplate);
 
         concert = Concert.builder()
                 .title("아이유 콘서트")
@@ -98,7 +106,8 @@ class GoodsServiceTest {
     @DisplayName("입장 완료한 내 티켓이면 만들고, 공연 스냅샷을 서버가 채운다")
     void createsWithSnapshot() {
         Ticket ticket = usedTicket();
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(ticket));
         given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.empty());
         given(goodsRepository.findByMemberIdAndClientGoodsId(MEMBER_ID, "c-1")).willReturn(Optional.empty());
         given(memberRepository.getReferenceById(MEMBER_ID)).willReturn(member());
@@ -150,6 +159,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("지금 내 티켓이 아니면 404 - 존재 여부를 알리지 않는다")
     void notOwned() {
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(MEMBER_ID, TICKET_ID, command("c-1", validLayers())))
                 .isInstanceOf(GoodsTicketNotOwnedException.class);
@@ -162,7 +173,8 @@ class GoodsServiceTest {
     void notUsed() {
         Ticket ticket = Ticket.builder().reservation(reservation()).build();
         ticket.markMinted(BigInteger.ONE, "0x" + "1".repeat(64));
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(ticket));
 
         assertThatThrownBy(() -> service.create(MEMBER_ID, TICKET_ID, command("c-1", validLayers())))
                 .isInstanceOf(GoodsTicketNotUsedException.class);
@@ -173,7 +185,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("같은 clientGoodsId 재전송이면 저장하지 않고 기존 굿즈를 돌려준다")
     void idempotentRetry() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.of(existingGoods("c-1")));
 
         GoodsCreateResult result = service.create(MEMBER_ID, TICKET_ID, command("c-1", validLayers()));
@@ -186,7 +199,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("이 티켓의 굿즈가 남의 것이면 멱등 키가 같아도 409 - 남의 굿즈를 돌려주지 않는다")
     void otherOwnersGoodsConflicts() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID))
                 .willReturn(Optional.of(existingGoods("c-1", OTHER_MEMBER_ID)));
 
@@ -197,7 +211,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("이미 있는데 다른 clientGoodsId 면 409")
     void differentClientIdConflicts() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.of(existingGoods("c-1")));
 
         assertThatThrownBy(() -> service.create(MEMBER_ID, TICKET_ID, command("c-2", validLayers())))
@@ -207,7 +222,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("같은 clientGoodsId 를 다른 티켓에 이미 썼으면 409 - 유니크 위반으로 500 이 나기 전에 거른다")
     void clientIdReusedOnAnotherTicket() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.empty());
         given(goodsRepository.findByMemberIdAndClientGoodsId(MEMBER_ID, "c-1"))
                 .willReturn(Optional.of(existingGoods("c-1")));
@@ -221,7 +237,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("동시 요청이 유니크 제약에서 지면, 다시 읽어 같은 키면 기존 굿즈를 200 으로 돌려준다")
     void uniqueViolationResolvedAsRetry() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         // 첫 조회 땐 없었고(둘 다 통과), 위반 뒤 다시 읽으면 이긴 쪽이 만든 것이 있다.
         given(goodsRepository.findByTicketId(TICKET_ID))
                 .willReturn(Optional.empty(), Optional.of(existingGoods("c-1")));
@@ -239,7 +256,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("유니크 제약에서 졌는데 이긴 쪽의 키가 다르면 409")
     void uniqueViolationResolvedAsConflict() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID))
                 .willReturn(Optional.empty(), Optional.of(existingGoods("c-other")));
         given(goodsRepository.findByMemberIdAndClientGoodsId(MEMBER_ID, "c-1")).willReturn(Optional.empty());
@@ -254,7 +272,8 @@ class GoodsServiceTest {
     @Test
     @DisplayName("유니크 위반이 굿즈로 설명되지 않으면 원래 예외를 그대로 던진다")
     void unexplainedViolationRethrown() {
-        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID)).willReturn(Optional.of(usedTicket()));
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
         given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.empty());
         given(goodsRepository.findByMemberIdAndClientGoodsId(MEMBER_ID, "c-1")).willReturn(Optional.empty());
         given(memberRepository.getReferenceById(MEMBER_ID)).willReturn(member());
@@ -266,6 +285,35 @@ class GoodsServiceTest {
     }
 
     // ---------------------------------------------------------------- 픽스처
+
+    @Test
+    @DisplayName("청소 배치가 이미 지운 이미지를 가리키면 409 - 깨진 굿즈를 저장하지 않는다")
+    void rejectsDeletedImageKey() {
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
+        given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.empty());
+        given(goodsRepository.findByMemberIdAndClientGoodsId(MEMBER_ID, "c-1")).willReturn(Optional.empty());
+        given(goodsUploadRepository.countByStatus(anyCollection(), eq(GoodsUploadStatus.DELETED)))
+                .willReturn(1L);
+
+        assertThatThrownBy(() -> service.create(MEMBER_ID, TICKET_ID, command("c-1", validLayers())))
+                .isInstanceOf(GoodsImageDeletedException.class);
+
+        verify(goodsRepository, never()).saveAndFlush(any(Goods.class));
+    }
+
+    @Test
+    @DisplayName("멱등 재전송은 대장을 보지 않는다 - 이미 만들어진 굿즈를 그대로 돌려준다")
+    void skipsImageCheckOnIdempotentRetry() {
+        given(ticketRepository.findByIdAndOwnerMemberId(TICKET_ID, MEMBER_ID))
+                .willReturn(Optional.of(usedTicket()));
+        given(goodsRepository.findByTicketId(TICKET_ID)).willReturn(Optional.of(existingGoods("c-1")));
+
+        GoodsCreateResult result = service.create(MEMBER_ID, TICKET_ID, command("c-1", validLayers()));
+
+        assertThat(result.created()).isFalse();
+        verify(goodsUploadRepository, never()).countByStatus(anyCollection(), any(GoodsUploadStatus.class));
+    }
 
     private Ticket usedTicket() {
         Ticket ticket = Ticket.builder().reservation(reservation()).build();

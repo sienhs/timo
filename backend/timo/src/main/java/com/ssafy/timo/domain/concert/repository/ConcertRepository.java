@@ -202,4 +202,23 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
                        and r.status = com.ssafy.timo.domain.reservation.entity.ReservationStatus.PAID)
             """)
     int reopenSoldOut();
+
+    /**
+     * 이 회원이 <b>지금</b> 이 공연의 티켓을 가지고 있으면 1 이상, 아니면 0.
+     *
+     * <p>소재({@code kit})를 볼 자격을 가리는 데 쓴다. 입장 여부는 보지 않는다 - 소재는 제작을
+     * 시작하기 전에 고르는 것이라 공연 전에도 열려 있어야 하고, 만들 수 있는지는 굿즈 쪽이
+     * {@code USED} 로 따로 가린다.
+     *
+     * <p>귀속 판정은 {@code ticket.owner_member_id} 를 그대로 따른다 - 양도되면 그 컬럼이 바뀌므로
+     * 구매자가 소재를 보고 원 예매자는 못 본다.
+     */
+    @Query("""
+            select count(t)
+              from Ticket t
+             where t.reservation.concert.id = :concertId
+               and t.ownerMemberId = :memberId
+            """)
+    long countCurrentOwnershipOfConcert(@Param("memberId") Long memberId,
+                                        @Param("concertId") Long concertId);
 }

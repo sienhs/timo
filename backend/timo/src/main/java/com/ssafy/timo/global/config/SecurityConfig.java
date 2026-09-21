@@ -51,6 +51,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/gates/entries/verify")
                         .hasRole("ADMIN")
 
+                        // 소장품 제작용 소재 등록. 공연을 여는 쪽이 준비하는 자료라 주최사와 운영자만 올린다.
+                        // 조회(GET .../kit)는 티켓 보유자면 되므로 여기 두지 않고 서비스가 가린다.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/concerts/{concertId}/kit/images")
+                        .hasAnyRole("ADMIN", "ORGANIZER")
+
                         // Authenticated endpoints
                         .anyRequest().authenticated()
                 )
