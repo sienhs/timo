@@ -14,7 +14,7 @@ import '../../../core/utils/formatters.dart';
 /// 시각에 더한다([serverNow]). 기기 시계가 몇 분 틀려 있어도 카운트다운은
 /// 서버가 닫는 순간에 0 이 된다.
 ///
-/// [opensAt] · [closesAt] 는 규칙(매일 20:00~23:59:59)이 아니라 구체적인
+/// [opensAt] · [closesAt] 는 규칙(매일 08:00~23:00)이 아니라 구체적인
 /// 일시다. 열려 있으면 이번 창, 닫혀 있으면 다음 창의 시각이라 "닫힘까지" 와
 /// "오픈까지" 를 같은 값([nextBoundary])으로 센다.
 class MarketHours {
@@ -49,7 +49,7 @@ class MarketHours {
   final DateTime opensAt;
 
   /// 열려 있으면 이번 창이 닫히는 시각, 닫혀 있으면 다음 창이 닫히는 시각.
-  /// **포함**이다 — 23:59:59 까지는 열려 있다.
+  /// **포함**이다 — 이 시각 정각까지는 열려 있다(서버 `!now.isAfter(closesAt)`).
   final DateTime closesAt;
 
   /// 이 응답을 받은 기기 시각. [serverNow] 의 기준점이다.
@@ -58,7 +58,7 @@ class MarketHours {
   /// 카운트다운 대상. 열려 있으면 닫히는 순간, 닫혀 있으면 여는 시각.
   ///
   /// [closesAt] 은 마지막으로 열려 있는 초라 닫히는 순간은 그 1초 뒤다.
-  /// [closesAt] 까지 세면 23:59:59 에 0 이 되고, 그때 서버에 다시 물으면
+  /// [closesAt] 까지 세면 닫는 시각 정각에 0 이 되고, 그때 서버에 다시 물으면
   /// 아직 열려 있다고 답해 화면이 열림 상태에 그대로 머문다.
   DateTime get nextBoundary => isOpen ? closesAt.add(_closeGrace) : opensAt;
 
@@ -74,7 +74,7 @@ class MarketHours {
     return left.isNegative ? Duration.zero : left;
   }
 
-  /// 여는 시각을 `20:00` 처럼 적는다. 닫힘 화면의 안내 문구가 쓴다.
+  /// 여는 시각을 `08:00` 처럼 적는다. 닫힘 화면의 안내 문구가 쓴다.
   String get opensAtLabel => formatClock(opensAt);
 
   /// [listedAt] 에 등록된 매물이 남에게 처음 보이는 시각. 등록 다음 날의 여는

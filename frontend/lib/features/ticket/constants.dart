@@ -250,7 +250,7 @@ class TicketStrings {
   /// 카드가 먼저 말한다.
   static const pendingExposureBadge = '노출 대기';
 
-  /// 그 매물이 마켓에 올라가는 시각. (예: `09.16 20:00 마켓 노출`)
+  /// 그 매물이 마켓에 올라가는 시각. (예: `09.16 08:00 마켓 노출`)
   static String exposureAt(String time) => '$time 마켓 노출';
   static const editPrice = '가격 수정';
   static const delist = '등록 취소';

@@ -5,7 +5,6 @@ import '../models/market_concert.dart';
 import '../models/market_hours.dart';
 import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
-import '../models/trade_status.dart';
 
 /// 양도마켓 화면들이 서버에 요청하는 일.
 ///
@@ -72,20 +71,18 @@ abstract class ResaleApi {
   /// [idempotencyKey] 는 한 번의 구매 시도에 하나다. 재시도는 같은 키로 보내야
   /// 결제가 두 번 일어나지 않는다([newIdempotencyKey]).
   ///
-  /// 성공해도 양도가 끝난 것은 아니다. 응답의 상태는 언제나 `PENDING` 이고,
-  /// 소유권 이전은 [fetchTradeStatus] 로 확인한다.
+  /// **성공하면 양도까지 끝나 있다.** 코인 전송과 소유권 이전이 응답 전에
+  /// 동기로 끝나므로(백엔드 `PurchaseService`) 응답의 상태는 언제나
+  /// `CONFIRMED` 다. 끝났는지 따로 물을 일이 없다.
+  ///
+  /// 온체인 체결이 실패하면 `TransferFailedException` 으로 온다. 코인이 모자란
+  /// 경우도 여기 섞여 오지만, 구매 화면이 먼저 잔액을 보고 거르므로 대개
+  /// 여기까지 오지 않는다.
   Future<PurchasedTrade> purchase({
     required int listingId,
     required int expectedPrice,
     required String idempotencyKey,
   });
-
-  /// 체결 한 건의 지금 상태. 결제 완료 화면이 되풀이해 묻는다.
-  ///
-  /// 폴링 전용 주소가 따로 없어 내 거래 내역에서 같은 체결 번호를 찾아 읽는다
-  /// (백엔드 `PurchaseResponseDto` 주석). 그 목록에 없으면(아직 반영 전)
-  /// 진행 중으로 본다.
-  Future<TradeStatus> fetchTradeStatus(int tradeId);
 
   /// 내 거래 내역. 내가 올린 매물(판매)과 내가 산 티켓(구매)이 같은 모양으로
   /// 한 목록에 섞여 온다. 정렬 기준은 [MyTrade.occurredAt] 이다.

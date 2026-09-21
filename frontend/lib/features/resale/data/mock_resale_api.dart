@@ -56,17 +56,10 @@ class MockResaleApi implements ResaleApi {
   final DateTime Function() clock;
 
   /// 마켓이 여는 시각과 닫는 시각(포함). 서버 `market.hours` 기본값
-  /// (20:00:00~23:59:59)을 흉내 낸다. 실제 규칙은 서버 설정이고 앱은 응답으로만
+  /// (08:00:00~23:00:00)을 흉내 낸다. 실제 규칙은 서버 설정이고 앱은 응답으로만
   /// 안다 — 이 값은 목이 그 응답을 만드는 데만 쓴다.
-  static const opensAtHour = 20;
-  static const closesAt = (hour: 23, minute: 59, second: 59);
-
-  /// 내가 산 체결이 온체인까지 끝난 것으로 보이기까지의 시간.
-  ///
-  /// 결제 완료 화면이 '티켓 양도 중' 에서 '티켓 양도 완료' 로 바뀌는 것을
-  /// 보려면 기다릴 시간이 필요하다. 백엔드 스텁의
-  /// `LISTING_SOLD_AFTER_SECONDS`(10초)와 같은 장치다.
-  static const confirmAfter = Duration(seconds: 6);
+  static const opensAtHour = 8;
+  static const closesAt = (hour: 23, minute: 0, second: 0);
 
   List<_MockListing>? _listings;
   List<ListableTicket>? _tickets;
@@ -222,7 +215,8 @@ class MockResaleApi implements ResaleApi {
     return PurchasedTrade(
       tradeId: trade.id,
       listingId: listing.listingId,
-      status: TradeStatus.pending,
+      // 서버가 온체인 체결까지 끝내고 응답하므로 언제나 확정이다.
+      status: TradeStatus.confirmed,
       price: listing.price,
       concertTitle: concert.title,
       venueName: concert.venueName,
@@ -233,20 +227,6 @@ class MockResaleApi implements ResaleApi {
       startAt: concert.startAt,
     );
   }
-
-  @override
-  Future<TradeStatus> fetchTradeStatus(int tradeId) async {
-    await _respond();
-    final trade = _trades[tradeId];
-    return trade == null ? TradeStatus.pending : _tradeStatusOf(trade);
-  }
-
-  /// 체결한 지 [confirmAfter] 가 지났으면 끝난 것으로 본다. 실제 서버에서
-  /// 온체인 전송이 끝나는 것을 시간으로 흉내 낸 것이다.
-  TradeStatus _tradeStatusOf(_MockTrade trade) =>
-      clock().difference(trade.tradedAt) >= confirmAfter
-      ? TradeStatus.confirmed
-      : TradeStatus.pending;
 
   @override
   Future<List<ListableTicket>> fetchListableTickets() async {
@@ -315,14 +295,14 @@ class MockResaleApi implements ResaleApi {
     return trades;
   }
 
-  /// 내가 산 체결 하나를 내 거래 내역 항목으로. 공연·좌석·가격은 산 매물의 것,
-  /// 상태는 체결 시각으로 만든다([_tradeStatusOf]).
+  /// 내가 산 체결 하나를 내 거래 내역 항목으로. 공연·좌석·가격은 산 매물의
+  /// 것이고, 상태는 늘 확정이다 — 체결이 끝나야 응답이 오기 때문이다.
   MyTrade _purchaseOf(_MockTrade trade) {
     final listing = _find(trade.listingId);
     return listing.toMyTrade(
       _concertOf(listing.concertId),
       type: MyTradeType.purchase,
-      status: MyTradeStatus.fromWire(_tradeStatusOf(trade).wireName),
+      status: MyTradeStatus.fromWire(TradeStatus.confirmed.wireName),
       occurredAt: trade.tradedAt,
       tradeId: trade.id,
     );

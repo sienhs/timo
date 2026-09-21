@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/data/mock_wallet_ledger.dart';
+import 'package:timo/features/mypage/models/wallet_summary.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/features/resale/constants.dart';
 import 'package:timo/features/resale/data/mock_resale_api.dart';
 import 'package:timo/features/resale/data/resale_api.dart';
@@ -17,7 +22,6 @@ import 'package:timo/features/resale/models/market_concert.dart';
 import 'package:timo/features/resale/models/market_hours.dart';
 import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/models/purchased_trade.dart';
-import 'package:timo/features/resale/models/trade_status.dart';
 import 'package:timo/features/resale/screens/listing_purchase_complete_screen.dart';
 import 'package:timo/features/resale/screens/listing_purchase_screen.dart';
 import 'package:timo/features/resale/screens/listing_register_screen.dart';
@@ -27,6 +31,7 @@ import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/resale/widgets/listable_ticket_card.dart';
 import 'package:timo/features/resale/widgets/listing_row_card.dart';
 import 'package:timo/features/resale/widgets/market_concert_card.dart';
+import 'package:timo/features/resale/widgets/purchase_transferring_view.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 마켓이 열려 있는 시각과 닫혀 있는 시각. 열림 판정은 가짜 서버(목)가 제
@@ -37,7 +42,11 @@ final _whileOpen = DateTime(
   20,
   MockResaleApi.opensAtHour,
 ).add(const Duration(minutes: 30));
-final _whileClosed = DateTime(2026, 5, 20, 16, 37);
+final _whileClosed = DateTime(2026, 5, 20, 2, 15);
+
+/// 목 지갑에 넣어 두는 잔액. 구매 화면이 결제 전에 잔액을 보고 모자라면 버튼을
+/// 잠그므로, 잔액을 보는 테스트가 아니면 넉넉히 둔다.
+const _plentyBalance = 10000000;
 
 void main() {
   /// 홈 라우트는 뺀다. 이 화면들이 홈으로 돌아갈 일은 여기서 볼 게 아니고,
@@ -71,6 +80,7 @@ void main() {
     required ResaleApi api,
     required Widget home,
     bool loggedIn = true,
+    int balance = _plentyBalance,
   }) async {
     usePhoneSize(tester);
     final session = AuthSession(storage: InMemoryTokenStorage());
@@ -80,9 +90,23 @@ void main() {
     await tester.pumpWidget(
       AuthSessionScope(
         session: session,
-        child: ResaleApiScope(
-          api: api,
-          child: MaterialApp(theme: AppTheme.light, home: home, routes: routes),
+        // 구매 화면이 결제 전에 지갑 잔액을 읽는다. 실제 앱에서도 이 스코프가
+        // 마켓 스코프보다 위에 있다(`App`).
+        child: MyPageApiScope(
+          api: MockMyPageApi(
+            latency: Duration.zero,
+            ledger: MockWalletLedger(
+              initial: WalletSummary(balance: balance, transactions: const []),
+            ),
+          ),
+          child: ResaleApiScope(
+            api: api,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: home,
+              routes: routes,
+            ),
+          ),
         ),
       ),
     );
@@ -104,13 +128,13 @@ void main() {
       expect(find.text(ResaleStrings.listingCount(4)), findsOneWidget);
       // 등록 입구는 늘 있고, 열려 있어도 올린 매물은 다음 날에 보인다고 알린다.
       expect(find.text(ResaleStrings.registerAction), findsOneWidget);
-      expect(find.text(ResaleStrings.registerNotice('20:00')), findsOneWidget);
+      expect(find.text(ResaleStrings.registerNotice('08:00')), findsOneWidget);
 
       await closeScreen(tester);
     });
 
     testWidgets('마켓이 닫혀 있으면 목록 대신 다음 오픈을 알리고, 등록은 열어 둔다', (tester) async {
-      final api = _CountingResaleApi(
+      final api = _SpyResaleApi(
         MockResaleApi(latency: Duration.zero, clock: () => _whileClosed),
       );
       await pump(
@@ -120,9 +144,9 @@ void main() {
       );
 
       expect(find.text(ResaleStrings.closedTitle), findsOneWidget);
-      expect(find.text(ResaleStrings.closedNextOpen('20:00')), findsOneWidget);
-      // 다음 오픈까지 남은 시간(16:37 -> 20:00).
-      expect(find.text('03:23:00'), findsOneWidget);
+      expect(find.text(ResaleStrings.closedNextOpen('08:00')), findsOneWidget);
+      // 다음 오픈까지 남은 시간(02:15 -> 08:00).
+      expect(find.text('05:45:00'), findsOneWidget);
       expect(find.byType(MarketConcertCard), findsNothing);
       // 닫혀 있는 동안에는 목록을 부르지도 않는다. 운영 상태만 묻는다.
       expect(api.concertCalls, 0);
@@ -130,7 +154,7 @@ void main() {
 
       // 등록은 닫혀 있어도 되므로 버튼이 살아 있고, 올린 매물이 언제 보이는지
       // 한 줄로 알린다.
-      expect(find.text(ResaleStrings.registerNotice('20:00')), findsOneWidget);
+      expect(find.text(ResaleStrings.registerNotice('08:00')), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(
@@ -144,7 +168,7 @@ void main() {
     });
 
     testWidgets('로그인하지 않았으면 안내와 로그인 입구만 보인다', (tester) async {
-      final api = _CountingResaleApi(
+      final api = _SpyResaleApi(
         MockResaleApi(latency: Duration.zero, clock: () => _whileOpen),
       );
       await pump(
@@ -250,8 +274,8 @@ void main() {
   });
 
   group('구매', () {
-    testWidgets('매물을 고르면 금액이 보이고, 결제하면 양도 중에서 완료로 바뀐다', (tester) async {
-      var now = _whileOpen;
+    testWidgets('매물을 고르면 금액이 보이고, 결제하면 양도까지 끝난다', (tester) async {
+      final now = _whileOpen;
       await pump(
         tester,
         api: MockResaleApi(latency: Duration.zero, clock: () => now),
@@ -283,16 +307,107 @@ void main() {
 
       expect(find.byType(ListingPurchaseCompleteScreen), findsOneWidget);
       expect(find.text(ResaleStrings.completeTitle), findsOneWidget);
-      // 결제가 끝나도 양도는 아직이다.
-      expect(find.text(ResaleStrings.transferringBadge), findsOneWidget);
-
-      // 온체인 전송이 끝날 만큼 시간이 지나면 배지가 바뀐다.
-      now = now.add(MockResaleApi.confirmAfter);
-      await tester.pump(ResaleMetrics.tradePollInterval);
-      await settle(tester);
-
+      // 체결 응답이 오면 양도까지 끝나 있다. 기다리거나 다시 묻지 않는다.
       expect(find.text(ResaleStrings.transferredBadge), findsOneWidget);
       expect(find.text(ResaleStrings.viewTicketLabel), findsOneWidget);
+
+      await closeScreen(tester);
+    });
+
+    testWidgets('결제하는 동안 화면 전체가 연출이고, 응답이 오면 걷힌다', (tester) async {
+      final now = _whileOpen;
+      await pump(
+        tester,
+        api: MockResaleApi(latency: Duration.zero, clock: () => now),
+        home: MarketConcertsScreen(clock: () => now),
+      );
+
+      await tester.tap(find.text('2026 BIGBANG'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(ListingRowCard, '176,000 MSR'));
+      await settle(tester);
+
+      await tester.tap(find.textContaining(ResaleStrings.purchaseAction));
+      await tester.pump();
+
+      // 서버가 온체인 체결까지 끝내고 답할 때까지가 이 연출이 서 있는 시간이다.
+      // 테스트 환경에는 영상 플러그인이 없어 마스코트가 대신 서는데, 영상이
+      // 없을 때도 화면이 제구실을 하는지 함께 보게 된다.
+      expect(find.byType(PurchaseTransferringView), findsOneWidget);
+      expect(find.text(ResaleStrings.transferringTitle), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      // 완료 화면으로 갈아타는 전환이 끝나야 이 화면이 트리에서 빠진다.
+      await settle(tester);
+      await settle(tester);
+
+      expect(find.byType(ListingPurchaseCompleteScreen), findsOneWidget);
+      expect(find.byType(PurchaseTransferringView), findsNothing);
+
+      await closeScreen(tester);
+    });
+
+    testWidgets('결제가 거절되면 연출이 걷히고 다시 결제할 수 있다', (tester) async {
+      final now = _whileOpen;
+      final api = _SpyResaleApi(
+        MockResaleApi(latency: Duration.zero, clock: () => now),
+      );
+      await pump(
+        tester,
+        api: api,
+        home: MarketConcertsScreen(clock: () => now),
+      );
+
+      await tester.tap(find.text('2026 BIGBANG'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(ListingRowCard, '176,000 MSR'));
+      await settle(tester);
+
+      api.purchaseError = const ApiException('결제하지 못했어요.', status: 500);
+      await tester.tap(find.textContaining(ResaleStrings.purchaseAction));
+      await settle(tester);
+
+      // 연출에 갇히지 않는다. 매물은 성한 채라 결제 버튼도 다시 눌려야 한다 —
+      // 여기서 잠긴 채로 두면 나갔다 들어와야 다시 살 수 있다.
+      expect(find.byType(PurchaseTransferringView), findsNothing);
+      expect(find.byType(ListingPurchaseScreen), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.ancestor(
+                of: find.textContaining(ResaleStrings.purchaseAction),
+                matching: find.byType(FilledButton),
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await closeScreen(tester);
+    });
+
+    testWidgets('잔액이 매물가보다 적으면 결제 버튼이 잠기고 이유가 보인다', (tester) async {
+      final now = _whileOpen;
+      await pump(
+        tester,
+        api: MockResaleApi(latency: Duration.zero, clock: () => now),
+        home: MarketConcertsScreen(clock: () => now),
+        // 176,000 짜리 매물을 살 수 없는 잔액.
+        balance: 100000,
+      );
+
+      await tester.tap(find.text('2026 BIGBANG'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(ListingRowCard, '176,000 MSR'));
+      await settle(tester);
+
+      expect(find.text(ResaleStrings.insufficientBalance), findsOneWidget);
+
+      // 남은 시간이 붙은 결제 버튼 대신 잠긴 버튼이 선다.
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, ResaleStrings.purchaseAction),
+      );
+      expect(button.onPressed, isNull);
 
       await closeScreen(tester);
     });
@@ -418,13 +533,18 @@ void main() {
 ///
 /// "닫혀 있거나 로그인하지 않았으면 서버를 부르지 않는다" 는 화면에 드러나지
 /// 않는 약속이라 이렇게만 확인할 수 있다. 나머지는 그대로 넘긴다.
-class _CountingResaleApi implements ResaleApi {
-  _CountingResaleApi(this._delegate);
+class _SpyResaleApi implements ResaleApi {
+  _SpyResaleApi(this._delegate);
 
   final ResaleApi _delegate;
 
   int hoursCalls = 0;
   int concertCalls = 0;
+
+  /// 심어 두면 [purchase] 가 이걸 던진다. 목만으로는 매물을 성하게 둔 채
+  /// 결제만 실패시킬 수가 없어서 둔다 — 매물이 살아 있어야 실패 뒤에 다시
+  /// 결제할 수 있는지 볼 수 있다.
+  ApiException? purchaseError;
 
   @override
   Future<MarketHours> fetchMarketHours() {
@@ -451,15 +571,15 @@ class _CountingResaleApi implements ResaleApi {
     required int listingId,
     required int expectedPrice,
     required String idempotencyKey,
-  }) => _delegate.purchase(
-    listingId: listingId,
-    expectedPrice: expectedPrice,
-    idempotencyKey: idempotencyKey,
-  );
-
-  @override
-  Future<TradeStatus> fetchTradeStatus(int tradeId) =>
-      _delegate.fetchTradeStatus(tradeId);
+  }) {
+    final error = purchaseError;
+    if (error != null) throw error;
+    return _delegate.purchase(
+      listingId: listingId,
+      expectedPrice: expectedPrice,
+      idempotencyKey: idempotencyKey,
+    );
+  }
 
   @override
   Future<List<ListableTicket>> fetchListableTickets() =>

@@ -10,10 +10,10 @@ import 'package:timo/features/resale/models/trade_status.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
-/// 내 거래 내역·등록 취소·가격 수정이 마켓 API(v1)에 맞는 요청을 보내고 응답을
-/// 제대로 읽는지. 서버 없이 [FakeHttpAdapter] 로 검사한다. 조회·구매는 화면
-/// 테스트가 목으로 덮고 있어, 여기서는 양도 목록 탭이 얹은 요청과 그 위로
-/// 옮긴 체결 상태 확인, 그리고 예매 응답에서 등록 번호를 꺼내는 자리를 본다.
+/// 내 거래 내역·등록 취소·가격 수정·구매가 마켓 API(v1)에 맞는 요청을 보내고
+/// 응답을 제대로 읽는지. 서버 없이 [FakeHttpAdapter] 로 검사한다. 조회는 화면
+/// 테스트가 목으로 덮고 있어, 여기서는 양도 목록 탭이 얹은 요청과 구매 요청이
+/// 들고 가는 것들, 그리고 예매 응답에서 등록 번호를 꺼내는 자리를 본다.
 void main() {
   late FakeHttpAdapter adapter;
   late HttpResaleApi api;
@@ -199,31 +199,57 @@ void main() {
     });
   });
 
-  group('체결 상태 확인', () {
-    // 폴링 전용 주소가 없어 내 거래 내역에서 골라낸다. 이 작업이 그 메서드를
-    // 목록 모델 위로 옮겼으니 결과가 그대로인지 본다.
-    test('같은 체결 번호의 상태를 돌려준다', () async {
-      givenServer(
-        (_) => jsonResponse(
-          paged([
-            tradeJson(),
-            tradeJson(
-              type: 'PURCHASE',
-              tradeId: 42,
-              listingId: 7,
-              status: 'CONFIRMED',
-            ),
-          ]),
-        ),
+  group('구매', () {
+    /// 서버 체결 응답 한 건. 실제 `PurchaseResponseDto` 모양이다.
+    Map<String, dynamic> purchaseJson() => {
+      'tradeId': 42,
+      'listingId': 6,
+      'status': 'CONFIRMED',
+      'price': 132000,
+      'concertTitle': '2026 REMIND: 리센느',
+      'venueName': '올림픽공원 체조경기장',
+      'sectionName': 'R석',
+      'tradedAt': '2026-09-17T21:10:00',
+      'startDate': '2026-10-10T19:00:00',
+      'seatNo': 12,
+      'seatCol': 24,
+    };
+
+    test('본 금액과 멱등키를 실어 보내고 확정된 체결을 받는다', () async {
+      givenServer((_) => jsonResponse(purchaseJson()));
+
+      final trade = await api.purchase(
+        listingId: 6,
+        expectedPrice: 132000,
+        idempotencyKey: 'once',
       );
 
-      expect(await api.fetchTradeStatus(42), TradeStatus.confirmed);
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/v1/market/listings/6/purchase');
+      expect(request.rawBody, contains('132000'));
+      expect(request.headers['Idempotency-Key'], 'once');
+      // 체결이 끝나야 응답이 오므로 상태는 언제나 확정이다.
+      expect(trade.tradeId, 42);
+      expect(trade.status, TradeStatus.confirmed);
     });
 
-    test('목록에 아직 없으면 진행 중으로 본다', () async {
-      givenServer((_) => jsonResponse(paged([tradeJson()])));
+    // 서버는 온체인 체결이 끝날 때까지 붙들고 있다가 답한다(백엔드
+    // `ContractClient` 의 영수증 폴링, 최대 30초). 기본 대기(10초)로 끊으면
+    // 앱만 실패로 돌아서고 결제와 양도는 그대로 끝나, 산 티켓을 못 샀다고 읽는다.
+    test('서버의 온체인 대기보다 오래 기다린다', () async {
+      givenServer((_) => jsonResponse(purchaseJson()));
 
-      expect(await api.fetchTradeStatus(99), TradeStatus.pending);
+      await api.purchase(
+        listingId: 6,
+        expectedPrice: 132000,
+        idempotencyKey: 'once',
+      );
+
+      expect(
+        adapter.requests.single.options.receiveTimeout,
+        ResaleMetrics.onChainTimeout,
+      );
     });
   });
 
@@ -237,6 +263,9 @@ void main() {
       expect(request.method, 'POST');
       expect(request.path, '/api/v1/market/listings/6/cancel');
       expect(request.rawBody, isNull);
+      // 취소도 체인을 탄다(백엔드 `TicketNftClient.delistFor`). 기본 대기로
+      // 끊으면 취소는 끝났는데 앱만 실패로 돌아선다.
+      expect(request.options.receiveTimeout, ResaleMetrics.onChainTimeout);
     });
 
     // 취소 조건은 서버가 최종 판정한다. 화면이 미리 걸러도 시점 차이로 통과할
@@ -441,6 +470,10 @@ void main() {
       expect(request.method, 'POST');
       expect(request.path, '/api/v1/market/listings');
       expect(request.jsonBody, {'ticketId': 501, 'price': 120000});
+      // 등록도 체인을 탄다(백엔드 `TicketNftClient.listForTransferFor`). 기본
+      // 대기로 끊으면 매물은 올라갔는데 앱만 실패로 돌아서고, 다시 올리면
+      // 이번엔 "등록할 수 있는 상태가 아니다" 를 받는다.
+      expect(request.options.receiveTimeout, ResaleMetrics.onChainTimeout);
     });
   });
 }
