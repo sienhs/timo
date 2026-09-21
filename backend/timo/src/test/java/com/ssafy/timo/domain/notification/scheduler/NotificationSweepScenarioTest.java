@@ -2,6 +2,9 @@ package com.ssafy.timo.domain.notification.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.entity.ConcertAlarm;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -25,8 +28,6 @@ import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
-import com.ssafy.timo.domain.wish.entity.ConcertWish;
-import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.math.BigInteger;
@@ -61,7 +62,7 @@ class NotificationSweepScenarioTest {
     private ConcertRepository concertRepository;
 
     @Autowired
-    private ConcertWishRepository wishRepository;
+    private ConcertAlarmRepository alarmRepository;
 
     @Autowired
     private VenueRepository venueRepository;
@@ -222,7 +223,7 @@ class NotificationSweepScenarioTest {
         LocalDateTime openAt = LocalDateTime.of(2026, 10, 4, 20, 0);
         ReflectionTestUtils.setField(concert, "openAt", openAt);
         em.flush();
-        wishMany(concert, 2);
+        subscribeMany(concert, AlarmType.CONCERT_OPEN, 2);
         List<Fire> fires = new ArrayList<>();
 
         fires.addAll(tick(LocalDateTime.of(2026, 9, 27, 8, 55), LocalDateTime.of(2026, 9, 27, 10, 10)));
@@ -236,12 +237,12 @@ class NotificationSweepScenarioTest {
     }
 
     @Test
-    @DisplayName("양도 매물 알림은 마켓 오픈 08:00 주기에 찜한 회원마다 한 번만 나가고, 이튿날 다시 나간다")
+    @DisplayName("양도 매물 알림은 마켓 오픈 08:00 주기에 알림을 신청한 회원마다 한 번만 나가고, 이튿날 다시 나간다")
     void timeline_marketNewListing_firesOncePerDay() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 12, 25, 20, 0));
         listing(concert, LocalDateTime.of(2026, 9, 19, 12, 0));
         listing(concert, LocalDateTime.of(2026, 9, 20, 12, 0));
-        wishMany(concert, 2);
+        subscribeMany(concert, AlarmType.MARKET_LISTING, 2);
         List<Fire> fires = new ArrayList<>();
 
         fires.addAll(tick(LocalDateTime.of(2026, 9, 20, 7, 55), LocalDateTime.of(2026, 9, 20, 9, 10)));
@@ -310,9 +311,9 @@ class NotificationSweepScenarioTest {
         }
     }
 
-    private void wishMany(Concert concert, int count) {
+    private void subscribeMany(Concert concert, AlarmType type, int count) {
         for (int i = 0; i < count; i++) {
-            wishRepository.save(ConcertWish.builder().member(member()).concert(concert).build());
+            alarmRepository.save(ConcertAlarm.builder().member(member()).concert(concert).type(type).build());
         }
     }
 

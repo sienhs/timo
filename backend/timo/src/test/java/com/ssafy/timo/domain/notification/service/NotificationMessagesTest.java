@@ -107,7 +107,7 @@ class NotificationMessagesTest {
         List<String> lines = NotificationMessages.marketNewListing(concerts(count)).lines().toList();
 
         List<String> expected = new ArrayList<>();
-        expected.add("찜한 공연 " + count + "건에 양도 매물이 올라왔어요");
+        expected.add("알림 신청한 공연 " + count + "건에 양도 매물이 올라왔어요");
         for (int i = 1; i <= listed; i++) {
             expected.add("· 공연" + i);
         }
@@ -122,7 +122,7 @@ class NotificationMessagesTest {
     void market_headerCountsAllConcertsNotJustListed() {
         String header = NotificationMessages.marketNewListing(concerts(10)).lines().findFirst().orElseThrow();
 
-        assertThat(header).isEqualTo("찜한 공연 10건에 양도 매물이 올라왔어요");
+        assertThat(header).isEqualTo("알림 신청한 공연 10건에 양도 매물이 올라왔어요");
     }
 
     @Test
@@ -261,7 +261,7 @@ class NotificationMessagesTest {
                 new ListedConcert(longTitle, SOON), new ListedConcert("짧은 공연", SOON.plusDays(1)));
 
         assertThat(NotificationMessages.marketNewListing(input).lines().toList())
-                .containsExactly("찜한 공연 2건에 양도 매물이 올라왔어요", "· " + "가".repeat(30) + "…", "· 짧은 공연");
+                .containsExactly("알림 신청한 공연 2건에 양도 매물이 올라왔어요", "· " + "가".repeat(30) + "…", "· 짧은 공연");
     }
 
     // ---------------------------------------------------------------- 길이 상한

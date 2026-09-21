@@ -7,6 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.entity.ConcertAlarm;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -17,8 +20,6 @@ import com.ssafy.timo.domain.notification.controller.DevNotificationController;
 import com.ssafy.timo.domain.notification.scheduler.NotificationSweepScheduler;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
-import com.ssafy.timo.domain.wish.entity.ConcertWish;
-import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
 import com.ssafy.timo.support.IntegrationTest;
 import java.time.Clock;
 import java.time.Instant;
@@ -60,7 +61,7 @@ class DevNotificationControllerTest {
     private ConcertRepository concertRepository;
 
     @Autowired
-    private ConcertWishRepository wishRepository;
+    private ConcertAlarmRepository alarmRepository;
 
     @Autowired
     private VenueRepository venueRepository;
@@ -102,7 +103,7 @@ class DevNotificationControllerTest {
     @DisplayName("기준 시각을 주면 그 시각인 것처럼 스윕이 돌고 알림이 만들어진다")
     void sweep_withAt_createsNotificationsAsOfThatTime() throws Exception {
         Concert concert = concert("로이킴 콘서트", LocalDateTime.of(2026, 9, 27, 20, 0));
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         mvc.perform(post(PATH).param("at", "2026-09-20T09:00:00"))
                 .andExpect(status().isOk())
@@ -112,14 +113,14 @@ class DevNotificationControllerTest {
                 .andExpect(jsonPath("$.sweeps[?(@.failed == true)]").isEmpty());
 
         assertThat(jdbc.queryForObject("select body from notification where member_id = ?", String.class,
-                wisher.getId())).isEqualTo("로이킴 콘서트 예매가 일주일 뒤 시작돼요");
+                subscriber.getId())).isEqualTo("로이킴 콘서트 예매가 일주일 뒤 시작돼요");
     }
 
     @Test
     @DisplayName("같은 시각으로 다시 부르면 이번에는 0건이다")
     void sweep_calledTwiceWithSameAt_recordsNothingSecondTime() throws Exception {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0));
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         mvc.perform(post(PATH).param("at", "2026-09-20T09:00:00")).andExpect(status().isOk());
         mvc.perform(post(PATH).param("at", "2026-09-20T09:00:00"))
@@ -127,7 +128,7 @@ class DevNotificationControllerTest {
                 .andExpect(jsonPath("$.sweeps[?(@.name == 'CONCERT_OPEN')].recorded").value(0));
 
         assertThat(jdbc.queryForObject("select count(*) from notification where member_id = ?", Long.class,
-                wisher.getId())).isEqualTo(1);
+                subscriber.getId())).isEqualTo(1);
     }
 
     @Test
@@ -149,12 +150,12 @@ class DevNotificationControllerTest {
     @DisplayName("스윕이 만든 알림은 예매 오픈 안내 종류로 저장된다")
     void sweep_savesNotificationOfExpectedType() throws Exception {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0));
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         mvc.perform(post(PATH).param("at", "2026-09-20T09:00:00")).andExpect(status().isOk());
 
         assertThat(jdbc.queryForList("select type from notification where member_id = ?", String.class,
-                wisher.getId())).containsExactly("CONCERT_OPEN_REMINDER");
+                subscriber.getId())).containsExactly("CONCERT_OPEN_REMINDER");
     }
 
     private Concert concert(String title, LocalDateTime openAt) {
@@ -172,14 +173,14 @@ class DevNotificationControllerTest {
                 .build());
     }
 
-    private Member wish(Concert concert) {
+    private Member subscribe(Concert concert) {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         Member member = memberRepository.save(Member.builder()
                 .phoneNumber("010" + suffix.replaceAll("[a-z]", "1"))
                 .name("정희성")
                 .nickname("티모" + suffix)
                 .build());
-        wishRepository.save(ConcertWish.builder().member(member).concert(concert).build());
+        alarmRepository.save(ConcertAlarm.builder().member(member).concert(concert).type(AlarmType.CONCERT_OPEN).build());
         return member;
     }
 }

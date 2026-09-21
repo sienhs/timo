@@ -25,7 +25,7 @@ public enum NotificationType {
     ENTRY_OPEN(LinkType.CONCERT, "ENTRY_OPEN",
             "%s, 지금부터 입장할 수 있어요"),
 
-    /** 예매 오픈 D-7 · D-1 · H-1, 그 공연을 찜한 회원에게. 시점마다 템플릿 인자는 공연명 하나뿐이다. */
+    /** 예매 오픈 D-7 · D-1 · H-1, 그 공연의 예매 오픈 알림을 신청한 회원에게. 시점마다 템플릿 인자는 공연명 하나뿐이다. */
     CONCERT_OPEN_REMINDER(LinkType.CONCERT, "CONCERT_OPEN", Map.of(
             NotificationPhase.D7, "%s 예매가 일주일 뒤 시작돼요",
             NotificationPhase.D1, "%s 예매가 내일 시작돼요",
@@ -40,7 +40,7 @@ public enum NotificationType {
     )),
 
     /**
-     * 찜한 공연에 어제 새 양도 매물이 올라왔을 때, 하루 한 건. 이동 화면은 공연이 하나면 공연 상세,
+     * 양도 매물 알림을 신청한 공연에 어제 새 양도 매물이 올라왔을 때, 하루 한 건. 이동 화면은 공연이 하나면 공연 상세,
      * 여러 개면 마켓 목록이 될 수 있어 아직 확정되지 않았다. 템플릿은 공연이 하나일 때의 한 줄이다.
      */
     MARKET_NEW_LISTING(LinkType.MARKET, "MARKET_NEW_LISTING",

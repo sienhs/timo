@@ -8,6 +8,9 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.entity.ConcertAlarm;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -27,8 +30,6 @@ import com.ssafy.timo.domain.notification.service.NotificationRecorder;
 import com.ssafy.timo.domain.notification.service.NotificationRecorder.Draft;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
-import com.ssafy.timo.domain.wish.entity.ConcertWish;
-import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
 import com.ssafy.timo.global.config.notification.NotificationProperties;
 import com.ssafy.timo.global.firebase.PushDelivery;
 import com.ssafy.timo.global.firebase.PushNotificationSender;
@@ -106,16 +107,16 @@ class NotificationSweepPushPipelineTest {
     private PushDeviceRepository pushDeviceRepository;
 
     @Autowired
-    private ConcertWishRepository wishRepository;
+    private ConcertAlarmRepository alarmRepository;
 
     @Autowired
     private JdbcTemplate jdbc;
 
     private Venue venue;
     private Concert concert;
-    private Member wisher;
-    private String wisherPhoneToken;
-    private String wisherTabletToken;
+    private Member subscriber;
+    private String subscriberPhoneToken;
+    private String subscriberTabletToken;
     private Member bystander;
     private String bystanderToken;
 
@@ -134,12 +135,12 @@ class NotificationSweepPushPipelineTest {
                 .venue(venue)
                 .build());
 
-        wisher = member();
-        wisherPhoneToken = "phone-" + unique;
-        wisherTabletToken = "tablet-" + unique;
-        device(wisher, wisherPhoneToken);
-        device(wisher, wisherTabletToken);
-        wishRepository.save(ConcertWish.builder().member(wisher).concert(concert).build());
+        subscriber = member();
+        subscriberPhoneToken = "phone-" + unique;
+        subscriberTabletToken = "tablet-" + unique;
+        device(subscriber, subscriberPhoneToken);
+        device(subscriber, subscriberTabletToken);
+        alarmRepository.save(ConcertAlarm.builder().member(subscriber).concert(concert).type(AlarmType.CONCERT_OPEN).build());
 
         bystander = member();
         bystanderToken = "bystander-" + unique;
@@ -153,14 +154,14 @@ class NotificationSweepPushPipelineTest {
 
     @AfterEach
     void cleanUp() {
-        for (Member member : List.of(wisher, bystander)) {
+        for (Member member : List.of(subscriber, bystander)) {
             jdbc.update("delete from notification where member_id = ?", member.getId());
             jdbc.update("delete from push_device where member_id = ?", member.getId());
         }
-        jdbc.update("delete from concert_wish where concert_id = ?", concert.getId());
+        jdbc.update("delete from concert_alarm where concert_id = ?", concert.getId());
         jdbc.update("delete from concert where concert_id = ?", concert.getId());
         jdbc.update("delete from venue where venue_id = ?", venue.getId());
-        for (Member member : List.of(wisher, bystander)) {
+        for (Member member : List.of(subscriber, bystander)) {
             jdbc.update("delete from member where member_id = ?", member.getId());
         }
     }
@@ -172,7 +173,7 @@ class NotificationSweepPushPipelineTest {
         jdbc.update("""
                 insert into notification (member_id, type, body, link_type, link_id, dedup_key, created_at, updated_at)
                 values (?, 'ENTRY_OPEN', '예전 알림', 'CONCERT', 1, 'OLD:1', ?, ?)
-                """, wisher.getId(), LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 1, 9, 0));
+                """, subscriber.getId(), LocalDateTime.of(2026, 9, 1, 9, 0), LocalDateTime.of(2026, 9, 1, 9, 0));
 
         List<SweepResult> results = scheduler.runOnce(SEND_TIME);
 
@@ -185,13 +186,13 @@ class NotificationSweepPushPipelineTest {
 
         String inboxBody = jdbc.queryForObject(
                 "select body from notification where member_id = ? and type = 'CONCERT_OPEN_REMINDER'",
-                String.class, wisher.getId());
+                String.class, subscriber.getId());
         Long inboxId = jdbc.queryForObject(
                 "select notification_id from notification where member_id = ? and type = 'CONCERT_OPEN_REMINDER'",
-                Long.class, wisher.getId());
+                Long.class, subscriber.getId());
         assertThat(inboxBody).isEqualTo("로이킴 콘서트 예매가 일주일 뒤 시작돼요");
         assertThat(targets.getValue()).extracting(PushTarget::token)
-                .containsExactlyInAnyOrder(wisherPhoneToken, wisherTabletToken);
+                .containsExactlyInAnyOrder(subscriberPhoneToken, subscriberTabletToken);
         assertThat(targets.getValue()).allSatisfy(target -> {
             assertThat(target.message().body()).isEqualTo(inboxBody);
             assertThat(target.message().data())
@@ -213,7 +214,7 @@ class NotificationSweepPushPipelineTest {
         scheduler.runOnce(SEND_TIME.plusMinutes(1));
 
         verify(sender, after(1500).times(1)).sendEach(anyList(), any());
-        assertThat(count(wisher)).isEqualTo(1);
+        assertThat(count(subscriber)).isEqualTo(1);
     }
 
     @Test
@@ -244,10 +245,10 @@ class NotificationSweepPushPipelineTest {
         ArgumentCaptor<List<PushTarget>> targets = targetCaptor();
         verify(sender, timeout(5000)).sendEach(targets.capture(), any());
         assertThat(targets.getValue()).extracting(PushTarget::token)
-                .containsExactlyInAnyOrder(wisherPhoneToken, wisherTabletToken)
+                .containsExactlyInAnyOrder(subscriberPhoneToken, subscriberTabletToken)
                 .doesNotContain(bystanderToken);
         assertThat(count(bystander)).as("실패한 스윕의 알림은 되돌아간다").isZero();
-        assertThat(count(wisher)).isEqualTo(1);
+        assertThat(count(subscriber)).isEqualTo(1);
         verify(sender, after(1000).times(1)).sendEach(anyList(), any());
     }
 

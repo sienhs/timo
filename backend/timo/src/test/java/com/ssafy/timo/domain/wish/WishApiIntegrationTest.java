@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -152,19 +151,6 @@ class WishApiIntegrationTest {
         assertThatThrownBy(() -> concertWishRepository.saveAndFlush(
                 ConcertWish.builder().member(me).concert(first).build()))
                 .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    @DisplayName("추첨용 조회는 그 공연을 찜한 회원 id 만 준다")
-    void memberIdsByConcert() {
-        concertWishRepository.saveAndFlush(ConcertWish.builder().member(me).concert(first).build());
-        concertWishRepository.saveAndFlush(ConcertWish.builder().member(other).concert(first).build());
-        concertWishRepository.saveAndFlush(ConcertWish.builder().member(other).concert(second).build());
-
-        assertThat(concertWishRepository.findMemberIdsByConcertId(first.getId()))
-                .containsExactlyInAnyOrder(me.getId(), other.getId());
-        assertThat(concertWishRepository.findMemberIdsByConcertId(second.getId()))
-                .containsExactly(other.getId());
     }
 
     private Concert saveConcert(Venue venue, String title) {

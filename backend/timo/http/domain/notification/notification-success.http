@@ -1,22 +1,22 @@
 ###############################################################################
-# 알림 세 종류를 한 흐름으로 확인한다 - 찜한 공연의 새 매물, 공연 2시간 전 입장 안내, 판매 완료
+# 알림 세 종류를 한 흐름으로 확인한다 - 알림 신청한 공연의 새 매물, 공연 2시간 전 입장 안내, 판매 완료
 #
 # local 프로필로 띄우고 우측 상단에서 env 를 local 로 고른다({{baseUrl}}). 앱을 새로 띄운 직후
 # (시드가 새로 만들어진 상태) 한 번 위에서 아래로 돌린다. 스윕 트리거는 local 에만 있다(notification-dev.http).
 #
 # 회원 셋을 쓴다. 시드는 seed001~seed110 에게 공연 3(로이킴) 티켓을 한 장씩 주고, seed180 은 티켓이 없다.
-#   찜한 사람  seed180  공연 3 을 찜한다. 티켓이 없어야 매물 알림을 받는다(보유자는 제외).
+#   알림 신청한 사람  seed180  공연 3 의 양도 매물 알림을 신청한다. 티켓이 없어야 매물 알림을 받는다(보유자는 제외).
 #   판매자     seed002  공연 3 티켓을 매물로 올린다. 자기 매물 알림은 받지 않는다.
 #   구매자     seed001  그 매물을 산다. 판매자에게 판매 완료가 간다.
 #
-# 흐름: 로그인 셋 -> 찜 -> 매물 등록 -> [market-fixture.sql 로 등록 시각을 하루 당김]
-#       -> 마켓 오픈 시각(오늘 08:00) 스윕 -> 찜한 사람 알림함 -> 같은 시각 재실행 0건
+# 흐름: 로그인 셋 -> 알림 신청 -> 매물 등록 -> [market-fixture.sql 로 등록 시각을 하루 당김]
+#       -> 마켓 오픈 시각(오늘 08:00) 스윕 -> 알림 신청한 사람 알림함 -> 같은 시각 재실행 0건
 #       -> 공연 시작 2시간 전 스윕 -> 보유자 알림함 -> 구매 -> 판매자 알림함 -> 같은 매물 재구매 409
 # 매물은 등록 다음 날 08:00 에 올라가므로 스윕도 "어제 등록된 매물" 만 본다. 오늘 등록한 매물로 오늘
 # 알림을 보려면 fixture 로 등록 시각을 당기는 수밖에 없다. 구매는 마켓이 열린 08:00~23:00 에만 된다.
 ###############################################################################
 
-### 로그인 - 찜한 사람 (seed180, 티켓 없음)
+### 로그인 - 알림 신청한 사람 (seed180, 티켓 없음)
 POST {{baseUrl}}/api/v1/auth/login
 X-Device-Id: 11111111-1111-1111-1111-111111111180
 Content-Type: application/json
@@ -30,7 +30,7 @@ Content-Type: application/json
     client.test("로그인", function () {
         client.assert(response.status === 200, "status: " + response.status);
     });
-    client.global.set("wisherToken", response.body.accessToken);
+    client.global.set("subscriberToken", response.body.accessToken);
 %}
 
 ### 로그인 - 판매자 (seed002)
@@ -87,9 +87,9 @@ Authorization: Bearer {{sellerToken}}
     });
 %}
 
-### 찜 - seed180 이 공연 3 을 찜한다 (204)
-PUT {{baseUrl}}/api/v1/wishes/{{concertId}}
-Authorization: Bearer {{wisherToken}}
+### 알림 신청 - seed180 이 공연 3 의 양도 매물 알림을 신청한다 (204)
+PUT {{baseUrl}}/api/v1/alarms/{{concertId}}/MARKET_LISTING
+Authorization: Bearer {{subscriberToken}}
 
 > {%
     client.test("204", function () {
@@ -132,7 +132,7 @@ Authorization: Bearer {{sellerToken}}
     });
 %}
 
-### 스윕 - 마켓 오픈 시각(오늘 08:00). 찜한 사람에게 새 매물 알림 1건
+### 스윕 - 마켓 오픈 시각(오늘 08:00). 알림 신청한 사람에게 새 매물 알림 1건
 POST {{baseUrl}}/api/v1/dev/notifications/sweep?at={{marketOpenAt}}
 
 > {%
@@ -140,13 +140,13 @@ POST {{baseUrl}}/api/v1/dev/notifications/sweep?at={{marketOpenAt}}
         client.assert(response.status === 200, "status: " + response.status);
         var sweep = response.body.sweeps.filter(function (s) { return s.name === "MARKET_NEW_LISTING"; })[0];
         client.assert(sweep.failed === false, "스윕이 실패했다");
-        client.assert(sweep.recorded === 1, "recorded: " + sweep.recorded + " (찜한 사람 한 명이어야 한다)");
+        client.assert(sweep.recorded === 1, "recorded: " + sweep.recorded + " (알림 신청한 사람 한 명이어야 한다)");
     });
 %}
 
-### 찜한 사람 알림함 - 공연이 하나라 공연 상세로 이동한다
+### 알림 신청한 사람 알림함 - 공연이 하나라 공연 상세로 이동한다
 GET {{baseUrl}}/api/v1/notifications?size=10
-Authorization: Bearer {{wisherToken}}
+Authorization: Bearer {{subscriberToken}}
 
 > {%
     client.test("새 매물 알림이 있고 공연 상세로 간다", function () {
@@ -207,7 +207,7 @@ Authorization: Bearer {{buyerToken}}
 
 ### 티켓이 없는 seed180 은 입장 안내를 받지 않는다 - 새 매물 1건 그대로
 GET {{baseUrl}}/api/v1/notifications/unread-count
-Authorization: Bearer {{wisherToken}}
+Authorization: Bearer {{subscriberToken}}
 
 > {%
     client.test("1", function () {
@@ -260,7 +260,7 @@ Authorization: Bearer {{buyerToken}}
 
 ### 같은 매물을 다시 사면 409 - 알림도 두 번 가지 않는다
 POST {{baseUrl}}/api/v1/market/listings/{{listingId}}/purchase
-Authorization: Bearer {{wisherToken}}
+Authorization: Bearer {{subscriberToken}}
 Idempotency-Key: {{$uuid}}
 Content-Type: application/json
 

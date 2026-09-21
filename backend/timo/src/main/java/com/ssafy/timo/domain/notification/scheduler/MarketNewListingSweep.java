@@ -1,5 +1,8 @@
 package com.ssafy.timo.domain.notification.scheduler;
 
+import com.ssafy.timo.domain.alarm.dto.AlarmedConcertRow;
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.notification.entity.LinkType;
 import com.ssafy.timo.domain.notification.entity.NotificationType;
@@ -10,8 +13,6 @@ import com.ssafy.timo.domain.notification.service.NotificationRecorder.Draft;
 import com.ssafy.timo.domain.notification.service.TicketOwnerReader;
 import com.ssafy.timo.domain.transfer.dto.NewListingRow;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
-import com.ssafy.timo.domain.wish.dto.WishedConcertRow;
-import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
 import com.ssafy.timo.global.config.transfer.MarketHoursProperties;
 import com.ssafy.timo.global.config.notification.NotificationProperties;
 import lombok.RequiredArgsConstructor;
@@ -29,13 +30,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 양도 마켓이 열릴 때, 찜한 공연에 어제 새 매물이 올라왔다고 알린다. 회원 한 명에게 하루 한 건이고, 여러
+ * 양도 마켓이 열릴 때, 양도 매물 알림을 신청한 공연에 어제 새 매물이 올라왔다고 알린다. 회원 한 명에게 하루 한 건이고, 여러
  * 공연이면 본문 한 통에 목록으로 묶는다.
  *
  * <pre>
  * 알림 시각  매일 마켓 여는 시각 (market.hours.open-at)
  * 새 매물    어제 00:00 이상 오늘 00:00 미만에 등록됐고 지금도 LISTED 인 매물
- * 대상       그 매물이 있는 공연을 찜한 회원
+ * 대상       그 매물이 있는 공연의 양도 매물 알림({@link AlarmType#MARKET_LISTING})을 신청한 회원. 찜과는 별개다
  * 제외       판매자 본인, 그 공연 티켓을 이미 가진 회원, 취소·종료된 공연, 시작이 2시간 안인 공연
  * 중복 방지  MARKET_NEW_LISTING:{yyyy-MM-dd}
  * 이동 화면  공연이 하나면 그 공연 상세, 여러 개면 마켓 목록
@@ -67,7 +68,7 @@ public class MarketNewListingSweep implements NotificationSweep {
     static final Duration START_CUTOFF = Duration.ofHours(2);
 
     private final TicketListingRepository ticketListingRepository;
-    private final ConcertWishRepository concertWishRepository;
+    private final ConcertAlarmRepository concertAlarmRepository;
     private final TicketOwnerReader ticketOwnerReader;
     private final NotificationRecorder notificationRecorder;
     private final MarketHoursProperties marketHours;
@@ -111,14 +112,15 @@ public class MarketNewListingSweep implements NotificationSweep {
         Map<Long, Set<Long>> holders = ticketOwnerReader.findHolderMemberIds(concertIds).entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
 
-        // 회원마다, 찜했고 판매자도 보유자도 아닌 공연만 모은다.
+        // 회원마다, 알림을 신청했고 판매자도 보유자도 아닌 공연만 모은다.
         Map<Long, List<ConcertWithListings>> concertsByMember = new LinkedHashMap<>();
-        for (WishedConcertRow wish : concertWishRepository.findAllByConcertIdIn(concertIds)) {
-            ConcertWithListings concert = concerts.get(wish.getConcertId());
-            boolean isSeller = concert.sellerIds().contains(wish.getMemberId());
-            boolean isHolder = holders.getOrDefault(wish.getConcertId(), Set.of()).contains(wish.getMemberId());
+        for (AlarmedConcertRow alarm
+                : concertAlarmRepository.findAllByConcertIdInAndType(concertIds, AlarmType.MARKET_LISTING)) {
+            ConcertWithListings concert = concerts.get(alarm.getConcertId());
+            boolean isSeller = concert.sellerIds().contains(alarm.getMemberId());
+            boolean isHolder = holders.getOrDefault(alarm.getConcertId(), Set.of()).contains(alarm.getMemberId());
             if (!isSeller && !isHolder) {
-                concertsByMember.computeIfAbsent(wish.getMemberId(), memberId -> new ArrayList<>()).add(concert);
+                concertsByMember.computeIfAbsent(alarm.getMemberId(), memberId -> new ArrayList<>()).add(concert);
             }
         }
 
@@ -130,7 +132,7 @@ public class MarketNewListingSweep implements NotificationSweep {
         return SweepLimits.recordUpTo(drafts, remaining, notificationRecorder::recordAll);
     }
 
-    /** 공연이 하나면 그 공연으로, 여러 개면 마켓 목록으로 보낸다. 마켓에는 찜한 공연 필터가 없어서다. */
+    /** 공연이 하나면 그 공연으로, 여러 개면 마켓 목록으로 보낸다. 마켓에는 알림 신청한 공연 필터가 없어서다. */
     private static Draft draft(Long memberId, List<ConcertWithListings> concerts, String dedupKey) {
         List<ListedConcert> listed = concerts.stream()
                 .map(concert -> new ListedConcert(concert.title(), concert.startDate()))

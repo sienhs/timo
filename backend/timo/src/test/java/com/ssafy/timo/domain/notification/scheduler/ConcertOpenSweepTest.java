@@ -2,6 +2,9 @@ package com.ssafy.timo.domain.notification.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.entity.ConcertAlarm;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -33,7 +36,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * 예매 오픈 안내가 정해진 날짜와 시각에, 찜한 사람에게만, 한 번씩 나가는지 실제 MySQL 로 확인한다.
+ * 예매 오픈 안내가 정해진 날짜와 시각에, 예매 오픈 알림을 신청한 사람에게만, 한 번씩 나가는지 실제 MySQL 로 확인한다.
  *
  * <p>7일 전과 하루 전은 오픈 시각이 아니라 <b>오픈 날짜</b>의 09:00 에 나간다. 그래서 오픈이 새벽 0시 반이든
  * 밤 11시 59분이든 같은 아침에 나가는지를 따로 본다. 시간 창의 경계는 초 단위로 본다.
@@ -52,6 +55,9 @@ class ConcertOpenSweepTest {
 
     @Autowired
     private ConcertRepository concertRepository;
+
+    @Autowired
+    private ConcertAlarmRepository alarmRepository;
 
     @Autowired
     private ConcertWishRepository wishRepository;
@@ -83,17 +89,17 @@ class ConcertOpenSweepTest {
     }
 
     @Test
-    @DisplayName("7일 전: 오픈 날짜의 7일 전 09:00 에 찜한 회원에게 규약대로 저장된다")
-    void sevenDaysBefore_notifiesWisherWithContractFields() {
+    @DisplayName("7일 전: 오픈 날짜의 7일 전 09:00 에 알림을 신청한 회원에게 규약대로 저장된다")
+    void sevenDaysBefore_notifiesSubscriberWithContractFields() {
         Concert concert = concert("로이킴 콘서트", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         int recorded = sweep.run(NOW, 500);
 
         assertThat(recorded).isEqualTo(1);
         Map<String, Object> row = jdbc.queryForMap(
                 "select body, type, link_type, link_id, dedup_key from notification where member_id = ?",
-                wisher.getId());
+                subscriber.getId());
         assertThat(row.get("body")).isEqualTo("로이킴 콘서트 예매가 일주일 뒤 시작돼요");
         assertThat(row.get("type")).isEqualTo("CONCERT_OPEN_REMINDER");
         assertThat(row.get("link_type")).isEqualTo("CONCERT");
@@ -105,24 +111,24 @@ class ConcertOpenSweepTest {
     @DisplayName("1일 전: 오픈 날짜의 하루 전 09:00 에 나간다")
     void oneDayBefore_notifiesAt0900() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 21, 20, 0), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isEqualTo(1);
 
-        assertThat(bodyOf(wisher)).isEqualTo("공연 예매가 내일 시작돼요");
-        assertThat(keyOf(wisher)).isEqualTo("CONCERT_OPEN_D1:concert=" + concert.getId());
+        assertThat(bodyOf(subscriber)).isEqualTo("공연 예매가 내일 시작돼요");
+        assertThat(keyOf(subscriber)).isEqualTo("CONCERT_OPEN_D1:concert=" + concert.getId());
     }
 
     @Test
     @DisplayName("1시간 전: 오픈 시각의 1시간 전에 나간다")
     void oneHourBefore_notifies() {
         Concert concert = concert("공연", NOW.plusHours(1), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isEqualTo(1);
 
-        assertThat(bodyOf(wisher)).isEqualTo("공연 예매 시작까지 1시간 남았어요");
-        assertThat(keyOf(wisher)).isEqualTo("CONCERT_OPEN_H1:concert=" + concert.getId());
+        assertThat(bodyOf(subscriber)).isEqualTo("공연 예매 시작까지 1시간 남았어요");
+        assertThat(keyOf(subscriber)).isEqualTo("CONCERT_OPEN_H1:concert=" + concert.getId());
     }
 
     @ParameterizedTest(name = "7일 전 알림 시각에서 {0}초 지난 시점이면 대상 {1}")
@@ -135,7 +141,7 @@ class ConcertOpenSweepTest {
     @DisplayName("7일 전 알림의 시간 창 경계를 초 단위로 지킨다")
     void sevenDaysBefore_windowBoundaries(long secondsAfterSend, boolean expectedNotified) {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         int recorded = sweep.run(SEVEN_DAYS_BEFORE_SEND.plusSeconds(secondsAfterSend), 500);
 
@@ -152,7 +158,7 @@ class ConcertOpenSweepTest {
     @DisplayName("1시간 전 알림의 시간 창 경계를 초 단위로 지킨다")
     void oneHourBefore_windowBoundaries(long secondsUntilOpen, boolean expectedNotified) {
         Concert concert = concert("공연", NOW.plusSeconds(secondsUntilOpen), ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         int recorded = sweep.run(NOW, 500);
 
@@ -164,7 +170,7 @@ class ConcertOpenSweepTest {
     @DisplayName("7일 전은 오픈 시각이 아니라 오픈 날짜를 기준으로 09:00 에 나간다")
     void sevenDaysBefore_usesOpenDateNotOpenTime(LocalDateTime openAt) {
         Concert concert = concert("공연", openAt, ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(sweep.run(SEVEN_DAYS_BEFORE_SEND.minusSeconds(1), 500)).as("09:00 전").isZero();
         assertThat(sweep.run(SEVEN_DAYS_BEFORE_SEND, 500)).as("09:00 정각").isEqualTo(1);
@@ -174,7 +180,7 @@ class ConcertOpenSweepTest {
     @DisplayName("오픈 당일 09:00 에는 알림이 없다")
     void openDayMorning_hasNoNotification() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 20, 20, 0), ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isZero();
     }
@@ -183,34 +189,56 @@ class ConcertOpenSweepTest {
     @DisplayName("취소된 공연은 알림이 없다")
     void canceledConcert_isExcluded() {
         Concert concert = concert("취소된 공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.CANCELED);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isZero();
     }
 
     @Test
-    @DisplayName("찜한 회원에게만 가고, 찜하지 않은 회원과 다른 공연을 찜한 회원은 받지 않는다")
-    void onlyWishersOfThatConcert_areNotified() {
+    @DisplayName("알림을 신청한 회원에게만 가고, 신청하지 않은 회원과 다른 공연을 신청한 회원은 받지 않는다")
+    void onlySubscribersOfThatConcert_areNotified() {
         Concert target = concert("대상 공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
         Concert other = concert("다른 공연", LocalDateTime.of(2026, 12, 25, 20, 0), ConcertStatus.SCHEDULED);
-        Member first = wish(target);
-        Member second = wish(target);
-        Member wishesOther = wish(other);
-        member(); // 아무것도 찜하지 않은 회원
+        Member first = subscribe(target);
+        Member second = subscribe(target);
+        Member subscribesOther = subscribe(other);
+        member(); // 아무것도 신청하지 않은 회원
 
         int recorded = sweep.run(NOW, 500);
 
         assertThat(recorded).isEqualTo(2);
         assertThat(notifiedMembers("CONCERT_OPEN_D7", target))
                 .containsExactlyInAnyOrder(first.getId(), second.getId());
-        assertThat(count(wishesOther)).isZero();
+        assertThat(count(subscribesOther)).isZero();
+    }
+
+    @Test
+    @DisplayName("찜만 하고 알림을 신청하지 않은 회원은 받지 않는다 - 찜과 알림은 별개다")
+    void wishWithoutAlarm_isNotNotified() {
+        Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
+        Member onlyWished = member();
+        wishRepository.save(ConcertWish.builder().member(onlyWished).concert(concert).build());
+
+        assertThat(sweep.run(NOW, 500)).isZero();
+        assertThat(count(onlyWished)).isZero();
+    }
+
+    @Test
+    @DisplayName("양도 매물 알림만 신청한 회원은 예매 오픈 알림을 받지 않는다 - 종류는 서로 독립이다")
+    void otherAlarmType_isNotNotified() {
+        Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
+        Member marketOnly = member();
+        alarmRepository.save(alarm(marketOnly, concert, AlarmType.MARKET_LISTING));
+
+        assertThat(sweep.run(NOW, 500)).isZero();
+        assertThat(count(marketOnly)).isZero();
     }
 
     @Test
     @DisplayName("같은 주기를 다시 돌거나 창 안에서 시간이 흘러도 알림은 늘지 않는다")
     void repeatedRuns_doNotDuplicate() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         int first = sweep.run(NOW, 500);
         int again = sweep.run(NOW, 500);
@@ -219,21 +247,21 @@ class ConcertOpenSweepTest {
         assertThat(first).isEqualTo(1);
         assertThat(again).isZero();
         assertThat(later).isZero();
-        assertThat(count(wisher)).isEqualTo(1);
+        assertThat(count(subscriber)).isEqualTo(1);
     }
 
     @Test
     @DisplayName("같은 공연의 7일 전, 1일 전, 1시간 전은 각자의 키로 따로 나간다")
     void eachPhase_isAnIndependentNotification() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         sweep.run(LocalDateTime.of(2026, 9, 20, 9, 0), 500);
         sweep.run(LocalDateTime.of(2026, 9, 26, 9, 0), 500);
         sweep.run(LocalDateTime.of(2026, 9, 27, 19, 0), 500);
 
         assertThat(jdbc.queryForList("select dedup_key from notification where member_id = ? order by notification_id",
-                String.class, wisher.getId()))
+                String.class, subscriber.getId()))
                 .containsExactly(
                         "CONCERT_OPEN_D7:concert=" + concert.getId(),
                         "CONCERT_OPEN_D1:concert=" + concert.getId(),
@@ -245,14 +273,14 @@ class ConcertOpenSweepTest {
     void longOutage_sendsEveryMissedPhaseWithinCatchUp() {
         ConcertOpenSweep weekLong = withCatchUp(Duration.ofDays(7));
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 21, 20, 0), ConcertStatus.SCHEDULED);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         // 7일 전(9/14 09:00)과 1일 전(9/20 09:00) 알림 시각이 모두 지났고 아직 열리지 않았다.
         int recorded = weekLong.run(LocalDateTime.of(2026, 9, 20, 10, 0), 500);
 
         assertThat(recorded).isEqualTo(2);
         assertThat(jdbc.queryForList("select dedup_key from notification where member_id = ?", String.class,
-                wisher.getId()))
+                subscriber.getId()))
                 .containsExactlyInAnyOrder(
                         "CONCERT_OPEN_D7:concert=" + concert.getId(),
                         "CONCERT_OPEN_D1:concert=" + concert.getId());
@@ -263,7 +291,7 @@ class ConcertOpenSweepTest {
     void alreadyOpened_isNeverNotified() {
         ConcertOpenSweep longCatchUp = withCatchUp(Duration.ofHours(5));
         Concert concert = concert("이미 열린 공연", NOW.minusHours(1), ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(longCatchUp.run(NOW, 500)).isZero();
     }
@@ -272,7 +300,7 @@ class ConcertOpenSweepTest {
     @DisplayName("오픈이 한참 뒤인 공연은 알림 시각이 오지 않았으니 보내지 않는다")
     void farFutureOpen_isNotNotified() {
         Concert concert = concert("먼 공연", NOW.plusDays(30), ConcertStatus.SCHEDULED);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isZero();
     }
@@ -281,7 +309,7 @@ class ConcertOpenSweepTest {
     @DisplayName("처리 상한에 닿으면 멈추고, 남은 사람은 다음 주기에 이어서 받으며 중복은 없다")
     void limit_stopsAndContinuesNextRun() {
         Concert concert = concert("공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
-        List<Member> wishers = wishMany(concert, 5);
+        List<Member> subscribers = subscribeMany(concert, 5);
 
         int first = sweep.run(NOW, 2);
         int second = sweep.run(NOW.plusMinutes(1), 2);
@@ -290,7 +318,7 @@ class ConcertOpenSweepTest {
 
         assertThat(List.of(first, second, third, fourth)).containsExactly(2, 2, 1, 0);
         assertThat(notifiedMembers("CONCERT_OPEN_D7", concert))
-                .containsExactlyInAnyOrderElementsOf(wishers.stream().map(Member::getId).toList());
+                .containsExactlyInAnyOrderElementsOf(subscribers.stream().map(Member::getId).toList());
     }
 
     @Test
@@ -298,8 +326,8 @@ class ConcertOpenSweepTest {
     void limit_isSharedAcrossConcertsAndPhases() {
         Concert sevenDay = concert("7일 전 공연", LocalDateTime.of(2026, 9, 27, 20, 0), ConcertStatus.SCHEDULED);
         Concert oneDay = concert("1일 전 공연", LocalDateTime.of(2026, 9, 21, 20, 0), ConcertStatus.SCHEDULED);
-        wishMany(sevenDay, 2);
-        wishMany(oneDay, 2);
+        subscribeMany(sevenDay, 2);
+        subscribeMany(oneDay, 2);
 
         assertThat(sweep.run(NOW, 3)).isEqualTo(3);
         assertThat(sweep.run(NOW.plusMinutes(1), 3)).isEqualTo(1);
@@ -308,7 +336,7 @@ class ConcertOpenSweepTest {
     // ---------------------------------------------------------------- 헬퍼
 
     private ConcertOpenSweep withCatchUp(Duration catchUp) {
-        return new ConcertOpenSweep(concertRepository, wishRepository, recorder,
+        return new ConcertOpenSweep(concertRepository, alarmRepository, recorder,
                 new NotificationProperties(500, catchUp));
     }
 
@@ -331,16 +359,21 @@ class ConcertOpenSweepTest {
                 keyPrefix + ":concert=" + concert.getId());
     }
 
-    private Member wish(Concert concert) {
+    /** 새 회원이 이 공연의 예매 오픈 알림을 신청한다. */
+    private Member subscribe(Concert concert) {
         Member member = member();
-        wishRepository.save(ConcertWish.builder().member(member).concert(concert).build());
+        alarmRepository.save(alarm(member, concert, AlarmType.CONCERT_OPEN));
         return member;
     }
 
-    private List<Member> wishMany(Concert concert, int count) {
+    private ConcertAlarm alarm(Member member, Concert concert, AlarmType type) {
+        return ConcertAlarm.builder().member(member).concert(concert).type(type).build();
+    }
+
+    private List<Member> subscribeMany(Concert concert, int count) {
         List<Member> members = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            members.add(wish(concert));
+            members.add(subscribe(concert));
         }
         return members;
     }
