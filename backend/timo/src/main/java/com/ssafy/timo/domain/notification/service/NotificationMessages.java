@@ -60,11 +60,11 @@ public final class NotificationMessages {
     }
 
     /**
-     * 찜한 공연의 양도 매물 알림. 공연이 하나면 한 줄이고, 여럿이면 첫 줄이 요약이다. 푸시가 접혀
+     * 알림 신청한 공연의 양도 매물 알림. 공연이 하나면 한 줄이고, 여럿이면 첫 줄이 요약이다. 푸시가 접혀
      * 첫 줄만 보여도 뜻이 통하게 하려는 것이다.
      *
      * <pre>
-     * 찜한 공연 5건에 양도 매물이 올라왔어요
+     * 알림 신청한 공연 5건에 양도 매물이 올라왔어요
      * · 로이킴 콘서트
      * · Bruno Mars 내한공연
      * · 이승기 콘서트
@@ -89,7 +89,7 @@ public final class NotificationMessages {
                 .sorted(Comparator.comparing(ListedConcert::startDate))
                 .toList();
 
-        StringBuilder body = new StringBuilder("찜한 공연 ")
+        StringBuilder body = new StringBuilder("알림 신청한 공연 ")
                 .append(concerts.size())
                 .append("건에 양도 매물이 올라왔어요");
         soonestFirst.stream().limit(LIST_LIMIT)

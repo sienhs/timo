@@ -68,7 +68,7 @@ class NotificationApiIntegrationTest {
         long concertNoti = insert(me, "ENTRY_OPEN:concert=12", NotificationType.ENTRY_OPEN,
                 "로이킴 콘서트, 지금부터 입장할 수 있어요", LinkType.CONCERT, 12L);
         long marketNoti = insert(me, "MARKET_NEW_LISTING:2026-09-20", NotificationType.MARKET_NEW_LISTING,
-                "찜한 공연 2건에 양도 매물이 올라왔어요\n· 공연A\n· 공연B", LinkType.MARKET, null);
+                "알림 신청한 공연 2건에 양도 매물이 올라왔어요\n· 공연A\n· 공연B", LinkType.MARKET, null);
 
         Authenticated.set(me.getId());
         mvc.perform(get(PATH))
@@ -76,7 +76,7 @@ class NotificationApiIntegrationTest {
                 .andExpect(jsonPath("$.items", hasSize(2)))
                 .andExpect(jsonPath("$.items[0].notificationId").value(marketNoti))
                 .andExpect(jsonPath("$.items[0].type").value("MARKET_NEW_LISTING"))
-                .andExpect(jsonPath("$.items[0].body").value("찜한 공연 2건에 양도 매물이 올라왔어요\n· 공연A\n· 공연B"))
+                .andExpect(jsonPath("$.items[0].body").value("알림 신청한 공연 2건에 양도 매물이 올라왔어요\n· 공연A\n· 공연B"))
                 .andExpect(jsonPath("$.items[0].linkType").value("MARKET"))
                 .andExpect(jsonPath("$.items[0].linkId").doesNotExist())
                 .andExpect(jsonPath("$.items[0].read").value(false))

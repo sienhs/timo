@@ -1,5 +1,7 @@
 package com.ssafy.timo.domain.notification.scheduler;
 
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.concert.dto.ConcertOpenRow;
 import com.ssafy.timo.domain.concert.entity.ConcertStatus;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
@@ -7,7 +9,6 @@ import com.ssafy.timo.domain.notification.entity.NotificationPhase;
 import com.ssafy.timo.domain.notification.entity.NotificationType;
 import com.ssafy.timo.domain.notification.service.NotificationMessages;
 import com.ssafy.timo.domain.notification.service.NotificationRecorder;
-import com.ssafy.timo.domain.wish.repository.ConcertWishRepository;
 import com.ssafy.timo.global.config.notification.NotificationProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,13 +18,13 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * 찜한 공연의 예매가 곧 열린다고 미리 알린다. 세 번 나간다.
+ * 예매 오픈 알림을 신청한 공연의 예매가 곧 열린다고 미리 알린다. 세 번 나간다.
  *
  * <pre>
  * 7일 전   오픈 날짜의 7일 전 09:00   (D7)
  * 1일 전   오픈 날짜의 하루 전 09:00  (D1)
  * 1시간 전 오픈 시각의 1시간 전       (H1)
- * 대상     그 공연을 찜한 회원
+ * 대상     그 공연의 예매 오픈 알림({@link AlarmType#CONCERT_OPEN})을 신청한 회원. 찜과는 별개다
  * 제외     취소된 공연, 이미 열린 공연
  * 중복 방지  CONCERT_OPEN_D7 | D1 | H1 :concert={공연 id}
  * </pre>
@@ -57,7 +58,7 @@ public class ConcertOpenSweep implements NotificationSweep {
     private static final int LOOKAHEAD_DAYS = 8;
 
     private final ConcertRepository concertRepository;
-    private final ConcertWishRepository concertWishRepository;
+    private final ConcertAlarmRepository concertAlarmRepository;
     private final NotificationRecorder notificationRecorder;
     private final NotificationProperties properties;
 
@@ -87,7 +88,7 @@ public class ConcertOpenSweep implements NotificationSweep {
                 if (sendAt.isAfter(now) || sendAt.isBefore(notBefore)) {
                     continue;
                 }
-                recorded += recordForWishers(concert, phase, limit - recorded);
+                recorded += recordForSubscribers(concert, phase, limit - recorded);
             }
         }
         return recorded;
@@ -103,12 +104,13 @@ public class ConcertOpenSweep implements NotificationSweep {
         };
     }
 
-    private int recordForWishers(ConcertOpenRow concert, NotificationPhase phase, int remaining) {
-        List<Long> wishers = concertWishRepository.findMemberIdsByConcertId(concert.getId());
+    private int recordForSubscribers(ConcertOpenRow concert, NotificationPhase phase, int remaining) {
+        List<Long> subscribers =
+                concertAlarmRepository.findMemberIdsByConcertIdAndType(concert.getId(), AlarmType.CONCERT_OPEN);
         String body = NotificationMessages.concertOpen(concert.getTitle(), phase);
         String dedupKey = NotificationType.CONCERT_OPEN_REMINDER.concertKey(phase.name(), concert.getId());
 
-        return SweepLimits.recordUpTo(wishers, remaining, slice -> notificationRecorder.recordAll(
+        return SweepLimits.recordUpTo(subscribers, remaining, slice -> notificationRecorder.recordAll(
                 slice, NotificationType.CONCERT_OPEN_REMINDER, body, concert.getId(), dedupKey));
     }
 }

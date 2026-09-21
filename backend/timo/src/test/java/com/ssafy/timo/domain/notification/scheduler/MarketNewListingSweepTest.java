@@ -17,6 +17,9 @@ import com.ssafy.timo.domain.seat.entity.Seat;
 import com.ssafy.timo.domain.seat.entity.SeatPosition;
 import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.seat.repository.SeatRepository;
+import com.ssafy.timo.domain.alarm.entity.AlarmType;
+import com.ssafy.timo.domain.alarm.entity.ConcertAlarm;
+import com.ssafy.timo.domain.alarm.repository.ConcertAlarmRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
@@ -50,7 +53,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * 새 양도 매물 알림이 마켓 오픈 시각에, 어제 올라온 매물만 기준으로, 찜한 사람에게 하루 한 건씩 나가는지 실제
+ * 새 양도 매물 알림이 마켓 오픈 시각에, 어제 올라온 매물만 기준으로, 양도 매물 알림을 신청한 사람에게 하루 한 건씩 나가는지 실제
  * MySQL 로 확인한다.
  *
  * <p>이 알림은 다른 셋과 조건의 모양이 달라 경계가 두 가지다. 지금이 발송 시각의 보정 구간 안인가와, 매물이
@@ -73,6 +76,9 @@ class MarketNewListingSweepTest {
 
     @Autowired
     private TicketListingRepository listingRepository;
+
+    @Autowired
+    private ConcertAlarmRepository alarmRepository;
 
     @Autowired
     private ConcertWishRepository wishRepository;
@@ -132,18 +138,18 @@ class MarketNewListingSweepTest {
     }
 
     @Test
-    @DisplayName("공연 하나에 새 매물이 올라오면 찜한 회원에게 그 공연으로 가는 알림이 규약대로 저장된다")
-    void singleConcert_notifiesWisherWithConcertLink() {
+    @DisplayName("공연 하나에 새 매물이 올라오면 알림을 신청한 회원에게 그 공연으로 가는 알림이 규약대로 저장된다")
+    void singleConcert_notifiesSubscriberWithConcertLink() {
         Concert concert = concert("로이킴 콘서트", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, YESTERDAY_NOON);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         int recorded = sweep.run(NOW, 500);
 
         assertThat(recorded).isEqualTo(1);
         Map<String, Object> row = jdbc.queryForMap(
                 "select body, type, link_type, link_id, dedup_key from notification where member_id = ?",
-                wisher.getId());
+                subscriber.getId());
         assertThat(row.get("body")).isEqualTo("로이킴 콘서트 양도 매물이 올라왔어요");
         assertThat(row.get("type")).isEqualTo("MARKET_NEW_LISTING");
         assertThat(row.get("link_type")).isEqualTo("CONCERT");
@@ -152,20 +158,20 @@ class MarketNewListingSweepTest {
     }
 
     @Test
-    @DisplayName("찜한 공연이 여럿이면 한 통에 목록으로 묶어 마켓으로 보내고, 공연일이 임박한 순으로 나열한다")
+    @DisplayName("알림 신청한 공연이 여럿이면 한 통에 목록으로 묶어 마켓으로 보내고, 공연일이 임박한 순으로 나열한다")
     void multipleConcerts_areCombinedInOneNotificationSoonestFirst() {
         Concert later = concert("나중 공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         Concert sooner = concert("임박 공연", NOW.plusDays(5), ConcertStatus.ON_SALE);
         listing(later, YESTERDAY_NOON);
         listing(sooner, YESTERDAY_NOON);
-        Member wisher = wish(later, sooner);
+        Member subscriber = subscribe(later, sooner);
 
         int recorded = sweep.run(NOW, 500);
 
         assertThat(recorded).as("회원 한 명에게 한 건").isEqualTo(1);
-        assertThat(bodyOf(wisher)).isEqualTo("찜한 공연 2건에 양도 매물이 올라왔어요\n· 임박 공연\n· 나중 공연");
+        assertThat(bodyOf(subscriber)).isEqualTo("알림 신청한 공연 2건에 양도 매물이 올라왔어요\n· 임박 공연\n· 나중 공연");
         Map<String, Object> row = jdbc.queryForMap(
-                "select link_type, link_id from notification where member_id = ?", wisher.getId());
+                "select link_type, link_id from notification where member_id = ?", subscriber.getId());
         assertThat(row.get("link_type")).isEqualTo("MARKET");
         assertThat(row.get("link_id")).isNull();
     }
@@ -179,12 +185,12 @@ class MarketNewListingSweepTest {
             listing(concert, YESTERDAY_NOON);
             concerts.add(concert);
         }
-        Member wisher = wish(concerts.toArray(Concert[]::new));
+        Member subscriber = subscribe(concerts.toArray(Concert[]::new));
 
         sweep.run(NOW, 500);
 
-        assertThat(bodyOf(wisher)).isEqualTo(
-                "찜한 공연 4건에 양도 매물이 올라왔어요\n· 공연1\n· 공연2\n· 공연3\n· 외 1건");
+        assertThat(bodyOf(subscriber)).isEqualTo(
+                "알림 신청한 공연 4건에 양도 매물이 올라왔어요\n· 공연1\n· 공연2\n· 공연3\n· 외 1건");
     }
 
     @ParameterizedTest(name = "마켓 오픈 시각에서 {0}초 지난 시점이면 대상 {1}")
@@ -198,7 +204,7 @@ class MarketNewListingSweepTest {
     void sendTimeWindowBoundaries(long secondsAfterOpen, boolean expectedNotified) {
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, YESTERDAY_NOON);
-        wish(concert);
+        subscribe(concert);
 
         int recorded = sweep.run(NOW.plusSeconds(secondsAfterOpen), 500);
 
@@ -217,7 +223,7 @@ class MarketNewListingSweepTest {
     void listedDateBoundaries(LocalDateTime listedAt, boolean expectedNew) {
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, listedAt);
-        wish(concert);
+        subscribe(concert);
 
         int recorded = sweep.run(NOW, 500);
 
@@ -232,7 +238,7 @@ class MarketNewListingSweepTest {
         listing(sold, YESTERDAY_NOON).markStatus(ListingStatus.SOLD);
         listing(canceled, YESTERDAY_NOON).markStatus(ListingStatus.CANCELED);
         em.flush();
-        wish(sold, canceled);
+        subscribe(sold, canceled);
 
         assertThat(sweep.run(NOW, 500)).isZero();
     }
@@ -246,11 +252,11 @@ class MarketNewListingSweepTest {
         listing(canceled, YESTERDAY_NOON);
         listing(closed, YESTERDAY_NOON);
         listing(soldOut, YESTERDAY_NOON);
-        Member wisher = wish(canceled, closed, soldOut);
+        Member subscriber = subscribe(canceled, closed, soldOut);
 
         sweep.run(NOW, 500);
 
-        assertThat(bodyOf(wisher)).isEqualTo("매진 공연 양도 매물이 올라왔어요");
+        assertThat(bodyOf(subscriber)).isEqualTo("매진 공연 양도 매물이 올라왔어요");
     }
 
     @Test
@@ -260,11 +266,11 @@ class MarketNewListingSweepTest {
         Concert justEnough = concert("여유 있는 공연", NOW.plusHours(2).plusSeconds(1), ConcertStatus.ON_SALE);
         listing(tooSoon, YESTERDAY_NOON);
         listing(justEnough, YESTERDAY_NOON);
-        Member wisher = wish(tooSoon, justEnough);
+        Member subscriber = subscribe(tooSoon, justEnough);
 
         sweep.run(NOW, 500);
 
-        assertThat(bodyOf(wisher)).isEqualTo("여유 있는 공연 양도 매물이 올라왔어요");
+        assertThat(bodyOf(subscriber)).isEqualTo("여유 있는 공연 양도 매물이 올라왔어요");
     }
 
     @Test
@@ -275,9 +281,9 @@ class MarketNewListingSweepTest {
         Member holder = member();
         holdTicket(holder, concert);
         Member ordinary = member();
-        wish(seller, concert);
-        wish(holder, concert);
-        wish(ordinary, concert);
+        subscribe(seller, concert);
+        subscribe(holder, concert);
+        subscribe(ordinary, concert);
 
         int recorded = sweep.run(NOW, 500);
 
@@ -299,8 +305,8 @@ class MarketNewListingSweepTest {
                 someoneElsesTicket.getReservation().getSeat().getSeatNo(),
                 someoneElsesTicket.getReservation().getSeat().getSeatCol(),
                 SEAT_PRICE - 10_000L, SEAT_PRICE, YESTERDAY_NOON));
-        wish(seller, concert);
-        Member ordinary = wish(concert);
+        subscribe(seller, concert);
+        Member ordinary = subscribe(concert);
 
         sweep.run(NOW, 500);
 
@@ -317,8 +323,8 @@ class MarketNewListingSweepTest {
         listing(wanted, YESTERDAY_NOON);
         Member member = member();
         holdTicket(member, owned);
-        wish(member, owned);
-        wish(member, wanted);
+        subscribe(member, owned);
+        subscribe(member, wanted);
 
         sweep.run(NOW, 500);
 
@@ -330,17 +336,41 @@ class MarketNewListingSweepTest {
     }
 
     @Test
-    @DisplayName("찜하지 않은 회원과 매물이 없는 공연을 찜한 회원은 받지 않는다")
-    void nonWishers_areNotNotified() {
+    @DisplayName("신청하지 않은 회원과 매물이 없는 공연을 신청한 회원은 받지 않는다")
+    void nonSubscribers_areNotNotified() {
         Concert withListing = concert("매물 있는 공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         Concert withoutListing = concert("매물 없는 공연", NOW.plusDays(11), ConcertStatus.ON_SALE);
         listing(withListing, YESTERDAY_NOON);
-        Member noWish = member();
-        Member wishesOther = wish(withoutListing);
+        Member noSubscription = member();
+        Member subscribesOther = subscribe(withoutListing);
 
         assertThat(sweep.run(NOW, 500)).isZero();
-        assertThat(count(noWish)).isZero();
-        assertThat(count(wishesOther)).isZero();
+        assertThat(count(noSubscription)).isZero();
+        assertThat(count(subscribesOther)).isZero();
+    }
+
+    @Test
+    @DisplayName("찜만 하고 알림을 신청하지 않은 회원은 받지 않는다 - 찜과 알림은 별개다")
+    void wishWithoutAlarm_isNotNotified() {
+        Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
+        listing(concert, YESTERDAY_NOON);
+        Member onlyWished = member();
+        wishRepository.save(ConcertWish.builder().member(onlyWished).concert(concert).build());
+
+        assertThat(sweep.run(NOW, 500)).isZero();
+        assertThat(count(onlyWished)).isZero();
+    }
+
+    @Test
+    @DisplayName("예매 오픈 알림만 신청한 회원은 양도 매물 알림을 받지 않는다 - 종류는 서로 독립이다")
+    void otherAlarmType_isNotNotified() {
+        Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
+        listing(concert, YESTERDAY_NOON);
+        Member openOnly = member();
+        alarmRepository.save(alarm(openOnly, concert, AlarmType.CONCERT_OPEN));
+
+        assertThat(sweep.run(NOW, 500)).isZero();
+        assertThat(count(openOnly)).isZero();
     }
 
     @Test
@@ -348,7 +378,7 @@ class MarketNewListingSweepTest {
     void repeatedRuns_doNotDuplicate() {
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, YESTERDAY_NOON);
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         int first = sweep.run(NOW, 500);
         int again = sweep.run(NOW, 500);
@@ -357,7 +387,7 @@ class MarketNewListingSweepTest {
         assertThat(first).isEqualTo(1);
         assertThat(again).isZero();
         assertThat(later).isZero();
-        assertThat(count(wisher)).isEqualTo(1);
+        assertThat(count(subscriber)).isEqualTo(1);
     }
 
     @Test
@@ -366,44 +396,44 @@ class MarketNewListingSweepTest {
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, YESTERDAY_NOON);
         listing(concert, NOW.plusHours(1)); // 9/20 21:00 등록, 다음 날 기준으로 새 매물이다
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         sweep.run(NOW, 500);
         int nextDay = sweep.run(NOW.plusDays(1), 500);
 
         assertThat(nextDay).isEqualTo(1);
         assertThat(jdbc.queryForList("select dedup_key from notification where member_id = ? order by notification_id",
-                String.class, wisher.getId()))
+                String.class, subscriber.getId()))
                 .containsExactly("MARKET_NEW_LISTING:2026-09-20", "MARKET_NEW_LISTING:2026-09-21");
     }
 
     @Test
     @DisplayName("오픈 시각이 밤늦어 보정 구간이 자정을 넘어도, 자정 뒤 주기가 전날의 발송을 마무리한다")
     void catchUpAcrossMidnight_finishesPreviousDaysSend() {
-        MarketNewListingSweep lateOpen = new MarketNewListingSweep(listingRepository, wishRepository,
+        MarketNewListingSweep lateOpen = new MarketNewListingSweep(listingRepository, alarmRepository,
                 ticketOwnerReader, recorder,
                 new MarketHoursProperties(LocalTime.of(23, 30), LocalTime.of(23, 59, 59)),
                 new NotificationProperties(500, Duration.ofHours(1)));
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
         listing(concert, LocalDateTime.of(2026, 9, 19, 12, 0)); // 9/20 발송의 새 매물
-        Member wisher = wish(concert);
+        Member subscriber = subscribe(concert);
 
         assertThat(lateOpen.run(LocalDateTime.of(2026, 9, 21, 0, 31), 500)).as("보정 구간을 넘겼다").isZero();
         assertThat(lateOpen.run(LocalDateTime.of(2026, 9, 21, 0, 10), 500)).as("자정 뒤지만 구간 안이다")
                 .isEqualTo(1);
-        assertThat(keyOf(wisher)).as("발송일은 전날이다").isEqualTo("MARKET_NEW_LISTING:2026-09-20");
+        assertThat(keyOf(subscriber)).as("발송일은 전날이다").isEqualTo("MARKET_NEW_LISTING:2026-09-20");
     }
 
     @Test
-    @DisplayName("처리 상한에 닿으면 멈추고 남은 회원은 다음 주기에 이어서 받으며, 여러 공연을 찜한 회원도 한 건이다")
+    @DisplayName("처리 상한에 닿으면 멈추고 남은 회원은 다음 주기에 이어서 받으며, 여러 공연을 신청한 회원도 한 건이다")
     void limit_countsNotificationsAndContinuesNextRun() {
         Concert first = concert("첫 공연", NOW.plusDays(5), ConcertStatus.ON_SALE);
         Concert second = concert("둘째 공연", NOW.plusDays(6), ConcertStatus.ON_SALE);
         listing(first, YESTERDAY_NOON);
         listing(second, YESTERDAY_NOON);
-        List<Member> wishers = new ArrayList<>();
+        List<Member> subscribers = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            wishers.add(wish(first, second));
+            subscribers.add(subscribe(first, second));
         }
 
         int run1 = sweep.run(NOW, 2);
@@ -412,14 +442,14 @@ class MarketNewListingSweepTest {
         int run4 = sweep.run(NOW.plusMinutes(3), 2);
 
         assertThat(List.of(run1, run2, run3, run4)).containsExactly(2, 2, 1, 0);
-        assertThat(wishers).allSatisfy(wisher -> assertThat(count(wisher)).isEqualTo(1));
+        assertThat(subscribers).allSatisfy(subscriber -> assertThat(count(subscriber)).isEqualTo(1));
     }
 
     @Test
     @DisplayName("새 매물이 없으면 0건이다")
     void noNewListings_returnsZero() {
         Concert concert = concert("공연", NOW.plusDays(10), ConcertStatus.ON_SALE);
-        wish(concert);
+        subscribe(concert);
 
         assertThat(sweep.run(NOW, 500)).isZero();
     }
@@ -440,17 +470,21 @@ class MarketNewListingSweepTest {
                 "select dedup_key from notification where member_id = ?", String.class, member.getId());
     }
 
-    /** 이 공연들을 새 회원이 찜한다. */
-    private Member wish(Concert... concerts) {
+    /** 이 공연들의 양도 매물 알림을 새 회원이 신청한다. */
+    private Member subscribe(Concert... concerts) {
         Member member = member();
-        wish(member, concerts);
+        subscribe(member, concerts);
         return member;
     }
 
-    private void wish(Member member, Concert... concerts) {
+    private void subscribe(Member member, Concert... concerts) {
         for (Concert concert : concerts) {
-            wishRepository.save(ConcertWish.builder().member(member).concert(concert).build());
+            alarmRepository.save(alarm(member, concert, AlarmType.MARKET_LISTING));
         }
+    }
+
+    private ConcertAlarm alarm(Member member, Concert concert, AlarmType type) {
+        return ConcertAlarm.builder().member(member).concert(concert).type(type).build();
     }
 
     /** 새 판매자가 티켓을 가진 채 매물을 올린다. */

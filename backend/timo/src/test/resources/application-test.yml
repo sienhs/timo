@@ -46,6 +46,13 @@ solapi:
   api-key: test-api-key
   api-secret: test-api-secret
   sender-phone-number: "01000000000"
+# 양도 매물 공개 대기를 켠다. application.yml 기본값은 false(오늘 등록한 매물도 즉시 노출)라서, 그대로 두면
+# "등록 다음 날 08:00 에 노출" 을 전제로 한 마켓 테스트(MarketApiIntegrationTest 등)가 깨진다. 운영 기본값은
+# 바꾸지 않고 테스트만 이 규칙 위에서 돌린다.
+market:
+  hours:
+    listing-delay-enabled: true
+
 # @Scheduled 잡을 끈다. 통합 테스트는 @Transactional 롤백으로 서로를 격리하는데, 잡은 별도
 # 스레드에서 자기 트랜잭션으로 커밋해 그 격리를 통과한다. 잡의 동작은 빈을 직접 불러 검증한다
 # (ConcertStatusSchedulerTest).
