@@ -3,24 +3,22 @@ import 'package:flutter/material.dart';
 import '../../motion/press_scale.dart';
 import '../../motion/reveal.dart';
 import '../../models/memory_ticket.dart';
-import '../../theme/timo_colors.dart';
 import '../../constants.dart';
 import '../../models/collection_slot.dart';
 import 'ticket_thumbnail.dart';
 
-/// "모두 보기": every concert in the catalogue, two per row. Owned slots show
-/// the newest ticket; empty ones are grey cards that start the creator for
-/// that concert. Long-press an owned card to delete it.
+/// "모두 보기": 입장을 마친 내 티켓이 두 장씩 한 줄로. 소장품을 만든 칸은 그
+/// 소장품을, 아직 만들지 않은 칸은 흐린 포스터를 보여주고 누르면 그 티켓으로
+/// 만들기가 열린다.
 class CatalogGrid extends StatelessWidget {
   const CatalogGrid({
     super.key,
     required this.slots,
     required this.onOpen,
     required this.onCreateFor,
-    required this.onDelete,
   });
   final List<CollectionSlot> slots;
-  final ValueChanged<MemoryTicket> onOpen, onDelete;
+  final ValueChanged<MemoryTicket> onOpen;
   final ValueChanged<CollectionSlot> onCreateFor;
 
   @override
@@ -45,7 +43,6 @@ class CatalogGrid extends StatelessWidget {
         slot: slots[i],
         onOpen: onOpen,
         onCreateFor: onCreateFor,
-        onDelete: onDelete,
       ),
     ),
   );
@@ -56,15 +53,14 @@ class _SlotCell extends StatelessWidget {
     required this.slot,
     required this.onOpen,
     required this.onCreateFor,
-    required this.onDelete,
   });
   final CollectionSlot slot;
-  final ValueChanged<MemoryTicket> onOpen, onDelete;
+  final ValueChanged<MemoryTicket> onOpen;
   final ValueChanged<CollectionSlot> onCreateFor;
 
   @override
   Widget build(BuildContext context) {
-    final ticket = slot.latest;
+    final ticket = slot.ticket;
     if (ticket == null) {
       return Semantics(
         button: true,
@@ -72,49 +68,17 @@ class _SlotCell extends StatelessWidget {
         child: PressScale(
           onTap: () => onCreateFor(slot),
           lift: 1,
-          child: const TicketPlaceholder(),
+          child: TicketPlaceholder(poster: slot.poster, title: slot.title),
         ),
       );
     }
     return Semantics(
       button: true,
       label: slot.title,
-      child: GestureDetector(
-        onLongPress: () => onDelete(ticket),
-        child: PressScale(
-          onTap: () => onOpen(ticket),
-          lift: 2,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              TicketThumbnail(ticket: ticket),
-              if (slot.tickets.length > 1)
-                // Below the brand line so the two never overlap.
-                Positioned(
-                  top: 30,
-                  right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: TimoColors.paper.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      CollectionText.ownedCount(slot.tickets.length),
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: TimoColors.brandMid,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+      child: PressScale(
+        onTap: () => onOpen(ticket),
+        lift: 2,
+        child: TicketThumbnail(ticket: ticket),
       ),
     );
   }

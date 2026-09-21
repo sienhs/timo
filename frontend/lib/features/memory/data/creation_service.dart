@@ -418,7 +418,9 @@ class CreationService {
       if (p['personDepthPath'] != null) notes.add(layerNote(i + 1, p));
     }
     return MemoryTicket(
-      ticketId: DateTime.now().microsecondsSinceEpoch.toString(),
+      // 티켓 번호가 곧 소장품의 번호다. 한 티켓으로 다시 만들면 예전 것을
+      // 덮어쓴다 — 서버의 1티켓 1소장품과 같은 규칙이다.
+      ticketId: concert.ticketId,
       concertId: concert.id,
       backgroundPath: depthResult['backgroundPath'] as String,
       sourceBackgroundPath: background,

@@ -9,7 +9,7 @@ import '../../theme/timo_colors.dart';
 import '../../constants.dart';
 import 'ticket_thumbnail.dart';
 
-/// "내가 가진 티켓만 보기" as a music box: tickets stand on a ring around a
+/// "내가 만든 소장품 보기" as a music box: tickets stand on a ring around a
 /// vertical axis and the whole platform turns. Drag to spin, release to
 /// settle on the nearest ticket, tap a side ticket to bring it round, tap
 /// the front one to open. Left alone it turns slowly by itself.
@@ -18,10 +18,9 @@ class TicketOrgel extends StatefulWidget {
     super.key,
     required this.tickets,
     required this.onOpen,
-    required this.onDelete,
   });
   final List<MemoryTicket> tickets;
-  final ValueChanged<MemoryTicket> onOpen, onDelete;
+  final ValueChanged<MemoryTicket> onOpen;
   @override
   State<TicketOrgel> createState() => _TicketOrgelState();
 }
@@ -267,7 +266,6 @@ class _TicketOrgelState extends State<TicketOrgel>
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => tapCard(i),
-            onLongPress: () => widget.onDelete(ticket),
             child: Stack(
               fit: StackFit.expand,
               children: [

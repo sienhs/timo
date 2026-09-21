@@ -56,20 +56,8 @@ class _PersonPlacementEditorState extends State<PersonPlacementEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          '인물 위치와 크기',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          '인물을 눌러 선택한 뒤 박스 안을 드래그해 이동하고, 모서리를 끌어 크기를 조절하세요.',
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.5,
-            color: TimoColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
+        // 제목과 사용법은 단계 머리말이 이미 말한다. 여기서 또 적으면 화면
+        // 위쪽 절반이 글자로 찬다.
         Wrap(
           spacing: 8,
           children: [

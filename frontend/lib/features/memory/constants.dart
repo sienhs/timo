@@ -9,16 +9,27 @@ import 'dart:ui';
 // ---- 컬렉션 -------------------------------------------------------------------
 class CollectionText {
   static const title = '컬렉션';
-  static const filterMine = '내가 가진 티켓만 보기';
+  static const filterMine = '내가 만든 소장품 보기';
   static const filterAll = '모두 보기';
-  static const emptyTitle = '아직 가진 티켓이 없어요';
+  static const emptyTitle = '아직 만든 소장품이 없어요';
   static const emptyBody = '공연을 골라 첫 소장품을 만들어보세요.';
   static const createLabel = '소장품 만들기';
   static const createTooltip = '새 소장품 만들기';
-  static const deleteTooltip = '소장품 삭제';
-  static const notOwnedLabel = '아직 없는 소장품';
+
+  /// 아직 확정하지 않은 소장품 위에 뜨는 딱지.
+  static const draftBadge = '임시';
+
+  /// 미보유 칸 위에 뜨는 짧은 유도 문구.
+  static const makeLabel = '만들기';
+
+  /// 화면에는 없고 스크린리더만 읽는다 — 칸 제목 뒤에 붙는다.
+  static const notOwnedLabel = '아직 만들지 않음';
   static const swipeHint = '좌우로 돌려 다른 소장품 보기';
-  static String ownedCount(int n) => '$n장 보유';
+
+  /// 로그인 전. 소장품은 내가 입장한 공연으로 만드는 것이라 누구인지 모르면
+  /// 보여줄 것이 없다.
+  static const loginTitle = '로그인하고 소장품을 만들어요';
+  static const loginBody = '입장을 마친 공연으로 나만의 소장품을 만들 수 있어요.';
 }
 
 class CollectionLayout {
@@ -68,14 +79,15 @@ class CollectionLayout {
 
 // ---- 제작 --------------------------------------------------------------------
 class CreatorText {
-  static const totalSteps = 5;
-  static const appBarTitle = 'NFT 소장품 만들기';
+  static const totalSteps = 6;
+  static const appBarTitle = '공연 추억 만들기';
   static const brand = 'TIMO';
   static const titles = [
     '소장품을 만들 공연을\n선택해주세요',
     '배경에 쓰일\n사진을 골라주세요!',
     '아티스트의 사진을\n선택해주세요',
     '더 추가하고 싶은 인물 사진이\n있다면 추가해도 좋아요!',
+    '인물을\n조정해주세요',
     '추가하고 싶은\n이펙트가 있나요?',
   ];
   static const subtitles = [
@@ -83,16 +95,22 @@ class CreatorText {
     '공연 영상과도 이어지니 신중히 선택해야 해요.',
     '마음에 드는 사진을 선택하면 돼요.',
     '원하는 사진을 직접 고를 수 있어요.',
+    '인물을 눌러 옮기고, 크기와 입체감을 정할 수 있어요.',
     '마음에 드는 걸 골라보세요.',
   ];
 
   /// Buttons.
-  static const concertAction = 'NFT 소장품 만들기';
+  static const concertAction = '이 공연으로 만들기';
   static const nextLabel = '다음으로';
   static const skipLabel = '건너뛰기';
   static const finishLabel = '완료하기';
   static const retryLabel = '다시 만들기';
   static const backTooltip = '이전 단계';
+
+  /// 만들 수 있는 공연이 하나도 없을 때. 티켓 한 장에 소장품은 하나뿐이라
+  /// 이미 만든 공연은 목록에서 빠진다.
+  static const noConcertsTitle = '만들 수 있는 공연이 없어요';
+  static const noConcertsBody = '입장을 마친 공연으로 만들 수 있고, 한 공연에 하나씩만 만들어요.';
 
   /// Photo tiles.
   static const stageLabel = '데모 무대';
@@ -152,10 +170,76 @@ class CreatorLayout {
   static const photoTileAspect = 0.7;
   static const effectTileAspect = 0.7;
   static const previewHeight = 220.0;
+
+  /// 인물 단계에서 고른 누끼를 확인만 하는 칸.
+  static const personPreviewHeight = 170.0;
   static const giftSize = 210.0;
+
+  /// 건너뛰기. 주 버튼(52)보다 한 단 낮아 둘의 무게가 갈린다.
+  static const skipButtonHeight = 46.0;
+
+  /// 제작 클립. 원본 비율 그대로 두되, 선물 상자가 서던 자리보다 넓게 쓴다.
+  static const clipAspect = 16 / 9;
+  static const clipWidthFactor = 1.6;
+
+  /// 만드는 장면이 끝나고 완성된 선물이 드러나기 시작하는 지점. 제작 중에는
+  /// 여기서 앞으로 되감아, 완성을 미리 보여주지 않는다.
+  static const clipMakingEnd = Duration(seconds: 6, milliseconds: 500);
+}
+
+// ---- 공유(싸피스타그램) --------------------------------------------------------
+
+/// 소장품을 스토리로 올리는 흉내를 내는 화면의 문구·치수.
+///
+/// 진짜 인스타그램을 켜지 않는다. 상표를 쓰지 않으려고 이름도 로고도 우리
+/// 것으로 짓는다. 실제 공유 연동은 이 화면이 하는 일이 아니다.
+class ShareText {
+  static const brand = '싸피스타그램';
+  static const title = '스토리로 공유';
+  static const account = '내 스토리';
+  static const justNow = '방금';
+  static const tiltOption = '받는 사람도 기울여 볼 수 있게';
+  static const tiltOptionBody = '스토리를 보는 사람이 폰을 기울이면 카드가 따라 움직여요.';
+  static const post = '내 스토리에 공유';
+  static const uploading = '올리는 중…';
+  static const posted = '스토리에 공유했어요';
+  static const tiltHint = '폰을 기울여 보세요';
+  static const closeTooltip = '스토리 닫기';
+  static const messageHint = '메시지 보내기';
+  static const shareTooltip = '스토리로 공유';
+}
+
+class ShareLayout {
+  /// 세로 스토리 한 장의 비율.
+  static const storyAspect = 9 / 16;
+
+  static const uploadDuration = Duration(milliseconds: 1700);
+
+  /// 올라간 스토리가 저절로 흘러가는 시간. 끝나도 닫지는 않는다 — 보는 도중에
+  /// 화면이 사라지면 기울여 보던 사람이 놀란다.
+  static const storyDuration = Duration(seconds: 15);
 }
 
 // ---- 뷰어 --------------------------------------------------------------------
+
+/// 소장품을 여는 화면의 문구.
+class ViewerText {
+  /// 확정 전 한 줄. 상자와 제목까지 두면 카드보다 안내가 커진다.
+  static const draftNote = '임시 저장 · 이 기기에만 있어요';
+  static const editLabel = '다시 만들기';
+  static const confirmLabel = '확정하기';
+  static const confirmTitle = '이대로 확정할까요?';
+  static const confirmMessage = '확정하면 서버에 올라가고, 그 뒤로는 고치거나 지울 수 없어요.';
+  static const confirmCancel = '더 볼게요';
+  static const confirmOk = '확정';
+  static const confirmed = '소장품을 확정했어요';
+  static const confirmFailed = '확정하지 못했어요. 다시 시도해주세요.';
+
+  /// 기울임이 켜져 있을 때 버튼이 말하는 것 — 누르면 꺼진다.
+  static const tiltOnTooltip = '기울임 효과 끄기';
+  static const tiltOffTooltip = '기울임 효과 켜기';
+}
+
 class ViewerConstants {
   /// Card shape used by the photo editor and saved background.
   static const cardAspect = 9 / 14;

@@ -13,9 +13,9 @@ import 'catalog_grid.dart';
 import 'collection_filter.dart';
 import 'ticket_orgel.dart';
 
-/// 컬렉션: a catalogue grid of every concert ("모두 보기") or a music-box ring
-/// of the tickets the user owns ("내가 가진 티켓만 보기"). Pure display; the
-/// route supplies data and handles navigation.
+/// 컬렉션: a catalogue grid of the concerts the user attended ("모두 보기") or a
+/// music-box ring of the collectibles they made ("내가 만든 소장품 보기"). Pure
+/// display; the route supplies data and handles navigation.
 class CollectionView extends StatefulWidget {
   const CollectionView({
     super.key,
@@ -24,7 +24,6 @@ class CollectionView extends StatefulWidget {
     required this.onCreate,
     required this.onCreateFor,
     required this.onOpen,
-    required this.onDelete,
     this.initialFilter = CollectionFilter.mine,
   });
 
@@ -35,7 +34,7 @@ class CollectionView extends StatefulWidget {
   final List<MemoryTicket> tickets;
   final VoidCallback onCreate;
   final ValueChanged<CollectionSlot> onCreateFor;
-  final ValueChanged<MemoryTicket> onOpen, onDelete;
+  final ValueChanged<MemoryTicket> onOpen;
   final CollectionFilter initialFilter;
 
   @override
@@ -51,7 +50,6 @@ class _CollectionScreenState extends State<CollectionView> {
       slots: widget.slots,
       onOpen: widget.onOpen,
       onCreateFor: widget.onCreateFor,
-      onDelete: widget.onDelete,
     ),
     CollectionFilter.mine when widget.tickets.isEmpty => _EmptyStage(
       key: const ValueKey('empty'),
@@ -61,7 +59,6 @@ class _CollectionScreenState extends State<CollectionView> {
       key: const ValueKey('mine'),
       tickets: widget.tickets,
       onOpen: widget.onOpen,
-      onDelete: widget.onDelete,
     ),
   };
 

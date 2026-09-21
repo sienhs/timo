@@ -157,17 +157,21 @@ class _MarketConcertsScreenState extends State<MarketConcertsScreen> {
         child: Column(
           children: [
             Expanded(child: _body()),
-            ResaleBottomBar(
-              // 올린 매물이 언제 보이는지. 여는 시각은 서버 값이라 운영 상태를
-              // 받은 뒤에만 적는다.
-              notice: hours != null
-                  ? ResaleStrings.registerNotice(hours.opensAtLabel)
-                  : null,
-              child: ResaleActionButton(
-                label: ResaleStrings.registerAction,
-                onPressed: _isLoggedIn ? _openRegister : null,
+            // 로그인 전에는 줄 자체를 내지 않는다. 눌리지 않는 버튼을 세워 두면
+            // 왜 안 되는지는 안 알려주면서 자리만 차지한다 — 로그인하라는 말은
+            // 본문이 이미 하고 있다.
+            if (_isLoggedIn)
+              ResaleBottomBar(
+                // 올린 매물이 언제 보이는지. 여는 시각은 서버 값이라 운영
+                // 상태를 받은 뒤에만 적는다.
+                notice: hours != null
+                    ? ResaleStrings.registerNotice(hours.opensAtLabel)
+                    : null,
+                child: ResaleActionButton(
+                  label: ResaleStrings.registerAction,
+                  onPressed: _openRegister,
+                ),
               ),
-            ),
           ],
         ),
       ),

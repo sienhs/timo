@@ -6,7 +6,7 @@ import '../../constants.dart';
 
 enum CollectionFilter { mine, all }
 
-/// "내가 가진 티켓만 보기 | 모두 보기" — right-aligned text toggle.
+/// "내가 만든 소장품 보기 | 모두 보기" — right-aligned text toggle.
 class CollectionFilterBar extends StatelessWidget {
   const CollectionFilterBar({
     super.key,

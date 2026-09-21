@@ -18,6 +18,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
   @override
   Future<List<MemoryConcert>> getConcerts() async => const [
     MemoryConcert(
+      ticketId: 'ticket-1024',
       id: 'concert-1024',
       title: '빛으로 남은 밤',
       artist: 'TIMO STAGE',
@@ -27,6 +28,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
       videoUrl: 'assets/videos/official_demo.mp4',
     ),
     MemoryConcert(
+      ticketId: 'ticket-2048',
       id: 'concert-2048',
       title: '우리의 여름, 앙코르',
       artist: 'TIMO BAND',
@@ -36,6 +38,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
       videoUrl: 'assets/videos/official_demo.mp4',
     ),
     MemoryConcert(
+      ticketId: 'ticket-3072',
       id: 'concert-3072',
       title: '핑크 노이즈 나이트',
       artist: 'TIMO CREW',
@@ -45,6 +48,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
       videoUrl: 'assets/videos/official_demo.mp4',
     ),
     MemoryConcert(
+      ticketId: 'ticket-4096',
       id: 'concert-4096',
       title: '첫눈 전야제',
       artist: 'TIMO STAGE',
@@ -54,6 +58,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
       videoUrl: 'assets/videos/official_demo.mp4',
     ),
     MemoryConcert(
+      ticketId: 'ticket-5120',
       id: 'concert-5120',
       title: '골든 아워 페스타',
       artist: 'TIMO BAND',
@@ -63,6 +68,7 @@ class MockMemoryConcertApi implements MemoryConcertApi {
       videoUrl: 'assets/videos/official_demo.mp4',
     ),
     MemoryConcert(
+      ticketId: 'ticket-6144',
       id: 'concert-6144',
       title: '카운트다운 스테이지',
       artist: 'TIMO CREW',
@@ -79,6 +85,11 @@ class HttpMemoryConcertApi implements MemoryConcertApi {
 
   static const concertsPath = '/api/v1/collectibles/concerts';
 
+  // TODO(AI 연동): 아직 이 구현을 쓰지 않는다(app.dart 는 목을 쓴다). 붙이기
+  // 전에 남은 불일치를 함께 고칠 것 — date 가 LocalDateTime 문자열로 오고,
+  // videoUrl 은 항상 null 이며(공연에 영상 컬럼이 없다), 이미 만든 소장품을
+  // 가리키는 goodsId 를 아직 읽지 않는다.
+
   final Dio _dio;
 
   @override
@@ -93,7 +104,9 @@ class HttpMemoryConcertApi implements MemoryConcertApi {
           .cast<Map<String, dynamic>>()
           .map(
             (json) => MemoryConcert(
-              id: json['concertId'] as String,
+              // 서버는 식별자를 숫자로 준다(CollectibleConcertResponseDto).
+              ticketId: '${json['ticketId']}',
+              id: '${json['concertId']}',
               title: json['title'] as String,
               artist: json['artist'] as String,
               date: json['date'] as String,

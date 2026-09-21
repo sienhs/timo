@@ -20,12 +20,18 @@ class TicketBack extends StatelessWidget {
   final ValueListenable<Offset> tilt;
   final ValueListenable<double> time;
   static const _titleKey = '공연명';
-  static const _wideKeys = {'입장 안내', '장소'};
+  static const _wideKeys = {'장소'};
+
+  /// 서버가 주지 않는 값들. 예전에 저장된 소장품에는 아직 남아 있어 여기서
+  /// 거른다 — 소장품은 입장권이 아니라 게이트를 적을 일이 없다.
+  static const _droppedKeys = {'게이트', '입장 안내'};
 
   @override
   Widget build(BuildContext context) {
     final title = ticket.details[_titleKey] ?? '';
-    final fields = ticket.details.entries.where((e) => e.key != _titleKey);
+    final fields = ticket.details.entries.where(
+      (e) => e.key != _titleKey && !_droppedKeys.contains(e.key),
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -97,7 +103,7 @@ class TicketBack extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Semantics(
-                      label: '입장 불가 데모 바코드',
+                      label: '장식용 바코드',
                       child: CustomPaint(
                         size: const Size(double.infinity, 34),
                         painter: _Barcode(ticket.ticketId),
@@ -115,8 +121,10 @@ class TicketBack extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
+              // 입장권이 아니라 소장품이라 '입장 불가' 를 적지 않는다. 번호만
+              // 남겨 어느 소장품인지 가린다.
               Text(
-                '데모 · 입장 불가  ·  #${ticket.ticketId.substring(ticket.ticketId.length - 6)}',
+                '#${ticket.ticketId.substring(ticket.ticketId.length - 6)}',
                 style: const TextStyle(
                   fontSize: 10.5,
                   color: TimoColors.textTertiary,

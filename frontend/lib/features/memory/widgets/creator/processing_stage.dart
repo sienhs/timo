@@ -5,7 +5,7 @@ import '../../motion/reveal.dart';
 import '../../motion/staggered_text.dart';
 import '../../theme/timo_colors.dart';
 import '../../constants.dart';
-import 'gift_box.dart';
+import 'creating_clip.dart';
 
 enum ProcessingPhase { running, done, failed }
 
@@ -53,9 +53,9 @@ class ProcessingStage extends StatelessWidget {
               Reveal(
                 index: 2,
                 scaleFrom: 0.9,
-                child: GiftBox(
+                child: CreatingClip(
                   size: CreatorLayout.giftSize,
-                  celebrate: phase == ProcessingPhase.done,
+                  done: phase == ProcessingPhase.done,
                 ),
               ),
               const SizedBox(height: 24),

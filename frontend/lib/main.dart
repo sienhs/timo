@@ -10,6 +10,7 @@ import 'features/auth/state/auth_session.dart';
 import 'features/favorite/data/favorite_artist_store.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/memory/data/ticket_store.dart';
+import 'features/memory/data/tilt_setting.dart';
 import 'features/notification/push_notification_service.dart';
 
 /// 백그라운드 수신은 Flutter 엔진이 이 진입점을 찾아 호출하므로 트리 셰이킹하면 안 된다.
@@ -84,6 +85,8 @@ Future<void> main() async {
       // App 이 켜지면서 읽는다 — 여기서 기다릴 만큼 급하지 않다.
       favoriteArtistStore: SharedPreferencesFavoriteArtistStore(),
       ticketStore: ticketStore,
+      // 기울임 효과를 껐는지도 기기에 남는다. App 이 켜지면서 읽는다.
+      tiltSettingStore: SharedPreferencesTiltSettingStore(),
       // 로그아웃할 때 이 기기의 푸시 토큰을 서버에서 지우려면 화면이 이 서비스에
       // 닿아야 한다. 등록은 서비스가 세션을 구독해 알아서 하지만, 해제는 세션을
       // 비우기 전에 일어나야 해서 로그아웃하는 쪽이 직접 불러야 한다. 로딩 화면도
