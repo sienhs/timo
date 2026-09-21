@@ -10,11 +10,16 @@ import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
+import com.ssafy.timo.domain.seat.entity.Seat;
+import com.ssafy.timo.domain.seat.entity.Section;
 import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyRequestDto;
 import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto;
+import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto.HolderInfo;
+import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto.SeatInfo;
 import com.ssafy.timo.domain.ticket.dto.GateRejectReason;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.wallet.entity.Wallet;
 import com.ssafy.timo.domain.wallet.repository.WalletRepository;
 import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
@@ -56,6 +61,11 @@ class GateEntryServiceTest {
     private static final Long MEMBER_ID = 111L;
     private static final BigInteger TOKEN_ID = BigInteger.valueOf(77);
     private static final String OWNER_ADDRESS = "0xAbC0000000000000000000000000000000000001";
+    private static final String SECTION_NAME = "B구역";
+    private static final int SEAT_NO = 14;
+    private static final int SEAT_COL = 12;
+    private static final String HOLDER_NAME = "장민석";
+    private static final String HOLDER_PHONE = "01012345678";
 
     @Mock
     private TicketRepository ticketRepository;
@@ -72,13 +82,16 @@ class GateEntryServiceTest {
     @Test
     @DisplayName("유효한 QR 이면 입장시키고 티켓을 소진한다")
     void admitsValidPass() {
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
         given(ticketRepository.markUsedIfOwned(TICKET_ID)).willReturn(1);
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
         assertThat(response.admitted()).isTrue();
         assertThat(response.reasonCode()).isNull();
+        assertThat(response.seat()).isEqualTo(new SeatInfo(SECTION_NAME, SEAT_NO, SEAT_COL));
+        // 연락처는 서버에서 가려 내린다. 앱이 가리면 프록시·로그를 원문이 그대로 지나간다.
+        assertThat(response.holder()).isEqualTo(new HolderInfo(HOLDER_NAME, "010****5678"));
         then(eventPublisher).should().publishEvent(new TicketEnteredEvent(TICKET_ID, TOKEN_ID));
     }
 
@@ -89,7 +102,7 @@ class GateEntryServiceTest {
 
         assertThat(response.reasonCode()).isEqualTo(GateRejectReason.INVALID);
         // 아무 문자열이나 던져 티켓 조회를 유발할 수 있으면 안 된다.
-        then(ticketRepository).should(never()).findById(any());
+        then(ticketRepository).should(never()).findForGateEntry(any());
     }
 
     @Test
@@ -105,7 +118,7 @@ class GateEntryServiceTest {
     @Test
     @DisplayName("다른 공연 티켓은 거절한다")
     void rejectsTicketOfAnotherConcert() {
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
 
         GateEntryVerifyResponseDto response = service()
                 .verify(new GateEntryVerifyRequestDto(issuedQr(), OTHER_CONCERT_ID));
@@ -118,11 +131,15 @@ class GateEntryServiceTest {
     void rejectsAlreadyUsedTicket() {
         Ticket ticket = ownedTicket();
         ticket.markUsed();
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ticket));
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
         assertThat(response.reasonCode()).isEqualTo(GateRejectReason.ALREADY_USED);
+        // 운영자가 "이미 입장한 그 자리" 를 확인시켜 줄 수 있어야 한다.
+        assertThat(response.seat()).isEqualTo(new SeatInfo(SECTION_NAME, SEAT_NO, SEAT_COL));
+        // 들여보내지 않은 사람의 예매자 정보까지 단말에 띄울 이유는 없다.
+        assertThat(response.holder()).isNull();
         then(ticketRepository).should(never()).markUsedIfOwned(any());
     }
 
@@ -131,11 +148,14 @@ class GateEntryServiceTest {
     void rejectsRevokedTicket() {
         Ticket ticket = ownedTicket();
         ticket.revoke();
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ticket));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ticket));
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
         assertThat(response.reasonCode()).isEqualTo(GateRejectReason.REVOKED);
+        // 좌석을 알아도 운영자가 할 일이 없는 거절이다. 노출 범위만 넓어진다.
+        assertThat(response.seat()).isNull();
+        assertThat(response.holder()).isNull();
     }
 
     @Test
@@ -143,7 +163,7 @@ class GateEntryServiceTest {
     void rejectsPendingMintTicket() {
         Ticket pending = Ticket.builder().reservation(reservation()).build();
         ReflectionTestUtils.setField(pending, "id", TICKET_ID);
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(pending));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(pending));
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
@@ -156,22 +176,24 @@ class GateEntryServiceTest {
         Ticket consumed = ownedTicket();
         consumed.markUsed();
         // 상태 검사 때는 OWNED 였는데, 그 사이 다른 게이트가 먼저 소진한 상황이다.
-        given(ticketRepository.findById(TICKET_ID))
-                .willReturn(Optional.of(ownedTicket()))
-                .willReturn(Optional.of(consumed));
+        // 재조회만 findById 다 - 사유를 가를 상태 하나면 되고 좌석은 이미 떠 뒀다.
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
+        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(consumed));
         given(ticketRepository.markUsedIfOwned(TICKET_ID)).willReturn(0);
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
         assertThat(response.admitted()).isFalse();
         assertThat(response.reasonCode()).isEqualTo(GateRejectReason.ALREADY_USED);
+        // 소진 UPDATE 가 영속성 컨텍스트를 비운 뒤라, 좌석을 여기서 읽으려 했다면 터졌을 자리다.
+        assertThat(response.seat()).isEqualTo(new SeatInfo(SECTION_NAME, SEAT_NO, SEAT_COL));
         then(eventPublisher).should(never()).publishEvent(any(TicketEnteredEvent.class));
     }
 
     @Test
     @DisplayName("서명은 유효한데 티켓이 없으면 거절한다")
     void rejectsSignedPassWithoutTicket() {
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.empty());
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.empty());
 
         GateEntryVerifyResponseDto response = service().verify(request(issuedQr()));
 
@@ -181,7 +203,7 @@ class GateEntryServiceTest {
     @Test
     @DisplayName("온체인 소유자가 다르면 거절하고 티켓을 태우지 않는다")
     void rejectsWhenOnChainOwnerDiffers() {
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
         given(walletRepository.findById(MEMBER_ID)).willReturn(Optional.of(wallet()));
         given(ticketNftClient.ownerOf(TOKEN_ID)).willReturn("0xdEaD000000000000000000000000000000000000");
 
@@ -195,7 +217,7 @@ class GateEntryServiceTest {
     @Test
     @DisplayName("온체인 소유자가 같으면 입장시킨다")
     void admitsWhenOnChainOwnerMatches() {
-        given(ticketRepository.findById(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
+        given(ticketRepository.findForGateEntry(TICKET_ID)).willReturn(Optional.of(ownedTicket()));
         given(walletRepository.findById(MEMBER_ID)).willReturn(Optional.of(wallet()));
         given(ticketRepository.markUsedIfOwned(TICKET_ID)).willReturn(1);
         // 체인은 EIP-55 체크섬 대소문자로 돌려주므로 대소문자를 구분해 비교하면 안 된다.
@@ -243,13 +265,22 @@ class GateEntryServiceTest {
     }
 
     private static Reservation reservation() {
-        Member member = Member.builder().phoneNumber("01012345678").name("장민석").nickname("민석").build();
+        Member member = Member.builder()
+                .phoneNumber(HOLDER_PHONE).name(HOLDER_NAME).nickname("민석").build();
         ReflectionTestUtils.setField(member, "id", MEMBER_ID);
 
         Concert concert = Concert.builder().title("입장 테스트 공연").build();
         ReflectionTestUtils.setField(concert, "id", CONCERT_ID);
 
-        return Reservation.builder().concert(concert).member(member).seat(null).build();
+        return Reservation.builder().concert(concert).member(member).seat(seat()).build();
+    }
+
+    /** 좌석은 응답에 실리므로 null 로 둘 수 없다. 구역까지 세워야 구역명이 나온다. */
+    private static Seat seat() {
+        Venue venue = Venue.builder().name("테스트 공연장").address("서울").totalSeatCount(100).build();
+        Section section = Section.builder()
+                .name(SECTION_NAME).price(150_000).rowCount(20).seatPerRow(20).venue(venue).build();
+        return Seat.builder().seatNo(SEAT_NO).seatCol(SEAT_COL).section(section).build();
     }
 
     private static Wallet wallet() {

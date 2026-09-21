@@ -81,6 +81,26 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             nativeQuery = true)
     Page<MyTicketRow> findMyTickets(@Param("memberId") Long memberId, Pageable pageable);
 
+    /**
+     * 게이트 검표가 한 건을 판정하는 데 필요한 것을 한 번에 읽는다.
+     *
+     * <p>LAZY 로 두면 공연 일치 검사, 좌석 응답, 예매자 응답이 각각 쿼리를 내 검표 한 건에 SELECT
+     * 가 다섯이 된다. 그보다 중요한 이유는 {@link #markUsedIfOwned} 가
+     * {@code clearAutomatically} 라 <b>소진 뒤에는 초기화 전 LAZY 를 더는 탈 수 없다</b>는 것이다.
+     * 여기서 다 채워 오면 그 뒤 분기가 무엇을 읽든 안전하다.
+     */
+    @Query("""
+            select t
+              from Ticket t
+              join fetch t.reservation r
+              join fetch r.concert
+              join fetch r.member
+              join fetch r.seat s
+              join fetch s.section
+             where t.id = :ticketId
+            """)
+    Optional<Ticket> findForGateEntry(@Param("ticketId") Long ticketId);
+
     Optional<Ticket> findByIdAndOwnerMemberId(Long ticketId, Long memberId);
 
     boolean existsByIdAndOwnerMemberId(Long ticketId, Long memberId);
