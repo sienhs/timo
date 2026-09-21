@@ -67,7 +67,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LocalDataSeederTest {
 
     /** 좌석 상태가 들어가는 공연. 예매 중인 것만이다. */
-    private static final int EXPECTED_ON_SALE_CONCERTS = 2;
+    private static final int EXPECTED_ON_SALE_CONCERTS = 3;
 
     private static final int EXPECTED_SECTIONS = 5;
     private static final int EXPECTED_SEATS_PER_SECTION = 200;
@@ -189,7 +189,6 @@ class LocalDataSeederTest {
                 .allSatisfy(section -> {
                     assertThat(section.seatCount()).isEqualTo(EXPECTED_SEATS_PER_SECTION);
                     assertThat(section.rowCount()).isEqualTo(10);
-                    assertThat(section.seatPerRow()).isEqualTo(20);
                 });
         assertThat(sections.sections())
                 .extracting(SectionSummary::name)
@@ -197,6 +196,10 @@ class LocalDataSeederTest {
         assertThat(sections.sections())
                 .extracting(SectionSummary::price)
                 .containsExactly(150_000, 150_000, 120_000, 120_000, 99_000);
+        // 사다리꼴 배치라 구역마다 격자 폭(가장 넓은 열)이 다르다 - A·B·D·E는 25, 뒤쪽 C는 22.
+        assertThat(sections.sections())
+                .extracting(SectionSummary::seatPerRow)
+                .containsExactly(25, 25, 22, 25, 25);
     }
 
     @Test
@@ -330,7 +333,7 @@ class LocalDataSeederTest {
         flushAndClear();
 
         List<Concert> concerts = concertRepository.findAll();
-        assertThat(concerts).hasSize(4);
+        assertThat(concerts).hasSize(5);
 
         for (Concert concert : concerts) {
             if (concert.getStatus() == ConcertStatus.SCHEDULED) {
@@ -368,7 +371,7 @@ class LocalDataSeederTest {
 
 
     @Test
-    @DisplayName("공연 4건을 상태·조회수·이미지까지 시드대로 넣는다")
+    @DisplayName("공연 5건을 상태·조회수·이미지까지 시드대로 넣는다")
     void seedsFourConcertsWithTheirStateAndImages() {
         seeder.run(new DefaultApplicationArguments());
         flushAndClear();
@@ -376,7 +379,7 @@ class LocalDataSeederTest {
         Map<String, Concert> concerts = concertRepository.findAll().stream()
                 .collect(Collectors.toMap(Concert::getTitle, Function.identity()));
 
-        assertThat(concerts).hasSize(4);
+        assertThat(concerts).hasSize(5);
 
         assertThat(concerts.get("김필 단독 콘서트"))
                 .satisfies(concert -> {
@@ -453,7 +456,7 @@ class LocalDataSeederTest {
         newSeeder().run(new DefaultApplicationArguments());
         flushAndClear();
 
-        assertThat(concertRepository.count()).isEqualTo(4);
+        assertThat(concertRepository.count()).isEqualTo(5);
         assertThat(seatRepository.count()).isEqualTo(seatsAfterFirstRun);
         assertThat(venueRepository.findAll())
                 .filteredOn(venue -> venue.getName().equals("고척돔"))
