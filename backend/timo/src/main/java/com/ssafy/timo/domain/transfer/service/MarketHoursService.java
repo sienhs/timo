@@ -60,17 +60,28 @@ public class MarketHoursService {
     }
 
     /**
-     * 이 시각보다 먼저 등록된 매물만 남에게 보인다. 오늘 00:00 이다.
+     * 이 시각보다 먼저 등록된 매물만 남에게 보인다. 기본값은 오늘 00:00,
+     * 등록 대기를 끈 시연 모드는 내일 00:00으로 오늘 매물도 포함한다.
      *
      * <p>"등록 다음 날 08:00 에 올라간다" 를 날짜 하나로 옮긴 것이다. 창은 어차피 08:00 에 열리므로,
      * 창 안에서 "어제까지 등록된 것" 을 보이면 그게 곧 다음 날 08:00 노출이다.
      */
     public LocalDateTime visibleBefore() {
-        return LocalDate.now(clock).atStartOfDay();
+        // 시연 모드에서는 오늘 등록된 매물도 조회·구매 대상에 포함한다.
+        // exclusive cutoff를 내일 자정으로 두어 등록 시각과 조회 시각이 같아도 노출한다.
+        LocalDate today = LocalDate.now(clock);
+        return (properties.listingDelayEnabled() ? today : today.plusDays(1)).atStartOfDay();
     }
 
     /** 이 시각에 등록된 매물이 처음 보이는 시각. 등록 다음 날의 여는 시각이다. */
     public LocalDateTime visibleFrom(LocalDateTime listedAt) {
+        if (!properties.listingDelayEnabled()) {
+            LocalDateTime opensAt = listedAt.toLocalDate().atTime(properties.openAt());
+            LocalDateTime closesAt = listedAt.toLocalDate().atTime(properties.closeAt());
+            if (listedAt.isBefore(opensAt)) return opensAt;
+            if (listedAt.truncatedTo(ChronoUnit.SECONDS).isAfter(closesAt)) return opensAt.plusDays(1);
+            return listedAt;
+        }
         return listedAt.toLocalDate().plusDays(1).atTime(properties.openAt());
     }
 

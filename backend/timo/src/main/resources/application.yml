@@ -87,6 +87,9 @@ entry-pass:
 # 환경마다 다르면 "로컬은 되는데 배포하면 409" 가 나므로 여기 한 곳에만 둔다.
 market:
   hours:
+    # false: 오늘 등록한 매물도 즉시 조회·구매 가능(마켓 운영 시간 제한은 유지).
+    # 환경변수 변경 후 백엔드를 재시작해야 적용된다.
+    listing-delay-enabled: ${MARKET_LISTING_DELAY_ENABLED:true}
     open-at: "08:00:00"
     close-at: "23:00:00"
 

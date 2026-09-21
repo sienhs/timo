@@ -122,6 +122,15 @@ class LocalDataSeederTest {
     private TicketRepository ticketRepository;
 
     @Autowired
+    private com.ssafy.timo.domain.transfer.repository.TicketListingRepository ticketListingRepository;
+
+    @Autowired
+    private com.ssafy.timo.domain.blockchain.TicketNftClient ticketNftClient;
+
+    @Autowired
+    private com.ssafy.timo.domain.transfer.service.PurchaseService purchaseService;
+
+    @Autowired
     private SeatHoldRepository seatHoldRepository;
 
     @Autowired
@@ -256,15 +265,62 @@ class LocalDataSeederTest {
         assertThat(tickets).hasSize((int) reservationRepository.count());
 
         // OWNED 여야 한다. PENDING_MINT 면 ListingService 가 "발행 전 티켓" 으로 거절해
-        // 로컬에서 양도 등록을 만져 볼 수 없다.
+        // 로컬에서 양도 등록을 만져 볼 수 없다. 시드가 매물로 연 티켓만 LISTED 다.
         assertThat(tickets).allSatisfy(ticket ->
-                assertThat(ticket.getStatus()).isEqualTo(TicketStatus.OWNED));
+                assertThat(ticket.getStatus()).isIn(TicketStatus.OWNED, TicketStatus.LISTED));
 
         // tokenId 는 uk_ticket_token_id 가 걸려 있어 주문마다 달라야 한다.
         assertThat(tickets).extracting(Ticket::getTokenId).doesNotContainNull().doesNotHaveDuplicates();
         // 해시 컬럼이 66자(0x + 64)라 형식이 어긋나면 저장 단계에서 잘린다.
         assertThat(tickets).allSatisfy(ticket ->
                 assertThat(ticket.getMintTxHash()).hasSize(66).startsWith("0x"));
+    }
+
+    @Test
+    @DisplayName("예매 중인 공연마다 양도 매물이 열리고, 어제 등록이라 당일에 바로 보인다")
+    void seedsTransferListings() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        List<com.ssafy.timo.domain.transfer.entity.TicketListing> listings = ticketListingRepository.findAll();
+
+        // 예매 중인 공연 2건 x 공연당 2건.
+        assertThat(listings).hasSize(EXPECTED_ON_SALE_CONCERTS * 2);
+        assertThat(listings).allSatisfy(listing -> {
+            assertThat(listing.getStatus())
+                    .isEqualTo(com.ssafy.timo.domain.transfer.entity.ListingStatus.LISTED);
+            // 등록 다음 날부터 보이므로 어제여야 기동 당일에 목록과 구매가 열린다.
+            assertThat(listing.getListedAt()).isBefore(LocalDateTime.now(clock).toLocalDate().atStartOfDay());
+            // 정가 초과 판매 차단이 이 서비스의 존재 이유다. 시드가 그 규칙을 깨면 안 된다.
+            assertThat(listing.getPrice()).isLessThanOrEqualTo(listing.getFaceValue());
+            // 매물이 열린 티켓은 LISTED 여야 판매자가 먼저 입장하는 이중 입장이 막힌다.
+            assertThat(ticketRepository.findById(listing.getTicketId()).orElseThrow().getStatus())
+                    .isEqualTo(TicketStatus.LISTED);
+        });
+    }
+
+    @Test
+    @DisplayName("시드 매물을 사면 소유자가 구매자로 넘어가고 매물이 닫힌다")
+    void seededListingCanBePurchased() {
+        seeder.run(new DefaultApplicationArguments());
+        flushAndClear();
+
+        com.ssafy.timo.domain.transfer.entity.TicketListing listing = ticketListingRepository.findAll().getFirst();
+        Long ticketId = listing.getTicketId();
+        com.ssafy.timo.domain.member.entity.Member buyer = memberRepository.save(
+                com.ssafy.timo.domain.member.entity.Member.builder()
+                        .phoneNumber("01055556666").name("구매자").nickname("시드구매자").build());
+        flushAndClear();
+
+        purchaseService.purchase(listing.getId(),
+                new com.ssafy.timo.domain.transfer.dto.PurchaseRequestDto(listing.getPrice()), buyer.getId());
+        flushAndClear();
+
+        Ticket sold = ticketRepository.findById(ticketId).orElseThrow();
+        assertThat(sold.getOwnerMemberId()).isEqualTo(buyer.getId());
+        assertThat(sold.getStatus()).isEqualTo(TicketStatus.OWNED);
+        assertThat(ticketListingRepository.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(com.ssafy.timo.domain.transfer.entity.ListingStatus.SOLD);
     }
 
     @Test
@@ -424,6 +480,8 @@ class LocalDataSeederTest {
                 loginInfoRepository,
                 reservationRepository,
                 ticketRepository,
+                ticketListingRepository,
+                ticketNftClient,
                 passwordEncoder,
                 em,
                 clock,

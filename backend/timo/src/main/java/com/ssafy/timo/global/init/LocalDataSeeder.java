@@ -5,7 +5,9 @@ import com.ssafy.timo.domain.artist.repository.ArtistRepository;
 import com.ssafy.timo.domain.auth.entity.LoginInfo;
 import com.ssafy.timo.domain.auth.repository.LoginInfoRepository;
 import com.ssafy.timo.domain.blockchain.ContractCallException;
+import com.ssafy.timo.domain.blockchain.MintResult;
 import com.ssafy.timo.domain.blockchain.ShowRegistryClient;
+import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.global.config.blockchain.BlockchainProperties;
 import com.ssafy.timo.domain.concert.dto.CommandConcertRequestDto;
 import com.ssafy.timo.domain.concert.dto.CommandConcertResponseDto;
@@ -21,6 +23,8 @@ import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.transfer.entity.TicketListing;
+import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SeatPositionRequest;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto.SectionLayout;
@@ -59,6 +63,7 @@ import java.net.URLConnection;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -156,6 +161,25 @@ public class LocalDataSeeder implements ApplicationRunner {
      * 쓰면 {@code uk_ticket_token_id} 가 충돌할 수 있어, 겹칠 일이 없는 높은 대역을 쓴다.
      */
     private static final long SEED_TOKEN_ID_START = 1_000_000_000L;
+
+    /**
+     * 공연 하나에 열어 둘 시드 매물 수.
+     *
+     * <p>목록이 비어 보이지 않을 만큼만이다. 체인이 붙어 있으면 이 수만큼 온체인 발행이 일어나므로
+     * ({@link #seedListings}) 늘릴수록 최초 기동이 느려진다.
+     */
+    private static final int LISTINGS_PER_CONCERT = 2;
+
+    /** 시드 등록가는 정가의 이 비율이다. 정가 초과는 등록 자체가 막히므로 100 을 넘기면 안 된다. */
+    private static final int SEED_LIST_PRICE_PERCENT = 90;
+
+    /**
+     * 시드 매물의 등록 시각. <b>어제여야 한다.</b>
+     *
+     * <p>매물은 등록 다음 날 08:00 부터 남에게 보인다({@code MarketHoursService.visibleBefore}).
+     * 오늘로 두면 기동 당일에는 목록에도 없고 구매도 409 라 데모가 성립하지 않는다.
+     */
+    private static final LocalTime LISTED_AT_TIME = LocalTime.of(20, 0);
 
     private static final int OCCUPIED_EVERY = 9;
     private static final int RESERVED_EVERY = 13;
@@ -305,6 +329,8 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final LoginInfoRepository loginInfoRepository;
     private final ReservationRepository reservationRepository;
     private final TicketRepository ticketRepository;
+    private final TicketListingRepository ticketListingRepository;
+    private final TicketNftClient ticketNftClient;
     private final PasswordEncoder passwordEncoder;
     private final EntityManager entityManager;
     private final Clock clock;
@@ -347,11 +373,14 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         // 좌석 상태는 공연이 생긴 뒤에 입힌다. 선점·판매가 공연별 행이라 공연 없이는 만들 수 없다.
         List<Long> onSaleConcertIds = onSaleConcerts.stream().map(OnSaleConcert::id).toList();
-        markSomeSeatsTaken(venueId, onSaleConcertIds);
+        List<Reservation> sold = markSomeSeatsTaken(venueId, onSaleConcertIds);
 
         // 좌석 배치까지 끝난 뒤에 체인 등록을 한다 - 실패해도 이미 넣은 시드 데이터에는 영향이 없다.
         int totalSeats = SECTION_SEEDS.size() * SEATS_PER_SECTION;
         registerOnChain(onSaleConcerts, totalSeats, venueId);
+
+        // 매물은 체인 등록 뒤에 연다. 온체인 발행에 공연의 showId 가 필요한데 그 값이 방금 채워졌다.
+        seedListings(sold, venueId);
 
         log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", CONCERT_SEEDS.size(), venueId);
     }
@@ -488,8 +517,10 @@ public class LocalDataSeeder implements ApplicationRunner {
      *
      * <p>판매를 먼저 넣는다. {@link SeatService#hold} 가 이미 팔린 자리를 거절하므로 순서가 뒤집히면
      * 겹치는 자리(117번째)에서 기동이 실패한다.
+     *
+     * @return 만들어진 판매 주문. {@link #seedListings} 가 이 가운데 일부를 매물로 연다
      */
-    private void markSomeSeatsTaken(Long venueId, List<Long> concertIds) {
+    private List<Reservation> markSomeSeatsTaken(Long venueId, List<Long> concertIds) {
         List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId);
         Map<Long, List<Seat>> seatsBySection = sections.stream()
                 .collect(Collectors.toMap(
@@ -536,6 +567,8 @@ public class LocalDataSeeder implements ApplicationRunner {
         log.info("로컬 시드: 시드 계정으로 로그인할 수 있다. id={}001~{}{} / pw={}",
                 SEED_MEMBER_USERNAME_PREFIX, SEED_MEMBER_USERNAME_PREFIX,
                 String.format("%03d", holders.size()), SEED_MEMBER_PASSWORD);
+
+        return sold;
     }
 
     /**
@@ -571,6 +604,90 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         ticketRepository.saveAll(tickets);
         log.info("시드 티켓 {}장을 발행 완료 상태로 넣었다", tickets.size());
+    }
+
+    /**
+     * 시드 주문 가운데 일부를 양도 매물로 연다. 마켓 화면이 빈 목록으로 뜨지 않게 하는 것이 목적이다.
+     *
+     * <p><b>등록 서비스를 거치지 않는다.</b> {@code ListingService.register} 는 등록 시각을
+     * {@code now} 로 박는데, 매물은 <b>등록 다음 날</b>부터 남에게 보인다({@code MarketHoursService}).
+     * 시드가 그 경로를 타면 기동 당일에는 아무것도 안 보여 데모가 성립하지 않는다. 그래서 여기서
+     * 등록 시각을 어제로 두고 직접 만든다 - 주문과 티켓도 같은 이유로 리포지토리에 직접 넣는다.
+     *
+     * <p>체인이 붙어 있으면 <b>매물로 쓸 티켓만 실제로 발행한다.</b> {@link #seedTickets} 가 박아 둔
+     * {@code tokenId} 는 체인에 없는 가짜라, 그대로 두면 구매자가 결제하는 순간 {@code Marketplace.buy}
+     * 가 없는 토큰을 건드려 되돌려진다. 판매자 지갑도 이때 함께 만든다 - 없으면 등록과 체결 양쪽에서
+     * {@code walletService.getAddress} 가 터진다.
+     *
+     * <p>전 좌석을 발행하지 않는 이유는 {@link #seedTickets} 주석과 같다. 매물 수만큼이면 공연당
+     * 두 건이라 기동이 느려지지 않는다.
+     */
+    private void seedListings(List<Reservation> sold, Long venueId) {
+        List<Section> sections = sectionRepository.findAllByVenueIdOrderByIdAsc(venueId);
+        LocalDateTime listedAt = LocalDateTime.now(clock).toLocalDate().minusDays(1).atTime(LISTED_AT_TIME);
+        boolean onChain = blockchainProperties.hasRealAdminPrivateKey();
+
+        Map<Long, List<Reservation>> byConcert = sold.stream()
+                .collect(Collectors.groupingBy(reservation -> reservation.getConcert().getId(),
+                        java.util.LinkedHashMap::new, Collectors.toList()));
+
+        // 판매자 지갑은 회원마다 하나다. 같은 시드 회원이 공연을 바꿔 가며 다시 나오므로 여기서 모은다.
+        Map<Long, String> sellerAddresses = new java.util.HashMap<>();
+
+        int opened = 0;
+        for (List<Reservation> reservations : byConcert.values()) {
+            for (Reservation reservation : reservations.stream().limit(LISTINGS_PER_CONCERT).toList()) {
+                if (openSeedListing(reservation, sections, listedAt, onChain, sellerAddresses)) {
+                    opened++;
+                }
+            }
+        }
+
+        log.info("로컬 시드: 양도 매물 {}건을 열었다. 온체인 발행={}", opened, onChain);
+    }
+
+    /** 매물 하나. 체인 호출이 실패하면 그 매물만 건너뛰고 나머지 시드는 살린다. */
+    private boolean openSeedListing(Reservation reservation,
+                                    List<Section> sections,
+                                    LocalDateTime listedAt,
+                                    boolean onChain,
+                                    Map<Long, String> sellerAddresses) {
+        Ticket ticket = ticketRepository.findByReservationId(reservation.getId()).orElseThrow();
+        Seat seat = reservation.getSeat();
+        Section section = seat.getSection();
+        long price = section.getPrice() * SEED_LIST_PRICE_PERCENT / 100;
+        Member seller = reservation.getMember();
+
+        if (onChain) {
+            try {
+                String sellerAddress = sellerAddresses.computeIfAbsent(
+                        seller.getId(), id -> walletService.createWallet(seller).getAddress());
+                // 가짜 tokenId 를 진짜로 갈아 끼운다. 상태는 이미 OWNED 라 바뀌지 않는다.
+                MintResult minted = ticketNftClient.mintTicket(sellerAddress, reservation.getConcert().getShowId(),
+                        BigInteger.valueOf(seat.getId()), sectionIndexOf(sections, section));
+                ticket.markMinted(minted.tokenId(), minted.transactionHash());
+                ticketNftClient.listForTransferFor(minted.tokenId(), sellerAddress, BigInteger.valueOf(price));
+            } catch (ContractCallException e) {
+                log.warn("시드 매물 온체인 준비 실패, 이 매물은 건너뛴다 (reservationId={})", reservation.getId(), e);
+                return false;
+            }
+        }
+
+        ticket.markListed();
+        ticketListingRepository.save(TicketListing.open(
+                ticket.getId(), seller.getId(), reservation.getConcert(), section,
+                seat.getSeatNo(), seat.getSeatCol(), price, section.getPrice(), listedAt));
+        return true;
+    }
+
+    /** {@code ReservationSettlementRunner} 와 같은 순서여야 온체인 구역 가격 배열과 어긋나지 않는다. */
+    private int sectionIndexOf(List<Section> sections, Section section) {
+        for (int index = 0; index < sections.size(); index++) {
+            if (sections.get(index).getId().equals(section.getId())) {
+                return index;
+            }
+        }
+        throw new IllegalStateException("구역이 공연장 구역 목록에 없습니다 (sectionId=" + section.getId() + ")");
     }
 
     private static BigInteger seedTokenId(Reservation reservation) {
