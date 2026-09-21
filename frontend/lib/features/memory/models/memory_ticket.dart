@@ -23,6 +23,7 @@ class MemoryTicket {
     this.depthMapPath,
     this.processingNotes = const [],
     this.transition = const {},
+    this.confirmed = false,
   });
   final String ticketId,
       concertId,
@@ -42,6 +43,10 @@ class MemoryTicket {
   final List<String> depthLayers, processingNotes;
   final bool demoDepth;
   final Map<String, dynamic> transition;
+
+  /// 확정했는가. 확정하기 전에는 기기에만 있고 고칠 수 있다. 확정하면 서버로
+  /// 가고 그 뒤로는 고치지도 지우지도 못한다 — 서버에 수정·삭제가 없다.
+  final bool confirmed;
   TicketEffect get effect => TicketEffect.fromLabel(effectType);
 
   /// Copy with a re-rendered background (used when an older ticket is
@@ -54,6 +59,7 @@ class MemoryTicket {
     List<String>? processingNotes,
     List<PersonDepthLayer>? personDepthLayers,
     String? effectType,
+    bool? confirmed,
   }) => MemoryTicket(
     ticketId: ticketId,
     concertId: concertId,
@@ -74,6 +80,7 @@ class MemoryTicket {
     demoDepth: demoDepth ?? this.demoDepth,
     processingNotes: processingNotes ?? this.processingNotes,
     transition: transition,
+    confirmed: confirmed ?? this.confirmed,
   );
   Map<String, dynamic> toJson() => {
     'ticketId': ticketId,
@@ -95,6 +102,7 @@ class MemoryTicket {
     'demoDepth': demoDepth,
     'processingNotes': processingNotes,
     'transition': transition,
+    'confirmed': confirmed,
   };
 
   /// 서버(`goods` 단일 테이블)로 올릴 페이로드.
@@ -161,8 +169,9 @@ class MemoryTicket {
         'demoDepth': demoDepth,
         'manualPersonLayout': manualPersonLayout,
       },
-      // details 에는 좌석·게이트·예매 번호·입장 안내도 있지만 소장품에는
-      // 저장하지 않기로 했다(docs/ERD_SERVICE_INTEGRATION.md).
+      // details 에는 좌석·예매 번호도 있지만 소장품에는 저장하지 않기로 했다
+      // (docs/ERD_SERVICE_INTEGRATION.md). 예전에 저장된 것에는 게이트·입장
+      // 안내도 남아 있는데, 마찬가지로 싣지 않는다.
       'concert_snapshot': {
         'title': details['공연명'],
         'artist': details['아티스트'],
@@ -225,5 +234,8 @@ class MemoryTicket {
     demoDepth: j['demoDepth'] as bool,
     processingNotes: List<String>.from(j['processingNotes'] as List? ?? []),
     transition: Map<String, dynamic>.from(j['transition'] as Map? ?? {}),
+    // 확정 개념이 생기기 전에 저장된 것은 이미 만들어 둔 소장품이다. 임시로
+    // 되돌리면 멀쩡한 소장품에 '임시' 딱지가 붙는다.
+    confirmed: j['confirmed'] as bool? ?? true,
   );
 }

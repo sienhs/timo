@@ -5,6 +5,7 @@ import '../constants.dart';
 import '../models/memory_concert.dart';
 import '../state/creation_job_scope.dart';
 import '../state/memory_concert_api_scope.dart';
+import '../state/ticket_store_scope.dart';
 import '../widgets/creator/concert_card.dart';
 import '../widgets/creator/processing_orbit.dart';
 import '../widgets/creator/processing_stage.dart';
@@ -16,6 +17,7 @@ import '../widgets/creator/step_progress.dart';
 import '../widgets/viewer/effect_layer.dart';
 import '../widgets/viewer/volumetric_lab.dart';
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/timo_mascot.dart';
 import '../motion/motion_tokens.dart';
 import '../motion/reveal.dart';
 import '../motion/staggered_text.dart';
@@ -25,13 +27,14 @@ import '../models/ticket_effect.dart';
 import '../models/photo_framing.dart';
 import '../theme/timo_colors.dart';
 import '../widgets/ui/glow_button.dart';
+import '../widgets/ui/local_image.dart';
 import '../widgets/ui/paper_card.dart';
 import '../state/creation_job.dart';
 import '../data/creation_service.dart';
 import 'memory_page_route.dart';
 import 'memory_ticket_screen.dart';
 
-/// 다섯 단계(공연 → 배경 → 인물 → 인물 추가 → 이펙트) 뒤에 '제작중' 단계.
+/// 여섯 단계(공연 → 배경 → 인물 → 인물 추가 → 인물 조정 → 이펙트) 뒤에 '제작중' 단계.
 ///
 /// 생성 자체는 [CreationJob] 에서 돌기 때문에 이 화면을 떠나도 취소되지 않는다.
 class CreatorScreen extends StatefulWidget {
@@ -65,6 +68,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
   final people = <Map<String, dynamic>>[];
   TicketEffect effect = TicketEffect.none;
   String status = CreatorText.processing[0];
+
   /// 사진 복사·보정처럼 화면을 잠가야 하는 작업이 도는 중.
   bool busy = false;
 
@@ -121,13 +125,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
       return picked?.path;
     } catch (_) {
       if (mounted) {
-        OverlayService.notify(
-          context,
-          switch (from) {
-            PhotoSource.gallery => CreatorText.permissionFailed,
-            PhotoSource.camera => CreatorText.cameraFailed,
-          },
-        );
+        OverlayService.notify(context, switch (from) {
+          PhotoSource.gallery => CreatorText.permissionFailed,
+          PhotoSource.camera => CreatorText.cameraFailed,
+        });
       }
       return null;
     }
@@ -141,6 +142,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
       source = await pickPhoto(from);
     }
     if (source == null || !mounted) return;
+    var advance = false;
     setState(() {
       busy = true;
       status = step == 1
@@ -188,11 +190,19 @@ class _CreatorScreenState extends State<CreatorScreen> {
           people.add(person);
         }
         await harmonizePeople(changed: {personIndex});
+        // 인물은 고르면 곧바로 다음으로 넘어간다. 고른 뒤 이 화면에 남아서 할
+        // 일이 없어, '다음으로' 를 누르는 손이 한 번 더 들어갈 뿐이었다.
+        advance = true;
       }
     } catch (_) {
       if (mounted) OverlayService.notify(context, CreatorText.photoFailed);
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() {
+          busy = false;
+          if (advance && !lastStep) step++;
+        });
+      }
     }
   }
 
@@ -230,11 +240,24 @@ class _CreatorScreenState extends State<CreatorScreen> {
 
   void openResult() {
     final ticket = result;
-    if (ticket == null) return;
+    final made = concert;
+    if (ticket == null || made == null) return;
     CreationJobScope.read(context).acknowledge();
     Navigator.pushReplacement(
       context,
-      stageRoute<void>(MemoryTicketScreen(ticket: ticket, created: true)),
+      stageRoute<void>(
+        MemoryTicketScreen(
+          ticket: ticket,
+          created: true,
+          // 방금 만든 것은 아직 임시다. 마음에 안 들면 같은 공연으로 곧장
+          // 다시 만들 수 있어야 한다. 이 화면은 그때 이미 교체된 뒤라 여기
+          // context 를 가둬 쓸 수 없다 — 소장품 화면이 제 것을 넘겨준다.
+          onEdit: (viewer) => Navigator.pushReplacement(
+            viewer,
+            memoryRoute<void>(CreatorScreen(initialConcert: made)),
+          ),
+        ),
+      ),
     );
   }
 
@@ -311,12 +334,11 @@ class _CreatorScreenState extends State<CreatorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _SectionLabel(step == 1 ? '선택한 사진' : '배경 위에서 조정'),
+                _SectionLabel(step == 1 ? '선택한 사진' : '고른 인물'),
                 const SizedBox(height: 10),
-                if (step == 1)
-                  backgroundEditor(chosen)
-                else
-                  compositionEditor(),
+                // 인물 단계에서는 고른 사진만 보여준다. 옮기고 키우는 일은
+                // 인물을 다 고른 뒤 제 단계에서 한 자리에 모아 한다.
+                if (step == 1) backgroundEditor(chosen) else personPreview(),
                 if (step > 1)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -342,16 +364,24 @@ class _CreatorScreenState extends State<CreatorScreen> {
             ),
           ),
         ],
-        if (step >= 2 &&
-            chosen == null &&
-            people.isNotEmpty &&
-            background != null) ...[
-          const SizedBox(height: 16),
-          compositionEditor(),
-        ],
       ],
     );
   }
+
+  /// 인물 단계에서 방금 고른 누끼를 확인만 하는 자리. 조작은 없다.
+  Widget personPreview() => PaperCard(
+    padding: const EdgeInsets.all(12),
+    radius: 14,
+    elevated: false,
+    color: TimoColors.paperMuted,
+    child: SizedBox(
+      height: CreatorLayout.personPreviewHeight,
+      child: LocalImage(
+        people[personIndex]['path'] as String,
+        fit: BoxFit.contain,
+      ),
+    ),
+  );
 
   String personStatus(int index) {
     final p = people[index];
@@ -441,40 +471,44 @@ class _CreatorScreenState extends State<CreatorScreen> {
   Widget concertList() => AsyncBoundary<List<MemoryConcert>>(
     future: _concerts,
     onRetry: _reloadConcerts,
-    builder: (context, concerts) => Column(
-      children: [
-        for (var i = 0; i < concerts.length; i++)
-          Reveal(
-            index: i,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: ConcertCard(
-                title: concerts[i].title,
-                date: '${concerts[i].date} ${concerts[i].ticketDetails['시간']}',
-                venue: concerts[i].venue,
-                seat: concerts[i].ticketDetails['좌석']!,
-                poster: concerts[i].poster,
-                selected: concert?.id == concerts[i].id,
-                actionLabel: CreatorText.concertAction,
-                onTap: () => setState(() => concert = concerts[i]),
-                onAction: () => setState(() {
-                  concert = concerts[i];
-                  step = 1;
-                }),
+    builder: (context, concerts) {
+      // 이미 만든 티켓은 내리지 않는다. 티켓 한 장에 소장품은 하나뿐이라
+      // 골라 봤자 예전 것을 덮어쓸 뿐이다. 고치는 길은 컬렉션 쪽에 있다.
+      final made = {
+        for (final t in TicketStoreScope.of(context).readAll()) t.ticketId,
+      };
+      final pickable = [
+        for (final c in concerts)
+          if (!made.contains(c.ticketId)) c,
+      ];
+      if (pickable.isEmpty) return const _NoConcerts();
+      return Column(
+        children: [
+          for (var i = 0; i < pickable.length; i++)
+            Reveal(
+              index: i,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: ConcertCard(
+                  title: pickable[i].title,
+                  date:
+                      '${pickable[i].date} ${pickable[i].ticketDetails['시간']}',
+                  venue: pickable[i].venue,
+                  seat: pickable[i].ticketDetails['좌석']!,
+                  poster: pickable[i].poster,
+                  selected: concert?.id == pickable[i].id,
+                  onTap: () => setState(() => concert = pickable[i]),
+                ),
               ),
             ),
-          ),
-      ],
-    ),
+        ],
+      );
+    },
   );
 
   /// Live previews: every tile runs the real stage effect renderer.
   Widget effectGrid() => Column(
     children: [
-      if (background != null && people.isNotEmpty) ...[
-        compositionEditor(),
-        const SizedBox(height: 24),
-      ],
       GridView.count(
         crossAxisCount: 2,
         shrinkWrap: true,
@@ -519,6 +553,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
   Widget stepContent() {
     if (step == 0) return concertList();
     if (step < 4) return photoGrid();
+    if (step == 4) return compositionEditor();
     return effectGrid();
   }
 
@@ -642,7 +677,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
 
   Widget? bottomBar(CreationJobState job) {
     if (busy) return null;
-    final Widget primary;
+    Widget? primary;
     Widget? secondary;
     if (submitted) {
       if (result != null) {
@@ -663,18 +698,39 @@ class _CreatorScreenState extends State<CreatorScreen> {
           onPressed: null,
         );
       }
-    } else if (step == 0) {
-      // The concert cards carry their own action.
+    } else if (step == 2) {
+      // 인물은 고르는 순간 넘어간다. 아래에서 한 번 더 누를 것이 없다.
       return null;
     } else {
-      primary = GlowButton(
-        label: CreatorText.nextLabel,
-        onPressed: canContinue
-            ? () => lastStep ? submit() : setState(() => step++)
-            : null,
-      );
-      if (step >= 3) {
-        secondary = TextButton(
+      // 인물을 더 넣는 단계에서도 고르면 저절로 넘어간다. 남는 선택은 "안
+      // 넣는다" 뿐이라 건너뛰기만 세운다.
+      if (step != 3) {
+        primary = GlowButton(
+          // 공연을 고르는 첫 단계에서는 이 버튼이 곧 시작 버튼이다.
+          label: step == 0 ? CreatorText.concertAction : CreatorText.nextLabel,
+          onPressed: canContinue
+              ? () => lastStep ? submit() : setState(() => step++)
+              : null,
+        );
+      }
+      // 건너뛰기가 뜨는 곳은 두 군데다 — 인물을 더 안 넣을 때와, 효과 없이
+      // 만들 때. 인물 조정 단계는 건너뛸 것이 없다(안 만지면 그대로 간다).
+      if (step == 3 || lastStep) {
+        // 글자만 있으면 버튼으로 안 읽혀 그냥 지나친다. 주 버튼(채운 초록)과
+        // 나란히 서도 한쪽만 주인공이도록 테두리만 두른다.
+        secondary = OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(CreatorLayout.skipButtonHeight),
+            foregroundColor: TimoColors.brandMid,
+            side: const BorderSide(color: TimoColors.brandMid, width: 1.4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           onPressed: () {
             if (step == 3) {
               if (people.length > 1) {
@@ -701,8 +757,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
         14,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
-        children: [primary, ?secondary],
+        spacing: primary == null ? 0 : 8,
+        children: [?primary, ?secondary],
       ),
     );
   }
@@ -845,5 +903,41 @@ class _EffectPreview extends StatelessWidget {
           ),
         ),
     ],
+  );
+}
+
+/// 만들 수 있는 공연이 하나도 없을 때. 목록 대신 같은 자리에 선다.
+class _NoConcerts extends StatelessWidget {
+  const _NoConcerts();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 60),
+    child: Column(
+      children: [
+        const Reveal(child: TimoMascot.sad(size: 140)),
+        const SizedBox(height: 24),
+        const Reveal(
+          index: 1,
+          child: Text(
+            CreatorText.noConcertsTitle,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: TimoColors.ink,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Reveal(
+          index: 2,
+          child: Text(
+            CreatorText.noConcertsBody,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: TimoColors.inkSecondary),
+          ),
+        ),
+      ],
+    ),
   );
 }

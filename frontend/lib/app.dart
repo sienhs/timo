@@ -30,12 +30,14 @@ import 'features/home/state/home_api_scope.dart';
 import 'features/home/state/recent_search_scope.dart';
 import 'features/memory/data/memory_concert_api.dart';
 import 'features/memory/data/ticket_store.dart';
+import 'features/memory/data/tilt_setting.dart';
 import 'features/memory/motion/ambient_motion.dart';
 import 'features/memory/motion/motion_tokens.dart';
 import 'features/memory/state/creation_job.dart';
 import 'features/memory/state/creation_job_scope.dart';
 import 'features/memory/state/memory_concert_api_scope.dart';
 import 'features/memory/state/ticket_store_scope.dart';
+import 'features/memory/state/tilt_setting_scope.dart';
 import 'features/memory/widgets/creation_notification_host.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
@@ -75,6 +77,7 @@ class App extends StatefulWidget {
     this.favoriteArtistStore,
     this.showApi,
     this.ticketStore,
+    this.tiltSettingStore,
     this.memoryConcertApi,
     this.resaleApi,
     this.push,
@@ -130,6 +133,10 @@ class App extends StatefulWidget {
   /// (위젯 테스트, 또는 기기 저장소를 못 연 실행) 앱을 끄면 사라지는 구현으로
   /// 시작한다.
   final TicketStore? ticketStore;
+
+  /// 기울임 효과를 켤지 말지를 남길 기기 저장소. main 이 기기 설정 저장소
+  /// 구현을 넘긴다. 안 넘기면(위젯 테스트) 앱을 끄면 사라진다.
+  final TiltSettingStore? tiltSettingStore;
 
   /// 소장품을 만들 수 있는 공연 카탈로그 API. 안 넘기면 목을 쓴다 — 아직
   /// 백엔드에 이 주소가 없다([MemoryConcertApi] 주석).
@@ -319,6 +326,12 @@ class _AppState extends State<App> {
   late final TicketStore _ticketStore =
       widget.ticketStore ?? InMemoryTicketStore();
 
+  /// 기울임 효과 설정. 소장품 화면 여러 곳이 같은 값을 봐야 해서 앱에 하나만
+  /// 두고 [TiltSettingScope] 로 내려준다.
+  late final TiltSetting _tiltSetting = TiltSetting(
+    widget.tiltSettingStore ?? InMemoryTiltSettingStore(),
+  );
+
   late final MemoryConcertApi _memoryConcertApi =
       widget.memoryConcertApi ?? MockMemoryConcertApi();
 
@@ -362,6 +375,10 @@ class _AppState extends State<App> {
     // 아티스트 찜은 기기에 있다. 검색 결과의 하트가 빨리 맞아야 해서 바로
     // 읽되, 기다리지는 않는다 — 수 ms 뒤 저장소가 알리면 하트가 채워진다.
     _favoriteStore.restoreArtists().ignore();
+
+    // 기울임 설정도 같은 이유로 기다리지 않는다. 읽히기 전에 소장품을 열면
+    // 기본값(켜짐)으로 잠깐 움직이다가 저장된 값으로 맞춰진다.
+    _tiltSetting.restore().ignore();
 
     _session.addListener(_syncFavoriteShows);
     _syncFavoriteShows();
@@ -408,6 +425,7 @@ class _AppState extends State<App> {
     _session.removeListener(_syncFavoriteShows);
     _bookingController.dispose();
     _creationJob.dispose();
+    _tiltSetting.dispose();
     // 저장소는 우리가 만든 것(테스트·실패 대비 기본값)만 정리한다. main 이
     // 넘긴 것은 앱과 수명이 같다. 세션을 다루는 방식과 같다.
     if (widget.ticketStore == null) _ticketStore.dispose();
@@ -442,39 +460,42 @@ class _AppState extends State<App> {
                         store: _ticketStore,
                         child: MemoryConcertApiScope(
                           api: _memoryConcertApi,
-                          child: ResaleApiScope(
-                            api: _resaleApi,
-                            child: CreationJobScope(
-                              job: _creationJob,
-                              child: FavoriteScope(
-                                store: _favoriteStore,
-                                child: NotificationApiScope(
-                                  api: _notificationApi,
-                                  child: PushNotificationScope(
-                                    push: _push,
-                                    child: MaterialApp(
-                                      title: 'TIMO',
-                                      theme: AppTheme.light,
-                                      navigatorKey: _navigatorKey,
-                                      // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
-                                      initialRoute: widget.initialRoute,
-                                      onGenerateInitialRoutes:
-                                          _generateInitialRoutes,
-                                      routes: AppRoutes.routes,
-                                      // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                                      // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                                      // 라우트가 아니라 앱 전체를 감싼다.
-                                      //
-                                      // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                                      // 애니메이션 채널도 같이 멈춘다.
-                                      builder: (context, child) {
-                                        AmbientMotion.instance.enabled =
-                                            !Motion.reduced(context);
-                                        return CreationNotificationHost(
-                                          navigatorKey: _navigatorKey,
-                                          child: child!,
-                                        );
-                                      },
+                          child: TiltSettingScope(
+                            setting: _tiltSetting,
+                            child: ResaleApiScope(
+                              api: _resaleApi,
+                              child: CreationJobScope(
+                                job: _creationJob,
+                                child: FavoriteScope(
+                                  store: _favoriteStore,
+                                  child: NotificationApiScope(
+                                    api: _notificationApi,
+                                    child: PushNotificationScope(
+                                      push: _push,
+                                      child: MaterialApp(
+                                        title: 'TIMO',
+                                        theme: AppTheme.light,
+                                        navigatorKey: _navigatorKey,
+                                        // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
+                                        initialRoute: widget.initialRoute,
+                                        onGenerateInitialRoutes:
+                                            _generateInitialRoutes,
+                                        routes: AppRoutes.routes,
+                                        // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                        // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                        // 라우트가 아니라 앱 전체를 감싼다.
+                                        //
+                                        // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                        // 애니메이션 채널도 같이 멈춘다.
+                                        builder: (context, child) {
+                                          AmbientMotion.instance.enabled =
+                                              !Motion.reduced(context);
+                                          return CreationNotificationHost(
+                                            navigatorKey: _navigatorKey,
+                                            child: child!,
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),

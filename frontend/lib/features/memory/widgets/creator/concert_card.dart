@@ -4,9 +4,11 @@ import '../../motion/press_scale.dart';
 import '../../theme/timo_colors.dart';
 import '../ui/paper_card.dart';
 
-/// MemoryConcert pick: poster, facts with icons, and a full-width action that
-/// starts the collectible for this concert. Takes plain values so it does
-/// not depend on another domain.
+/// 소장품을 만들 공연 하나. 포스터와 사실 몇 줄이 전부다.
+///
+/// 카드마다 버튼을 달지 않는다. 고른 것은 초록 테두리가 말하고, 다음으로 가는
+/// 버튼은 화면 아래 하나뿐이다 — 버튼이 카드 수만큼 서 있으면 무엇을 눌러야
+/// 넘어가는지가 흐려진다. 다른 도메인을 모르도록 값만 받는다.
 class ConcertCard extends StatelessWidget {
   const ConcertCard({
     super.key,
@@ -16,13 +18,11 @@ class ConcertCard extends StatelessWidget {
     required this.seat,
     required this.poster,
     required this.selected,
-    required this.actionLabel,
     required this.onTap,
-    required this.onAction,
   });
-  final String title, date, venue, seat, poster, actionLabel;
+  final String title, date, venue, seat, poster;
   final bool selected;
-  final VoidCallback onTap, onAction;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => PressScale(
@@ -68,16 +68,6 @@ class ConcertCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-          OutlinedButton(
-            onPressed: onAction,
-            style: selected
-                ? OutlinedButton.styleFrom(
-                    backgroundColor: TimoColors.brandSoft,
-                  )
-                : null,
-            child: Text(actionLabel),
           ),
         ],
       ),

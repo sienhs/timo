@@ -58,7 +58,9 @@ frontend_build:
     - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     - apt-get install -y --no-install-recommends nodejs
     - npm install -g firebase-tools
-    - git lfs pull --include="frontend/assets/models/*.onnx,frontend/android/app/src/main/assets/models/*.task"
+    # 영상도 LFS 라 같이 받는다. 빠뜨리면 포인터 텍스트가 자산으로 들어가
+    # 배포본에서만 연출이 안 뜬다 — 빌드는 통과하므로 티가 안 난다.
+    - git lfs pull --include="frontend/assets/models/*.onnx,frontend/android/app/src/main/assets/models/*.task,frontend/assets/videos/*.mp4"
     - |
       for model in \
         frontend/assets/models/depth_anything_v2_vits_int8.onnx \

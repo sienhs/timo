@@ -41,9 +41,13 @@ class MemoryTicketCard extends StatefulWidget {
     required this.ticket,
     required this.wrap,
     this.glow = TimoColors.accent,
+    this.tiltBySensor = true,
   });
   final MemoryTicket ticket;
   final InteractionWrapper wrap;
+
+  /// 기기를 기울여 카드를 움직일지. 끄면 센서를 놓고 손가락 조작만 남는다.
+  final bool tiltBySensor;
 
   /// Colour of the soft glow under the card (the photo palette accent).
   final Color glow;
@@ -107,9 +111,17 @@ class _TicketCardState extends State<MemoryTicketCard>
     }
   }
 
+  /// 센서 구독을 지금 설정에 맞춘다. 꺼져 있으면 구독하지 않고, 센서가 만들어
+  /// 둔 기울기를 0 으로 되돌려 카드가 스스로 평평해지게 둔다.
   void startSensor() {
     sensor?.cancel();
     accelSensor?.cancel();
+    if (!widget.tiltBySensor) {
+      gyro = Offset.zero;
+      accelTilt = Offset.zero;
+      gravityInit = false;
+      return;
+    }
     // Gyro: quick response to rotation, decays on its own.
     sensor = gyroscopeEventStream(samplingPeriod: SensorInterval.uiInterval)
         .listen(
@@ -163,6 +175,7 @@ class _TicketCardState extends State<MemoryTicketCard>
   @override
   void didUpdateWidget(MemoryTicketCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.tiltBySensor != widget.tiltBySensor) startSensor();
     if (oldWidget.ticket != widget.ticket) {
       frontFace = _FrontFace(ticket: widget.ticket, tilt: tilt, time: time);
     }
