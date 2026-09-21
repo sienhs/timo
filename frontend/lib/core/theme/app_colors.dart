@@ -26,6 +26,10 @@ class AppColors {
   /// [primary] 를 20% 어둡게. 눌림 상태와 진한 글자용.
   static const primaryPressed = Color(0xFF107F4A);
 
+  /// [primary] 를 흰 바탕에 아주 옅게 깐 색(약 10%). 고른 칸처럼 브랜드색으로
+  /// 바탕을 물들이되 그 위의 검은 글자가 그대로 읽혀야 하는 자리에 쓴다.
+  static const primarySurface = Color(0xFFE8F5EF);
+
   /// 브랜드 강조 색. 금액, 경고, 주의 문구.
   ///
   /// 시안에서 뽑은 값은 채도가 낮은 뮤티드 로즈(#C4756A)였으나, 결제 화면이

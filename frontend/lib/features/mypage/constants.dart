@@ -165,6 +165,16 @@ class MyPageStrings {
   /// 내역 한 줄의 잔액. (예: `잔액 23,400`)
   static String balanceAfter(String formatted) => '잔액 $formatted';
 
+  /// 서버가 충전 거래에 붙여 보내는 출처. 결제가 아직 모의 연동이라 문구에
+  /// '모의' 가 들어 있는데, 쓰는 사람에게는 알릴 말이 아니라 [sourceLabel] 이
+  /// 화면에서만 걷어낸다.
+  static const mockPgSource = 'PG 모의 결제';
+
+  /// 화면에 보여 줄 출처. [mockPgSource] 만 바꾸고 나머지는 서버가 준 대로
+  /// 둔다 — 서버가 문구를 고치면 여기는 저절로 아무 일도 하지 않는다.
+  static String sourceLabel(String source) =>
+      source == mockPgSource ? 'PG 결제' : source;
+
   /// 로그인 안 한 상태의 안내.
   static const loginPrompt = '로그인하고 내 버섯을 확인해 보세요.';
 

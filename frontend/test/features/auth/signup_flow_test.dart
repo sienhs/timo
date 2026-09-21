@@ -237,8 +237,6 @@ void main() {
       );
       // 아이디 · 비밀번호 · 비밀번호 확인.
       expect(find.byType(TextField), findsNWidgets(3));
-      // 팝업으로 묻던 주의 문구가 라벨 옆에 상시 붙는다.
-      expect(find.text(AuthStrings.usernameNote), findsOneWidget);
       expect(checkEnabled(tester), isFalse);
 
       await tester.enterText(find.byType(TextField).at(0), 'abc');

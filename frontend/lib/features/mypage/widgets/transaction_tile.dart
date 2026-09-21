@@ -41,7 +41,7 @@ class TransactionTile extends StatelessWidget {
                 const SizedBox(height: MyPageMetrics.transactionLineGap),
                 Text(
                   '${formatMonthDayClock(transaction.occurredAt)} · '
-                  '${transaction.source}',
+                  '${MyPageStrings.sourceLabel(transaction.source)}',
                   style: textTheme.labelMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
