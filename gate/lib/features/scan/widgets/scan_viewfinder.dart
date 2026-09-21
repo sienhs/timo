@@ -139,12 +139,16 @@ class _ViewfinderPainter extends CustomPainter {
           ],
         ).createShader(glowRect),
     );
-    canvas.drawLine(
-      Offset(window.left, y),
-      Offset(window.right, y),
-      Paint()
-        ..color = AppColors.primary
-        ..strokeWidth = ScanMetrics.scanLineStroke,
+    final line = Paint()
+      ..color = AppColors.primary
+      ..strokeWidth = ScanMetrics.scanLineStroke;
+    canvas.drawLine(Offset(window.left, y), Offset(window.right, y), line);
+    // 선 한가운데의 과녁. 선만 있으면 "어디에 맞춰라" 가 모호해, 관람객 폰을
+    // 가져다 댈 지점을 한 곳으로 모은다.
+    canvas.drawCircle(
+      Offset(window.center.dx, y),
+      ScanMetrics.scanLineDotRadius,
+      line,
     );
     canvas.restore();
   }

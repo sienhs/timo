@@ -27,6 +27,16 @@ String formatPeriod(DateTime start, DateTime? end) {
   return '${formatPerformedAt(start)} ~ ${formatDate(end)}';
 }
 
+/// 시:분:초. (예: `19:02:14`)
+///
+/// 검표 결과에 적는 시각이라 초까지 남긴다. 중복 입장을 따질 때 "몇 시 몇 분" 만
+/// 으로는 같은 분 안에 두 번 찍힌 경우를 가릴 수 없다.
+String formatClock(DateTime at) => [
+  _twoDigits(at.hour),
+  _twoDigits(at.minute),
+  _twoDigits(at.second),
+].join(':');
+
 /// 두 시각이 같은 날인지. 시·분은 보지 않는다.
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;

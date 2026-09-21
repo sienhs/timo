@@ -9,8 +9,10 @@ import '../../../core/widgets/timo_logo.dart';
 import '../../../core/widgets/timo_mascot.dart';
 import '../constants.dart';
 import '../data/concert_api.dart';
+import '../models/concert_filter.dart';
 import '../models/concert_summary.dart';
 import '../state/concert_api_scope.dart';
+import '../widgets/concert_filter_chips.dart';
 import '../widgets/concert_list_skeleton.dart';
 import '../widgets/concert_tile.dart';
 
@@ -58,6 +60,10 @@ class _ConcertPickerScreenState extends State<ConcertPickerScreen> {
 
   /// 지금 화면에 반영된 검색어. 컨트롤러의 글자와 다를 수 있다(입력 중).
   String _keyword = '';
+
+  /// 고른 필터 칩. 검색과 달리 서버에 다시 묻지 않는다 — 이미 받아 온 목록을
+  /// 걸러 보여 줄 뿐이라 공연장 와이파이가 끊겨도 칩은 계속 동작한다.
+  ConcertFilter _filter = ConcertFilter.all;
 
   late Future<List<ConcertSummary>> _future;
 
@@ -157,24 +163,56 @@ class _ConcertPickerScreenState extends State<ConcertPickerScreen> {
               loading: const ConcertListSkeleton(),
               builder: (context, concerts) {
                 if (concerts.isEmpty) {
-                  return _EmptyView(searching: _keyword.isNotEmpty);
+                  return _EmptyView(
+                    message: _keyword.isEmpty
+                        ? ConcertStrings.empty
+                        : ConcertStrings.emptyForKeyword,
+                  );
                 }
+                // 정렬·필터·칩의 개수가 같은 "지금" 을 봐야 한다. 자정을 넘기는
+                // 순간 칩은 오늘로 세고 목록은 지난 공연으로 미는 일이 없도록
+                // 한 번만 읽어 아래로 내려 준다.
                 final now = _now;
-                final sorted = ConcertSummary.sortedForGate(concerts, now: now);
-                return ListView.separated(
-                  itemCount: sorted.length,
-                  separatorBuilder: (_, _) => const Divider(
-                    indent: AppMetrics.pagePadding,
-                    endIndent: AppMetrics.pagePadding,
-                  ),
-                  itemBuilder: (context, index) {
-                    final concert = sorted[index];
-                    return ConcertTile(
-                      concert: concert,
-                      isToday: concert.isOn(now),
-                      onPressed: () => widget.onSelected(concert),
-                    );
-                  },
+                final visible = ConcertSummary.sortedForGate(
+                  concerts.where((concert) => _filter.matches(concert, now)),
+                  now: now,
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ConcertFilterChips(
+                      counts: ConcertFilter.countsOf(concerts, now: now),
+                      selected: _filter,
+                      onSelected: (filter) => setState(() => _filter = filter),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: visible.isEmpty
+                          ? const _EmptyView(
+                              message: ConcertStrings.emptyForFilter,
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppMetrics.pagePadding,
+                                0,
+                                AppMetrics.pagePadding,
+                                AppMetrics.pagePadding,
+                              ),
+                              itemCount: visible.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: ConcertMetrics.cardGap),
+                              itemBuilder: (context, index) {
+                                final concert = visible[index];
+                                return ConcertTile(
+                                  concert: concert,
+                                  isToday: concert.isOn(now),
+                                  isEntryOpen: concert.isEntryOpen(now),
+                                  onPressed: () => widget.onSelected(concert),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -221,12 +259,12 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-/// 받아 온 목록이 비었을 때. 검색 중인지에 따라 문구가 다르다 — 검색 결과가
-/// 없는 것과 서버에 공연이 하나도 없는 것은 운영자가 할 일이 다르다.
+/// 보여 줄 공연이 없을 때. 문구는 받아서 쓴다 — 서버에 공연이 없는 것,
+/// 검색어에 안 걸리는 것, 고른 칩에 안 걸리는 것은 운영자가 할 일이 다르다.
 class _EmptyView extends StatelessWidget {
-  const _EmptyView({required this.searching});
+  const _EmptyView({required this.message});
 
-  final bool searching;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -240,7 +278,7 @@ class _EmptyView extends StatelessWidget {
             const TimoMascot.sad(),
             const SizedBox(height: AppMetrics.inlineGap),
             Text(
-              searching ? ConcertStrings.emptyForKeyword : ConcertStrings.empty,
+              message,
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
