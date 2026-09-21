@@ -104,6 +104,35 @@ variable "db_instance_class" {
   default     = "db.t4g.micro"
 }
 
+variable "redis_node_type" {
+  description = "Development ElastiCache Redis node type"
+  type        = string
+  default     = "cache.t4g.micro"
+}
+
+variable "redis_engine_version" {
+  description = "Redis engine version for ElastiCache"
+  type        = string
+  default     = "7.1"
+}
+
+variable "redis_port" {
+  description = "Redis listener port"
+  type        = number
+  default     = 6379
+}
+
+variable "redis_auth_token" {
+  description = "Redis AUTH token; set only in ignored terraform.tfvars"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.redis_auth_token) >= 16 && length(var.redis_auth_token) <= 128 && can(regex("^[^/@\"]+$", var.redis_auth_token))
+    error_message = "redis_auth_token must be 16-128 characters and cannot contain '/', '@', or a double quote."
+  }
+}
+
 variable "db_name" {
   description = "Initial MySQL database name"
   type        = string

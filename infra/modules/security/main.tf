@@ -149,3 +149,29 @@ resource "aws_security_group" "rds" {
     Name = "${var.name}-rds-sg"
   }
 }
+
+resource "aws_security_group" "redis" {
+  name        = "${var.name}-redis-sg"
+  description = "Allow Redis only from the application EC2 security group"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "Redis from application EC2"
+    from_port       = var.redis_port
+    to_port         = var.redis_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ec2.id]
+  }
+
+  egress {
+    description = "Outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name}-redis-sg"
+  }
+}

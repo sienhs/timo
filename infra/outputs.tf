@@ -47,6 +47,15 @@ output "rds_port" {
   value       = module.rds.port
 }
 
+output "redis_primary_endpoint" {
+  description = "Private Redis endpoint for backend clients"
+  value       = module.redis.primary_endpoint_address
+}
+
+output "redis_port" {
+  value = module.redis.port
+}
+
 output "vpc_id" {
   value = module.network.vpc_id
 }
