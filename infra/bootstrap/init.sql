@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS `concert_image` (
     `concert_image_id` BIGINT NOT NULL AUTO_INCREMENT,
     `concert_id` BIGINT NOT NULL,
     `image_key` VARCHAR(500) NOT NULL,
+    `purpose` VARCHAR(20) NOT NULL DEFAULT 'DETAIL',
     `sort_order` INT NOT NULL,
     `created_at` DATETIME(6) NOT NULL,
     `updated_at` DATETIME(6) NOT NULL,
@@ -361,6 +362,16 @@ CREATE TABLE IF NOT EXISTS `ticket_trade` (
 DELIMITER //
 CREATE PROCEDURE ensure_entity_unique_constraints()
 BEGIN
+    -- 기존 공연 상세 이미지는 모두 DETAIL 용도로 보존한다.
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'concert_image'
+          AND column_name = 'purpose'
+    ) THEN
+        ALTER TABLE `concert_image`
+            ADD COLUMN `purpose` VARCHAR(20) NOT NULL DEFAULT 'DETAIL' AFTER `image_key`;
+    END IF;
+
     -- Ticket.ownerMemberId는 QR·굿즈·내 티켓·양도·알림의 현재 소유권 기준이다.
     -- 이미 운영 중인 티켓은 원 예매자를 BOOKING 취득자로 보정한 뒤 NOT NULL로 바꾼다.
     IF NOT EXISTS (
