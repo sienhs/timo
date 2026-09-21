@@ -66,6 +66,24 @@ class ConcertSummary {
     return now.isAfter(start) && !now.isAfter(_endOfDay(end));
   }
 
+  /// 아직 열리지 않은 공연인지. 오늘 하는 공연은 여기 들지 않는다.
+  bool isUpcoming(DateTime now) {
+    final start = startDate;
+    return start != null && !isOn(now) && start.isAfter(now);
+  }
+
+  /// 지금 팬 앱이 이 공연의 입장 QR 을 받을 수 있는 시간대인지.
+  ///
+  /// [isOn] 과 달리 **시각**으로 본다. 오늘 하는 공연이어도 문 열기 전(시작
+  /// 두 시간 전)에는 거짓이다. 판정 창은 백엔드가 QR 을 발급해 주는 구간과
+  /// 같아야 한다 — [ConcertMetrics.entryOpensBefore] 주석 참고.
+  bool isEntryOpen(DateTime now) {
+    final start = startDate;
+    if (start == null) return false;
+    return !now.isBefore(start.subtract(ConcertMetrics.entryOpensBefore)) &&
+        !now.isAfter(start.add(ConcertMetrics.entryClosesAfter));
+  }
+
   /// 게이트가 보기 좋은 순서로 다시 늘어놓는다. 원본은 건드리지 않는다.
   ///
   /// 오늘 하는 공연 → 앞으로 할 공연(가까운 순) → 지나간 공연(최근 순) →

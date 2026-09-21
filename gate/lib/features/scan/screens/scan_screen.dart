@@ -7,10 +7,14 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/gate_target.dart';
+import '../models/scan_tally.dart';
+import '../models/server_status.dart';
 import '../models/verification_result.dart';
 import '../state/scan_api_scope.dart';
 import '../widgets/scan_result_view.dart';
+import '../widgets/scan_tally_bar.dart';
 import '../widgets/scan_viewfinder.dart';
+import '../widgets/server_status_chip.dart';
 
 /// 검표 화면. 공연을 고른 뒤 보는 화면이다.
 ///
@@ -22,9 +26,10 @@ import '../widgets/scan_viewfinder.dart';
 /// 카메라는 결과를 보여 주는 동안에도 끄지 않는다. 다시 켜는 데 0.5~1초가
 /// 걸려 줄이 그만큼 밀린다. 결과 화면이 불투명하게 덮으므로 보이지는 않는다.
 ///
-/// 헤더에는 검표 중인 공연([target])이 적힌다. 운영자가 옆 입구의 단말과
-/// 바꿔 들었을 때 어느 공연을 받고 있는지 한눈에 알아야 한다. [onChangeTarget]
-/// 은 헤더의 '공연 변경' 버튼이 부른다 — 어디로 가서 고르는지는 앱이 안다.
+/// 헤더에는 검표 중인 공연([target])과 서버 상태가 적힌다. 운영자가 옆 입구의
+/// 단말과 바꿔 들었을 때 어느 공연을 받고 있는지 한눈에 알아야 한다.
+/// [onChangeTarget] 은 헤더의 '공연 변경' 버튼이 부른다 — 어디로 가서 고르는지는
+/// 앱이 안다.
 ///
 /// [trailing] 은 헤더 맨 오른쪽(로그아웃 버튼). 이 화면은 인증을 모른다.
 class ScanScreen extends StatefulWidget {
@@ -50,11 +55,36 @@ class _ScanScreenState extends State<ScanScreen> {
 
   bool _verifying = false;
   VerificationResult? _result;
+
+  /// [_result] 를 받은 시각. 결과 카드가 '검표 완료 시각' 으로 적는다.
+  DateTime? _resultAt;
+
   Timer? _autoDismiss;
+
+  /// 앱을 켠 뒤 이 단말이 찍은 횟수와, 마지막 검증이 말해 준 서버 상태.
+  ScanTally _tally = const ScanTally();
+  ServerStatus _serverStatus = ServerStatus.unknown;
 
   /// 마지막으로 검증한 QR 과 그 시각. 같은 QR 의 중복 인식을 걸러낸다.
   String? _lastPayload;
   DateTime? _lastScannedAt;
+
+  @override
+  void didUpdateWidget(ScanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 공연을 바꾸면 집계를 0 부터 다시 센다. 이 화면은 '공연 변경' 뒤에도 같은
+    // 자리에 같은 타입으로 남아 State 가 그대로 재사용되므로(app.dart 가 key 를
+    // 주지 않는다), 여기서 비우지 않으면 옆 공연에서 찍은 숫자가 이어진다.
+    //
+    // 서버 상태는 비우지 않는다. 서버에 닿는지는 공연과 무관하다.
+    if (oldWidget.target.concertId != widget.target.concertId) {
+      setState(() {
+        _tally = const ScanTally();
+        _lastPayload = null;
+        _lastScannedAt = null;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -102,6 +132,9 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _verifying = false;
       _result = result;
+      _resultAt = DateTime.now();
+      _tally = _tally.plus(result);
+      _serverStatus = ServerStatus.of(result);
     });
     if (result is Admitted) {
       _autoDismiss = Timer(ScanMetrics.admittedHold, _dismissResult);
@@ -112,24 +145,37 @@ class _ScanScreenState extends State<ScanScreen> {
     _autoDismiss?.cancel();
     _autoDismiss = null;
     if (!mounted || _result == null) return;
-    setState(() => _result = null);
+    setState(() {
+      _result = null;
+      _resultAt = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final result = _result;
+    final resultAt = _resultAt;
     final onChangeTarget = widget.onChangeTarget;
 
     return Scaffold(
       backgroundColor: AppColors.scanBackground,
       // 카메라 화면이라 앱 공통(흰) 앱바 대신 어두운 바를 쓴다. 흰 띠가 위에
       // 붙으면 카메라 영역이 잘려 보이고, 밝은 곳에서 눈이 그쪽으로 끌린다.
+      //
+      // 결과가 뜬 동안에는 그 결과 색의 진한 쪽으로 물든다. 헤더만 검게 남으면
+      // 결과 화면 위에 띠 하나가 떠 있는 것처럼 보인다.
       appBar: AppBar(
-        backgroundColor: AppColors.scanBackground,
+        backgroundColor: _headerColor(result),
         foregroundColor: AppColors.onScan,
         centerTitle: false,
         titleSpacing: ScanMetrics.horizontalPadding,
-        title: _TargetHeader(target: widget.target),
+        toolbarHeight: ScanMetrics.headerHeight,
+        title: _TargetHeader(
+          target: widget.target,
+          // 결과가 화면을 덮은 동안에는 서버 상태를 감춘다. 그때 운영자가 볼
+          // 것은 판정 하나뿐이고, 칩까지 있으면 헤더가 두 가지를 말한다.
+          serverStatus: result == null ? _serverStatus : null,
+        ),
         actions: [
           _TorchButton(controller: _controller),
           if (onChangeTarget != null)
@@ -151,15 +197,21 @@ class _ScanScreenState extends State<ScanScreen> {
             errorBuilder: (context, error) => _CameraError(error: error),
           ),
           const _ScanGuide(),
-          if (_verifying) const _VerifyingChip(),
+          // 아래쪽 자리는 하나다. 확인 중에는 그 진행을 보여 주는 쪽이 먼저고,
+          // 집계는 다음 사람을 기다리는 동안 보면 된다.
+          if (_verifying)
+            const _VerifyingChip()
+          else if (result == null)
+            ScanTallyBar(tally: _tally),
           // 결과는 카메라 위에 불투명하게 덮인다. 나타나고 사라질 때만 짧게 섞인다.
           AnimatedSwitcher(
             duration: ScanMetrics.resultFade,
-            child: result == null
+            child: result == null || resultAt == null
                 ? const SizedBox.shrink()
                 : ScanResultView(
                     key: ValueKey(result),
                     result: result,
+                    verifiedAt: resultAt,
                     onDismiss: _dismissResult,
                   ),
           ),
@@ -167,22 +219,38 @@ class _ScanScreenState extends State<ScanScreen> {
       ),
     );
   }
+
+  /// 헤더 띠의 색. 결과가 없으면 카메라 화면과 같은 검정이다.
+  static Color _headerColor(VerificationResult? result) => switch (result) {
+    null => AppColors.scanBackground,
+    Admitted() => AppColors.admittedHeader,
+    Rejected() => AppColors.rejectedHeader,
+    Undetermined() => AppColors.undeterminedHeader,
+  };
 }
 
-/// 헤더의 공연 표시. 첫 줄 공연명, 둘째 줄 공연장 · 일시.
+/// 헤더의 공연 표시. 서버 상태 칩, 공연명, 공연장 · 일시 순으로 쌓인다.
 class _TargetHeader extends StatelessWidget {
-  const _TargetHeader({required this.target});
+  const _TargetHeader({required this.target, required this.serverStatus});
 
   final GateTarget target;
+
+  /// null 이면 칩을 그리지 않는다.
+  final ServerStatus? serverStatus;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final subtitle = target.subtitle;
+    final status = serverStatus;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (status != null) ...[
+          ServerStatusChip(status: status),
+          const SizedBox(height: 6),
+        ],
         Text(
           target.concertTitle,
           style: textTheme.titleMedium?.copyWith(color: AppColors.onScan),
@@ -190,13 +258,25 @@ class _TargetHeader extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         if (subtitle.isNotEmpty)
-          Text(
-            subtitle,
-            style: textTheme.labelMedium?.copyWith(
-              color: AppColors.onScanMuted,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              const Icon(
+                Icons.place_outlined,
+                size: 13,
+                color: AppColors.onScanMuted,
+              ),
+              const SizedBox(width: 3),
+              Flexible(
+                child: Text(
+                  subtitle,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: AppColors.onScanMuted,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
       ],
     );
@@ -217,10 +297,25 @@ class _ScanGuide extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(
-              ScanStrings.scanHint,
-              textAlign: TextAlign.center,
-              style: textTheme.headlineSmall?.copyWith(color: AppColors.onScan),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.crop_free_rounded,
+                  size: 22,
+                  color: AppColors.onScan,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    ScanStrings.scanHint,
+                    textAlign: TextAlign.center,
+                    style: textTheme.headlineSmall?.copyWith(
+                      color: AppColors.onScan,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             // 보조 안내는 패널에 담아 카메라 화면과 분리한다. 카메라 위에 글자만
@@ -270,30 +365,36 @@ class _VerifyingChip extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 32),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.scanPanel,
-            borderRadius: BorderRadius.circular(999),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            bottom: ScanMetrics.counterBarInset + 16,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primary,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.scanPanel,
+              borderRadius: BorderRadius.circular(ScanMetrics.pillRadius),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                ScanStrings.verifying,
-                style: textTheme.bodyMedium?.copyWith(color: AppColors.onScan),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  ScanStrings.verifying,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.onScan,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
