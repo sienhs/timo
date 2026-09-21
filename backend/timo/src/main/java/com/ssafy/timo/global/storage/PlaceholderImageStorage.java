@@ -38,15 +38,17 @@ public class PlaceholderImageStorage implements ImageStorage {
     }
 
     /**
-     * 실제로 저장하지 않는다 - {@code local}/{@code test} 는 S3 버킷이 없다. content type 검증은
-     * {@link S3ImageStorage} 와 같은 기준({@link ImageKeys})으로 하므로, 업로드 API 를 테스트할 때
-     * 지원하지 않는 형식은 여기서도 똑같이 걸러진다.
+     * content type 검증은 {@link S3ImageStorage} 와 같은 기준({@link ImageKeys})으로 하므로, 업로드
+     * API 를 테스트할 때 지원하지 않는 형식은 여기서도 똑같이 걸러진다.
      */
     @Override
-    public String upload(String keyPrefix, MultipartFile file) {
-        String key = ImageKeys.generate(keyPrefix, file.getContentType());
-        log.warn("이미지 업로드가 아직 구현되지 않았습니다. key={}", key);
+    public String newKey(String keyPrefix, MultipartFile file) {
+        return ImageKeys.generate(keyPrefix, file.getContentType());
+    }
 
-        return key;
+    /** 실제로 저장하지 않는다 - {@code local}/{@code test} 는 S3 버킷이 없다. */
+    @Override
+    public void uploadTo(String imageKey, MultipartFile file) {
+        log.warn("이미지 업로드가 아직 구현되지 않았습니다. key={}", imageKey);
     }
 }

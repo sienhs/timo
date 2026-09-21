@@ -29,7 +29,9 @@ spring:
 
 logging:
   level:
-    org.hibernate.SQL: debug
+    # 기본은 debug 로 두어 로컬에서 쿼리가 보이게 한다. 시끄러우면 환경변수로만 낮춘다
+    # (예: HIBERNATE_SQL_LOG_LEVEL=error) - 파일을 고치면 커밋에 섞인다.
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:debug}
 
 jwt:
   secret: local-dev-only-secret-please-change-in-prod-0123456789

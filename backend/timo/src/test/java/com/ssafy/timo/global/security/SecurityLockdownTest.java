@@ -1,6 +1,7 @@
 package com.ssafy.timo.global.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -64,6 +66,10 @@ class SecurityLockdownTest {
      * 유효 토큰에서 401(회원 없음)이 나와 {@link #validToken} 의 404 기대가 깨진다.
      */
     private static final String PROTECTED_PATH = "/api/v1/sections?concertId=1";
+
+    /** 소재는 공연 상세와 달리 잠겨 있어야 한다. 없는 공연을 골라 통과 여부만 본다. */
+    private static final String KIT_PATH = "/api/v1/concerts/999999/kit";
+    private static final String KIT_IMAGES_PATH = "/api/v1/concerts/999999/kit/images";
 
     @Autowired
     private MockMvc mvc;
@@ -180,6 +186,52 @@ class SecurityLockdownTest {
         // 공연이 없으므로 404 다. 401 이 아니라는 것이 확인 대상이다.
         mvc.perform(get(PROTECTED_PATH).header("Authorization", "Bearer " + issued))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("소재 조회는 잠겨 있다 - 토큰이 없으면 401")
+    void kitRequiresToken() throws Exception {
+        // 공연 상세는 공개지만 소재는 티켓 보유자만 본다. permitAll 목록에 들어가면 안 된다.
+        mvc.perform(get(KIT_PATH))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("TOKEN_INVALID"));
+    }
+
+    @Test
+    @DisplayName("소재 조회는 일반 회원도 필터를 통과한다 - 자격은 티켓 보유로 가린다")
+    void kitReadNeedsNoRole() throws Exception {
+        String issued = accessTokenProvider.issue(1L, Role.USER).value();
+
+        // 없는 공연이라 404 다. 403 이 아니라는 것이 확인 대상이다.
+        mvc.perform(get(KIT_PATH).header("Authorization", "Bearer " + issued))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("소재 등록은 일반 회원에게 403 - 공연을 여는 쪽만 올린다")
+    void kitUploadRejectsUser() throws Exception {
+        String issued = accessTokenProvider.issue(1L, Role.USER).value();
+
+        mvc.perform(multipart(KIT_IMAGES_PATH)
+                        .file(new MockMultipartFile("files", "bg.png", "image/png", new byte[]{1}))
+                        .param("purpose", "KIT_BACKGROUND")
+                        .header("Authorization", "Bearer " + issued))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("소재 등록은 주최사와 운영자가 통과한다")
+    void kitUploadAllowsOrganizerAndAdmin() throws Exception {
+        for (Role role : List.of(Role.ORGANIZER, Role.ADMIN)) {
+            String issued = accessTokenProvider.issue(1L, role).value();
+
+            // 없는 공연이라 404 다. 403 이 아니라는 것이 확인 대상이다.
+            mvc.perform(multipart(KIT_IMAGES_PATH)
+                            .file(new MockMultipartFile("files", "bg.png", "image/png", new byte[]{1}))
+                            .param("purpose", "KIT_BACKGROUND")
+                            .header("Authorization", "Bearer " + issued))
+                    .andExpect(status().isNotFound());
+        }
     }
 
     private String token(Duration validFor, String secret) throws Exception {

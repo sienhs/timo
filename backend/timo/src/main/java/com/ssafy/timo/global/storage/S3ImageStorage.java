@@ -82,26 +82,27 @@ public class S3ImageStorage implements ImageStorage {
         }
     }
 
+    /** content type 미지원은 {@link ImageKeys#generate} 가 던지는 예외를 그대로 전파한다. */
+    @Override
+    public String newKey(String keyPrefix, MultipartFile file) {
+        return ImageKeys.generate(keyPrefix, file.getContentType());
+    }
+
     /**
-     * 업로드 실패(content type 미지원)는 {@link ImageKeys#generate} 가 던지는 예외를 그대로 전파한다.
-     * S3 쪽 실패(자격증명·권한 등)도 그대로 전파해 호출 쪽 트랜잭션이 롤백되게 한다 - 일부만 업로드된
+     * S3 쪽 실패(자격증명·권한 등)는 그대로 전파해 호출 쪽 트랜잭션이 롤백되게 한다 - 일부만 업로드된
      * 채로 공연이 저장되는 것보다는, 이미 올라간 객체가 고아로 남는 쪽이 낫다.
      */
     @Override
-    public String upload(String keyPrefix, MultipartFile file) {
-        String key = ImageKeys.generate(keyPrefix, file.getContentType());
-
+    public void uploadTo(String imageKey, MultipartFile file) {
         try {
             s3Client.putObject(PutObjectRequest.builder()
                             .bucket(bucketName)
-                            .key(key)
+                            .key(imageKey)
                             .contentType(file.getContentType())
                             .build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (IOException e) {
-            throw new UncheckedIOException("S3 이미지 업로드 실패: key=" + key, e);
+            throw new UncheckedIOException("S3 이미지 업로드 실패: key=" + imageKey, e);
         }
-
-        return key;
     }
 }

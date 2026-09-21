@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 굿즈 API (v1). 매핑과 규약은 {@link GoodsApi} 에 있고 여기서는 버전 경로만 정한다.
  *
  * <p>인증을 요구한다. {@code SecurityConfig} 의 {@code anyRequest().authenticated()} 가 받으므로
- * 경로를 따로 등록하지 않는다. 생성 API 는 아직 없다 — {@link GoodsApi} 의 TODO 참고.
+ * 경로를 따로 등록하지 않는다. 만들기는 {@code GoodsCreateController} 에 있다.
  */
 @RestController
 @RequestMapping("/api/v1/goods")

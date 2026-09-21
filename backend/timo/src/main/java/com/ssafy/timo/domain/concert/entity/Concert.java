@@ -27,6 +27,7 @@ import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -207,7 +208,28 @@ public class Concert extends BaseEntity {
 
     /** 상세 이미지를 추가한다. 노출 순서는 추가된 순서를 그대로 따른다. */
     public void addImage(String imageKey) {
-        this.images.add(new ConcertImage(this, imageKey, this.images.size()));
+        addImage(imageKey, ConcertImagePurpose.DETAIL);
+    }
+
+    /**
+     * 소장품 제작용 소재 이미지를 추가한다. 상세 이미지와 같은 표에 살고 용도로만 갈린다.
+     *
+     * @param purpose {@link ConcertImagePurpose#KIT_BACKGROUND} 또는
+     *                {@link ConcertImagePurpose#KIT_PERSON}
+     */
+    public void addKitImage(String imageKey, ConcertImagePurpose purpose) {
+        if (!purpose.isKit()) {
+            throw new IllegalArgumentException("소재 용도가 아닙니다: " + purpose);
+        }
+        addImage(imageKey, purpose);
+    }
+
+    /** 순서는 <b>용도마다 따로</b> 센다 - 소재를 더해도 상세 이미지의 순서가 밀리지 않는다. */
+    private void addImage(String imageKey, ConcertImagePurpose purpose) {
+        int sortOrder = (int) this.images.stream()
+                .filter(image -> image.getPurpose() == purpose)
+                .count();
+        this.images.add(new ConcertImage(this, imageKey, sortOrder, purpose));
     }
 
     public List<Artist> getArtists() {
@@ -220,7 +242,22 @@ public class Concert extends BaseEntity {
         return Collections.unmodifiableList(this.concertArtists);
     }
 
+    /**
+     * <b>상세 이미지만</b> 돌려준다. 소재({@link ConcertImagePurpose#isKit()})는 빠진다 - 공연 상세는
+     * 인증 없이 열리는 공개 API 라 소재가 섞이면 티켓 없는 사람에게도 나간다. 소재가 필요하면
+     * {@link #getKitImages(ConcertImagePurpose)} 를 쓴다.
+     */
     public List<ConcertImage> getImages() {
-        return Collections.unmodifiableList(this.images);
+        return this.images.stream()
+                .filter(image -> image.getPurpose() == ConcertImagePurpose.DETAIL)
+                .toList();
+    }
+
+    /** 그 용도의 소재를 {@code sortOrder} 순으로 돌려준다. */
+    public List<ConcertImage> getKitImages(ConcertImagePurpose purpose) {
+        return this.images.stream()
+                .filter(image -> image.getPurpose() == purpose)
+                .sorted(Comparator.comparingInt(ConcertImage::getSortOrder))
+                .toList();
     }
 }

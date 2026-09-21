@@ -4,14 +4,15 @@ import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.goods.dto.CreateGoodsCommand;
 import com.ssafy.timo.domain.goods.dto.GoodsCreateResult;
 import com.ssafy.timo.domain.goods.entity.Goods;
+import com.ssafy.timo.domain.goods.entity.GoodsUploadStatus;
 import com.ssafy.timo.domain.goods.exception.GoodsAlreadyExistsException;
-import com.ssafy.timo.domain.goods.exception.GoodsTicketNotOwnedException;
-import com.ssafy.timo.domain.goods.exception.GoodsTicketNotUsedException;
+import com.ssafy.timo.domain.goods.exception.GoodsImageDeletedException;
 import com.ssafy.timo.domain.goods.repository.GoodsRepository;
+import com.ssafy.timo.domain.goods.repository.GoodsUploadRepository;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
-import com.ssafy.timo.domain.ticket.entity.TicketStatus;
-import com.ssafy.timo.domain.ticket.service.TicketOwnershipService;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,11 +33,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 위반이 난 트랜잭션은 이미 롤백 대상이라 그 안에서는 다시 읽을 수 없고, 롤백이 끝난 뒤 새 트랜잭션에서
  * 읽어야 한다.
  *
- * <p><b>TODO(S3 확정 후)</b>: 컨트롤러 {@code POST /api/v1/tickets/{ticketId}/goods} 를 붙인다.
- * 이미지는 AI 서버가 S3 에 올리고 key 만 앱에 주므로 서버는 파일을 받지 않는다 — 요청 바디가 곧
- * {@link CreateGoodsCommand} 이고 컨트롤러는 이 메서드를 부르기만 한다. 응답은
- * {@link GoodsCreateResult#created()} 가 {@code true} 면 201, 아니면 200 이다. key 접두로 회원 소유를
- * 가리는 검증은 그때 이 메서드 앞머리에 더한다. 자세한 것은 {@code GoodsApi} 주석 참고.
+ * <p><b>이미지는 이 메서드가 받지 않는다.</b> 앱이 먼저 업로드 API 로 올리고
+ * ({@link GoodsUploadService}) 받은 key 를 요청에 실어 온다. 그래서 요청 바디가 곧
+ * {@link CreateGoodsCommand} 이고, 이 메서드는 저장소를 건드리지 않는다 — 티켓 판정은 업로드 쪽에서
+ * 이미 한 번 끝났고 여기서 한 번 더 한다({@link GoodsTicketGuard}).
+ *
+ * <p>앱이 써넣은 key 는 <b>이미 지워진 것만</b> 가린다. key 는 UUID 라 추측할 수 없고 남의 굿즈
+ * 상세는 404 라 남의 key 를 알아낼 경로가 사실상 없다. 레이어 안의 key 는 보지 않는다 — 서버가 그
+ * JSON 구조를 해석하지 않는다는 규칙 그대로다.
  */
 @Slf4j
 @Service
@@ -44,8 +48,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GoodsService {
 
     private final GoodsRepository goodsRepository;
-    private final TicketOwnershipService ticketOwnershipService;
+    private final GoodsUploadRepository goodsUploadRepository;
     private final MemberRepository memberRepository;
+    private final GoodsTicketGuard goodsTicketGuard;
     private final GoodsJson goodsJson;
     private final GoodsMapper goodsMapper;
     private final TransactionTemplate transactionTemplate;
@@ -64,19 +69,15 @@ public class GoodsService {
     }
 
     private GoodsCreateResult createInTransaction(Long memberId, Long ticketId, CreateGoodsCommand command) {
-        Ticket ticket = ticketOwnershipService.findAssignedTicket(memberId, ticketId)
-                .orElseThrow(() -> new GoodsTicketNotOwnedException(ticketId));
-
-        if (ticket.getStatus() != TicketStatus.USED) {
-            // 어떤 상태였는지는 사용자에게 알릴 이유가 없는 내부 값이라 로그로만 남긴다.
-            log.debug("굿즈 생성 불가 - 티켓 상태 (ticketId={}, status={})", ticketId, ticket.getStatus());
-            throw new GoodsTicketNotUsedException();
-        }
+        Ticket ticket = goodsTicketGuard.requireUsedTicket(memberId, ticketId);
 
         Optional<GoodsCreateResult> existing = findExisting(memberId, ticketId, command.clientGoodsId());
         if (existing.isPresent()) {
+            // 멱등 재전송이다. 이미 만들어진 굿즈를 돌려주므로 key 를 다시 볼 이유가 없다.
             return existing.get();
         }
+
+        requireLiveImages(command);
 
         Concert concert = ticket.getReservation().getConcert();
         Goods goods = Goods.builder()
@@ -100,6 +101,39 @@ public class GoodsService {
         // 유니크 위반을 여기서 받으려면 flush 까지 해야 한다. 커밋 시점에 터지면 잡을 곳이 없다.
         Goods saved = goodsRepository.saveAndFlush(goods);
         return new GoodsCreateResult(goodsMapper.toDetail(saved), true);
+    }
+
+    /**
+     * 컬럼 5개의 key 가 청소 배치에 지워진 것은 아닌지 본다. 하나라도 지워졌으면 409 다.
+     *
+     * <p>지워진 key 를 그대로 저장하면 DB 에는 key 가 있는데 객체가 없는 <b>깨진 굿즈</b>가 된다.
+     * 대장이 지운 행을 남기는 것이 이 판정을 가능하게 한다 — 행까지 지우면 "처음부터 없던 key" 와
+     * 구분할 수 없다.
+     *
+     * <p>{@code personLayers} 안의 key 는 보지 않는다. 그 JSON 구조는 서버가 해석하지 않는다.
+     */
+    private void requireLiveImages(CreateGoodsCommand command) {
+        List<String> imageKeys = new ArrayList<>();
+        addIfPresent(imageKeys, command.backgroundKey());
+        addIfPresent(imageKeys, command.sourceBackgroundKey());
+        addIfPresent(imageKeys, command.personCompositeKey());
+        addIfPresent(imageKeys, command.depthMapKey());
+        addIfPresent(imageKeys, command.previewKey());
+
+        if (imageKeys.isEmpty()) {
+            return;
+        }
+
+        if (goodsUploadRepository.countByStatus(imageKeys, GoodsUploadStatus.DELETED) > 0) {
+            log.info("굿즈 생성 거절 - 이미 지워진 이미지 key (keys={})", imageKeys);
+            throw new GoodsImageDeletedException();
+        }
+    }
+
+    private void addIfPresent(List<String> imageKeys, String imageKey) {
+        if (imageKey != null && !imageKey.isBlank()) {
+            imageKeys.add(imageKey);
+        }
     }
 
     /**

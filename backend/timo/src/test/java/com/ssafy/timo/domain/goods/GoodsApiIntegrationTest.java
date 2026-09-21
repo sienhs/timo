@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -24,7 +27,11 @@ import com.ssafy.timo.domain.goods.exception.GoodsErrorCode;
 import com.ssafy.timo.domain.goods.exception.GoodsInvalidLayersException;
 import com.ssafy.timo.domain.goods.exception.GoodsTicketNotOwnedException;
 import com.ssafy.timo.domain.goods.exception.GoodsTicketNotUsedException;
+import com.ssafy.timo.domain.goods.entity.GoodsUpload;
+import com.ssafy.timo.domain.goods.entity.GoodsUploadStatus;
 import com.ssafy.timo.domain.goods.repository.GoodsRepository;
+import com.ssafy.timo.domain.goods.repository.GoodsUploadRepository;
+import com.ssafy.timo.domain.goods.scheduler.GoodsUploadCleanupScheduler;
 import com.ssafy.timo.domain.goods.service.GoodsService;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
@@ -60,6 +67,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -67,9 +76,13 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 굿즈 도메인 통합 테스트 — 생성 규칙(서비스)과 조회 API 셋.
  *
- * <p>생성은 컨트롤러가 아직 없어 {@link GoodsService#create} 를 직접 부른다. 201/200 은
- * {@code GoodsCreateResult.created()} 로 본다. 소유 판정이 네이티브 쿼리라 여기서만 검증된다 —
- * 양도받은 티켓의 구매자는 만들 수 있고 원 예매자는 못 만드는 것이 핵심이다.
+ * <p>생성 규칙은 {@link GoodsService#create} 를 직접 불러 본다 — 201/200 은
+ * {@code GoodsCreateResult.created()} 로 본다. 엔드포인트를 실제로 태우는 것은 아래 업로드·생성
+ * 절이다. 소유 판정이 네이티브 쿼리라 여기서만 검증된다 — 양도받은 티켓의 구매자는 만들 수 있고
+ * 원 예매자는 못 만드는 것이 핵심이다.
+ *
+ * <p>업로드 대장과 청소 배치도 여기서 본다. {@code findDeletable} 이 네이티브라 DB 없이는
+ * 문법조차 검증되지 않고, "굿즈로 이어지지 않은 것만 지운다" 는 판정도 실제 조인 없이는 못 본다.
  *
  * <p>소장품 공연 목록이 티켓 수에 비례해 쿼리를 내지 않는지는 Hibernate 통계로 센다. 설정 파일을
  * 건드리지 않으려고 테스트 안에서 런타임에 켠다.
@@ -80,6 +93,8 @@ class GoodsApiIntegrationTest {
     private static final String COLLECTIBLE_CONCERTS_PATH = "/api/v1/collectibles/concerts";
     private static final String MY_GOODS_PATH = "/api/v1/goods/me";
     private static final String GOODS_PATH = "/api/v1/goods/{goodsId}";
+    private static final String UPLOAD_PATH = "/api/v1/tickets/{ticketId}/goods/images";
+    private static final String CREATE_PATH = "/api/v1/tickets/{ticketId}/goods";
     private static final int SEAT_PRICE = 150_000;
 
     @Autowired
@@ -120,6 +135,12 @@ class GoodsApiIntegrationTest {
 
     @Autowired
     private GoodsService goodsService;
+
+    @Autowired
+    private GoodsUploadRepository goodsUploadRepository;
+
+    @Autowired
+    private GoodsUploadCleanupScheduler goodsUploadCleanupScheduler;
 
     @Autowired
     private EntityManager em;
@@ -559,6 +580,176 @@ class GoodsApiIntegrationTest {
     }
 
     /** 예매하고 발행까지 끝난 티켓. 공연을 새로 만드는 이유는 한 계정 한 공연 1매 때문이다. */
+    // ---------------------------------------------------- 업로드 · 엔드포인트 · 청소
+
+    @Test
+    @DisplayName("업로드는 티켓 아래 접두로 저장하고 대장에 한 줄씩 남긴다")
+    void uploadsUnderTicketPrefix() throws Exception {
+        Ticket ticket = book(alice, 0, "아이유 콘서트");
+        ticket.markUsed();
+        em.flush();
+        String prefix = "goods/" + alice.getId() + "/" + ticket.getId() + "/";
+
+        mvc.perform(multipart(UPLOAD_PATH, ticket.getId())
+                        .file(png("a.png"))
+                        .file(png("b.png"))
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].key").value(startsWith(prefix)));
+
+        em.flush();
+        List<GoodsUpload> ledger = goodsUploadRepository.findAll();
+        assertThat(ledger).hasSize(2)
+                .allSatisfy(row -> {
+                    assertThat(row.getMemberId()).isEqualTo(alice.getId());
+                    assertThat(row.getTicketId()).isEqualTo(ticket.getId());
+                    assertThat(row.getStatus()).isEqualTo(GoodsUploadStatus.UPLOADED);
+                    assertThat(row.getImageKey()).startsWith(prefix);
+                });
+    }
+
+    @Test
+    @DisplayName("남의 티켓으로 올리면 404 이고 대장에 아무것도 남지 않는다")
+    void uploadRejectsOthersTicket() throws Exception {
+        Ticket ticket = book(bob, 0, "아이유 콘서트");
+        ticket.markUsed();
+        em.flush();
+
+        mvc.perform(multipart(UPLOAD_PATH, ticket.getId())
+                        .file(png("a.png"))
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isNotFound());
+
+        em.flush();
+        assertThat(goodsUploadRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("입장 전 티켓으로 올리면 409 - 검증이 저장보다 앞선다")
+    void uploadRejectsBeforeEntry() throws Exception {
+        Ticket ticket = book(alice, 0, "아이유 콘서트");
+        em.flush();
+
+        mvc.perform(multipart(UPLOAD_PATH, ticket.getId())
+                        .file(png("a.png"))
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isConflict());
+
+        em.flush();
+        assertThat(goodsUploadRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("허용하지 않는 형식은 400 이고 대장에도 남지 않는다")
+    void uploadRejectsUnsupportedType() throws Exception {
+        Ticket ticket = book(alice, 0, "아이유 콘서트");
+        ticket.markUsed();
+        em.flush();
+
+        mvc.perform(multipart(UPLOAD_PATH, ticket.getId())
+                        .file(new MockMultipartFile("files", "a.txt", "text/plain", new byte[]{1}))
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isBadRequest());
+
+        em.flush();
+        assertThat(goodsUploadRepository.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("업로드한 key 로 생성까지 두 번 호출하면 201, 같은 키 재전송은 200")
+    void createsThroughEndpoint() throws Exception {
+        Ticket ticket = book(alice, 0, "아이유 콘서트");
+        ticket.markUsed();
+        em.flush();
+        String uploadedKey = uploadOne(ticket, alice);
+
+        String body = mapper.writeValueAsString(uploadedCommand("c-1", uploadedKey));
+        mvc.perform(post(CREATE_PATH, ticket.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.backgroundKey").value(uploadedKey));
+
+        mvc.perform(post(CREATE_PATH, ticket.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isOk());
+
+        em.flush();
+        assertThat(goodsRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("청소는 굿즈로 이어지지 않은 업로드만 지운다 - 굿즈가 있는 티켓 것은 남는다")
+    void cleanupDeletesOnlyOrphans() throws Exception {
+        Ticket orphanTicket = book(alice, 0, "아이유 콘서트");
+        Ticket keptTicket = book(alice, 1, "아이유 콘서트 2");
+        orphanTicket.markUsed();
+        keptTicket.markUsed();
+        em.flush();
+        uploadOne(orphanTicket, alice);
+        String keptKey = uploadOne(keptTicket, alice);
+        goodsService.create(alice.getId(), keptTicket.getId(), uploadedCommand("c-1", keptKey));
+        em.flush();
+
+        // 보존 기간(7일)이 지난 시점으로 돌린다. 굿즈가 있는 티켓 것은 not exists 가 걸러낸다.
+        int deleted = goodsUploadCleanupScheduler.cleanUp(LocalDateTime.now().plusDays(8));
+
+        assertThat(deleted).isEqualTo(1);
+        em.clear();
+        assertThat(goodsUploadRepository.findAll())
+                .extracting(GoodsUpload::getStatus)
+                .containsExactlyInAnyOrder(GoodsUploadStatus.DELETED, GoodsUploadStatus.UPLOADED);
+    }
+
+    @Test
+    @DisplayName("청소된 key 를 가리키는 생성 요청은 409 - 깨진 굿즈를 만들지 않는다")
+    void createRejectsCleanedKey() throws Exception {
+        Ticket ticket = book(alice, 0, "아이유 콘서트");
+        ticket.markUsed();
+        em.flush();
+        String uploadedKey = uploadOne(ticket, alice);
+        goodsUploadCleanupScheduler.cleanUp(LocalDateTime.now().plusDays(8));
+        em.flush();
+
+        mvc.perform(post(CREATE_PATH, ticket.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(uploadedCommand("c-1", uploadedKey)))
+                        .with(Authenticated.as(alice.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.exception").value("GoodsImageDeletedException"));
+
+        em.flush();
+        assertThat(goodsRepository.count()).isZero();
+    }
+
+    /** 한 장 올리고 그 key 를 돌려준다. */
+    private String uploadOne(Ticket ticket, Member requester) throws Exception {
+        String response = mvc.perform(multipart(UPLOAD_PATH, ticket.getId())
+                        .file(png("a.png"))
+                        .with(Authenticated.as(requester.getId())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        return mapper.readTree(response).get(0).get("key").stringValue();
+    }
+
+    private MockMultipartFile png(String name) {
+        return new MockMultipartFile("files", name, "image/png", new byte[]{1, 2, 3});
+    }
+
+    /** 업로드로 받은 key 를 배경에 넣은 요청. 레이어는 규칙만 만족하는 최소 모양이다. */
+    private CreateGoodsCommand uploadedCommand(String clientGoodsId, String backgroundKey) {
+        return new CreateGoodsCommand(clientGoodsId, backgroundKey, null, null, null, null,
+                GoodsEffect.stageLights, null,
+                mapper.readTree("[{\"cutoutKey\":\"cut-0.png\",\"layerOrder\":0,\"parts\":[]}]"),
+                mapper.readTree("{\"durationMs\":610}"),
+                mapper.readTree("{\"model\":\"on-device\"}"));
+    }
+
     private Ticket book(Member member, int seatIndex, String concertTitle) {
         Concert concert = saveConcert(concertTitle, 20 + seatIndex);
         Reservation reservation = reservationRepository.save(Reservation.builder()
