@@ -62,6 +62,19 @@ CREATE TABLE IF NOT EXISTS `concert_wish` (
     KEY `idx_wish_concert` (`concert_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 회원별 공연 알림 설정. 같은 공연·알림 종류는 회원당 한 건만 유지한다.
+CREATE TABLE IF NOT EXISTS `concert_alarm` (
+    `alarm_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `member_id` BIGINT NOT NULL,
+    `concert_id` BIGINT NOT NULL,
+    `alarm_type` VARCHAR(20) NOT NULL,
+    `created_at` DATETIME(6) NOT NULL,
+    `updated_at` DATETIME(6) NOT NULL,
+    PRIMARY KEY (`alarm_id`),
+    UNIQUE KEY `uk_alarm_member_concert_type` (`member_id`, `concert_id`, `alarm_type`),
+    KEY `idx_alarm_concert_type` (`concert_id`, `alarm_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 취소표 구매 기회. OFFERED 상태의 동일 공연·좌석은 한 건만 열릴 수 있다.
 CREATE TABLE IF NOT EXISTS `cancel_offer` (
     `offer_id` BIGINT NOT NULL AUTO_INCREMENT,
