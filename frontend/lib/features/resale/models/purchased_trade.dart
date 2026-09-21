@@ -4,9 +4,8 @@ import 'wire_time.dart';
 
 /// 방금 체결된 양도 한 건. 서버 `PurchaseResponseDto` 다.
 ///
-/// 응답 시점의 [status] 는 언제나 [TradeStatus.pending] 이다 — 코인 전송과
-/// 소유권 이전이 DB 트랜잭션 밖이라 아직 끝나지 않았다. 완료 화면은 이 값이
-/// 바뀌는지 [tradeId] 로 지켜본다.
+/// [status] 는 언제나 [TradeStatus.confirmed] 다 — 코인 전송과 소유권 이전이
+/// 응답 전에 끝나므로, 이 값을 받았다는 것이 곧 양도가 끝났다는 뜻이다.
 ///
 /// **포스터 주소가 없다.** 완료 화면 위쪽의 원형 포스터는 구매 화면이 들고
 /// 있던 매물 상세의 것을 함께 넘겨 그린다([PurchaseResult]).
@@ -39,7 +38,7 @@ class PurchasedTrade {
     seatNumber: (json['seatCol'] as num?)?.toInt(),
   );
 
-  /// 체결 번호. 온체인 전송이 끝났는지 확인할 때 이 값으로 찾는다.
+  /// 체결 번호. 서버 `ticket_trade` 의 PK 다.
   ///
   /// 온체인 `Marketplace.buy` 가 받는 `tradeId`(bytes32)와는 다른 값이다.
   final int tradeId;
@@ -62,21 +61,6 @@ class PurchasedTrade {
 
   /// 완료 화면에 찍는 좌석. 좌석이 오면 `S구역 8열 19번`, 아니면 구역명만.
   String get seatLabel => formatSeatLabel(sectionName, seatRow, seatNumber);
-
-  /// 상태만 바꾼 사본. 전송이 끝났는지 확인해 배지만 갈아 끼울 때 쓴다.
-  PurchasedTrade copyWith({TradeStatus? status}) => PurchasedTrade(
-    tradeId: tradeId,
-    listingId: listingId,
-    status: status ?? this.status,
-    price: price,
-    concertTitle: concertTitle,
-    venueName: venueName,
-    sectionName: sectionName,
-    tradedAt: tradedAt,
-    startAt: startAt,
-    seatRow: seatRow,
-    seatNumber: seatNumber,
-  );
 }
 
 /// 결제 완료 화면이 받는 것. 체결 결과와, 응답에 없는 포스터 주소.

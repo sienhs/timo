@@ -16,6 +16,21 @@ class ResaleMetrics {
   /// 남은 시간 표시를 갱신하는 주기.
   static const countdownTick = Duration(seconds: 1);
 
+  /// 체인을 타는 요청에만 따로 두는 응답 대기 시간. 구매·등록·등록 취소다.
+  ///
+  /// 기본값(`ApiClient` 의 10초)으로는 모자란다. 서버가 온체인 작업이 끝날
+  /// 때까지 기다렸다 응답하는데, 그 대기가 최대 30초이기 때문이다(백엔드
+  /// `ContractClient` 의 영수증 폴링 1초 x 30회). 10초에 끊으면 앱만 실패로
+  /// 돌아서고 서버 일은 그대로 끝나, 산 티켓을 못 샀다고, 올린 매물을 못
+  /// 올렸다고 읽는다. 그러고 다시 시도하면 이번엔 409 를 받는다.
+  ///
+  /// 서버 상한보다 넉넉히 둬서, 끊는 쪽은 언제나 서버이게 한다. 한계일 뿐이라
+  /// 응답이 빨리 오면 그만큼 빨리 끝난다.
+  ///
+  /// 가격 수정은 여기 없다 — 그것만 체인을 타지 않고 DB 만 바꾼다
+  /// (백엔드 `ListingService.updatePrice`).
+  static const onChainTimeout = Duration(seconds: 40);
+
   /// 구매 확인 화면에서 본 가격이 유효한 시간.
   ///
   /// 예매의 좌석 선점과는 다르다. **양도 매물에는 선점이 없다** — 확인 화면을
@@ -23,14 +38,6 @@ class ResaleMetrics {
   /// 가격이 오래되면 결제가 `expectedPrice` 불일치로 거절되기 때문이다. 그
   /// 거절을 결제 버튼에서 받느니 시간이 지나면 버튼을 잠그고 다시 불러온다.
   static const priceWindow = Duration(minutes: 5);
-
-  /// 구매 뒤 온체인 전송이 끝났는지 확인하는 주기와, 확인을 그만두는 시점.
-  ///
-  /// 체결 응답은 202(PENDING)이라 그 시점에는 전송이 아직이다. 폴링 전용
-  /// API 가 따로 없어 내 거래 내역에서 같은 `tradeId` 를 찾아 읽는다
-  /// (백엔드 `PurchaseResponseDto` 주석).
-  static const tradePollInterval = Duration(seconds: 3);
-  static const tradePollTimeout = Duration(minutes: 2);
 
   /// 가짜 API 의 응답 지연. 실제 서버처럼 로딩 상태가 보이게 한다.
   static const mockLatency = Duration(milliseconds: 400);
@@ -54,6 +61,12 @@ class ResaleMetrics {
 
   /// 마켓 닫힘 화면 한가운데의 큰 카운트다운 글자 크기.
   static const closedCountdownFontSize = 26.0;
+
+  /// 결제 대기 연출 클립의 비율. 자산이 1280x720 이다.
+  static const transferClipAspectRatio = 16 / 9;
+
+  /// 영상을 못 읽었을 때 그 자리를 채우는 마스코트의 크기.
+  static const transferMascotSize = 160.0;
 
   /// 결제 완료 화면 위쪽 원형 포스터의 지름.
   static const completePosterDiameter = 132.0;
@@ -153,13 +166,30 @@ class ResaleStrings {
   /// 버튼을 잠그고 이유를 적는 쪽이 낫다.
   static const ownListing = '내가 등록한 매물이에요';
 
+  /// 온체인 체결이 실패했을 때(`TransferFailedException`). 서버 문구는 재시도만
+  /// 권하는데, 잔액 부족이면 다시 시도해도 같다. 무엇을 보고 와야 하는지 적는다.
+  static const transferFailedError = '결제하지 못했어요. 잔액이 모자라거나 매물 상태가 바뀌었을 수 있어요';
+
+  /// 지갑 잔액이 매물가보다 적을 때. 서버도 막지만 온체인 revert 를 가리지
+  /// 않고 `TransferFailedException` 하나로 묶어 "잠시 후 다시 시도해 주세요"
+  /// 라고 답한다 — 충전하러 가야 하는 사람을 재시도로 보내는 셈이라, 앱이
+  /// 먼저 잠그고 이유를 적는다.
+  static const insufficientBalance = '잔액이 부족해요';
+
+  // 결제 대기 연출
+  static const transferringTitle = '티켓을 옮기는 중이에요';
+  static const transferringSubtitle = '잠시만 기다려 주세요';
+  static const transferringSemantics = '티켓을 옮기는 중입니다. 잠시만 기다려 주세요.';
+
   // 결제 완료
   static const completeTitle = '결제가 완료됐어요';
   static const transferringBadge = '티켓 양도 중';
   static const transferredBadge = '티켓 양도 완료';
   static const transferFailedBadge = '티켓 양도 실패';
+  /// 체결 응답이 오면 양도는 이미 끝나 있다(서버 `PurchaseService`). 예전에는
+  /// "1~2분이 걸릴 수 있어요" 라고 기다리게 했는데, 이제 기다릴 것이 없다.
   static const transferDescription =
-      '티켓 양도에는 1~2분이 걸릴 수 있어요.\n완료되면 알림으로 알려드릴게요.';
+      '티켓이 내 티켓함으로 옮겨졌어요.\n공연 당일 이 티켓으로 입장할 수 있어요.';
 
   /// 온체인 전송이 실패했을 때. 시안에 없는 상태다(서버 `TradeStatus.FAILED`).
   /// 무슨 일이 되돌려지는지는 정산 규칙이 정해지지 않아 단정하지 않는다.

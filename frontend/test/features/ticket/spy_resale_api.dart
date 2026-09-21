@@ -8,7 +8,6 @@ import 'package:timo/features/resale/models/market_concert.dart';
 import 'package:timo/features/resale/models/market_hours.dart';
 import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/models/purchased_trade.dart';
-import 'package:timo/features/resale/models/trade_status.dart';
 
 /// 내 티켓 화면이 마켓 API 에 무엇을 보냈는지 지켜보는 목. 실제 동작은
 /// [MockResaleApi] 에 그대로 넘긴다.
@@ -86,10 +85,6 @@ class SpyResaleApi implements ResaleApi {
     expectedPrice: expectedPrice,
     idempotencyKey: idempotencyKey,
   );
-
-  @override
-  Future<TradeStatus> fetchTradeStatus(int tradeId) =>
-      _base.fetchTradeStatus(tradeId);
 
   @override
   Future<List<ListableTicket>> fetchListableTickets() =>

@@ -11,7 +11,6 @@ import '../models/market_concert.dart';
 import '../models/market_hours.dart';
 import '../models/my_trade.dart';
 import '../models/purchased_trade.dart';
-import '../models/trade_status.dart';
 import '../utils/market_error.dart';
 import 'resale_api.dart';
 
@@ -85,28 +84,14 @@ class HttpResaleApi implements ResaleApi {
       () => _dio.post<dynamic>(
         '$basePath/listings/$listingId/purchase',
         data: {'expectedPrice': expectedPrice},
-        options: Options(headers: {'Idempotency-Key': idempotencyKey}),
+        options: Options(
+          headers: {'Idempotency-Key': idempotencyKey},
+          // 체인을 타는 요청이라 오래 기다린다([ResaleMetrics.onChainTimeout]).
+          receiveTimeout: ResaleMetrics.onChainTimeout,
+        ),
       ),
     );
     return PurchasedTrade.fromJson(_body(response));
-  }
-
-  /// 내 거래 내역에서 같은 체결 번호를 찾아 상태만 꺼낸다.
-  ///
-  /// 폴링 전용 주소가 따로 없어 [fetchMyTrades] 위에서 골라낸다. 두 상태 값은
-  /// 서버가 같은 이름을 쓰므로 이름으로 옮긴다.
-  ///
-  /// 목록에 아직 없으면(반영 전) 진행 중으로 본다. 없다는 것은 실패했다는
-  /// 뜻이 아니라 아직 모른다는 뜻이다.
-  @override
-  Future<TradeStatus> fetchTradeStatus(int tradeId) async {
-    final trades = await fetchMyTrades();
-    for (final trade in trades) {
-      if (trade.tradeId == tradeId) {
-        return TradeStatus.fromWire(trade.status.wireName);
-      }
-    }
-    return TradeStatus.pending;
   }
 
   @override
@@ -120,7 +105,11 @@ class HttpResaleApi implements ResaleApi {
   @override
   Future<void> cancelListing(int listingId) async {
     await _guard(
-      () => _dio.post<dynamic>('$basePath/listings/$listingId/cancel'),
+      () => _dio.post<dynamic>(
+        '$basePath/listings/$listingId/cancel',
+        // 체인을 타는 요청이라 오래 기다린다([ResaleMetrics.onChainTimeout]).
+        options: Options(receiveTimeout: ResaleMetrics.onChainTimeout),
+      ),
     );
   }
 
@@ -167,6 +156,8 @@ class HttpResaleApi implements ResaleApi {
       () => _dio.post<dynamic>(
         '$basePath/listings',
         data: {'ticketId': ticketId, 'price': price},
+        // 체인을 타는 요청이라 오래 기다린다([ResaleMetrics.onChainTimeout]).
+        options: Options(receiveTimeout: ResaleMetrics.onChainTimeout),
       ),
     );
     return ListingDetail.fromJson(_body(response));

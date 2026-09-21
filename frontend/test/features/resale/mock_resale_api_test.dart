@@ -12,7 +12,7 @@ void main() {
   /// 목록·구매는 열린 시간에만, 가격 수정은 닫힌 시간에만 받으므로 흐름마다
   /// 맞는 시각에 둔다.
   final whileOpen = DateTime(2026, 9, 16, 21);
-  final whileClosed = DateTime(2026, 9, 16, 12);
+  final whileClosed = DateTime(2026, 9, 16, 3);
 
   MockResaleApi apiOf({
     ResaleMockScenario scenario = ResaleMockScenario.design,
@@ -27,24 +27,24 @@ void main() {
     MockResaleApi at(DateTime clock) =>
         MockResaleApi(latency: Duration.zero, clock: () => clock);
 
-    test('20:00~23:59:59 에는 열려 있고 그날 창의 시각을 준다', () async {
+    test('08:00~23:00 에는 열려 있고 그날 창의 시각을 준다', () async {
       final hours = await at(
         DateTime(2026, 9, 16, 21, 25, 17),
       ).fetchMarketHours();
 
       expect(hours.isOpen, isTrue);
       expect(hours.serverTime, DateTime(2026, 9, 16, 21, 25, 17));
-      expect(hours.opensAt, DateTime(2026, 9, 16, 20));
-      expect(hours.closesAt, DateTime(2026, 9, 16, 23, 59, 59));
+      expect(hours.opensAt, DateTime(2026, 9, 16, 8));
+      expect(hours.closesAt, DateTime(2026, 9, 16, 23));
       // 시차가 없는 서버다.
       expect(hours.receivedAt, hours.serverTime);
     });
 
     test('여는 시각 전이면 닫혀 있고 그날 오픈을 준다', () async {
-      final hours = await at(DateTime(2026, 9, 16, 16, 37)).fetchMarketHours();
+      final hours = await at(DateTime(2026, 9, 16, 6, 37)).fetchMarketHours();
 
       expect(hours.isOpen, isFalse);
-      expect(hours.opensAt, DateTime(2026, 9, 16, 20));
+      expect(hours.opensAt, DateTime(2026, 9, 16, 8));
     });
 
     test('창이 끝난 뒤면 다음 날 창을 준다', () async {
@@ -53,8 +53,8 @@ void main() {
       ).fetchMarketHours();
 
       expect(hours.isOpen, isFalse);
-      expect(hours.opensAt, DateTime(2026, 9, 17, 20));
-      expect(hours.closesAt, DateTime(2026, 9, 17, 23, 59, 59));
+      expect(hours.opensAt, DateTime(2026, 9, 17, 8));
+      expect(hours.closesAt, DateTime(2026, 9, 17, 23));
     });
 
     Matcher rejectedAs(String exceptionName) => throwsA(
@@ -156,7 +156,8 @@ void main() {
       );
       expect(purchase.tradeId, bought.tradeId);
       expect(purchase.listingId, 1);
-      expect(purchase.status, MyTradeStatus.pending);
+      // 체결이 끝나야 응답이 오므로 내 거래 내역에도 확정으로 들어온다.
+      expect(purchase.status, MyTradeStatus.confirmed);
       // 산 티켓은 매물이 아니다. 양도 목록 탭이 세지 않는다.
       expect(purchase.isOnSale, isFalse);
       // 방금 샀으니 맨 위다.

@@ -27,10 +27,14 @@ import 'package:timo/features/ticket/widgets/upcoming_ticket_card.dart';
 void main() {
   /// 테스트가 보는 '지금'. 언제 돌려도 결과가 같아야 해서 고정한다.
   ///
-  /// 낮 시각인 것이 중요하다. 목 데이터의 첫 티켓은 '1시간 뒤' 공연인데, 실제
-  /// 시계를 쓰면 밤 11시 이후에 그 공연이 자정을 넘어 **내일**이 되어 D-day
-  /// 배지가 `D-DAY` 대신 `D-1` 로 찍힌다.
-  DateTime now() => DateTime(2026, 9, 15, 14);
+  /// 자정에서 먼 시각인 것이 중요하다. 목 데이터의 첫 티켓은 '1시간 뒤'
+  /// 공연인데, 실제 시계를 쓰면 밤 11시 이후에 그 공연이 자정을 넘어
+  /// **내일**이 되어 D-day 배지가 `D-DAY` 대신 `D-1` 로 찍힌다.
+  ///
+  /// 그리고 마켓이 **닫혀 있는** 시각이다. 가격 수정은 닫힌 시간에만 되므로,
+  /// 열려 있는 경우를 보는 테스트만 제 시각을 따로 넣는다. 창이 08:00~23:00
+  /// 이라 닫혀 있는 시각은 이른 새벽뿐이다.
+  DateTime now() => DateTime(2026, 9, 15, 3);
 
   /// 화면을 목과 함께 띄운다. 지연은 0 이라 한 번 더 pump 하면 목록이 나온다.
   ///
@@ -168,7 +172,7 @@ void main() {
       );
       // 목의 판매중 매물은 96일 뒤 공연이다.
       expect(
-        find.text(TicketStrings.deadlineAt('2026.12.20 14:00')),
+        find.text(TicketStrings.deadlineAt('2026.12.20 03:00')),
         findsOneWidget,
       );
     });
@@ -203,7 +207,7 @@ void main() {
       expect(find.text(TicketStrings.listingBadge), findsOneWidget);
       expect(find.text(TicketStrings.pendingExposureBadge), findsOneWidget);
       expect(
-        find.text(TicketStrings.exposureAt('09.16 20:00')),
+        find.text(TicketStrings.exposureAt('09.16 08:00')),
         findsOneWidget,
       );
       // 노출 대기여도 팔리는 중이라 버튼은 그대로다.

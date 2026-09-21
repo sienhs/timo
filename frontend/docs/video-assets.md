@@ -47,3 +47,27 @@ ffmpeg -i <원본>.mp4 \
   지운다 — [CreatingClip] 이 바깥을 투명하게 지우는 원형 마스크를 씌운다.
 - 클립을 갈아 끼울 때는 만드는 장면과 완성 장면이 한 클립 안에 있어야 하고,
   그 경계를 `CreatorLayout.clipMakingEnd` 로 다시 잡는다.
+
+## transferring.mp4
+
+양도 결제 대기 연출([PurchaseTransferringView])에 쓰는 클립. 너구리가 편지를
+전한다. 서버가 온체인 체결까지 끝내고 답하는 동안(최대 30초) 재생되므로,
+클립 길이(8초)보다 기다림이 길 수 있어 **반복 재생**한다. 첫 프레임과 끝
+프레임의 자세가 거의 같아 이음매가 드러나지 않는다.
+
+원본 배경은 `#E8E8E8` 의 스튜디오 회색이고 모든 프레임에서 균일하다.
+`wallet_creating.mp4` 와 같은 방식으로 **배경을 흰색까지 눌러서** 넣는다.
+
+```bash
+ffmpeg -i <원본>.mp4 \
+  -vf "colorlevels=rimax=0.89:gimax=0.89:bimax=0.89" \
+  -an -c:v libx264 -crf 23 -preset slow -pix_fmt yuv420p -movflags +faststart \
+  transferring.mp4
+```
+
+- `0.89` 는 배경이 `#FFFFFF` 에 닿는 값이다. 배경값 232 를 그대로 환산한
+  `0.91` 로는 253~254 가 남아 흰 화면 위에서 사각형이 비쳤다. 더 내리면 흰
+  봉투와 너구리 털의 밝은 부분이 서로 먹는다.
+- 화면(마켓)의 배경은 `#F4F5F6` 라 이 클립을 그대로 올리면 흰 사각형이 떠
+  보인다. 그래서 연출이 도는 동안에는 **화면을 흰 바탕으로 바꾼다**
+  ([ListingPurchaseScreen] 의 `_purchasing` 갈래).
