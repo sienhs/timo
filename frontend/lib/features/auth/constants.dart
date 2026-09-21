@@ -168,13 +168,8 @@ class AuthStrings {
 
   // 2/3 로그인 정보(아이디 + 비밀번호)
   static const accountTitle = '로그인 정보를 만들어주세요';
-  static const accountSubtitle = '로그인할 때 쓸 아이디와 비밀번호예요';
+  static const accountSubtitle = '아이디와 비밀번호를 설정해 주세요';
   static const usernameLabel = '아이디';
-
-  /// 아이디 라벨 옆 주의 문구. 예전에는 '다음' 을 누를 때 팝업으로 물었는데,
-  /// 비밀번호까지 한 화면에서 받게 되면서 팝업이 뜨는 시점과 아이디를 정하는
-  /// 시점이 어긋났다. 늘 보이는 문구가 한 번 닫으면 끝인 팝업보다 오래 남는다.
-  static const usernameNote = '가입 후 변경 불가';
   static const usernameHint = '아이디';
   static const usernameRule =
       '영문 소문자로 시작 · '

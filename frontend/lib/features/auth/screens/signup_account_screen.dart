@@ -178,7 +178,6 @@ class _SignupAccountScreenState extends State<SignupAccountScreen> {
         children: [
           LabeledTextField(
             label: AuthStrings.usernameLabel,
-            labelNote: AuthStrings.usernameNote,
             hint: AuthStrings.usernameHint,
             controller: _usernameController,
             focusNode: _usernameFocus,

@@ -121,6 +121,9 @@ class _PresetGrid extends StatelessWidget {
 
 /// 금액 칸 하나. 고르면 테두리·배경이 바뀌고 오른쪽에 체크가 붙는다.
 ///
+/// 고른 칸의 바탕은 브랜드색을 옅게 깐 [AppColors.primarySurface] 다. 테두리와
+/// 체크가 이미 브랜드색이라 바탕까지 진하게 칠하면 카드에서 이 칸만 튄다.
+///
 /// 체크와 `Semantics(selected:)` 를 함께 두는 이유: 색만으로 고른 칸을 가르면
 /// 색을 못 가리는 사람과 화면 낭독기 사용자가 무엇을 골랐는지 알 수 없다.
 class _PresetOption extends StatelessWidget {
@@ -158,7 +161,7 @@ class _PresetOption extends StatelessWidget {
               minimumSize: const Size.fromHeight(MyPageMetrics.presetHeight),
               backgroundColor: Color.lerp(
                 AppColors.surface,
-                AppColors.seatAvailable,
+                AppColors.primarySurface,
                 progress,
               ),
               side: BorderSide(

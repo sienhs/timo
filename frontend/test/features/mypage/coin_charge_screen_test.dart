@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/theme/app_colors.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/utils/formatters.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
@@ -81,6 +82,13 @@ void main() {
     OutlinedButton,
     MyPageStrings.withUnit(formatThousands(value)),
   );
+
+  /// 금액 칸의 지금 바탕색. 고름 여부에 따라 애니메이션으로 옮겨 간다.
+  Color? presetBackground(WidgetTester tester, int value) => tester
+      .widget<OutlinedButton>(preset(value))
+      .style
+      ?.backgroundColor
+      ?.resolve(const <WidgetState>{});
 
   final submit = find.widgetWithText(FilledButton, MyPageStrings.chargeSubmit);
 
@@ -175,6 +183,17 @@ void main() {
         isNot(isSemantics(isSelected: true)),
       );
       handle.dispose();
+    });
+
+    testWidgets('고른 칸의 바탕은 브랜드색을 옅게 깐 색이다', (tester) async {
+      await pumpCharge(tester, api: _RecordingMyPageApi());
+
+      await tester.tap(preset(30000));
+      // 바탕색이 애니메이션으로 옮겨 간다. 다 옮긴 뒤에 본다.
+      await tester.pumpAndSettle();
+
+      expect(presetBackground(tester, 30000), AppColors.primarySurface);
+      expect(presetBackground(tester, 10000), AppColors.surface);
     });
 
     testWidgets('직접 입력한 금액이 칸과 같으면 그 칸이 고른 것으로 보인다', (tester) async {
