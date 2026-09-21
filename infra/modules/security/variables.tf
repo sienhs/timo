@@ -9,3 +9,7 @@ variable "vpc_id" {
 variable "app_port" {
   type = number
 }
+
+variable "redis_port" {
+  type = number
+}

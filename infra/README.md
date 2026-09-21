@@ -15,6 +15,7 @@
 - `modules/image-storage`: 공개·개인 S3, CloudFront, 업로드 IAM 사용자와 키.
 - `modules/api-domain`: API 인증서, DNS 검증, ALB 별칭 레코드.
 - `modules/secrets-manager`: 백엔드 실행 환경 시크릿.
+- `modules/redis`: VPC 내부 전용 ElastiCache Redis와 암호화된 AUTH 연결.
 - 나머지 모듈: 네트워크·보안 그룹·EC2·NAT·RDS·ALB·ECR·백엔드 CI/CD.
 
 ## 환경변수
@@ -26,6 +27,10 @@ Firebase 푸시는 `FIREBASE_MESSAGING_ENABLED=true` 및 일반 채널
 `PUSH_CHANNEL_GENERAL=timo_general_notifications`를 Terraform 기본값으로 저장하므로, 별도 tfvars 설정이 필요 없습니다.
 
 시크릿 변경은 다음 백엔드 배포 시 컨테이너에 반영됩니다.
+Redis는 DB 서브넷 그룹에 단일 노드로 배치하고, 애플리케이션 EC2 보안 그룹만 6379 포트에
+접근할 수 있습니다. 전송·저장 암호화와 AUTH를 모두 사용하며, `redis_auth_token`은 16~128자의
+값을 Git에서 제외된 `terraform.tfvars`에만 설정합니다. `REDIS_HOST`, `REDIS_PORT`,
+`REDIS_PASSWORD`는 기존 백엔드 런타임 시크릿에 자동으로 포함됩니다.
 이미지 저장과 JSON 응답 규칙은 [이미지 가이드](docs/images.md)를 참고하세요.
 
 ## 실행 (저장소 루트의 PowerShell)

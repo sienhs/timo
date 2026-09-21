@@ -17,6 +17,9 @@ module "backend_secret" {
     ENTRY_PASS_SECRET                    = var.entry_pass_secret
     ADMIN_PRIVATE_KEY                    = var.admin_private_key
     WALLET_MASTER_KEY                    = var.wallet_master_key
+    REDIS_HOST                           = module.redis.primary_endpoint_address
+    REDIS_PORT                           = tostring(module.redis.port)
+    REDIS_PASSWORD                       = var.redis_auth_token
     FIREBASE_MESSAGING_ENABLED           = "true"
     PUSH_CHANNEL_GENERAL                 = "timo_general_notifications"
     FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = var.firebase_service_account_json_base64
@@ -62,9 +65,22 @@ module "nat_instance" {
 module "security" {
   source = "./modules/security"
 
-  name     = "${var.project_name}-${var.environment}"
-  vpc_id   = module.network.vpc_id
-  app_port = var.app_port
+  name       = "${var.project_name}-${var.environment}"
+  vpc_id     = module.network.vpc_id
+  app_port   = var.app_port
+  redis_port = var.redis_port
+}
+
+module "redis" {
+  source = "./modules/redis"
+
+  name              = "${var.project_name}-${var.environment}"
+  subnet_ids        = module.network.db_subnet_ids
+  security_group_id = module.security.redis_security_group_id
+  node_type         = var.redis_node_type
+  engine_version    = var.redis_engine_version
+  port              = var.redis_port
+  auth_token        = var.redis_auth_token
 }
 
 module "ec2" {
