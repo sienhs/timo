@@ -202,6 +202,9 @@ CREATE TABLE IF NOT EXISTS `refresh_token` (
 CREATE TABLE IF NOT EXISTS `ticket` (
     `ticket_id` BIGINT NOT NULL AUTO_INCREMENT,
     `reservation_id` BIGINT NOT NULL,
+    `owner_member_id` BIGINT NOT NULL,
+    `acquired_by` VARCHAR(20) NOT NULL,
+    `acquired_at` DATETIME(6) NOT NULL,
     `token_id` DECIMAL(38,0) NULL,
     `mint_tx_hash` VARCHAR(66) NULL,
     `mint_attempt_count` INT NOT NULL,
@@ -268,6 +271,23 @@ CREATE TABLE IF NOT EXISTS `reservation` (
 -- 입장 완료 티켓으로 만든 개인 소장품. 원본·합성 이미지 파일은 S3에, 그 key와 앱 렌더링
 -- 메타데이터만 RDS에 둔다. ticket 및 (member, client_goods_id) 유니크 제약이 동시 요청과
 -- 클라이언트 재시도를 각각 한 건으로 수렴시킨다.
+-- 굿즈 제작 중 올라간 이미지의 수명주기 대장. 굿즈에 연결되지 않은 업로드는 청소 배치가
+-- status 및 created_at 인덱스로 찾아 스토리지와 함께 정리한다.
+CREATE TABLE IF NOT EXISTS `goods_upload` (
+    `goods_upload_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `member_id`       BIGINT NOT NULL,
+    `ticket_id`       BIGINT NOT NULL,
+    `image_key`       VARCHAR(512) NOT NULL,
+    `status`          VARCHAR(20) NOT NULL,
+    `created_at`      DATETIME(6) NOT NULL,
+    `updated_at`      DATETIME(6) NOT NULL,
+    `deleted_at`      DATETIME(6) NULL,
+    PRIMARY KEY (`goods_upload_id`),
+    UNIQUE KEY `uk_goods_upload_image_key` (`image_key`),
+    KEY `idx_goods_upload_status_created` (`status`, `created_at`),
+    KEY `idx_goods_upload_ticket` (`ticket_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `goods` (
     `goods_id` BIGINT NOT NULL AUTO_INCREMENT,
     `ticket_id` BIGINT NOT NULL,
@@ -341,6 +361,52 @@ CREATE TABLE IF NOT EXISTS `ticket_trade` (
 DELIMITER //
 CREATE PROCEDURE ensure_entity_unique_constraints()
 BEGIN
+    -- Ticket.ownerMemberId는 QR·굿즈·내 티켓·양도·알림의 현재 소유권 기준이다.
+    -- 이미 운영 중인 티켓은 원 예매자를 BOOKING 취득자로 보정한 뒤 NOT NULL로 바꾼다.
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'ticket'
+          AND column_name = 'owner_member_id'
+    ) THEN
+        ALTER TABLE `ticket`
+            ADD COLUMN `owner_member_id` BIGINT NULL AFTER `reservation_id`;
+        UPDATE `ticket` t
+        JOIN `reservation` r ON r.`reservation_id` = t.`reservation_id`
+           SET t.`owner_member_id` = r.`member_id`
+         WHERE t.`owner_member_id` IS NULL;
+        ALTER TABLE `ticket`
+            MODIFY COLUMN `owner_member_id` BIGINT NOT NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'ticket'
+          AND column_name = 'acquired_by'
+    ) THEN
+        ALTER TABLE `ticket`
+            ADD COLUMN `acquired_by` VARCHAR(20) NULL AFTER `owner_member_id`;
+        UPDATE `ticket`
+           SET `acquired_by` = 'BOOKING'
+         WHERE `acquired_by` IS NULL;
+        ALTER TABLE `ticket`
+            MODIFY COLUMN `acquired_by` VARCHAR(20) NOT NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'ticket'
+          AND column_name = 'acquired_at'
+    ) THEN
+        ALTER TABLE `ticket`
+            ADD COLUMN `acquired_at` DATETIME(6) NULL AFTER `acquired_by`;
+        UPDATE `ticket` t
+        JOIN `reservation` r ON r.`reservation_id` = t.`reservation_id`
+           SET t.`acquired_at` = r.`created_at`
+         WHERE t.`acquired_at` IS NULL;
+        ALTER TABLE `ticket`
+            MODIFY COLUMN `acquired_at` DATETIME(6) NOT NULL;
+    END IF;
+
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = DATABASE() AND table_name = 'reservation'
