@@ -8,6 +8,8 @@ if (!base || !Number.isInteger(users) || users < 1 || users > 2000) throw new Er
 const success = new Rate('flow_success');
 const duration = new Trend('flow_ms', true);
 const holdTime = new Trend('hold_ms', true);
+const queueJoinTime = new Trend('queue_join_ms', true);
+const queueAdmissionTime = new Trend('queue_admission_ms', true);
 const completed = new Counter('completed_flows');
 export const options = {
   setupTimeout: '15m',
@@ -15,7 +17,7 @@ export const options = {
   // status and name are exported into k6's raw output and used to explain a
   // failed plateau without storing request headers or authentication tokens.
   systemTags: ['status', 'name', 'error', 'error_code'],
-  thresholds: { flow_success: ['rate>=0.99'], flow_ms: ['p(95)<=3000'], hold_ms: ['p(95)<=1500'], completed_flows: ['count>0'] },
+  thresholds: { flow_success: ['rate>=0.99'], flow_ms: ['p(95)<=4000'], hold_ms: ['p(95)<=1500'], queue_join_ms: ['p(95)<=1000'], completed_flows: ['count>0'] },
 };
 export function setup() {
   const tokens = [];
@@ -34,6 +36,19 @@ export default function (tokens) {
   const start = Date.now();
   let ok = false;
   try {
+    const queueStart = Date.now();
+    const queue = http.post(`${base}/api/v1/concerts/1/queue`, null, params('queue_join'));
+    queueJoinTime.add(queue.timings.duration);
+    if (queue.status !== 200) return;
+    let admission = queue.json('admissionToken');
+    for (let attempt = 0; !admission && attempt < 30; attempt++) {
+      sleep(1);
+      const status = http.get(`${base}/api/v1/concerts/1/queue`, params('queue_status'));
+      if (status.status !== 200) return;
+      admission = status.json('admissionToken');
+    }
+    queueAdmissionTime.add(Date.now() - queueStart);
+    if (!admission) return;
     if (http.get(`${base}/api/v1/concerts/1`, params('concert')).status !== 200) return;
     const sections = http.get(`${base}/api/v1/sections?concertId=1`, params('sections'));
     if (sections.status !== 200 || !sections.json('sections').some(s => s.id === section)) return;
@@ -45,6 +60,7 @@ export default function (tokens) {
     const release = http.del(`${base}/api/v1/seats/${__VU}/hold?concertId=1`, null, params('release'));
     ok = hold.status === 200 && release.status === 200;
     if (ok) completed.add(1);
+    http.del(`${base}/api/v1/concerts/1/queue`, null, params('queue_leave'));
   } finally {
     success.add(ok);
     duration.add(Date.now() - start);
