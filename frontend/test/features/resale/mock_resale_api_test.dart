@@ -88,34 +88,18 @@ void main() {
       );
     });
 
-    // 매물은 등록 다음 날 여는 시각에 올라간다. 열린 시간에 올려도 그날은
-    // 남에게 안 보이고, 번호로 사려 해도 막힌다. 내 거래 내역에는 바로 있다.
-    test('오늘 등록한 매물은 목록에 없고 살 수도 없지만 내 거래 내역에는 있다', () async {
-      var now = whileOpen;
-      final api = MockResaleApi(latency: Duration.zero, clock: () => now);
+    // 매물은 등록 즉시 마켓에 올라간다(서버 `listing-delay-enabled` 꺼짐).
+    // 열린 시간에 올리면 바로 목록에 있고, 내 거래 내역에도 있다.
+    test('오늘 등록한 매물은 바로 목록과 내 거래 내역에 있다', () async {
+      final api = MockResaleApi(latency: Duration.zero, clock: () => whileOpen);
       final listed = await api.createListing(ticketId: 101, price: 190000);
 
       expect(
         (await api.fetchListings(listed.concertId)).map((l) => l.listingId),
-        isNot(contains(listed.listingId)),
+        contains(listed.listingId),
       );
       expect(
         (await api.fetchMyTrades()).map((t) => t.listingId),
-        contains(listed.listingId),
-      );
-      await expectLater(
-        api.purchase(
-          listingId: listed.listingId,
-          expectedPrice: 190000,
-          idempotencyKey: 'k',
-        ),
-        rejectedAs(listingNotOpenYetExceptionName),
-      );
-
-      // 다음 날 창이 열리면 보인다.
-      now = whileOpen.add(const Duration(days: 1));
-      expect(
-        (await api.fetchListings(listed.concertId)).map((l) => l.listingId),
         contains(listed.listingId),
       );
     });

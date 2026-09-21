@@ -89,48 +89,6 @@ void main() {
       );
     });
 
-    test('매물은 등록 다음 날 여는 시각에 올라간다', () {
-      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
-
-      expect(
-        hours.visibleFrom(DateTime(2026, 9, 17, 21, 30)),
-        DateTime(2026, 9, 18, 20),
-      );
-      // 월말도 날짜가 넘어간다.
-      expect(
-        hours.visibleFrom(DateTime(2026, 9, 30, 3)),
-        DateTime(2026, 10, 1, 20),
-      );
-    });
-
-    test('오늘 등록한 매물은 아직 안 보이고, 어제 등록한 매물은 보인다', () {
-      final hours = hoursOf(open: true, serverTime: '2026-09-17T21:25:17');
-
-      expect(
-        hours.isListingVisible(DateTime(2026, 9, 17, 0, 0), received),
-        isFalse,
-      );
-      expect(
-        hours.isListingVisible(DateTime(2026, 9, 16, 23, 59), received),
-        isTrue,
-      );
-    });
-
-    test('보이는지는 기기 날짜가 아니라 서버 날짜로 가른다', () {
-      // 서버는 아직 9월 17일 23:30 인데 기기 시계는 이미 18일 00:30 이다.
-      final deviceAtReceipt = DateTime(2026, 9, 18, 0, 30);
-      final hours = hoursOf(
-        open: true,
-        serverTime: '2026-09-17T23:30:00',
-        receivedAt: deviceAtReceipt,
-      );
-
-      // 17일에 등록한 매물은 서버 기준 아직 오늘 것이라 안 보인다.
-      expect(
-        hours.isListingVisible(DateTime(2026, 9, 17, 10), deviceAtReceipt),
-        isFalse,
-      );
-    });
   });
 
   group('판매가', () {

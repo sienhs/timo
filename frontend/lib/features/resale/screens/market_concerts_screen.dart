@@ -162,11 +162,6 @@ class _MarketConcertsScreenState extends State<MarketConcertsScreen> {
             // 본문이 이미 하고 있다.
             if (_isLoggedIn)
               ResaleBottomBar(
-                // 올린 매물이 언제 보이는지. 여는 시각은 서버 값이라 운영
-                // 상태를 받은 뒤에만 적는다.
-                notice: hours != null
-                    ? ResaleStrings.registerNotice(hours.opensAtLabel)
-                    : null,
                 child: ResaleActionButton(
                   label: ResaleStrings.registerAction,
                   onPressed: _openRegister,
