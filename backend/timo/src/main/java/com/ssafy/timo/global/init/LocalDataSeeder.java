@@ -65,6 +65,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -132,20 +133,40 @@ public class LocalDataSeeder implements ApplicationRunner {
     // ---- 구역 · 좌석 ------------------------------------------------------------------------------
 
     /**
-     * 시드 배치도의 격자. 구역마다 10행 20열이 빈자리 없이 들어찬다.
+     * 시드 배치도의 행 수. 구역마다 같다 - 행마다 좌석 수가 다른 사다리꼴 배치라 그 폭은
+     * {@link SectionSeed#rowSeatCounts} 가 따로 정한다.
      */
     private static final int ROW_COUNT = 10;
-    private static final int SEAT_PER_ROW = 20;
 
     /**
-     * 구역 하나의 좌석 수. 통로를 두지 않아 격자 크기가 그대로 좌석 수다.
+     * 구역 하나의 좌석 수. 행마다 폭이 달라도 구역 전체 합은 어느 구역이나 같다(A~E 전부 200석).
      */
-    private static final int SEATS_PER_SECTION = ROW_COUNT * SEAT_PER_ROW;
+    private static final int SEATS_PER_SECTION = 200;
+
+    /**
+     * 무대에 가까운 1층 구역(A·B). 앞줄일수록 좁고 뒤로 갈수록 넓어지는 사다리꼴이다 - 5열과 6열
+     * 사이(가로 통로)에서만 한 번에 두 석씩 넓어진다.
+     */
+    private static final List<Integer> ROW_SEAT_COUNTS_FRONT = List.of(15, 16, 17, 18, 19, 21, 22, 23, 24, 25);
+
+    /** 1층 뒤쪽 구역(C). 무대에서 멀어 폭이 완만하게만 넓어진다. */
+    private static final List<Integer> ROW_SEAT_COUNTS_REAR = List.of(18, 19, 19, 20, 20, 20, 20, 21, 21, 22);
+
+    /** 2층 구역(D·E). 1층과 반대로 앞(무대 쪽)이 넓고 뒤로 갈수록 좁아진다. */
+    private static final List<Integer> ROW_SEAT_COUNTS_UPPER = List.of(25, 24, 23, 22, 21, 19, 18, 17, 16, 15);
 
     /**
      * 구역 하나의 시드 정보. 등급은 아직 구분이 없어 서버가 {@code COMMON} 으로 정한다.
+     *
+     * @param rowSeatCounts 1열부터 10열까지, 열마다 좌석이 몇 석인지(사다리꼴 배치). 합은 항상
+     *                      {@link #SEATS_PER_SECTION}이어야 한다.
      */
-    private record SectionSeed(String name, int price) {
+    private record SectionSeed(String name, int price, List<Integer> rowSeatCounts) {
+
+        /** 배치도 격자 폭 - 가장 넓은 열의 좌석 수. 구역마다 다르다(25 또는 22). */
+        int seatPerRow() {
+            return Collections.max(rowSeatCounts);
+        }
     }
 
     /**
@@ -231,11 +252,11 @@ public class LocalDataSeeder implements ApplicationRunner {
      * 시드 구역 5개. 층이 올라갈수록 가격을 낮춰 구역 선택 화면에서 가격대가 갈리는 것을 볼 수 있게 했다.
      */
     private static final List<SectionSeed> SECTION_SEEDS = List.of(
-            new SectionSeed("A구역", 150_000),
-            new SectionSeed("B구역", 150_000),
-            new SectionSeed("C구역", 120_000),
-            new SectionSeed("2층 D구역", 120_000),
-            new SectionSeed("2층 E구역", 99_000));
+            new SectionSeed("A구역", 150_000, ROW_SEAT_COUNTS_FRONT),
+            new SectionSeed("B구역", 150_000, ROW_SEAT_COUNTS_FRONT),
+            new SectionSeed("C구역", 120_000, ROW_SEAT_COUNTS_REAR),
+            new SectionSeed("2층 D구역", 120_000, ROW_SEAT_COUNTS_UPPER),
+            new SectionSeed("2층 E구역", 99_000, ROW_SEAT_COUNTS_UPPER));
 
     // ---- 공연 -----------------------------------------------------------------------------------
 
@@ -283,39 +304,52 @@ public class LocalDataSeeder implements ApplicationRunner {
      *   <li>{@code CLOSED} — 전부 과거</li>
      * </ul>
      *
-     * <p>날짜를 고정값으로 박아 둔 탓에 <b>시간이 지나면 이 관계가 깨진다.</b> {@code ON_SALE} 공연은
-     * {@code startDate - 2시간}({@code Concert.BOOKING_CUTOFF_HOURS})부터 선점·결제가 마감으로 거절되므로,
-     * 그 전에 여기 날짜를 뒤로 민다.
+     * <p>고정 캘린더 날짜가 아니라 {@link #clock} 기준 상대 오프셋으로 계산한다({@link #concertSeeds}) -
+     * 시간이 지나도 이 관계가 저절로 유지되어, 재시드할 때마다 날짜를 손으로 미룰 필요가 없다.
      */
-    private static final List<ConcertSeed> CONCERT_SEEDS = List.of(
-            // 내역. 이미 끝난 공연이라 예매 화면이 아니라 지난 공연 목록에서 확인한다.
-            new ConcertSeed("김필 단독 콘서트", ConcertGenre.CONCERT,
-                    "poster/poster_main_kim_feel.gif",
-                    List.of("detail/poster_detail_kim.jpg"),
-                    "김필 단독 콘서트", AgeRating.AGE_7, ConcertStatus.CLOSED, 1_203,
-                    LocalDateTime.of(2026, 7, 10, 19, 0), LocalDateTime.of(2026, 7, 10, 21, 0),
-                    LocalDateTime.of(2026, 6, 1, 20, 0), List.of("김필")),
-            // 대기. 오픈이 아직 남아 좌석 화면에 들어갈 수 없다.
-            new ConcertSeed("이승기 콘서트", ConcertGenre.CONCERT,
-                    "poster/poster_main_lee.gif",
-                    List.of("detail/poster_detail_lee.jpg"),
-                    "이승기 단독 콘서트", AgeRating.ALL, ConcertStatus.SCHEDULED, 512,
-                    LocalDateTime.of(2026, 11, 21, 18, 0), LocalDateTime.of(2026, 11, 21, 21, 0),
-                    LocalDateTime.of(2026, 10, 15, 20, 0), List.of("이승기")),
-            // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
-            new ConcertSeed("로이킴 콘서트", ConcertGenre.CONCERT,
-                    "poster/poster_main_roykim.jpg",
-                    List.of(),
-                    "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 3_300,
-                    LocalDateTime.of(2026, 10, 24, 19, 30), LocalDateTime.of(2026, 10, 24, 21, 30),
-                    LocalDateTime.of(2026, 8, 1, 14, 0), List.of("로이킴")),
-            // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
-            new ConcertSeed("Bruno Mars 내한공연", ConcertGenre.CONCERT,
-                    "poster/poster_main_mars.gif",
-                    List.of("detail/poster_detail_mars.jpg"),
-                    "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 87,
-                    LocalDateTime.of(2026, 12, 5, 19, 0), LocalDateTime.of(2026, 12, 5, 21, 0),
-                    LocalDateTime.of(2026, 9, 1, 20, 0), List.of("Bruno Mars")));
+    private List<ConcertSeed> concertSeeds() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        return List.of(
+                // 내역. 이미 끝난 공연이라 예매 화면이 아니라 지난 공연 목록에서 확인한다.
+                new ConcertSeed("김필 단독 콘서트", ConcertGenre.CONCERT,
+                        "poster/poster_main_kim_feel.gif",
+                        List.of("detail/poster_detail_kim.jpg"),
+                        "김필 단독 콘서트", AgeRating.AGE_7, ConcertStatus.CLOSED, 1_203,
+                        now.minusDays(60), now.minusDays(60).plusHours(2),
+                        now.minusDays(120), List.of("김필")),
+                // 대기. 오픈이 아직 남아 좌석 화면에 들어갈 수 없다.
+                new ConcertSeed("이승기 콘서트", ConcertGenre.CONCERT,
+                        "poster/poster_main_lee.gif",
+                        List.of("detail/poster_detail_lee.jpg"),
+                        "이승기 단독 콘서트", AgeRating.ALL, ConcertStatus.SCHEDULED, 512,
+                        now.plusDays(60), now.plusDays(60).plusHours(3),
+                        now.plusDays(30), List.of("이승기")),
+                // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
+                new ConcertSeed("로이킴 콘서트", ConcertGenre.CONCERT,
+                        "poster/poster_main_roykim.jpg",
+                        List.of(),
+                        "로이킴 단독 콘서트", AgeRating.AGE_7, ConcertStatus.ON_SALE, 3_300,
+                        now.plusDays(30), now.plusDays(30).plusHours(2),
+                        now.minusDays(30), List.of("로이킴")),
+                // 예매 중. 좌석 상태가 들어가는 두 건 중 하나다.
+                new ConcertSeed("Bruno Mars 내한공연", ConcertGenre.CONCERT,
+                        "poster/poster_main_mars.gif",
+                        List.of("detail/poster_detail_mars.jpg"),
+                        "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 87,
+                        now.plusDays(45), now.plusDays(45).plusHours(2),
+                        now.minusDays(10), List.of("Bruno Mars")),
+                // 입장 QR 종단 테스트 전용. 예매 마감(시작 2시간 전)까지 몇 분 남은 채로 시작해서,
+                // 예매를 마치고 몇 분만 기다리면 입장 QR 발급 창(마찬가지로 시작 2시간 전)이 열린다 -
+                // 실제로 몇 시간을 기다리지 않고도 예매→발행→입장 QR까지 전체 흐름을 검증할 수 있게
+                // 하려는 목적 하나뿐이다. Clock 을 앞당기는 대신 이 시드 자체를 "곧 시작하는 공연"으로
+                // 두는 것이라 DB·온체인·화면이 항상 서로 일치한다.
+                new ConcertSeed("입장 테스트 콘서트", ConcertGenre.CONCERT,
+                        "poster/poster_main_roykim.jpg",
+                        List.of(),
+                        "종단 테스트 전용 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 0,
+                        now.plusHours(2).plusMinutes(3), now.plusHours(2).plusMinutes(3).plusHours(2),
+                        now.minusHours(1), List.of("로이킴")));
+    }
 
     private final ConcertService concertService;
     private final SeatService seatService;
@@ -363,8 +397,9 @@ public class LocalDataSeeder implements ApplicationRunner {
 
         // 좌석 상태는 예매 중인 공연에만 넣는다. 오픈 전이거나 끝난 공연에 팔린 자리가 있으면
         // 상태와 배치도가 어긋나, 화면을 보는 쪽이 어느 쪽을 믿어야 할지 알 수 없다.
+        List<ConcertSeed> concertSeeds = concertSeeds();
         List<OnSaleConcert> onSaleConcerts = new ArrayList<>();
-        for (ConcertSeed seed : CONCERT_SEEDS) {
+        for (ConcertSeed seed : concertSeeds) {
             Long concertId = seedConcert(seed, venueId, artistIds);
             if (seed.status() == ConcertStatus.ON_SALE) {
                 onSaleConcerts.add(new OnSaleConcert(concertId, seed));
@@ -382,7 +417,7 @@ public class LocalDataSeeder implements ApplicationRunner {
         // 매물은 체인 등록 뒤에 연다. 온체인 발행에 공연의 showId 가 필요한데 그 값이 방금 채워졌다.
         seedListings(sold, venueId);
 
-        log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", CONCERT_SEEDS.size(), venueId);
+        log.info("로컬 시드: 공연 {}건을 넣었다. venueId={}", concertSeeds.size(), venueId);
     }
 
     /** {@code registerOnChain}에 필요한 최소 정보 - 공연 id와 그 시드(정가·시각 계산용). */
@@ -485,14 +520,11 @@ public class LocalDataSeeder implements ApplicationRunner {
             return;
         }
 
-        // 구역마다 배치가 같으므로 자리 목록은 한 번만 만들어 공유한다. 읽기만 하니 나눠 써도 된다.
-        List<SeatPositionRequest> positions = gridPositions();
-
         CommandSeatResponseDto registered = seatService.register(new CommandSeatRequestDto(
                 venueId,
                 SECTION_SEEDS.stream()
                         .map(seed -> new SectionLayout(
-                                seed.name(), seed.price(), ROW_COUNT, SEAT_PER_ROW, positions))
+                                seed.name(), seed.price(), ROW_COUNT, seed.seatPerRow(), trapezoidPositions(seed.rowSeatCounts())))
                         .toList()));
 
         log.info("로컬 시드: 구역 {}개 · 좌석 {}석을 넣었다.",
@@ -783,12 +815,16 @@ public class LocalDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * 격자를 빈자리 없이 채운 자리 목록. 행 우선으로 나열해 배치도 순서와 같다.
+     * 행마다 폭이 다른 사다리꼴 자리 목록. 행 우선으로 나열해 배치도 순서와 같다.
+     *
+     * <p>자리 번호(seatCol)는 실제 격자 폭({@link SectionSeed#seatPerRow}) 과 무관하게 매 행 1번부터
+     * 시작한다 - 화면 가운데 정렬은 프론트가 한다({@code CommandSeatRequestDto} 주석 참고).
      */
-    private List<SeatPositionRequest> gridPositions() {
+    private List<SeatPositionRequest> trapezoidPositions(List<Integer> rowSeatCounts) {
         List<SeatPositionRequest> positions = new ArrayList<>(SEATS_PER_SECTION);
-        for (int seatNo = 1; seatNo <= ROW_COUNT; seatNo++) {
-            for (int seatCol = 1; seatCol <= SEAT_PER_ROW; seatCol++) {
+        for (int seatNo = 1; seatNo <= rowSeatCounts.size(); seatNo++) {
+            int rowWidth = rowSeatCounts.get(seatNo - 1);
+            for (int seatCol = 1; seatCol <= rowWidth; seatCol++) {
                 positions.add(new SeatPositionRequest(seatNo, seatCol));
             }
         }
@@ -845,7 +881,7 @@ public class LocalDataSeeder implements ApplicationRunner {
      *                               공연 생성이 {@code ArtistNotFoundException} 으로 죽는데, 그보다 원인이 드러나는 편이 낫다.
      */
     private Map<String, Long> findArtistIdsByName() {
-        List<String> names = CONCERT_SEEDS.stream()
+        List<String> names = concertSeeds().stream()
                 .flatMap(seed -> seed.artistNames().stream())
                 .distinct()
                 .toList();
