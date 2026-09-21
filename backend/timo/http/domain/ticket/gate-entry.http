@@ -31,6 +31,13 @@
 #
 # 검표 요청에는 Authorization 헤더가 없다. 게이트 앱에 로그인 화면이 없어 보낼 토큰이
 # 없기 때문이다(팀 결정). 로그인은 QR 을 발급받는 앞부분에만 필요하다.
+#
+# ── 좌석·예매자는 아무 응답에나 실리지 않는다 ───────────────────────────────
+# seat 은 허용과 ALREADY_USED 에만, holder 는 허용에만 실린다. 나머지 거절은 운영자가
+# 좌석을 알아도 할 일이 없어 싣지 않는다. 필드가 없는 경우 null 이 아니라 아예 나타나지
+# 않아야 한다(@JsonInclude NON_NULL) - 게이트 앱이 optional 로 파싱하기 때문이다.
+# holder.maskedPhoneNumber 는 서버가 이미 가린 값이다. 앱이 가리면 프록시·로그를 원문이
+# 그대로 지나간다.
 ###############################################################################
 
 # 둘 다 entry-pass-fixture.sql 이 마지막에 찍어 주는 값이다. 시드가 새로 깔리면 달라질 수 있으니
@@ -84,6 +91,11 @@ Content-Type: application/json
     client.test("INVALID 로 거절한다", function () {
         client.assert(response.body.admitted === false, "admitted: " + response.body.admitted);
         client.assert(response.body.reasonCode === "INVALID", "reasonCode: " + response.body.reasonCode);
+    });
+
+    client.test("티켓이 특정되지 않았으므로 좌석도 예매자도 없다", function () {
+        client.assert(response.body.seat === undefined, "seat: " + JSON.stringify(response.body.seat));
+        client.assert(response.body.holder === undefined, "holder: " + JSON.stringify(response.body.holder));
     });
 %}
 
@@ -158,6 +170,10 @@ Content-Type: application/json
         // 공연 검사는 소진보다 앞이라 여기서 표가 타면 안 된다. 다음 요청이 통과해야 맞다.
         client.assert(response.body.admitted === false, "admitted: " + response.body.admitted);
     });
+
+    client.test("옆 공연 게이트에 좌석을 알려주지 않는다", function () {
+        client.assert(response.body.seat === undefined, "seat: " + JSON.stringify(response.body.seat));
+    });
 %}
 
 ### 정상 검표 - 여기서 티켓이 소진된다
@@ -181,6 +197,24 @@ Content-Type: application/json
     client.test("거절 사유는 응답에 없다", function () {
         client.assert(response.body.reasonCode === undefined, "reasonCode: " + response.body.reasonCode);
     });
+
+    client.test("자리 안내에 쓸 좌석이 실린다", function () {
+        const seat = response.body.seat;
+        client.assert(seat !== undefined && seat !== null, "seat 이 없다: " + JSON.stringify(response.body));
+        client.assert(typeof seat.sectionName === "string" && seat.sectionName.length > 0,
+            "sectionName: " + seat.sectionName);
+        client.assert(Number.isInteger(seat.seatNo) && Number.isInteger(seat.seatCol),
+            "seatNo/seatCol: " + seat.seatNo + "/" + seat.seatCol);
+    });
+
+    client.test("연락처는 서버가 가려서 내려준다", function () {
+        const holder = response.body.holder;
+        client.assert(holder !== undefined && holder !== null, "holder 가 없다: " + JSON.stringify(response.body));
+        client.assert(typeof holder.name === "string" && holder.name.length > 0, "name: " + holder.name);
+        // 앱이 가리는 것이 아니다. 여기에 원문이 보이면 프록시·접근 로그에도 원문이 남고 있다는 뜻이다.
+        client.assert(/^\d{3}\*{4}\d{4}$/.test(holder.maskedPhoneNumber || ""),
+            "maskedPhoneNumber: " + holder.maskedPhoneNumber);
+    });
 %}
 
 ### 같은 QR 재사용 - ALREADY_USED
@@ -196,6 +230,15 @@ Content-Type: application/json
 > {%
     client.test("ALREADY_USED 로 거절한다", function () {
         client.assert(response.body.reasonCode === "ALREADY_USED", "reasonCode: " + response.body.reasonCode);
+    });
+
+    client.test("이미 입장한 그 자리를 확인시켜 줄 좌석이 실린다", function () {
+        client.assert(response.body.seat !== undefined && response.body.seat !== null,
+            "seat 이 없다: " + JSON.stringify(response.body));
+    });
+
+    client.test("들여보내지 않은 사람의 예매자 정보는 싣지 않는다", function () {
+        client.assert(response.body.holder === undefined, "holder: " + JSON.stringify(response.body.holder));
     });
 %}
 

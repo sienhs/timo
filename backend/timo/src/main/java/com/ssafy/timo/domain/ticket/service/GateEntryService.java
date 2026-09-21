@@ -3,7 +3,10 @@ package com.ssafy.timo.domain.ticket.service;
 import com.ssafy.timo.domain.blockchain.ContractCallException;
 import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyRequestDto;
+import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto;
+import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto.HolderInfo;
+import com.ssafy.timo.domain.ticket.dto.GateEntryVerifyResponseDto.SeatInfo;
 import com.ssafy.timo.domain.ticket.dto.GateRejectReason;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.entity.TicketStatus;
@@ -65,7 +68,7 @@ public class GateEntryService {
             return GateEntryVerifyResponseDto.reject(GateRejectReason.EXPIRED);
         }
 
-        Optional<Ticket> found = ticketRepository.findById(verification.ticketId());
+        Optional<Ticket> found = ticketRepository.findForGateEntry(verification.ticketId());
         if (found.isEmpty()) {
             // 우리 서명이 붙었는데 티켓이 없다. 발급한 적 없는 조합이거나 행이 지워진 것이다.
             log.warn("서명은 유효한데 티켓이 없다 (ticketId={})", verification.ticketId());
@@ -77,8 +80,14 @@ public class GateEntryService {
             return GateEntryVerifyResponseDto.reject(GateRejectReason.WRONG_CONCERT);
         }
 
+        // 소진 UPDATE 가 영속성 컨텍스트를 비워(clearAutomatically) 티켓을 detached 로 만든다.
+        // 그 뒤에는 초기화 전 LAZY 를 탈 수 없으므로, 응답에 실을 값은 여기서 떠 둔다.
+        Reservation reservation = ticket.getReservation();
+        SeatInfo seat = SeatInfo.from(reservation.getSeat());
+        HolderInfo holder = HolderInfo.from(reservation.getMember());
+
         if (ticket.getStatus() != TicketStatus.OWNED) {
-            return GateEntryVerifyResponseDto.reject(reasonFor(ticket.getStatus()));
+            return rejectWithSeat(reasonFor(ticket.getStatus()), seat);
         }
 
         GateRejectReason ownershipProblem = verifyOnChainOwner(ticket);
@@ -88,14 +97,26 @@ public class GateEntryService {
 
         if (ticketRepository.markUsedIfOwned(ticket.getId()) == 0) {
             // 3번을 통과한 뒤 다른 게이트가 먼저 소진했다. 지금 상태를 다시 읽어 사유를 가린다.
+            // 좌석은 다시 읽지 않는다. 예매가 확정된 뒤 바뀌지 않아 위에서 뜬 값이 그대로 맞고,
+            // 여기서 필요한 것은 사유를 가를 현재 상태뿐이다.
             TicketStatus current = ticketRepository.findById(ticket.getId())
                     .map(Ticket::getStatus)
                     .orElse(TicketStatus.USED);
-            return GateEntryVerifyResponseDto.reject(reasonFor(current));
+            return rejectWithSeat(reasonFor(current), seat);
         }
 
         eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), ticket.getTokenId()));
-        return GateEntryVerifyResponseDto.admit();
+        return GateEntryVerifyResponseDto.admit(seat, holder);
+    }
+
+    /**
+     * 중복 스캔에만 좌석을 함께 내려 "이미 입장한 그 자리" 를 확인시켜 준다. 나머지 거절은
+     * 운영자가 좌석을 알아도 할 일이 없어 싣지 않는다.
+     */
+    private GateEntryVerifyResponseDto rejectWithSeat(GateRejectReason reason, SeatInfo seat) {
+        return reason == GateRejectReason.ALREADY_USED
+                ? GateEntryVerifyResponseDto.alreadyUsed(seat)
+                : GateEntryVerifyResponseDto.reject(reason);
     }
 
     /**
