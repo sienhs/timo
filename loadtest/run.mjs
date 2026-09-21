@@ -73,7 +73,7 @@ if (action === 'prepare') {
   if (!password || /[\r\n]/.test(password)) throw new Error('TF_VAR_db_password required');
   console.log('Preparing empty test DB and application (SSM app must be Online)...');
   await remote(config.app_id, upload([[path.join(root, '../infra/bootstrap/init.sql'), 'schema.sql'], [path.join(root, 'seed.py'), 'seed.py'], [path.join(root, 'prepare.sh'), 'prepare.sh']]) +
-    `export TEST_DB_PASSWORD=${quote(password)} DB_HOST=${quote(config.db_host)} IMAGE=${quote(config.image)} AWS_REGION=${quote(config.region)}\nbash /opt/loadtest/prepare.sh`, 1800);
+    `export TEST_DB_PASSWORD=${quote(password)} DB_HOST=${quote(config.db_host)} REDIS_HOST=${quote(config.redis_host)} REDIS_PORT=${quote(config.redis_port)} REDIS_PASSWORD=${quote(process.env.TF_VAR_redis_auth_token)} WAITING_QUEUE_ACTIVE_LIMIT=${quote(config.queue_active_limit)} IMAGE=${quote(config.image)} AWS_REGION=${quote(config.region)}\nbash /opt/loadtest/prepare.sh`, 1800);
   console.log('Ready.');
 } else if (action === 'run') {
   const users = Number(process.argv[3] || 50);
@@ -116,7 +116,7 @@ if (action === 'prepare') {
   const statuses = readHttpStatuses(rawPath);
   fs.writeFileSync(path.join(dir, 'http-status.json'), JSON.stringify(statuses, null, 2));
   const failedStatuses = Object.entries(statuses)
-    .filter(([name]) => !name.endsWith(' 200'))
+    .filter(([name]) => !/ 2\d\d$/.test(name))
     .sort(([, left], [, right]) => right - left)
     .map(([name, count]) => `- ${name}: ${count}건`)
     .join('\n') || '- 없음';

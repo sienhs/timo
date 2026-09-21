@@ -45,6 +45,14 @@ variable "db_password" {
     error_message = "Use a new test-only password: 8..41 ASCII letters, digits, underscore or hyphen."
   }
 }
+variable "redis_auth_token" {
+  type      = string
+  sensitive = true
+}
+variable "waiting_queue_active_limit" {
+  type    = number
+  default = 50
+}
 data "aws_ssm_parameter" "ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
@@ -76,6 +84,36 @@ resource "aws_security_group" "db" {
     protocol        = "tcp"
     security_groups = [aws_security_group.app.id]
   }
+}
+resource "aws_security_group" "redis" {
+  name_prefix = "timo-loadtest-redis-"
+  vpc_id      = var.vpc_id
+  ingress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.app.id]
+  }
+}
+resource "aws_elasticache_subnet_group" "test" {
+  name       = "timo-loadtest-redis-subnet-group"
+  subnet_ids = var.db_subnet_ids
+}
+resource "aws_elasticache_replication_group" "test" {
+  replication_group_id       = "timo-loadtest-redis"
+  description                = "Disposable Redis for queue load tests"
+  engine                     = "redis"
+  engine_version             = "7.1"
+  node_type                  = "cache.t4g.micro"
+  num_cache_clusters         = 1
+  automatic_failover_enabled = false
+  subnet_group_name          = aws_elasticache_subnet_group.test.name
+  security_group_ids         = [aws_security_group.redis.id]
+  transit_encryption_enabled = true
+  at_rest_encryption_enabled = true
+  auth_token                 = var.redis_auth_token
+  snapshot_retention_limit   = 0
+  apply_immediately          = true
 }
 resource "aws_iam_role" "host" {
   name_prefix        = "timo-loadtest-"
@@ -141,14 +179,17 @@ resource "aws_db_instance" "test" {
 }
 output "test" {
   value = {
-    region      = var.region
-    app_id      = aws_instance.host["app"].id
-    base_url    = "http://${aws_instance.host["app"].public_ip}:8080"
-    db_host     = aws_db_instance.test.address
-    db_id       = aws_db_instance.test.id
-    image       = var.image
-    cpu_credits = var.cpu_credits
-    db_class    = var.db_instance_class
-    db_engine   = var.db_engine_version
+    region             = var.region
+    app_id             = aws_instance.host["app"].id
+    base_url           = "http://${aws_instance.host["app"].public_ip}:8080"
+    db_host            = aws_db_instance.test.address
+    db_id              = aws_db_instance.test.id
+    image              = var.image
+    cpu_credits        = var.cpu_credits
+    db_class           = var.db_instance_class
+    db_engine          = var.db_engine_version
+    redis_host         = aws_elasticache_replication_group.test.primary_endpoint_address
+    redis_port         = aws_elasticache_replication_group.test.port
+    queue_active_limit = var.waiting_queue_active_limit
   }
 }
