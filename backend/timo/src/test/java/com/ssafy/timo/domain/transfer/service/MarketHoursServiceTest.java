@@ -133,6 +133,32 @@ class MarketHoursServiceTest {
         assertThat(at(allDay, LocalDateTime.of(2026, 9, 17, 23, 59, 59)).status().open()).isTrue();
     }
 
+    @Test
+    @DisplayName("시연 모드는 등록 당일 매물을 즉시 허용하고 다음 날 매물은 제외한다")
+    void delayDisabledIncludesSameInstantAndKeepsDateBoundary() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 17, 21, 0);
+        MarketHoursService service = at(new MarketHoursProperties(
+                LocalTime.of(20, 0), LocalTime.of(23, 59, 59), false), now);
+
+        assertThat(now.isBefore(service.visibleBefore())).isTrue();
+        assertThat(now.toLocalDate().plusDays(1).atStartOfDay().isBefore(service.visibleBefore())).isFalse();
+        assertThat(service.visibleFrom(now)).isEqualTo(now);
+        assertThatCode(service::requireOpen).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("시연 모드도 마켓 운영 시간을 지키며 닫힌 시간의 매물은 다음 개장에 보인다")
+    void delayDisabledStillRequiresMarketOpen() {
+        MarketHoursProperties demo = new MarketHoursProperties(
+                LocalTime.of(8, 0), LocalTime.of(23, 0), false);
+        LocalDateTime morning = LocalDateTime.of(2026, 9, 17, 7, 0);
+        MarketHoursService service = at(demo, morning);
+        assertThatThrownBy(service::requireOpen).isInstanceOf(MarketClosedException.class);
+        assertThat(service.visibleFrom(morning)).isEqualTo(morning.withHour(8));
+        assertThat(service.visibleFrom(morning.withHour(23).withMinute(1)))
+                .isEqualTo(morning.plusDays(1).withHour(8));
+    }
+
     private static MarketHoursService at(LocalDateTime now) {
         return at(DAILY_20_TO_24, now);
     }

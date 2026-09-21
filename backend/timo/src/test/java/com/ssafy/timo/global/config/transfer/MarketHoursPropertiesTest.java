@@ -1,14 +1,30 @@
 package com.ssafy.timo.global.config.transfer;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalTime;
+import java.util.Map;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** 잘못된 운영 시간은 첫 요청이 아니라 기동 시점에 걸려야 한다. */
 class MarketHoursPropertiesTest {
+
+    @Test
+    void bindingDefaultsToDelayAndSupportsExplicitDisable() {
+        var source = new MapConfigurationPropertySource(Map.of(
+                "market.hours.open-at", "08:00:00",
+                "market.hours.close-at", "23:00:00"));
+        assertThat(new Binder(source).bind("market.hours", MarketHoursProperties.class)
+                .get().listingDelayEnabled()).isTrue();
+        source.put("market.hours.listing-delay-enabled", "false");
+        assertThat(new Binder(source).bind("market.hours", MarketHoursProperties.class)
+                .get().listingDelayEnabled()).isFalse();
+    }
 
     @Test
     @DisplayName("20:00:00~23:59:59 는 유효하다")

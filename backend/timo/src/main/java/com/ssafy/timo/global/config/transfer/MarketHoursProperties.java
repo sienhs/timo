@@ -2,6 +2,8 @@ package com.ssafy.timo.global.config.transfer;
 
 import java.time.LocalTime;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * 양도 마켓 운영 시간. 매일 {@code openAt} 부터 {@code closeAt} 까지(양 끝 포함) 열린다.
@@ -16,8 +18,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param closeAt 닫는 시각(포함). {@code openAt} 보다 뒤여야 한다
  */
 @ConfigurationProperties(prefix = "market.hours")
-public record MarketHoursProperties(LocalTime openAt, LocalTime closeAt) {
+public record MarketHoursProperties(LocalTime openAt, LocalTime closeAt,
+                                    @DefaultValue("true") boolean listingDelayEnabled) {
 
+    public MarketHoursProperties(LocalTime openAt, LocalTime closeAt) {
+        this(openAt, closeAt, true);
+    }
+
+    @ConstructorBinding
     public MarketHoursProperties {
         if (openAt == null || closeAt == null) {
             throw new IllegalStateException("market.hours.open-at 과 close-at 은 필수입니다.");
