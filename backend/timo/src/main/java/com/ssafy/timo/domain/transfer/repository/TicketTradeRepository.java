@@ -112,23 +112,6 @@ public interface TicketTradeRepository extends JpaRepository<TicketTrade, Long> 
             nativeQuery = true)
     Page<MyTradeRow> findMyTrades(@Param("memberId") Long memberId, Pageable pageable);
 
-    /**
-     * 이 티켓의 가장 최근 체결.
-     *
-     * <p><b>"지금 이 티켓의 주인은 누구인가" 를 DB 로 답하는 유일한 근거다.</b> 티켓에는 소유자
-     * 칼럼이 없고 {@code ticket.reservation.member} 는 <b>처음 예매한 사람</b>에서 영원히 멈춰 있다.
-     * 그것만 보고 소유자를 판정하면 판 사람이 같은 티켓을 다시 등록할 수 있다.
-     *
-     * <p>그래서 현재 소유자는 이렇게 유도한다 — <b>최근 체결이 있으면 그 구매자, 없으면 예매자.</b>
-     * 한 티켓이 여러 번 양도될 수 있으므로 가장 마지막 것을 본다.
-     *
-     * <p>{@code tradedAt} 이 같을 때를 대비해 {@code id} 를 덧붙인다. 같은 초에 두 건이 들어오면
-     * 정렬이 흔들려 소유자가 요청마다 달라질 수 있다.
-     *
-     * <p>소유권의 정본은 온체인 {@code TicketNFT} 이고 이 판정은 그 미러다. 실제로 자산이 움직이는
-     * 작업 앞에서는 {@code ownerOf(tokenId)} 로 다시 확인해야 한다.
-     */
-    Optional<TicketTrade> findFirstByTicketIdOrderByTradedAtDescIdDesc(Long ticketId);
 
     /**
      * 이미 체결된 매물인지 본다.

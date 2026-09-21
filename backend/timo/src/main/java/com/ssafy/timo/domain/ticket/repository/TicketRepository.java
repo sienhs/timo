@@ -3,6 +3,7 @@ package com.ssafy.timo.domain.ticket.repository;
 import com.ssafy.timo.domain.ticket.dto.MyTicketRow;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import java.math.BigInteger;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -45,19 +46,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<ReservationTicketId> findTicketIdsByReservationIds(
             @Param("reservationIds") Collection<Long> reservationIds);
 
-    /**
-     * 내가 지금 가진 티켓 목록.
-     *
-     * <p>{@code reservation.member} 는 <b>처음 예매한 사람</b>에서 멈춰 있어, 그것만 보면 판 사람에게
-     * 판 티켓이 남고 산 사람에게는 산 티켓이 안 보인다. 그래서 두 갈래를 합친다 — 내가 예매했고
-     * <b>거래된 적 없는</b> 티켓과, 그 티켓의 <b>마지막 거래</b>에서 내가 산 티켓이다. 되산 경우
-     * ({@code A->B->A})는 앞 갈래에서 빠지고 뒤 갈래가 잡는다. 마지막을 {@code MAX(trade_id)} 로
-     * 고르는 것은 재양도({@code A->B->C}) 때문이고, 같은 초에 두 건이 와도 순서가 안 흔들린다.
-     *
-     * <p>두 갈래 모두 인덱스에서 출발한다({@code ix_rsv_member}, {@code idx_trade_buyer}).
-     * {@code where coalesce(마지막구매자, 예매자) = :memberId} 로 쓰면 유도값이라 인덱스를 못 탄다.
-     * 네이티브라 기동 시점에 검증되지 않으므로 통합 테스트가 이 쿼리를 지킨다.
-     */
+    /** 현재 귀속 회원의 티켓. 취득 정보도 Ticket에 저장된 값을 사용한다. */
     @Query(value = """
             select t.ticket_id        as ticketId,
                    r.reservation_id   as reservationId,
@@ -71,46 +60,48 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
                    st.seat_col        as seatCol,
                    s.price            as facePrice,
                    t.status           as ticketStatus,
-                   owned.acquired_by  as acquiredBy,
-                   owned.acquired_at  as acquiredAt,
+                   t.acquired_by  as acquiredBy,
+                   t.acquired_at  as acquiredAt,
                    exists (select 1
                              from ticket_listing l
                             where l.ticket_id = t.ticket_id
                               and l.status = 'LISTED') as listed
-              from (
-            """ + TicketOwnershipSql.CURRENT_OWNER + """
-                   ) owned
-              join ticket t      on t.ticket_id = owned.ticket_id
+              from ticket t
               join reservation r on r.reservation_id = t.reservation_id
               join concert c     on c.concert_id = r.concert_id
               join venue v       on v.venue_id = c.venue_id
               join seat st       on st.seat_id = r.seat_id
               join section s     on s.section_id = st.section_id
-             order by owned.acquired_at desc, t.ticket_id desc
+             where t.owner_member_id = :memberId
+             order by t.acquired_at desc, t.ticket_id desc
             """,
             countQuery = """
-            select count(*) from (
-            """ + TicketOwnershipSql.CURRENT_OWNER + """
-                   ) owned
+            select count(*) from ticket where owner_member_id = :memberId
             """,
             nativeQuery = true)
     Page<MyTicketRow> findMyTickets(@Param("memberId") Long memberId, Pageable pageable);
 
-    /**
-     * 이 회원이 <b>지금</b> 이 티켓을 가졌으면 1, 아니면 0. {@link com.ssafy.timo.domain.goods.repository.GoodsRepository#countCurrentOwnership}과 같은 조각.
-     *
-     * <p>{@code reservation.member}(최초 예매자)가 아니라 이걸로 판정해야, 양도로 주인이 바뀐 뒤에도
-     * 판 사람이 아니라 산 사람이 입장 QR을 받는다.
-     */
-    @Query(value = """
-            select count(*)
-              from (
-            """ + TicketOwnershipSql.CURRENT_OWNER + """
-                   ) owned
-             where owned.ticket_id = :ticketId
-            """,
-            nativeQuery = true)
-    long countCurrentOwnership(@Param("memberId") Long memberId, @Param("ticketId") Long ticketId);
+    Optional<Ticket> findByIdAndOwnerMemberId(Long ticketId, Long memberId);
+
+    boolean existsByIdAndOwnerMemberId(Long ticketId, Long memberId);
+
+    /** 기존 구매 트랜잭션 안에서만 호출한다. 소유자와 발행 상태를 함께 갱신한다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Ticket t
+               set t.ownerMemberId = :buyerId,
+                   t.acquiredBy = com.ssafy.timo.domain.ticket.dto.TicketAcquisition.TRANSFER,
+                   t.acquiredAt = :acquiredAt,
+                   t.status = com.ssafy.timo.domain.ticket.entity.TicketStatus.OWNED,
+                   t.updatedAt = :acquiredAt
+             where t.id = :ticketId
+               and t.ownerMemberId = :sellerId
+               and t.status = com.ssafy.timo.domain.ticket.entity.TicketStatus.LISTED
+            """)
+    int transferOwnershipIfListed(@Param("ticketId") Long ticketId,
+                                  @Param("sellerId") Long sellerId,
+                                  @Param("buyerId") Long buyerId,
+                                  @Param("acquiredAt") LocalDateTime acquiredAt);
 
     /** {@link #findTicketIdsByReservationIds}가 돌려주는 (주문, 티켓) 식별자 쌍. */
     interface ReservationTicketId {
@@ -145,27 +136,17 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     int markUsedIfOwned(@Param("ticketId") Long ticketId);
 
     /**
-     * 이 공연의 티켓을 지금 들고 있는 회원 id. 취소표 추첨에서 뺄 사람이다.
-     *
-     * <p>판정은 {@link #findMyTickets} 와 같은 두 갈래다 — 거래된 적 없는 {@code PAID} 주문의 예매자, 그리고
-     * 마지막 거래의 구매자. 판 사람은 주문이 {@code PAID} 로 남아 첫 갈래에 잡히는데, 예매의 1인 1매도 그
-     * 주문을 보므로 뽑아 봐야 결제가 막힌다. 산 사람은 주문이 없어 둘째 갈래로만 잡힌다.
+     * 알림의 기존 포함 조건을 유지한다: 거래 이력이 있거나 PAID 주문인 티켓.
+     * 소유자 선택은 거래 상태·순서와 관계없이 Ticket 한 곳을 따른다.
+     * 티켓 상태를 추가로 제한하지 않으며 회원은 공연 안에서 중복되지 않는다.
      */
     @Query(value = """
-            select r1.member_id
-              from ticket t1
-              join reservation r1 on r1.reservation_id = t1.reservation_id
-             where r1.concert_id = :concertId
-               and r1.status = 'PAID'
-               and not exists (select 1 from ticket_trade tt where tt.ticket_id = t1.ticket_id)
-            union
-            select tt2.buyer_member_id
-              from ticket_trade tt2
-              join ticket t2      on t2.ticket_id = tt2.ticket_id
-              join reservation r2 on r2.reservation_id = t2.reservation_id
-             where r2.concert_id = :concertId
-               and tt2.trade_id = (select max(x.trade_id) from ticket_trade x
-                                    where x.ticket_id = tt2.ticket_id)
+            select distinct t.owner_member_id
+              from ticket t
+              join reservation r on r.reservation_id = t.reservation_id
+             where r.concert_id = :concertId
+               and (r.status = 'PAID'
+                    or exists (select 1 from ticket_trade tt where tt.ticket_id = t.ticket_id))
             """, nativeQuery = true)
     List<Long> findHoldingMemberIdsByConcertId(@Param("concertId") Long concertId);
 }

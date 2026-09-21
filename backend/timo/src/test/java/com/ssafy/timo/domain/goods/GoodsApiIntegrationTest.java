@@ -331,7 +331,7 @@ class GoodsApiIntegrationTest {
     @Test
     @DisplayName("소유 판정이 티켓 목록과 어긋나지 않는다 - 같은 SQL 조각을 쓰는지 교차로 본다")
     void ownershipMatchesTicketRepository() {
-        // 세 쿼리가 TicketOwnershipSql.CURRENT_OWNER 하나에서 나오지만, 쓰는 쪽이 조건을 덧붙이면
+        // 세 쿼리가 같은 owner_member_id를 사용해도 기능별 조건이 다르므로
         // 여전히 갈릴 수 있다. 예전에 규칙이 네 군데에 복사돼 있던 자리라 교차로 못 박아 둔다.
         Ticket kept = book(alice, 0, "안 판 공연");
         kept.markUsed();
@@ -353,9 +353,9 @@ class GoodsApiIntegrationTest {
                 .containsExactly(kept.getId());
 
         // 소유 판정도 같은 집합을 따라야 한다.
-        assertThat(goodsRepository.countCurrentOwnership(alice.getId(), kept.getId())).isEqualTo(1);
-        assertThat(goodsRepository.countCurrentOwnership(alice.getId(), sold.getId())).isZero();
-        assertThat(goodsRepository.countCurrentOwnership(bob.getId(), sold.getId())).isEqualTo(1);
+        assertThat(ticketRepository.existsByIdAndOwnerMemberId(kept.getId(), alice.getId())).isTrue();
+        assertThat(ticketRepository.existsByIdAndOwnerMemberId(sold.getId(), alice.getId())).isFalse();
+        assertThat(ticketRepository.existsByIdAndOwnerMemberId(sold.getId(), bob.getId())).isTrue();
 
         assertThat(ticketRepository.findMyTickets(bob.getId(), Pageable.ofSize(50))
                 .map(MyTicketRow::getTicketId))
@@ -374,6 +374,7 @@ class GoodsApiIntegrationTest {
         // 없다. 그래도 고정해 두는 이유는, 굿즈 조회가 남의 도메인 상태 규칙에 기대지 않아야 하기
         // 때문이다. 그쪽 규칙이 느슨해지면 이 테스트가 먼저 깨진다.
         trade(ticket, alice, bob, LocalDateTime.now());
+        markUsedAfterTrade(ticket);
         em.flush();
         em.clear();
 
@@ -394,6 +395,7 @@ class GoodsApiIntegrationTest {
         goodsService.create(alice.getId(), ticket.getId(), command("same-key"));
         em.flush();
         trade(ticket, alice, bob, LocalDateTime.now());
+        markUsedAfterTrade(ticket);
         em.flush();
         em.clear();
 
@@ -572,6 +574,7 @@ class GoodsApiIntegrationTest {
 
     /** 매물을 열고 바로 체결시킨다. 소유자 판정만 보면 되므로 서비스를 거치지 않는다. */
     private void trade(Ticket ticket, Member seller, Member buyer, LocalDateTime tradedAt) {
+        ticketRepository.findById(ticket.getId()).orElseThrow().markListed();
         TicketListing listing = ticketListingRepository.saveAndFlush(TicketListing.open(
                 ticket.getId(),
                 seller.getId(),
@@ -585,7 +588,11 @@ class GoodsApiIntegrationTest {
         em.flush();
         ticketListingRepository.markSoldIfListed(listing.getId(), tradedAt);
         TicketListing sold = ticketListingRepository.findById(listing.getId()).orElseThrow();
-        ticketTradeRepository.save(TicketTrade.record(sold, buyer.getId(), tradedAt));
+        TicketTrade trade = TicketTrade.record(sold, buyer.getId(), tradedAt);
+        trade.confirm();
+        ticketTradeRepository.save(trade);
+        org.assertj.core.api.Assertions.assertThat(ticketRepository.transferOwnershipIfListed(
+                ticket.getId(), seller.getId(), buyer.getId(), tradedAt)).isEqualTo(1);
     }
 
     /**

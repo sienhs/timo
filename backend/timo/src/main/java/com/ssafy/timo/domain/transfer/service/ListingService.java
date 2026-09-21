@@ -15,7 +15,6 @@ import com.ssafy.timo.domain.transfer.dto.ListingDetailResponseDto;
 import com.ssafy.timo.domain.transfer.dto.UpdateListingPriceRequestDto;
 import com.ssafy.timo.domain.transfer.entity.ListingStatus;
 import com.ssafy.timo.domain.transfer.entity.TicketListing;
-import com.ssafy.timo.domain.transfer.entity.TicketTrade;
 import com.ssafy.timo.domain.transfer.exception.ListPriceExceedsFacePriceException;
 import com.ssafy.timo.domain.transfer.exception.ListingAlreadyClosedException;
 import com.ssafy.timo.domain.transfer.exception.ListingNotFoundException;
@@ -24,7 +23,7 @@ import com.ssafy.timo.domain.transfer.exception.NotTicketOwnerException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotFoundException;
 import com.ssafy.timo.domain.transfer.exception.TicketNotListableException;
 import com.ssafy.timo.domain.transfer.repository.TicketListingRepository;
-import com.ssafy.timo.domain.transfer.repository.TicketTradeRepository;
+import com.ssafy.timo.domain.ticket.service.TicketOwnershipService;
 import com.ssafy.timo.global.storage.ImageStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,19 +42,8 @@ import java.time.LocalDateTime;
  * {@code sub} 에서 꺼내 넘겨 준다. 본문으로 받으면 남의 티켓 식별자와 남의 회원 식별자를 함께 넣는
  * 통로가 생긴다.
  *
- * <h2>소유자를 어떻게 판정하는가</h2>
- *
- * <p>{@link Ticket} 에는 소유자 칼럼이 없다. 소유권의 정본은 온체인 {@code TicketNFT} 이고, DB 가
- * 아는 것은 {@code ticket.reservation.member} — <b>처음 예매한 사람</b>뿐이다. 양도로 주인이 바뀌어도
- * 그 값은 변하지 않는다.
- *
- * <p>그래서 예매자만 보고 판정하면 <b>판 사람이 같은 티켓을 다시 등록할 수 있다.</b> 매물 유니크
- * 제약도 이것을 막지 못한다 — 먼저 판 매물은 이미 {@code SOLD} 로 닫혀 있어 "열려 있는 매물 하나"
- * 규칙에 걸리지 않는다. 현재 소유자는 {@link #currentOwnerId} 가 체결 이력에서 유도한다.
- *
- * <p>{@link #currentOwnerId} 는 DB 미러일 뿐이라, 등록·취소 모두 컨트랙트 쪽에서
- * {@code ownerOf(tokenId)}를 다시 대조한다({@code listForTransferFor}/{@code delistFor}의
- * {@code owner} 파라미터 검증).
+ * <p>DB 소유 관계는 TicketOwnershipService에서 확인한다.
+ * 등록·취소의 기존 온체인 ownerOf 검증은 그대로 유지한다.
  *
  * <h2>티켓 상태도 함께 바뀐다</h2>
  *
@@ -71,7 +59,7 @@ public class ListingService {
 
     private final TicketRepository ticketRepository;
     private final TicketListingRepository ticketListingRepository;
-    private final TicketTradeRepository ticketTradeRepository;
+    private final TicketOwnershipService ticketOwnershipService;
     private final ImageStorage imageStorage;
     private final MarketHoursService marketHoursService;
     private final TicketNftClient ticketNftClient;
@@ -105,7 +93,7 @@ public class ListingService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
 
-        if (!currentOwnerId(ticket).equals(memberId)) {
+        if (!ticketOwnershipService.isAssignedTo(memberId, ticketId)) {
             // 남의 티켓이다. 존재 자체는 이미 위에서 드러났지만, 그 이상(어느 공연·어느 좌석인지)은 알려주지 않는다.
             throw new NotTicketOwnerException(ticketId);
         }
@@ -164,7 +152,7 @@ public class ListingService {
      *   <li>아직 {@code LISTED} 인가 → 409. <b>조회가 아니라 전이의 결과로 판정한다</b></li>
      * </ol>
      *
-     * <p>권한 판정은 {@link #currentOwnerId} 가 아니라 {@code sellerMemberId} 로 한다. 등록과 기준이
+     * <p>권한 판정은 {@code TicketOwnershipService} 가 아니라 {@code sellerMemberId} 로 한다. 등록과 기준이
      * 다른 것이 의도다 — 등록은 "지금 이 티켓의 주인인가" 를 묻지만 여기서는 "이 매물을 올린 사람인가"
      * 를 묻는다. 취소({@link #cancel})와 같은 기준이고, 매물을 올린 뒤 소유가 바뀌는 경로는
      * 체결뿐인데 그때는 매물이 {@code SOLD} 라 4번에서 막힌다.
@@ -254,22 +242,6 @@ public class ListingService {
             log.debug("체인 미연결 - delistFor 를 건너뛴다 (listingId={})", listingId);
         }
         ticket.markDelisted();
-    }
-
-    /**
-     * 지금 이 티켓의 주인.
-     *
-     * <p>최근 체결이 있으면 그 구매자, 없으면 처음 예매한 사람이다. 한 티켓이 여러 번 양도될 수
-     * 있으므로 가장 마지막 체결을 본다.
-     *
-     * <p>체결이 {@code PENDING}(온체인 전송 대기)이어도 소유자로 인정한다. 온체인 연동 전까지는
-     * 모든 체결이 그 상태에 머물기 때문에, {@code CONFIRMED} 만 인정하면 <b>산 사람이 자기 티켓을
-     * 영영 다시 팔 수 없다.</b> 연동 시 이 판정을 다시 볼 것.
-     */
-    private Long currentOwnerId(Ticket ticket) {
-        return ticketTradeRepository.findFirstByTicketIdOrderByTradedAtDescIdDesc(ticket.getId())
-                .map(TicketTrade::getBuyerMemberId)
-                .orElseGet(() -> ticket.getReservation().getMember().getId());
     }
 
     /**

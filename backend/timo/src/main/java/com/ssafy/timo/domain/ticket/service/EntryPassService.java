@@ -9,7 +9,6 @@ import com.ssafy.timo.domain.ticket.exception.EntryWindowClosedException;
 import com.ssafy.timo.domain.ticket.exception.EntryWindowNotOpenException;
 import com.ssafy.timo.domain.ticket.exception.TicketNotFoundException;
 import com.ssafy.timo.domain.ticket.exception.TicketStatusNotIssuableException;
-import com.ssafy.timo.domain.ticket.repository.TicketRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -58,20 +57,14 @@ public class EntryPassService {
      */
     static final Duration ENTRY_CLOSES_AFTER_START = Duration.ofMinutes(5);
 
-    private final TicketRepository ticketRepository;
+    private final TicketOwnershipService ticketOwnershipService;
     private final EntryPassProvider entryPassProvider;
     private final Clock clock;
 
     public EntryPassResponseDto issue(Long memberId, Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
+        Ticket ticket = ticketOwnershipService.findAssignedTicket(memberId, ticketId)
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
-
         Reservation reservation = ticket.getReservation();
-        if (ticketRepository.countCurrentOwnership(memberId, ticketId) == 0) {
-            // 최초 예매자가 아니라 지금 소유자로 판정한다 - 양도로 주인이 바뀌면 판 사람은 더 이상
-            // 발급받을 수 없다. 남의 티켓은 "권한 없음" 이 아니라 "없음" 이다(TicketNotFoundException 주석).
-            throw new TicketNotFoundException(ticketId);
-        }
 
         if (ticket.getStatus() != TicketStatus.OWNED) {
             // 발행 전(PENDING_MINT)·이미 입장(USED)·회수(REVOKED)·양도 등록 중(LISTED) 전부 여기서 걸린다.

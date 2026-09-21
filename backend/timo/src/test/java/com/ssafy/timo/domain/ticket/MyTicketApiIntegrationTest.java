@@ -45,11 +45,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 내 티켓 조회 API 통합 테스트.
  *
- * <p><b>소유자 판정이 전부 네이티브 쿼리 안에 있어 여기서만 검증된다.</b> JPQL 과 달리 기동 시점에
+ * <p><b>소유자 컬럼을 사용하는 목록 쿼리를 실제 DB에서 검증한다.</b> JPQL 과 달리 기동 시점에
  * 검증되지 않아 컬럼명이나 별칭이 틀려도 호출해 봐야 안다.
  *
- * <p>덮는 것은 판정의 두 갈래와 함정 둘이다 — 재양도({@code A->B->C})는 {@code MAX(trade_id)} 를
- * 쓰는 이유이고, 되사기({@code A->B->A})는 두 갈래로 모든 경우가 덮이는지를 본다.
+ * <p>재양도({@code A->B->C})와 되사기({@code A->B->A})에서도 현재 귀속 회원만 조회되어야 한다.
  */
 @IntegrationTest
 class MyTicketApiIntegrationTest {
@@ -161,7 +160,7 @@ class MyTicketApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("재양도하면 마지막 산 사람만 가진다 - MAX(trade_id) 를 쓰는 이유")
+    @DisplayName("재양도하면 소유자 컬럼이 마지막 구매자를 가리킨다")
     void resoldTwice() throws Exception {
         Ticket ticket = book(alice, 0, "아이유 콘서트");
         trade(ticket, alice, bob, LocalDateTime.now().minusDays(3));
@@ -174,14 +173,14 @@ class MyTicketApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("팔았다가 되사면 다시 내 것이다 - 두 갈래가 모든 경우를 덮는지 본다")
+    @DisplayName("팔았다가 되사면 다시 내 것이며 취득 경로는 TRANSFER다")
     void boughtBack() throws Exception {
         Ticket ticket = book(alice, 0, "아이유 콘서트");
         trade(ticket, alice, bob, LocalDateTime.now().minusDays(3));
         trade(ticket, bob, alice, LocalDateTime.now().minusDays(1));
         em.flush();
 
-        // 거래가 있으므로 "예매했고 거래 없음" 갈래에서는 빠진다. 반대 갈래가 잡아야 한다.
+        // 최초 주문자가 되사도 현재 소유자 컬럼으로 한 번만 조회한다.
         assertHolds(alice, ticket);
         assertHolds(bob);
     }
@@ -278,11 +277,16 @@ class MyTicketApiIntegrationTest {
 
     /** 매물을 열고 바로 체결시킨다. 서비스를 거치지 않는 이유는 소유자 판정만 보면 되기 때문이다. */
     private void trade(Ticket ticket, Member seller, Member buyer, LocalDateTime tradedAt) {
+        ticketRepository.findById(ticket.getId()).orElseThrow().markListed();
         TicketListing listing = openListing(ticket, seller);
         ticketListingRepository.markSoldIfListed(listing.getId(), tradedAt);
         TicketListing sold = ticketListingRepository.findById(listing.getId()).orElseThrow();
 
-        ticketTradeRepository.save(TicketTrade.record(sold, buyer.getId(), tradedAt));
+        TicketTrade trade = TicketTrade.record(sold, buyer.getId(), tradedAt);
+        trade.confirm();
+        ticketTradeRepository.save(trade);
+        org.assertj.core.api.Assertions.assertThat(ticketRepository.transferOwnershipIfListed(
+                ticket.getId(), seller.getId(), buyer.getId(), tradedAt)).isEqualTo(1);
     }
 
     private TicketListing openListing(Ticket ticket, Member seller) {

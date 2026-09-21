@@ -776,6 +776,11 @@ class MarketApiIntegrationTest {
                     .andExpect(jsonPath("$.seatCol").value(othersTicket.getReservation().getSeat().getSeatCol()))
                     .andExpect(jsonPath("$.txHash").doesNotExist())
                     .andExpect(jsonPath("$.ticketId").doesNotExist());
+            em.flush();
+            em.clear();
+            Ticket purchased = ticketRepository.findById(othersTicket.getId()).orElseThrow();
+            assertThat(purchased.getOwnerMemberId()).isEqualTo(seller.getId());
+            assertThat(purchased.getStatus()).isEqualTo(com.ssafy.timo.domain.ticket.entity.TicketStatus.OWNED);
         }
 
         @Test

@@ -327,6 +327,7 @@ class NotificationSweepScenarioTest {
 
     /** 같은 티켓에 매물을 열고 바로 체결시킨다. 서비스를 거치지 않는 이유는 소유자 판정만 보면 되기 때문이다. */
     private void trade(Ticket ticket, Member seller, Member buyer, LocalDateTime tradedAt) {
+        ticketRepository.findById(ticket.getId()).orElseThrow().markListed();
         TicketListing listing = ticketListingRepository.saveAndFlush(TicketListing.open(
                 ticket.getId(), seller.getId(), ticket.getReservation().getConcert(), section,
                 ticket.getReservation().getSeat().getSeatNo(), ticket.getReservation().getSeat().getSeatCol(),
@@ -334,7 +335,11 @@ class NotificationSweepScenarioTest {
         em.flush();
         ticketListingRepository.markSoldIfListed(listing.getId(), tradedAt);
         TicketListing sold = ticketListingRepository.findById(listing.getId()).orElseThrow();
-        ticketTradeRepository.save(TicketTrade.record(sold, buyer.getId(), tradedAt));
+        TicketTrade trade = TicketTrade.record(sold, buyer.getId(), tradedAt);
+        trade.confirm();
+        ticketTradeRepository.save(trade);
+        org.assertj.core.api.Assertions.assertThat(ticketRepository.transferOwnershipIfListed(
+                ticket.getId(), seller.getId(), buyer.getId(), tradedAt)).isEqualTo(1);
         em.flush();
     }
 

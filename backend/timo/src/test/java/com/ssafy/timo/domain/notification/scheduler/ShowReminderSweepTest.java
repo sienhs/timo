@@ -441,6 +441,7 @@ class ShowReminderSweepTest {
     }
 
     private void trade(Ticket ticket, Member seller, Member buyer) {
+        ticketRepository.findById(ticket.getId()).orElseThrow().markListed();
         TicketListing listing = ticketListingRepository.saveAndFlush(TicketListing.open(
                 ticket.getId(), seller.getId(), ticket.getReservation().getConcert(), section,
                 ticket.getReservation().getSeat().getSeatNo(), ticket.getReservation().getSeat().getSeatCol(),
@@ -448,7 +449,11 @@ class ShowReminderSweepTest {
         em.flush();
         ticketListingRepository.markSoldIfListed(listing.getId(), NOW.minusHours(1));
         TicketListing sold = ticketListingRepository.findById(listing.getId()).orElseThrow();
-        ticketTradeRepository.save(TicketTrade.record(sold, buyer.getId(), NOW.minusHours(1)));
+        TicketTrade trade = TicketTrade.record(sold, buyer.getId(), NOW.minusHours(1));
+        trade.confirm();
+        ticketTradeRepository.save(trade);
+        org.assertj.core.api.Assertions.assertThat(ticketRepository.transferOwnershipIfListed(
+                ticket.getId(), seller.getId(), buyer.getId(), NOW.minusHours(1))).isEqualTo(1);
         em.flush();
     }
 

@@ -16,6 +16,8 @@ import com.ssafy.timo.domain.concert.repository.ConcertRepository;
 import com.ssafy.timo.domain.notification.service.ListingSoldNotifier;
 import com.ssafy.timo.domain.ticket.entity.Ticket;
 import com.ssafy.timo.domain.ticket.repository.TicketRepository;
+import com.ssafy.timo.domain.ticket.service.TicketOwnershipService;
+import com.ssafy.timo.domain.ticket.service.TicketOwnershipWriter;
 import com.ssafy.timo.domain.wallet.service.WalletService;
 import com.ssafy.timo.domain.transfer.dto.CreateListingRequestDto;
 import com.ssafy.timo.domain.transfer.dto.MarketListRequestDto;
@@ -94,10 +96,10 @@ class MarketHoursGuardTest {
 
     @BeforeEach
     void setUp() {
-        listingService = new ListingService(ticketRepository, ticketListingRepository, ticketTradeRepository,
+        listingService = new ListingService(ticketRepository, ticketListingRepository, new TicketOwnershipService(ticketRepository),
                 imageStorage, marketHoursService, ticketNftClient, walletService, blockchainProperties, CLOCK);
         purchaseService = new PurchaseService(ticketListingRepository, ticketTradeRepository, ticketRepository,
-                marketHoursService, listingSoldNotifier, ticketTransferService, blockchainProperties, CLOCK);
+                marketHoursService, listingSoldNotifier, ticketTransferService, blockchainProperties, CLOCK, new TicketOwnershipWriter(ticketRepository));
         marketQueryService = new MarketQueryService(concertRepository, ticketListingRepository,
                 ticketTradeRepository, imageStorage, marketHoursService, CLOCK);
     }
