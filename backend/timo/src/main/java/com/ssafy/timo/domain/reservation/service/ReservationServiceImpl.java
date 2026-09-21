@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.reservation.service;
 
+import com.ssafy.timo.domain.blockchain.ContractCallException;
 import com.ssafy.timo.domain.blockchain.ContractClient;
 import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.blockchain.TicketVaultClient;
@@ -14,6 +15,7 @@ import com.ssafy.timo.domain.reservation.dto.ReservationListRequestDto;
 import com.ssafy.timo.domain.reservation.dto.ReservationSummaryResponseDto;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
 import com.ssafy.timo.domain.reservation.exception.AlreadyReservedException;
+import com.ssafy.timo.domain.reservation.exception.ReservationCancelFailedException;
 import com.ssafy.timo.domain.reservation.exception.ReservationNotCancellableException;
 import com.ssafy.timo.domain.reservation.exception.ReservationNotFoundException;
 import com.ssafy.timo.domain.reservation.repository.ReservationRepository;
@@ -41,6 +43,7 @@ import java.util.Optional;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.web.PagedModel;
@@ -59,6 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link #cancel}은 반대로 동기다 - 취소는 예매만큼 트래픽이 몰릴 일이 없고, 사용자가 "취소됐다"는
  * 응답을 받는 시점에 실제로 체인 반영(회수·환불)까지 끝나 있는 편이 낫다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -235,8 +239,22 @@ public class ReservationServiceImpl implements ReservationService {
         String buyerAddress = walletService.getAddress(memberId);
         String organizerAddress = walletService.getAddress(concert.getOrganizer().getId());
         BigInteger price = BigInteger.valueOf(reservation.getSeat().getSection().getPrice());
-        ticketNftClient.revoke(ticket.getTokenId());
-        ticketVaultClient.refund(buyerAddress, organizerAddress, price, ContractClient.keccak256(refundRefId(reservation)));
+
+        try {
+            ticketNftClient.revoke(ticket.getTokenId());
+        } catch (ContractCallException e) {
+            // 아직 아무 것도 안 바뀐 상태다 - 회수 자체가 안 먹었으니 그냥 다시 시도하면 된다.
+            log.warn("예매 취소 - 온체인 회수 실패 (reservationId={})", reservationId, e);
+            throw new ReservationCancelFailedException(e);
+        }
+        try {
+            ticketVaultClient.refund(buyerAddress, organizerAddress, price, ContractClient.keccak256(refundRefId(reservation)));
+        } catch (ContractCallException e) {
+            // 회수는 이미 온체인에 반영돼 되돌릴 수 없는데 환불이 실패했다 - 이 트랜잭션은 롤백돼
+            // DB는 취소 전 그대로 남지만, 실제로는 티켓이 이미 회수된 채라 수동으로 확인해야 한다.
+            log.error("예매 취소 - 회수는 됐는데 환불 실패, 수동 개입 필요 (reservationId={})", reservationId, e);
+            throw new ReservationCancelFailedException(e);
+        }
 
         ticket.revoke();
         reservation.cancel(now, now.plus(RELEASE_BASE_DELAY).plusSeconds(releaseJitterSeconds()));
