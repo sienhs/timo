@@ -9,13 +9,16 @@ spring:
       # 제약·인덱스 등을 임의로 추가하지 않고 엔티티와의 불일치만 검증하게 한다.
       ddl-auto: validate
     show-sql: false
-  # Redis 기능을 도입할 때 다시 활성화한다.
-  # data:
-  #   redis:
-  #     host: ${REDIS_HOST}
-  #     port: ${REDIS_PORT:6379}
-  #     password: ${REDIS_PASSWORD:}
-  #     database: 0
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: 0
+
+waiting-queue:
+  active-limit: ${WAITING_QUEUE_ACTIVE_LIMIT:100}
+  admission-ttl: ${WAITING_QUEUE_ADMISSION_TTL:PT5M}
 
 logging:
   level:
