@@ -178,6 +178,7 @@ class _MarketConcertsScreenState extends State<MarketConcertsScreen> {
     if (!_isLoggedIn) {
       return ResaleEmptyView(
         message: ResaleStrings.loginPrompt,
+        showMascot: false,
         actionLabel: AuthStrings.login,
         onAction: () => Navigator.pushNamed(context, AppRoutes.login),
       );

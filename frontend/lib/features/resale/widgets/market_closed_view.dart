@@ -40,7 +40,7 @@ class MarketClosedView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const TimoMascot.sad(size: 150),
+            const TimoMascot.sad(size: ResaleMetrics.emptyMascotSize),
             const SizedBox(height: 20),
             const Text(
               ResaleStrings.closedTitle,

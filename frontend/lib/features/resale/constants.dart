@@ -62,6 +62,9 @@ class ResaleMetrics {
   /// 마켓 닫힘 화면 한가운데의 큰 카운트다운 글자 크기.
   static const closedCountdownFontSize = 26.0;
 
+  /// 빈 상태와 마켓 닫힘 화면 한가운데에 그리는 마스코트의 크기.
+  static const emptyMascotSize = 150.0;
+
   /// 결제 대기 연출 클립의 비율. 자산이 1280x720 이다.
   static const transferClipAspectRatio = 16 / 9;
 
@@ -95,6 +98,10 @@ class ResaleStrings {
   static const emptyConcerts = '지금 올라온 매물이 없어요';
   static const emptyListings = '이 공연에 남은 매물이 없어요';
   static const emptyTickets = '양도할 수 있는 티켓이 없어요';
+
+  /// 양도할 티켓이 없을 때 다음에 할 일. 여기서 할 수 있는 일이 없으니
+  /// 예매 쪽(공연 전체 목록)으로 보낸다.
+  static const emptyTicketsAction = '예매하러 가기';
 
   static String searchEmpty(String keyword) => '\'$keyword\' 와 맞는 공연이 없어요';
 
