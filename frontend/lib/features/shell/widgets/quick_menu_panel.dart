@@ -61,8 +61,9 @@ class _QuickMenuPanel extends StatelessWidget {
         ),
         child: Material(
           color: AppColors.surface,
-          borderRadius:
-              const BorderRadius.all(Radius.circular(ShellMetrics.panelRadius)),
+          borderRadius: const BorderRadius.all(
+            Radius.circular(ShellMetrics.panelRadius),
+          ),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.all(
@@ -99,8 +100,7 @@ class _QuickMenuGrid extends StatelessWidget {
           children: [
             for (final item in cells) Expanded(child: _QuickMenuCell(item)),
             // 마지막 줄이 덜 찼을 때 남은 칸을 비워 정렬을 유지한다.
-            for (var i = cells.length; i < columns; i++)
-              const Spacer(),
+            for (var i = cells.length; i < columns; i++) const Spacer(),
           ],
         ),
       );
@@ -133,11 +133,12 @@ class _QuickMenuCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           children: [
-            Icon(
-              item.icon,
-              size: ShellMetrics.panelIconSize,
-              color: AppColors.textPrimary,
-            ),
+            item.customIcon ??
+                Icon(
+                  item.icon,
+                  size: ShellMetrics.panelIconSize,
+                  color: AppColors.textPrimary,
+                ),
             const SizedBox(height: 8),
             Text(
               item.label,

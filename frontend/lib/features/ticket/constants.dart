@@ -189,6 +189,9 @@ class TicketStrings {
 
   // 입장 QR 화면.
   static const qrScreenTitle = '입장 QR';
+  static const qrAlreadyUsed = '이미 입장한 QR입니다.';
+  static const qrNoTickets = '지금 입장 가능한 티켓이 없어요.';
+  static const qrSelectTicket = '입장할 티켓을 선택해주세요.';
   static const qrRemaining = '남은 시간';
 
   /// QR 이 몇 초 동안 쓸 수 있는지. 숫자는 서버가 응답에 실어 준 수명이다 —
@@ -200,8 +203,7 @@ class TicketStrings {
 
   /// 만료된 QR 가운데의 새로고침 버튼. 화면 읽기 프로그램이 읽는 이름이다.
   static const qrRefresh = 'QR 새로 받기';
-  static const qrCaptureNotice =
-      '화면을 캡처한 QR 은 입장할 수 없어요.\n입장 시 이 화면을 직접 보여주세요.';
+  static const qrCaptureNotice = '화면을 캡처한 QR은 입장할 수 없어요.\n입장 시 이 화면을 직접 보여주세요.';
 
   /// 진행 바는 눈으로만 읽히므로 화면 읽기 프로그램에는 초를 말로 준다.
   static String qrRemainingSemantics(int seconds) => '$qrRemaining $seconds초';

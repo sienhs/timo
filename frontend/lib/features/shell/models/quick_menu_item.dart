@@ -12,9 +12,11 @@ class QuickMenuItem {
     required this.icon,
     required this.label,
     this.routeName,
+    this.customIcon,
   });
 
   final IconData icon;
   final String label;
   final String? routeName;
+  final Widget? customIcon;
 }

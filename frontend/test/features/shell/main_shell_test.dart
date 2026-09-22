@@ -7,6 +7,7 @@ import 'package:timo/features/mypage/constants.dart';
 import 'package:timo/features/shell/constants.dart';
 import 'package:timo/features/shell/screens/main_shell_screen.dart';
 import 'package:timo/features/shell/widgets/app_bottom_nav_bar.dart';
+import 'package:timo/features/shell/widgets/mushroom_outline_icon.dart';
 import 'package:timo/features/shell/widgets/quick_menu_button.dart';
 import 'package:timo/routes/app_routes.dart';
 
@@ -39,6 +40,10 @@ void main() {
       findsOneWidget,
     );
     expect(quickMenuButton(), findsOneWidget);
+    expect(
+      find.descendant(of: quickMenuButton(), matching: find.byIcon(Icons.add)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('+ 버튼은 바 위로 지름의 1/3 만 솟는다', (tester) async {
@@ -80,6 +85,7 @@ void main() {
     for (final item in quickMenuItems) {
       expect(find.text(item.label), findsWidgets, reason: item.label);
     }
+    expect(find.byType(MushroomOutlineIcon), findsOneWidget);
     // 시안 순서(입장QR → ... → 환경 설정)가 목록 순서다.
     expect(quickMenuItems.map((item) => item.label).toList(), [
       '입장QR',
@@ -117,11 +123,9 @@ void main() {
     expect(find.text('입장QR'), findsNothing);
   });
 
-  // 입장 QR 은 따로 화면이 없다. 티켓 카드의 '입장 QR 보기' 가 입구라, 메뉴는
-  // 내 티켓으로 보낸다. 준비 중 안내로 되돌아가면 기능이 있는데 없다고 말하는 꼴이다.
-  test('입장QR 은 내 티켓으로 간다', () {
+  test('입장QR 은 QR 화면으로 간다', () {
     final item = quickMenuItems.singleWhere((item) => item.label == '입장QR');
-    expect(item.routeName, AppRoutes.myTickets);
+    expect(item.routeName, AppRoutes.entryQr);
   });
 
   testWidgets('화면이 없는 항목을 고르면 준비 중 안내가 뜬다', (tester) async {
