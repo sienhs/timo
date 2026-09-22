@@ -210,6 +210,7 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
     if (!_isLoggedIn) {
       return ResaleEmptyView(
         message: ResaleStrings.loginPrompt,
+        showMascot: false,
         actionLabel: AuthStrings.login,
         onAction: () => Navigator.pushNamed(context, AppRoutes.login),
       );
@@ -221,6 +222,25 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
       builder: (context, tickets) => _step == _RegisterStep.pickTicket
           ? _ticketPicker(tickets)
           : _priceForm(),
+    );
+  }
+
+  /// 고를 티켓이 하나도 안 남았을 때의 자리.
+  ///
+  /// 검색이 빗나간 것과 애초에 양도할 티켓이 없는 것을 갈라 둔다. 다음에 할
+  /// 일이 다르기 때문이다 — 검색은 검색어를 지우면 되지만, 티켓이 없는 쪽은
+  /// 이 화면에서 할 수 있는 일이 없다. 그 자리에서 뒤로가기 말곤 길이 없으면
+  /// 막다른 길이라, 예매 쪽으로 보낸다.
+  Widget _emptyPicker() {
+    final keyword = _query.trim();
+    if (keyword.isNotEmpty) {
+      return ResaleEmptyView(message: ResaleStrings.searchEmpty(keyword));
+    }
+
+    return ResaleEmptyView(
+      message: ResaleStrings.emptyTickets,
+      actionLabel: ResaleStrings.emptyTicketsAction,
+      onAction: () => Navigator.pushNamed(context, AppRoutes.allShows),
     );
   }
 
@@ -246,11 +266,7 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
         ),
         Expanded(
           child: matched.isEmpty
-              ? ResaleEmptyView(
-                  message: _query.trim().isEmpty
-                      ? ResaleStrings.emptyTickets
-                      : ResaleStrings.searchEmpty(_query.trim()),
-                )
+              ? _emptyPicker()
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: ResaleMetrics.horizontalPadding,
