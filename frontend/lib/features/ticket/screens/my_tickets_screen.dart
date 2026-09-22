@@ -11,7 +11,6 @@ import '../../resale/models/market_hours.dart';
 import '../../resale/models/my_trade.dart';
 import '../../resale/state/resale_api_scope.dart';
 import '../../resale/widgets/listing_price_sheet.dart';
-import '../../shell/constants.dart';
 import '../../shell/quick_menu_launcher.dart';
 import '../../shell/widgets/app_bottom_nav_bar.dart';
 import '../../shell/widgets/quick_menu_button.dart';
@@ -158,14 +157,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     });
   }
 
-  /// 안내 스낵바. 하단 바와 원형 버튼에 가리지 않게 그 위로 띄운다.
+  /// 안내 스낵바. 하단 바에 가리지 않게 그 위로 띄운다.
   void _notify(String message) {
-    showInfoSnackBar(
-      context,
-      message,
-      bottomMargin:
-          ShellMetrics.barHeight + ShellMetrics.fabProtrusion + _snackBarGap,
-    );
+    showInfoSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
   }
 
   /// 카드 더보기(⋮). 고른 것이 있으면 그 흐름으로 이어간다.
@@ -354,6 +348,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     final trades = _trades;
 
     return Scaffold(
+      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 하단 바 위의 원형 버튼이
+      // 키보드 위로 따라 올라와 본문 한가운데에 떠 있게 된다(공연 검색 화면과
+      // 같은 사정). 대신 목록 아래 여백에 키보드 높이를 더해 마지막 카드까지
+      // 스크롤로 닿게 한다([_listPadding]).
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text(TicketStrings.screenTitle),
         actions: [
@@ -486,10 +485,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       onRefresh: () async => _reload(),
       color: AppColors.primary,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(
-          horizontal: TicketMetrics.horizontalPadding,
-          vertical: TicketMetrics.cardGap,
-        ),
+        padding: _listPadding(context),
         itemCount: sales.length,
         itemBuilder: (_, index) => ListingCard(
           trade: sales[index],
@@ -544,10 +540,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                   onRefresh: () async => _reload(),
                   color: AppColors.primary,
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TicketMetrics.horizontalPadding,
-                      vertical: TicketMetrics.cardGap,
-                    ),
+                    padding: _listPadding(context),
                     itemCount: matched.length,
                     itemBuilder: (_, index) => cardBuilder(matched[index]),
                   ),
@@ -567,7 +560,6 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
 }
 
 /// 안내 스낵바와 하단 바(원형 버튼 포함) 사이 틈.
-const _snackBarGap = 12.0;
 
 /// 양도 목록 탭의 자리. [TicketTabBar.labels] 순서다.
 const _listingsTab = 2;
@@ -589,3 +581,12 @@ class _MyTicketsData {
       .where((ticket) => ticket.isPast(now) && !ticket.isVoided)
       .toList();
 }
+
+/// 카드 목록의 여백. 키보드가 열려 있으면 그 높이만큼 아래를 더 띄운다 —
+/// Scaffold 가 본문을 줄여 주지 않기 때문이다.
+EdgeInsets _listPadding(BuildContext context) => EdgeInsets.fromLTRB(
+  TicketMetrics.horizontalPadding,
+  TicketMetrics.cardGap,
+  TicketMetrics.horizontalPadding,
+  TicketMetrics.cardGap + MediaQuery.viewInsetsOf(context).bottom,
+);

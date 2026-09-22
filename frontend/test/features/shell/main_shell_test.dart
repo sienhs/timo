@@ -138,4 +138,20 @@ void main() {
 
     expect(find.text(ShellStrings.notReady('카테고리')), findsOneWidget);
   });
+
+  /// 이 안내는 한때 검정 기본 스낵바로 떴다. 앱의 다른 안내와 생김새가 달라
+  /// 같은 앱으로 보이지 않았다. 공통 상자로 돌아가지 않게 굳혀 둔다.
+  testWidgets('준비 중 안내는 앱 공통 상자로 뜬다', (tester) async {
+    await pumpShell(tester);
+
+    await tester.tap(quickMenuButton());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카테고리'));
+    await tester.pump();
+
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    // 공통 상자는 SnackBar 를 비워 두고 안쪽 Container 가 모양을 그린다.
+    expect(snackBar.backgroundColor, Colors.transparent);
+    expect(snackBar.clipBehavior, Clip.none);
+  });
 }

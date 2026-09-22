@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../core/widgets/poster_stage.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/state/auth_session_scope.dart';
@@ -104,14 +105,16 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     );
   }
 
-  /// 알림 신청 결과를 한 줄로 알린다.
+  /// 알림 신청 결과를 한 줄로 알린다. 앱 공통 안내 상자를 쓴다.
   ///
-  /// 띄우기 전에 떠 있던 것을 걷어낸다. 켜고 바로 끄면 먼저 뜬 '신청했어요' 가
-  /// 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에 신청했다는 말이 남는다.
+  /// 띄우기 전에 떠 있던 것을 걷어낸다(공통 동작이 맡는다). 켜고 바로 끄면
+  /// 먼저 뜬 '신청했어요' 가 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에
+  /// 신청했다는 말이 남는다.
+  ///
+  /// 아래 여백은 기본값을 쓴다. 하단 바를 `Scaffold.bottomNavigationBar` 가
+  /// 아니라 본문 안에 그려서 Flutter 가 스낵바를 올려 주지 않기 때문이다.
   void _notify(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showSuccessSnackBar(context, message);
   }
 
   @override

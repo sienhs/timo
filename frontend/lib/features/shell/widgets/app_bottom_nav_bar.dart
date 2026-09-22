@@ -28,10 +28,19 @@ class AppBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
+    // 선 대신 그림자로 경계를 준다. 1px 선은 바가 화면에 납작하게 붙은 것처럼
+    // 보이는데, 이 바는 내용 위에 떠 있는 것이라 위로 퍼지는 그림자가 맞다.
+    // 아래로는 퍼질 곳이 없으므로 위쪽으로만 밀어 준다.
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, -4),
+          ),
+        ],
       ),
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),

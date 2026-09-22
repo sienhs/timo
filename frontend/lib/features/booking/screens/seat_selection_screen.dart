@@ -4,6 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/server_errors.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../data/booking_api.dart';
@@ -297,10 +298,12 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     seatsPerRow: zoneSeats.rows.isEmpty ? 0 : zoneSeats.rows.first.length,
   );
 
+  /// 예매를 이어갈 수 없는 이유를 알린다. 앱 공통 안내 상자를 쓴다.
+  ///
+  /// 하단 바를 `Scaffold.bottomNavigationBar` 로 그리므로 바 높이를 더하지
+  /// 않는다 — Flutter 가 이미 그 위로 올려 준다.
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showErrorSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
   }
 
   @override

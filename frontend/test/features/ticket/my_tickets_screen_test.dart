@@ -493,6 +493,22 @@ void main() {
       expect(find.text(TicketStrings.searchEmpty('없는공연')), findsOneWidget);
       expect(find.text(TicketStrings.emptyUpcoming), findsNothing);
     });
+
+    /// 검색 칸을 누르면 키보드가 올라온다. 이때 화면을 줄이면 하단 바 위의
+    /// 원형 버튼이 키보드를 피해 본문 한가운데로 따라 올라온다. 줄이지 않는
+    /// 대신 카드 목록 아래 여백으로 키보드를 피한다.
+    testWidgets('키보드가 올라와도 화면을 줄이지 않아 원형 버튼이 따라 오르지 않는다', (tester) async {
+      await pumpScreen(tester, api: _ManyTicketsApi(now));
+      await tester.pumpAndSettle();
+
+      final scaffold = tester.widget<Scaffold>(
+        find.descendant(
+          of: find.byType(MyTicketsScreen),
+          matching: find.byType(Scaffold),
+        ),
+      );
+      expect(scaffold.resizeToAvoidBottomInset, isFalse);
+    });
   });
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/error_snack_bar.dart';
 import 'constants.dart';
 import 'widgets/quick_menu_panel.dart';
 
@@ -15,8 +16,10 @@ Future<void> openQuickMenu(BuildContext context) async {
 
   final routeName = selected.routeName;
   if (routeName == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ShellStrings.notReady(selected.label))),
+    showInfoSnackBar(
+      context,
+      ShellStrings.notReady(selected.label),
+      bottomMargin: snackBarGapAboveBar,
     );
     return;
   }
