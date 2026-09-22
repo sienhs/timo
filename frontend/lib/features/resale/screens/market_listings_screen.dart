@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
+import '../../ticket/widgets/delist_listing_dialog.dart';
 import '../constants.dart';
 import '../models/listing.dart';
 import '../models/market_concert.dart';
@@ -56,6 +59,10 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
     });
   }
 
+  /// 매물을 고르면 내 것이냐에 따라 갈린다. 내 매물은 살 수 없고 내릴 수 있다.
+  Future<void> _openListing(Listing listing) =>
+      listing.mine ? _delist(listing) : _openPurchase(listing);
+
   /// 매물을 고르면 구매 확인으로 간다.
   ///
   /// 돌아오면 목록을 다시 받는다. 사고 왔든 그냥 나왔든, 보고 있던 사이에
@@ -69,22 +76,53 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
     if (mounted) _reload();
   }
 
+  /// 내 매물을 내린다. 내 티켓의 양도 목록 탭과 **같은 팝업·같은 요청**이다.
+  ///
+  /// 확인을 받고 서버에 보낸 뒤 목록을 다시 받는다. 카드 한 장을 빼지 않는
+  /// 이유는 그 탭과 같다 — 그새 팔렸을 수 있고, 실패했다면 아무것도 바뀌지
+  /// 않아야 한다. 서버가 거절하면(그새 팔렸거나 이미 내려감) 그 문구를 그대로
+  /// 띄운다.
+  ///
+  /// 성공 안내는 따로 없다. 다시 받은 목록에서 그 줄이 사라져 결과가 이미
+  /// 보인다 — 마켓은 올라가 있는 매물만 주기 때문이다.
+  Future<void> _delist(Listing listing) async {
+    final confirmed = await showDelistListingDialog(
+      context,
+      // 매물 응답에 공연 정보가 없다. 목록과 같은 자리에서 가져온다.
+      concertTitle: widget.concert.title,
+      seatLabel: listing.seatLabel,
+      price: listing.price,
+    );
+    if (!confirmed || !mounted) return;
+
+    try {
+      await ResaleApiScope.of(context).cancelListing(listing.listingId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, e.message);
+      return;
+    }
+    if (mounted) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: ResaleAppBar(
-        title: widget.concert.title,
-        trailing: MarketClosingCountdown(
-          clock: widget.clock,
-          // 마감하면 첫 화면으로 돌려보낸다. 그 화면이 서버에 다시 물어 닫힘
-          // 안내와 다음 오픈 시간을 보여 준다.
-          onElapsed: () => Navigator.maybePop(context),
-        ),
-      ),
+      // 상단 바에 남은 시간을 적지 않는다(사용자 결정). 공연 목록 화면과 같다.
+      appBar: ResaleAppBar(title: widget.concert.title),
       body: SafeArea(
         child: Column(
           children: [
+            // 세는 일만 남긴다. 그리지는 않는다([Offstage]) — 마감하면 첫 화면으로
+            // 돌려보내야 하고, 그 화면이 서버에 다시 물어 닫힘 안내와 다음 오픈
+            // 시간을 보여 준다.
+            Offstage(
+              child: MarketClosingCountdown(
+                clock: widget.clock,
+                onElapsed: () => Navigator.maybePop(context),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 ResaleMetrics.horizontalPadding,
@@ -129,7 +167,7 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
       itemBuilder: (context, index) => ListingRowCard(
         listing: sorted[index],
         performedAt: widget.concert.startAt,
-        onTap: () => _openPurchase(sorted[index]),
+        onTap: () => _openListing(sorted[index]),
       ),
     );
   }

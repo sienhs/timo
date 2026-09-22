@@ -24,6 +24,13 @@ enum ResaleMockScenario {
 
   /// 모든 요청이 실패한다. 오류 화면과 다시 시도를 볼 때.
   error,
+
+  /// 마켓이 **늘 닫혀 있다.** 데이터는 [design] 과 같다.
+  ///
+  /// 닫힘 화면은 하루 중 정해진 때(창 밖)에만 나와서, 낮에는 코드를 고쳤다
+  /// 되돌리는 것 말고는 눈으로 볼 방법이 없었다. 판정이 서버로 넘어간 뒤로는
+  /// 기기 시각을 바꿔도 안 된다. 그 길을 다시 만든다.
+  closed,
 }
 
 /// 서버 없이 쓰는 가짜 [ResaleApi]. 테스트와 시안 확인용이다 —
@@ -72,7 +79,17 @@ class MockResaleApi implements ResaleApi {
   @override
   Future<MarketHours> fetchMarketHours() async {
     await _respond();
-    return _hoursAt(clock());
+    final hours = _hoursAt(clock());
+    // 닫힘 화면을 보려는 시나리오다. 창 안이어도 닫혔다고 답한다. 다음 오픈
+    // 시각은 제 값을 그대로 둬야 화면의 안내와 카운트다운이 뜻을 갖는다.
+    if (scenario != ResaleMockScenario.closed || !hours.isOpen) return hours;
+    return MarketHours(
+      isOpen: false,
+      serverTime: hours.serverTime,
+      opensAt: hours.opensAt.add(const Duration(days: 1)),
+      closesAt: hours.closesAt.add(const Duration(days: 1)),
+      receivedAt: hours.receivedAt,
+    );
   }
 
   MarketHours _hoursAt(DateTime now) {

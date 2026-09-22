@@ -13,7 +13,6 @@ import '../state/resale_api_scope.dart';
 import '../utils/idempotency_key.dart';
 import '../widgets/listing_summary_card.dart';
 import '../widgets/market_countdown.dart';
-import '../widgets/market_hours_countdown.dart';
 import '../widgets/purchase_transferring_view.dart';
 import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_bottom_bar.dart';
@@ -174,10 +173,10 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
 
     return Scaffold(
       backgroundColor: resalePageBackground,
-      appBar: ResaleAppBar(
-        title: ResaleStrings.purchaseTitle,
-        trailing: MarketClosingCountdown(clock: widget.clock),
-      ),
+      // 상단 바에 남은 시간을 적지 않는다(사용자 결정). 마켓 화면들과 같다.
+      // 여기서는 세는 일도 없앴다 — 마감 때 할 일이 없던 자리다(구매는 서버가
+      // 거절하고, 그 문구를 그대로 띄운다).
+      appBar: ResaleAppBar(title: ResaleStrings.purchaseTitle),
       body: SafeArea(
         bottom: false,
         child: Column(

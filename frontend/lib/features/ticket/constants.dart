@@ -153,12 +153,15 @@ class TicketStrings {
   /// 붙인다 — 사용자가 한 일이 아니라 발행 실패의 뒷처리다.
   static const refundedNotice = '발행에 실패해 환불됐어요.';
 
-  /// 양도 마켓에 올라가 있는 티켓. 팔리기 전까지 입장·취소가 막힌다. 내리는
-  /// 길은 양도 목록 탭에 있어 그리로 안내한다.
+  /// 양도 마켓에 올라가 있는 티켓. 팔리기 전까지 입장·취소가 막힌다.
+  ///
+  /// 내리는 길을 양도 목록 탭으로 보내지 않는다 — 이 카드의 더보기(⋮)에서
+  /// 바로 된다([TicketStrings.cancelListing]). 탭 이름을 외워 옮겨 가게 하면
+  /// 취소 경로가 없는 것처럼 읽힌다.
   ///
   /// 폰 폭(375)에서 한 줄에 들어가는 길이다. 길면 "있어 / 요." 처럼 낱말
   /// 중간에서 꺾인다(에뮬레이터로 확인).
-  static const listedNotice = '양도 등록 중이에요. 취소는 양도 목록 탭에서요.';
+  static const listedNotice = '양도 등록 중이에요. 더보기에서 취소할 수 있어요.';
 
   /// 게이트에서 입장 처리가 끝난 티켓. QR 을 다시 받아도 서버가 거절한다.
   static const usedNotice = '입장 완료';
@@ -217,6 +220,11 @@ class TicketStrings {
   /// 양도마켓의 등록 화면으로 간다. 마켓 첫 화면 아래 버튼과 같은 문구다.
   static const registerListing = '양도 등록하기';
 
+  /// 올려 둔 매물을 내린다. 등록과 **같은 자리**를 쓴다 — 한 티켓이 올라가
+  /// 있거나 없거나 둘 중 하나라, 두 항목을 나란히 두면 늘 하나는 잠긴 채다.
+  /// 양도 목록 탭의 `등록 취소` 와 같은 일이고, 확인 팝업도 같은 것을 쓴다.
+  static const cancelListing = '양도 등록 취소하기';
+
   static const cancelReservation = '예매 취소하기';
   static const cancelConfirmTitle = '예매를 취소할까요?';
   // "같은 자리를 다시 잡을 수는 없어요" 는 뺐다(사용자 결정). 팝업이 길어지고,
@@ -237,8 +245,16 @@ class TicketStrings {
   /// 예매 취소: 마켓에 올라가 있다. 먼저 내려야 한다.
   static const cancelWhileListed = '양도 등록 중에는 취소할 수 없어요';
 
-  /// 양도 등록: 이미 올라가 있다.
+  /// 양도 등록: 이미 올라가 있다. 이 자리는 [cancelListing] 이 가져가므로 매물을
+  /// 못 찾았을 때만 남는다.
   static const alreadyListed = '이미 양도 등록 중이에요';
+
+  /// 양도 등록 취소: 올라가 있는 것은 아는데 어느 매물인지 못 찾았다.
+  ///
+  /// 티켓 응답에 매물 번호가 없어 좌석으로 맞춰 찾는데(`_listingFor`), 거래
+  /// 목록이 아직 안 왔거나 실패했으면 맞출 상대가 없다. 이럴 때만 양도 목록
+  /// 탭으로 보낸다 — 거기서는 매물 자체를 받아 그리므로 번호가 있다.
+  static const cancelListingUnknown = '양도 목록 탭에서 취소할 수 있어요';
 
   /// 환불 금액. 수수료 없이 정가 전액이다.
   static String refundAmount(String price) => '환불 금액 $price';

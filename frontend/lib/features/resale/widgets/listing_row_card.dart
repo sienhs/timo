@@ -13,6 +13,10 @@ import 'resale_card.dart';
 ///
 /// [performedAt] 은 공연 회차다. 매물 응답에 공연 정보가 없어(같은 공연의
 /// 매물이라 반복해 실을 이유가 없다) 화면이 고른 공연에서 받아 넘긴다.
+///
+/// 내 매물도 **누를 수 있다.** 살 수는 없지만 내릴 수 있어서다. 어느 쪽인지는
+/// 화면이 [Listing.mine] 을 보고 가른다([onTap] 하나로 받는다) — 카드는 눌린
+/// 것만 알린다.
 class ListingRowCard extends StatelessWidget {
   const ListingRowCard({
     super.key,
@@ -33,9 +37,9 @@ class ListingRowCard extends StatelessWidget {
     final performedAt = this.performedAt;
 
     return ResaleCard(
-      // 내 매물은 살 수 없다. 눌러서 구매 화면까지 간 뒤에 막느니 여기서 막고
-      // 그 이유를 표로 붙인다.
-      onTap: listing.mine ? null : onTap,
+      // 내 매물도 누를 수 있다. 구매로 가지 않고 등록 취소 팝업이 열린다 —
+      // 내릴 길이 내 티켓 탭에만 있으면 여기서 내 매물을 보고도 손을 못 댄다.
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -105,7 +109,7 @@ class ListingRowCard extends StatelessWidget {
           if (listing.mine) ...[
             const SizedBox(height: 10),
             const ResaleChip(
-              label: ResaleStrings.ownListing,
+              label: ResaleStrings.ownListingDelist,
               background: ResaleColors.mineBackground,
               foreground: ResaleColors.mineForeground,
               icon: Icons.person_outline,
