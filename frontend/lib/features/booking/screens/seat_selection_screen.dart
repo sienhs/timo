@@ -17,6 +17,7 @@ import '../widgets/booking_bottom_bar.dart';
 import '../widgets/performance_header.dart';
 import '../widgets/seat_confirm_dialog.dart';
 import '../widgets/seat_grid.dart';
+import '../widgets/seat_map_layout.dart';
 import '../widgets/seat_legend.dart';
 import '../widgets/venue_map.dart';
 
@@ -52,6 +53,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     _controller = BookingScope.read(context);
     _concertId = _controller.concertId;
     _zoneId = widget.zoneId;
+    // 다른 구역을 보다 나왔다면 그때 고른 자리는 여기서 유효하지 않다.
+    _controller.enterZone(_zoneId);
     _seats = _fetch();
     _loadZones();
   }
@@ -162,9 +165,22 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     //
     // 알려 줘야 하는 경우는 따로 있다. 초록 자리를 눌러 잡으려는데 그 사이
     // 남이 채 간 때다(409). 그건 [_onHoldFailed] 가 맡는다.
-    if (!seat.isSelectable) return;
     if (_holding) return;
-    BookingScope.read(context).selectSeat(_zoneOf(zoneSeats), seat);
+
+    final controller = BookingScope.read(context);
+
+    // 고른 자리를 다시 누르면 선택을 푼다. 물릴 방법이 없으면 잘못 누른 자리를
+    // 되돌리려고 다른 자리를 아무거나 골라야 한다.
+    //
+    // 고를 수 있는지보다 먼저 본다. 고른 뒤 새로고침 사이에 남이 그 자리를
+    // 가져가면 회색이 되는데, 그때도 선택은 풀 수 있어야 한다.
+    if (controller.selectedSeat?.id == seat.id) {
+      controller.clearSelection();
+      return;
+    }
+
+    if (!seat.isSelectable) return;
+    controller.selectSeat(_zoneOf(zoneSeats), seat);
   }
 
   /// 확인을 받고 서버에 자리를 잡은 뒤 결제 화면으로 보낸다.
@@ -350,29 +366,18 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 26,
-                            alignment: Alignment.center,
-                            margin: const EdgeInsets.only(bottom: 6),
-                            color: AppColors.stageFill,
-                            child: Text(
-                              'STAGE 방향',
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ),
-                          Expanded(
-                            child: SeatGrid(
-                              key: ValueKey(_zoneId),
-                              zoneColor: zoneColor(_zoneId),
-                              seatsPerRow: _zoneOf(zoneSeats).seatsPerRow,
-                              seatRows: zoneSeats.rows,
-                              selectedSeatId: selectedSeat?.id,
-                              onSeatTap: (seat) => _onSeatTap(zoneSeats, seat),
-                            ),
-                          ),
-                        ],
+                      // 무대는 배치도 안쪽 맨 위에 그린다. 따로 띠를 두르면
+                      // 부채꼴이 가리키는 무대와 띠가 두 개로 보인다.
+                      child: SeatGrid(
+                        key: ValueKey(_zoneId),
+                        zoneColor: zoneColor(_zoneId),
+                        // 구역도에서 이 구역이 어느 자리인지에 따라 무대가 붙는
+                        // 방향과 좁아지는 방향이 달라진다.
+                        surroundings: ZoneSurroundings.of(_zones, _zoneId),
+                        seatsPerRow: _zoneOf(zoneSeats).seatsPerRow,
+                        seatRows: zoneSeats.rows,
+                        selectedSeatId: selectedSeat?.id,
+                        onSeatTap: (seat) => _onSeatTap(zoneSeats, seat),
                       ),
                     ),
                   ),

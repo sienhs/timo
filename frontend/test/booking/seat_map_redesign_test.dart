@@ -55,6 +55,26 @@ void main() {
     expect(find.text('매진'), findsOneWidget);
   });
 
+  testWidgets('잔여석 안내 덧붙임은 물음표를 눌러야 펴진다', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: RemainingSeatsPanel(zones: zones)),
+      ),
+    );
+
+    const hint = '선점 중인 좌석이 있어 실제로 고를 수 있는 자리는 더 적을 수 있어요.';
+    expect(find.text(hint), findsNothing);
+
+    // 아이콘으로 찾는다. bySemanticsLabel 은 시맨틱 트리를 켜야 걸린다.
+    await tester.tap(find.byIcon(Icons.help_outline));
+    await tester.pump();
+    expect(find.text(hint), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.help));
+    await tester.pump();
+    expect(find.text(hint), findsNothing);
+  });
+
   testWidgets('기존 배치도 구역은 한 개 또는 여러 개여도 탭할 수 있다', (tester) async {
     for (final items in [zones.take(1).toList(), zones]) {
       Zone? selected;

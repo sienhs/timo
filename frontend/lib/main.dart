@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
@@ -23,6 +24,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   // 기기 저장소(플러그인)를 runApp 전에 쓰려면 먼저 엔진과 연결해야 한다.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 세로로만 쓴다. 가로로 돌리면 좌석 배치도·티켓처럼 세로를 전제로 짠 화면이
+  // 무너진다. 안드로이드 매니페스트에도 같은 값을 박아 두는데, 그쪽은 플러터가
+  // 뜨기 전(런치 화면)까지 막아 준다.
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
