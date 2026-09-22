@@ -1,7 +1,11 @@
 # local 과 똑같이 휘발성 도커 MySQL 로 뜨지만, 이미지 저장소만 실제 S3(S3ImageStorage)로 바꾼 프로필.
-# 목적은 하나 - LocalDataSeeder 가 넣는 데모 이미지가 실제 S3 버킷에 정말 올라가는지 눈으로 확인하는
-# 것뿐이다. 그래서 DB·시크릿은 local 것을 그대로 복붙했다 - application-{profile}.yml 이 서로 다른
-# 파일로 독립돼 있는 이 저장소 관례(application-local.yml, application-prod.yml 참고)를 따른다.
+# 목적은 둘이다 - 업로드가 실제 S3 버킷을 상대로 도는지 눈으로 확인하는 것과, 시드 이미지를 버킷에
+# 채워 넣는 것(LocalDataSeeder.uploadSeedImages). 그래서 DB·시크릿은 local 것을 그대로 복붙했다 -
+# application-{profile}.yml 이 서로 다른 파일로 독립돼 있는 이 저장소 관례(application-local.yml,
+# application-prod.yml 참고)를 따른다.
+#
+# 시드 이미지는 src/main/resources/static 의 파일을 시드에 적힌 key 그대로 올린다. 그래서 이 프로필로
+# 한 번 띄우면 local·prod 가 쓰는 key 가 버킷에서 유효해지고, 그 뒤에는 정적 파일이 없어도 된다.
 #
 # 기동 전에 infra/modules/image-storage 의 runtime_environment 출력값을 환경변수로 내보내야 한다:
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION,
