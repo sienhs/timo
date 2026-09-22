@@ -2,7 +2,7 @@
 ///
 /// [amount] 는 부호가 있는 정수다. 충전·판매 정산·환불처럼 잔액이 늘면 양수,
 /// 구매처럼 줄면 음수다. 종류를 따로 두지 않고 부호로 가르는 이유: 지갑 API 가
-/// 종류 필드를 주지 않고 부호 하나로만 충전과 사용을 구분한다.
+/// 종류 필드를 주지 않고 부호로 잔액의 증가와 감소를 구분한다.
 class WalletTransaction {
   const WalletTransaction({
     required this.title,
@@ -26,7 +26,7 @@ class WalletTransaction {
   /// 거래가 일어난 곳. (예: `양도 마켓`, `카카오페이`, `판매 등록 #2381`)
   final String source;
 
-  /// 잔액이 늘어난 거래인지. 필터의 '충전' 이 이쪽, '사용' 이 반대쪽이다.
+  /// 잔액이 늘어난 거래인지. 필터의 '+'가 이쪽, '-'가 줄어든 거래다.
   bool get isCredit => amount > 0;
 
   /// 서버 응답 한 줄.
@@ -41,21 +41,4 @@ class WalletTransaction {
         occurredAt: DateTime.parse(json['occurredAt'] as String),
         source: json['source'] as String,
       );
-}
-
-/// 사용 내역 필터. 순서가 시안의 세그먼트 순서다.
-enum TransactionFilter {
-  all('전체'),
-  credit('충전'),
-  debit('사용');
-
-  const TransactionFilter(this.label);
-
-  final String label;
-
-  bool accepts(WalletTransaction transaction) => switch (this) {
-    TransactionFilter.all => true,
-    TransactionFilter.credit => transaction.isCredit,
-    TransactionFilter.debit => !transaction.isCredit,
-  };
 }

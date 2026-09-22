@@ -153,6 +153,31 @@ void main() {
       expect(summary.balance, 1150000);
     });
 
+    test('온체인 충전 실패(503)의 상세 문구와 예외 이름을 보존한다', () {
+      const message = '충전 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+      final api = build(
+        (_) => problemResponse(
+          status: 503,
+          errorMessage: message,
+          exception: 'WalletChargeFailedException',
+        ),
+      );
+
+      expect(
+        api.charge(10000),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 503)
+              .having((e) => e.message, 'message', message)
+              .having(
+                (e) => e.exceptionName,
+                'exceptionName',
+                'WalletChargeFailedException',
+              ),
+        ),
+      );
+    });
+
     test('서버가 거절한 금액(400)은 서버 문구를 담은 ApiException 이 된다', () {
       final api = build(
         (_) => problemResponse(
