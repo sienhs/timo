@@ -251,11 +251,7 @@ void main() {
 
     testWidgets('로그아웃이어도 아티스트 탭은 그대로다', (tester) async {
       // 아티스트 찜은 기기에 있다.
-      await pumpFavorites(
-        tester,
-        artists: seededArtists,
-        loggedIn: false,
-      );
+      await pumpFavorites(tester, artists: seededArtists, loggedIn: false);
 
       await openArtistTab(tester);
 
@@ -356,5 +352,20 @@ void main() {
 
     expect(cardTitles(tester), [iu.title, bigbang.title]);
     expect(find.text('${FavoriteStrings.showTab} 2'), findsOneWidget);
+  });
+
+  /// 검색 칸을 누르면 키보드가 올라온다. 이때 화면을 줄이면 하단 바 위의 원형
+  /// 버튼이 키보드를 피해 본문 한가운데로 따라 올라와, 그 자리에 있던 버튼
+  /// 위에 겹친다. 줄이지 않는 대신 목록 아래 여백으로 키보드를 피한다.
+  testWidgets('키보드가 올라와도 화면을 줄이지 않아 원형 버튼이 따라 오르지 않는다', (tester) async {
+    await pumpFavorites(tester, shows: seededShows);
+
+    final scaffold = tester.widget<Scaffold>(
+      find.descendant(
+        of: find.byType(FavoriteListScreen),
+        matching: find.byType(Scaffold),
+      ),
+    );
+    expect(scaffold.resizeToAvoidBottomInset, isFalse);
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../data/booking_api.dart';
@@ -70,10 +71,9 @@ class _ZoneSelectionScreenState extends State<ZoneSelectionScreen> {
     });
   }
 
+  /// 구역 상태 안내. 앱 공통 안내 상자를 쓴다.
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showInfoSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
   }
 
   @override

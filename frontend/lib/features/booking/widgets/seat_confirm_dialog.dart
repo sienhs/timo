@@ -33,10 +33,7 @@ class _SeatConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    // 테두리는 그리지 않는다(사용자 결정). 시안에는 얇은 그린 테두리가 있었지만
-    // 좌석 이름에 이미 브랜드색이 들어가 있어 테두리까지 두면 초록이 겹친다.
     return AppDialogFrame(
-      borderColor: null,
       padding: const EdgeInsets.fromLTRB(18, 24, 18, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,

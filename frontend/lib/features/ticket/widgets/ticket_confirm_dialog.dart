@@ -60,10 +60,9 @@ class _TicketConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    // 모서리·여백은 앱 팝업 공통([AppDialogFrame])을 따르되 테두리는 그리지
-    // 않는다(사용자 결정). 되돌릴 수 없는 행동임은 확인 버튼의 강조색으로만 알린다.
+    // 모서리·여백은 앱 팝업 공통([AppDialogFrame])을 따른다. 되돌릴 수 없는
+    // 행동임은 확인 버튼의 강조색으로만 알린다.
     return AppDialogFrame(
-      borderColor: null,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
