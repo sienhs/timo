@@ -61,29 +61,22 @@ class _CollectionScreenState extends State<CollectionView> {
       if (slot.remoteOnly) slot,
   ];
 
-  Widget body() => switch (filter) {
-    // 카탈로그가 비면 격자도 비어 아무 말이 없다. 왜 비었는지는 알려 줘야 한다.
-    CollectionFilter.all when widget.slots.isEmpty => const _EmptyCatalog(
-      key: ValueKey('empty-all'),
-    ),
-    CollectionFilter.all => CatalogGrid(
-      key: const ValueKey('all'),
-      slots: widget.slots,
-      onOpen: widget.onOpen,
-      onCreateFor: widget.onCreateFor,
-      onRestore: widget.onRestore ?? (_) {},
-      restoring: widget.restoring,
-    ),
-    CollectionFilter.mine when widget.tickets.isEmpty => _EmptyStage(
-      key: const ValueKey('empty'),
-      onCreate: widget.onCreate,
-    ),
-    CollectionFilter.mine => TicketOrgel(
-      key: const ValueKey('mine'),
-      tickets: widget.tickets,
-      onOpen: widget.onOpen,
-    ),
-  };
+  /// "모두 보기". 카탈로그가 비면 격자도 비어 아무 말이 없다 — 왜 비었는지는
+  /// 알려 줘야 한다.
+  Widget allBody() => widget.slots.isEmpty
+      ? const _EmptyCatalog()
+      : CatalogGrid(
+          slots: widget.slots,
+          onOpen: widget.onOpen,
+          onCreateFor: widget.onCreateFor,
+          onRestore: widget.onRestore ?? (_) {},
+          restoring: widget.restoring,
+        );
+
+  /// "내가 만든 소장품 보기".
+  Widget mineBody() => widget.tickets.isEmpty
+      ? _EmptyStage(onCreate: widget.onCreate)
+      : TicketOrgel(tickets: widget.tickets, onOpen: widget.onOpen);
 
   @override
   Widget build(BuildContext context) {
@@ -133,18 +126,10 @@ class _CollectionScreenState extends State<CollectionView> {
                 ),
               ),
             Expanded(
-              child: AnimatedSwitcher(
-                duration: Motion.slow,
-                switchInCurve: Motion.emphasized,
-                switchOutCurve: Motion.standard,
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: ScaleTransition(
-                    scale: Tween(begin: 0.97, end: 1.0).animate(animation),
-                    child: child,
-                  ),
-                ),
-                child: body(),
+              child: _FilterLayers(
+                filter: filter,
+                all: allBody(),
+                mine: mineBody(),
               ),
             ),
           ],
@@ -152,6 +137,117 @@ class _CollectionScreenState extends State<CollectionView> {
       ),
     );
   }
+}
+
+/// 두 보기를 겹쳐 두고 겉만 바꾼다.
+///
+/// 예전에는 [AnimatedSwitcher] 로 갈아 끼웠다. 그러면 필터를 누를 때마다 보고
+/// 있던 쪽이 통째로 버려져서, 오르골 각도와 격자 스크롤이 처음으로 돌아가고
+/// 칸마다 붙은 [Reveal] 이 initState 부터 다시 돌았다 — 칸이 열 개면 계단식
+/// 등장이 1.4초. 받아 둔 목록은 그대로인데 누를 때마다 다시 불러오는 것처럼
+/// 보였다.
+///
+/// 그래서 한 번 본 쪽은 트리에 남긴다. 가려진 동안에는 [Offstage] 로
+/// 레이아웃에서 빼고 [TickerMode] 로 애니메이션을 재워, 안 보이는 곳에서 도는
+/// 것이 없게 한다. 아직 한 번도 안 본 쪽은 만들지 않아서, 그쪽을 처음 여는
+/// 순간의 등장 연출은 그대로다.
+class _FilterLayers extends StatefulWidget {
+  const _FilterLayers({
+    required this.filter,
+    required this.all,
+    required this.mine,
+  });
+  final CollectionFilter filter;
+  final Widget all;
+  final Widget mine;
+
+  @override
+  State<_FilterLayers> createState() => _FilterLayersState();
+}
+
+class _FilterLayersState extends State<_FilterLayers>
+    with SingleTickerProviderStateMixin {
+  /// 0 이 "내가 만든 소장품 보기", 1 이 "모두 보기".
+  late final AnimationController fade = AnimationController(
+    vsync: this,
+    duration: Motion.slow,
+    value: widget.filter == CollectionFilter.all ? 1 : 0,
+  );
+
+  /// 들어오는 쪽과 나가는 쪽의 곡선이 달랐다(emphasized / standard). 한
+  /// 컨트롤러로 양쪽을 그리므로 reverseCurve 로 같은 짝을 만든다.
+  late final CurvedAnimation curve = CurvedAnimation(
+    parent: fade,
+    curve: Motion.emphasized,
+    reverseCurve: Motion.standard,
+  );
+
+  /// 한 번이라도 보인 보기. 여기 없는 쪽은 아직 만들지 않는다.
+  late final Set<CollectionFilter> visited = {widget.filter};
+
+  @override
+  void didUpdateWidget(covariant _FilterLayers oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filter == oldWidget.filter) return;
+    visited.add(widget.filter);
+    if (widget.filter == CollectionFilter.all) {
+      fade.forward();
+    } else {
+      fade.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    curve.dispose();
+    fade.dispose();
+    super.dispose();
+  }
+
+  /// 보이든 숨든 감싸는 위젯의 종류와 순서는 같아야 한다. 숨을 때만 [Offstage]
+  /// 를 씌우는 식으로 모양을 바꾸면 그 자리의 element 가 갈아끼워져서, 살려
+  /// 두려던 [TicketOrgel] 의 State 가 그대로 버려진다. 값만 바꾼다.
+  Widget layer(CollectionFilter which, Widget child, double opacity) {
+    if (!visited.contains(which)) return const SizedBox.shrink();
+    final showing = widget.filter == which;
+    // 다 사라진 쪽은 자리도 차지하지 않고 시계도 멈춘다 — 상태(오르골 각도·격자
+    // 스크롤·이미 끝난 등장)는 element 에 남아 돌아오면 이어진다.
+    final hidden = opacity == 0 && !showing;
+    return TickerMode(
+      enabled: !hidden,
+      child: Offstage(
+        offstage: hidden,
+        child: IgnorePointer(
+          ignoring: !showing,
+          child: ExcludeSemantics(
+            excluding: !showing,
+            child: Opacity(
+              opacity: opacity,
+              child: Transform.scale(
+                scale: 0.97 + 0.03 * opacity,
+                child: child,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: curve,
+    builder: (context, _) {
+      final t = curve.value.clamp(0.0, 1.0);
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          layer(CollectionFilter.mine, widget.mine, 1 - t),
+          layer(CollectionFilter.all, widget.all, t),
+        ],
+      );
+    },
+  );
 }
 
 /// 다른 기기에서 만든 소장품이 서버에 있을 때의 한 줄 안내와 가져오기 버튼.
@@ -212,7 +308,7 @@ class _PendingBanner extends StatelessWidget {
 /// 입장을 마친 티켓이 하나도 없을 때의 "모두 보기". 만들기 버튼은 없다 —
 /// 만들 공연이 없으니 눌러 봐야 같은 말을 한 번 더 듣는다.
 class _EmptyCatalog extends StatelessWidget {
-  const _EmptyCatalog({super.key});
+  const _EmptyCatalog();
 
   @override
   Widget build(BuildContext context) => Center(
@@ -253,7 +349,7 @@ class _EmptyCatalog extends StatelessWidget {
 
 /// 아직 만든 소장품이 없을 때: 마스코트와 만들기 버튼.
 class _EmptyStage extends StatelessWidget {
-  const _EmptyStage({super.key, required this.onCreate});
+  const _EmptyStage({required this.onCreate});
   final VoidCallback onCreate;
 
   @override

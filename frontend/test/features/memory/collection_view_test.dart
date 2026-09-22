@@ -4,6 +4,9 @@ import 'package:timo/core/widgets/timo_mascot.dart';
 import 'package:timo/features/memory/theme/memory_theme.dart';
 import 'package:timo/features/memory/constants.dart';
 import 'package:timo/features/memory/models/collection_slot.dart';
+import 'package:timo/features/memory/models/memory_ticket.dart';
+import 'package:timo/features/memory/widgets/collection/catalog_grid.dart';
+import 'package:timo/features/memory/widgets/collection/ticket_orgel.dart';
 import 'package:timo/features/memory/widgets/collection/collection_view.dart';
 import 'package:timo/features/memory/widgets/collection/ticket_thumbnail.dart';
 
@@ -65,6 +68,55 @@ void main() {
     await tester.tap(find.byType(TicketPlaceholder).last);
     await tester.pump();
     expect(started?.ticketId, 't2');
+    expect(tester.takeException(), isNull);
+  });
+
+  const ticket = MemoryTicket(
+    ticketId: 't1',
+    concertId: 'c1',
+    backgroundPath: '/none/t1.png',
+    personCompositePath: null,
+    effectType: '효과 없음',
+    videoId: 'v',
+    videoUrl: '',
+    details: {'공연명': '빛으로 남은 밤'},
+    depthLayers: [],
+    demoDepth: true,
+  );
+
+  testWidgets('필터를 오가도 보던 쪽을 다시 만들지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: timoTheme(),
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: CollectionView(
+            slots: slots,
+            tickets: const [ticket],
+            onCreate: () {},
+            onCreateFor: (_) {},
+            onOpen: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final orgel = tester.state(find.byType(TicketOrgel));
+
+    // "모두 보기" 로 가면 오르골은 화면에서 빠지지만 트리에는 남는다 —
+    // 돌려놓은 각도를 들고 있는 것이 저 State 다.
+    await tester.tap(find.text(CollectionText.filterAll));
+    await tester.pumpAndSettle();
+    expect(find.byType(CatalogGrid), findsOneWidget);
+    expect(find.byType(TicketOrgel), findsNothing);
+    expect(find.byType(TicketOrgel, skipOffstage: false), findsOneWidget);
+
+    // 돌아오면 그 State 그대로다. 격자도 버리지 않아 스크롤 위치가 남는다.
+    await tester.tap(find.text(CollectionText.filterMine));
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(TicketOrgel)), same(orgel));
+    expect(find.byType(CatalogGrid), findsNothing);
+    expect(find.byType(CatalogGrid, skipOffstage: false), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
