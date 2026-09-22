@@ -264,6 +264,25 @@ resource "aws_cloudwatch_dashboard" "operations" {
             ["AWS/RDS", "WriteIOPS", "DBInstanceIdentifier", module.rds.identifier, { label = "Write IOPS" }]
           ]
         }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Redis - engine CPU, connections, and free memory"
+          region = var.aws_region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 60
+          metrics = [
+            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", "${module.redis.replication_group_id}-001", { label = "Engine CPU (%)" }],
+            ["AWS/ElastiCache", "CurrConnections", "CacheClusterId", "${module.redis.replication_group_id}-001", { label = "Connections" }],
+            ["AWS/ElastiCache", "FreeableMemory", "CacheClusterId", "${module.redis.replication_group_id}-001", { label = "Free memory (bytes)" }]
+          ]
+        }
       }
     ]
   })

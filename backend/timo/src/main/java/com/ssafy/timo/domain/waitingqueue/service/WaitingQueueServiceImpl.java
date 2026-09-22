@@ -47,7 +47,20 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     private static final String LEAVE_SCRIPT = """
             redis.call('ZREM', KEYS[1], ARGV[1])
             redis.call('ZREM', KEYS[2], ARGV[1])
-            redis.call('DEL', KEYS[3])
+            redis.call('DEL', KEYS[3] .. ARGV[1])
+            redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])
+            local active = redis.call('ZCARD', KEYS[1])
+            if active >= tonumber(ARGV[3]) then
+                return 0
+            end
+            local next = redis.call('ZRANGE', KEYS[2], 0, 0)
+            if not next[1] then
+                return 0
+            end
+            local admissionExpiresAt = tonumber(ARGV[2]) + tonumber(ARGV[4])
+            redis.call('ZREM', KEYS[2], next[1])
+            redis.call('ZADD', KEYS[1], admissionExpiresAt, next[1])
+            redis.call('SET', KEYS[3] .. next[1], ARGV[5], 'PX', ARGV[4])
             return 1
             """;
     private static final DefaultRedisScript<String> JOIN_OR_STATUS = new DefaultRedisScript<>(JOIN_OR_STATUS_SCRIPT, String.class);
@@ -73,7 +86,14 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
 
     @Override
     public void leave(Long concertId, Long memberId) {
-        redis.execute(LEAVE, List.of(activeKey(concertId), waitingKey(concertId), tokenKey(concertId, memberId)), member(memberId));
+        redis.execute(
+                LEAVE,
+                List.of(activeKey(concertId), waitingKey(concertId), tokenKeyPrefix(concertId)),
+                member(memberId),
+                Long.toString(System.currentTimeMillis()),
+                Long.toString(activeLimit),
+                Long.toString(admissionTtl.toMillis()),
+                token());
     }
 
     private WaitingQueueResponseDto executeJoinOrStatus(Long concertId, Long memberId, String command) {
@@ -95,6 +115,7 @@ public class WaitingQueueServiceImpl implements WaitingQueueService {
     private String waitingKey(Long id) { return "waiting-queue:" + id + ":waiting"; }
     private String activeKey(Long id) { return "waiting-queue:" + id + ":active"; }
     private String sequenceKey(Long id) { return "waiting-queue:" + id + ":sequence"; }
-    private String tokenKey(Long concertId, Long memberId) { return "waiting-queue:" + concertId + ":token:" + memberId; }
+    private String tokenKey(Long concertId, Long memberId) { return tokenKeyPrefix(concertId) + memberId; }
+    private String tokenKeyPrefix(Long concertId) { return "waiting-queue:" + concertId + ":token:"; }
     private String member(Long memberId) { return memberId.toString(); }
 }

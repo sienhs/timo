@@ -108,6 +108,9 @@ if (action === 'prepare') {
     ['app_credits', 'AWS/EC2', 'CPUCreditBalance', 'InstanceId', config.app_id],
     ['db_cpu', 'AWS/RDS', 'CPUUtilization', 'DBInstanceIdentifier', config.db_id],
     ['db_connections', 'AWS/RDS', 'DatabaseConnections', 'DBInstanceIdentifier', config.db_id],
+    ['redis_engine_cpu', 'AWS/ElastiCache', 'EngineCPUUtilization', 'CacheClusterId', config.redis_cluster_id],
+    ['redis_connections', 'AWS/ElastiCache', 'CurrConnections', 'CacheClusterId', config.redis_cluster_id],
+    ['redis_freeable_memory', 'AWS/ElastiCache', 'FreeableMemory', 'CacheClusterId', config.redis_cluster_id],
   ]) {
     try { monitoring[label] = aws('cloudwatch', 'get-metric-statistics', '--namespace', namespace, '--metric-name', metric, '--dimensions', `Name=${dimension},Value=${id}`, '--start-time', started, '--end-time', new Date().toISOString(), '--period', '60', '--statistics', 'Maximum', 'Minimum'); }
     catch { monitoring[label] = { error: 'Metric unavailable; check CloudWatch manually' }; }
@@ -121,8 +124,15 @@ if (action === 'prepare') {
     .map(([name, count]) => `- ${name}: ${count}건`)
     .join('\n') || '- 없음';
   const report = `# 부하테스트 ${stamp}\n\n- 환경: t3.medium / ${config.db_class} / MySQL ${config.db_engine} / ${config.cpu_credits}\n- 이미지: \`${config.image}\`\n- 발생기: 로컬 PC / ${generator.cpu} / ${generator.memoryGiB} GiB / ${generator.k6}\n- 측정 경로: 로컬 인터넷 → 앱 public IP (네트워크 지연 포함)\n- 조건: ${users}명, ${duration}, 회차별 2초 대기, 계정·좌석 2,000개\n- 범위: 공연 → 구역 → 좌석 → 선점 → 해제 (로그인·결제 제외)\n\n| 성공률 | 흐름 p95 | 선점 p95 | 완료 flows/s | SLO 판정 |\n|---:|---:|---:|---:|---|\n| ${((value('flow_success','rate') || 0)*100).toFixed(2)}% | ${value('flow_ms','p(95)')?.toFixed(1) ?? '-'} ms | ${value('hold_ms','p(95)')?.toFixed(1) ?? '-'} ms | ${value('completed_flows','rate')?.toFixed(2) ?? '0'} | ${failed ? '실패' : '통과'} |\n\n## 실패 HTTP 상태\n\n${failedStatuses}\n\n- 원본 상태 집계: \`http-status.json\`\n- 앱 로그·메모리: \`app-log-tail.txt\`\n- 병목/자원 확인: 미기록 (cloudwatch.json, 앱 메모리, 발생기 포화 확인 후 작성)\n- 최종 판단: 미확정 (워밍업·발생기 포화 구간 제외, 30분 유지 통과 시 확정)\n`;
-  fs.writeFileSync(path.join(dir, 'report.md'), report);
-  console.log(report);
+  const queueDiagnostics = '\n\n## 대기열 승격\n\n'
+    + '- 입장 대기 p95: ' + (value('queue_admission_ms', 'p(95)')?.toFixed(1) ?? '-') + ' ms\n'
+    + '- 폴링 횟수: ' + (value('queue_poll_attempts', 'count') ?? 0) + '\n'
+    + '- 입장 응답: ' + (value('queue_admitted_responses', 'count') ?? 0) + '\n'
+    + '- 대기 응답: ' + (value('queue_waiting_responses', 'count') ?? 0) + '\n'
+    + '- 폴링 시간 초과: ' + (value('queue_admission_timeouts', 'count') ?? 0) + '\n'
+    + '- Redis 자원 지표: cloudwatch.json\n';
+  fs.writeFileSync(path.join(dir, 'report.md'), report + queueDiagnostics);
+  console.log(report + queueDiagnostics);
   if (failed) process.exitCode = 2;
 } else {
   throw new Error('Usage: node loadtest/run.mjs prepare | run USERS DURATION');
