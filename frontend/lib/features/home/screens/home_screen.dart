@@ -230,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
           future: _ticketOpenSoon,
           onRetry: _reloadTicketOpenSoon,
           select: _unopened,
-          badgeBuilder: (show, _) {
+          badgeBuilder: (show) {
             final openAt = show.ticketOpenAt;
             return openAt == null ? null : TicketOpenBadge(openAt: openAt);
           },
@@ -246,10 +246,10 @@ class _HomeScreenState extends State<HomeScreen> {
           future: _popular,
           onRetry: _reloadPopular,
           select: _bookable,
-          // 목록 순서가 순위다. 1위부터 세므로 인덱스에 1을 더한다. 거르고 난
-          // 뒤의 자리로 센다 — 끝난 공연을 빼 놓고 2위부터 시작하면 1위가
-          // 어디 갔는지 알 수 없다.
-          badgeBuilder: (_, index) => RankBadge(rank: index + 1),
+          // 순위 뱃지를 달지 않는다. 순위는 섹션 제목과 왼쪽부터의 차례로 이미
+          // 드러나지만, 이 줄에는 오픈 전 공연과 마감된 공연이 섞여 들어와도
+          // 카드만 보고는 구분할 수 없다. 자리를 그쪽에 준다.
+          badgeBuilder: (show) => BookingStatusBadge(show: show),
         ),
       ],
     );
