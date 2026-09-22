@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/network/server_errors.dart';
+import 'package:timo/core/widgets/timo_mascot.dart';
 import 'package:timo/features/booking/models/performance.dart';
 import 'package:timo/features/booking/models/seat.dart';
 import 'package:timo/features/booking/models/seat_hold.dart';
@@ -14,6 +15,7 @@ import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/features/payment/constants.dart';
 import 'package:timo/features/payment/screens/payment_complete_screen.dart';
 import 'package:timo/features/payment/screens/payment_screen.dart';
+import 'package:timo/features/payment/widgets/ticket_issuing_view.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/entry_pass.dart';
 import 'package:timo/features/ticket/models/my_ticket.dart';
@@ -40,6 +42,10 @@ class _FakeTicketApi implements TicketApi {
   /// 주문 상세를 몇 번 물었는가.
   int polls = 0;
 
+  /// 주문 상세 응답이 늦는 정도. 되묻는 주기보다 길게 주면 중간 주기들이
+  /// 그냥 넘어가는 상황(요청이 아직 나가 있는 상태)을 만든다.
+  Duration latency = Duration.zero;
+
   @override
   Future<ReservationDetail> createReservation({
     required int concertId,
@@ -53,6 +59,7 @@ class _FakeTicketApi implements TicketApi {
   @override
   Future<ReservationDetail> fetchReservation(int reservationId) async {
     final index = polls++;
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
     if (pollResponses.isEmpty) return detail();
     final response =
         pollResponses[index < pollResponses.length
@@ -416,15 +423,28 @@ void main() {
     testWidgets('발행이 끝나면 배지가 완료로 바뀌고 더 묻지 않는다', (tester) async {
       api.pollResponses.addAll([issuing, issued]);
       await pumpComplete(tester, reservationId: 7);
-      expect(find.text(PaymentConstants.issuingBadgeLabel), findsOneWidget);
+      // 기다리는 동안에는 연출만 돈다. 예약 정보도 버튼도 아직 없다.
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsOneWidget);
+      expect(find.text(PaymentConstants.seatLabel), findsNothing);
+      expect(find.text(PaymentConstants.viewTicketLabel), findsNothing);
+      expect(find.text(PaymentConstants.goHomeLabel), findsNothing);
 
       await tester.pump(const Duration(seconds: 1));
       expect(api.polls, 1);
-      expect(find.text(PaymentConstants.issuingBadgeLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text(PaymentConstants.issuedBadgeLabel), findsOneWidget);
+      // 끝난 상태는 배지가 아니라 마스코트가 알린다.
+      expect(find.text(PaymentConstants.issuedBadgeLabel), findsNothing);
+      expect(find.byType(TimoMascot), findsOneWidget);
       expect(find.text(PaymentConstants.issuedDescription), findsOneWidget);
+      // 발행이 잘 끝났으면 결제가 끝났다는 제목이 그대로 유효하다.
+      expect(find.text(PaymentConstants.completeTitle), findsOneWidget);
+      // 돈이 나간 것이 맞으므로 카드도 '결제 금액' 그대로다.
+      expect(find.text(PaymentConstants.paidAmountLabel), findsOneWidget);
+      // 티켓이 생겨야 보러 갈 곳이 생긴다. 그때 버튼이 올라온다.
+      expect(find.text(PaymentConstants.viewTicketLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.goHomeLabel), findsOneWidget);
 
       // 끝난 뒤에는 서버를 더 두드리지 않는다.
       await tester.pump(const Duration(seconds: 3));
@@ -437,11 +457,22 @@ void main() {
 
       await tester.pump(const Duration(seconds: 1));
 
-      expect(find.text(PaymentConstants.issueFailedBadgeLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.issueFailedBadgeLabel), findsNothing);
+      expect(find.byType(TimoMascot), findsOneWidget);
       expect(
         find.text(PaymentConstants.issueFailedDescription),
         findsOneWidget,
       );
+      // 제목까지 바꾼다. '결제가 완료됐어요' 가 남으면 환불 안내와 부딪힌다.
+      expect(find.text(PaymentConstants.issueFailedTitle), findsOneWidget);
+      expect(find.text(PaymentConstants.completeTitle), findsNothing);
+      // 카드 마지막 줄도 바뀐다. '결제 금액' 이 남으면 바로 위 환불 안내와
+      // 정반대로 읽힌다.
+      expect(find.text(PaymentConstants.refundAmountLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.paidAmountLabel), findsNothing);
+      // 발행이 엎어져 티켓이 없다. 보러 가라고 하면 빈 목록으로 보내는 셈이다.
+      expect(find.text(PaymentConstants.viewTicketLabel), findsNothing);
+      expect(find.text(PaymentConstants.goHomeLabel), findsOneWidget);
     });
 
     // 인터넷이 잠깐 끊긴 것을 발행 실패로 그리면 거짓말이다. 서버에서는 발행이
@@ -451,30 +482,94 @@ void main() {
       await pumpComplete(tester, reservationId: 7);
 
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text(PaymentConstants.issuingBadgeLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsOneWidget);
       expect(find.text(PaymentConstants.issueFailedBadgeLabel), findsNothing);
 
       await tester.pump(const Duration(seconds: 1));
-      expect(find.text(PaymentConstants.issuedBadgeLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.issuedDescription), findsOneWidget);
     });
 
-    testWidgets('시간이 다 되면 그만 묻고 발행 중으로 남긴다', (tester) async {
+    // 여기서도 연출만 계속 돌리면 누를 것도 나갈 곳도 없는 화면에 갇힌다.
+    testWidgets('시간이 다 되면 그만 묻고 연출을 걷어 나갈 길을 낸다', (tester) async {
       api.pollResponses.add(issuing);
       await pumpComplete(tester, reservationId: 7);
 
       await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
 
       expect(api.polls, 3);
-      expect(find.text(PaymentConstants.issuingBadgeLabel), findsOneWidget);
+
+      // 실패가 아니다. 연출은 그대로 두고 제목과 문구만 바꾼다 — 결과 화면으로
+      // 넘기면 발행이 끝난 것처럼 읽힌다. 끝나지 않았으니 마스코트도 없다.
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsNothing);
+      expect(find.text(PaymentConstants.issueDelayedTitle), findsOneWidget);
+      expect(
+        find.text(PaymentConstants.issueDelayedDescription),
+        findsOneWidget,
+      );
+      expect(find.byType(TimoMascot), findsNothing);
+      // 대신 여기서는 나갈 길을 낸다.
+      expect(find.text(PaymentConstants.goHomeLabel), findsOneWidget);
+      expect(find.text(PaymentConstants.viewTicketLabel), findsOneWidget);
     });
 
-    // 예매 흐름 밖에서 열린 완료 화면이다. 서버에 만든 주문이 없으니 물을 것도 없다.
-    testWidgets('예매 번호가 없으면 묻지 않는다', (tester) async {
+    // 물어본 횟수로 시간을 세면, 응답이 느려 주기를 거를 때마다 나갈 길이
+    // 열리는 시점이 뒤로 밀린다. 그 시간 내내 연출에는 누를 것이 없다.
+    testWidgets('응답이 느려 주기를 걸러도 제시간에 나갈 길이 열린다', (tester) async {
+      // 주기(1초)보다 오래 걸리는 응답이라 중간 주기들은 그냥 넘어간다.
+      api.latency = const Duration(seconds: 2);
+      api.pollResponses.add(issuing);
+      await pumpComplete(tester, reservationId: 7);
+
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 1));
+
+      // 물어본 횟수는 주기 수보다 적지만, 3초가 지났으니 화면은 열려 있다.
+      expect(api.polls, lessThan(3));
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsNothing);
+      expect(find.text(PaymentConstants.issueDelayedTitle), findsOneWidget);
+      expect(find.text(PaymentConstants.goHomeLabel), findsOneWidget);
+    });
+
+    // 클립 높이는 고정인데 글자만 커지면 화면이 넘친다. 지연이면 아래에 버튼
+    // 까지 서서 더 빠듯하다. 넘치면 렌더 오류가 나므로 이 테스트가 잡는다.
+    for (final delayed in [false, true]) {
+      testWidgets('글자를 두 배로 키운 작은 화면에서도 연출이 안 깨진다 (지연=$delayed)', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(360, 640));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: Column(
+                  children: [
+                    Expanded(child: TicketIssuingView(delayed: delayed)),
+                    if (delayed) const SizedBox(height: 100),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    // 예매 흐름 밖에서 열린 완료 화면이다. 서버에 만든 주문이 없으니 물을 것도
+    // 없고, 기다려도 상태가 바뀌지 않으니 연출에 가두지 않는다.
+    testWidgets('예매 번호가 없으면 묻지 않고 연출도 돌리지 않는다', (tester) async {
       await pumpComplete(tester);
 
       await tester.pump(const Duration(seconds: 3));
 
       expect(api.polls, 0);
+      expect(find.text(PaymentConstants.issuingCeremonyTitle), findsNothing);
       expect(find.text(PaymentConstants.issuingBadgeLabel), findsOneWidget);
     });
   });

@@ -71,3 +71,33 @@ ffmpeg -i <원본>.mp4 \
 - 화면(마켓)의 배경은 `#F4F5F6` 라 이 클립을 그대로 올리면 흰 사각형이 떠
   보인다. 그래서 연출이 도는 동안에는 **화면을 흰 바탕으로 바꾼다**
   ([ListingPurchaseScreen] 의 `_purchasing` 갈래).
+
+## issuing.mp4
+
+티켓 발행 대기 연출([TicketIssuingView])에 쓰는 클립. 너구리가 티켓을 써서
+(0~3.4초) 다 쓴 티켓을 들어 내민다(3.4~8초).
+
+**앞 구간만 되풀이한다.** 서버가 잔액 차감과 발행 두 트랜잭션을 확정하기를
+기다리는 동안 재생되는데(최대 2분), 클립을 통째로 돌리면 아직 발행 중인데도
+완성된 티켓이 주기적으로 나타나 다 됐다고 말하는 꼴이 된다. 되감는 지점은
+`PaymentConstants.issuingClipLoopEnd` 다 — 클립을 갈아 끼우면 이 값도 다시
+잡는다. 카메라가 클립 내내 천천히 다가와서 되감길 때 크기가 한 번 튀는데,
+`creating.mp4` 와 같은 정도라 그대로 둔다.
+
+원본 배경은 `#E7E7E7`~`#E9E9E9` 의 스튜디오 회색이고 모든 프레임에서 균일하다.
+`transferring.mp4` 와 같은 방식으로 **배경을 흰색까지 눌러서** 넣는다.
+
+```bash
+ffmpeg -i <원본>.mp4 \
+  -vf "colorlevels=rimax=0.89:gimax=0.89:bimax=0.89" \
+  -an -c:v libx264 -crf 23 -preset slow -pix_fmt yuv420p -movflags +faststart \
+  issuing.mp4
+```
+
+- `0.89` 로 네 가장자리가 전부 흰색(제한 범위 Y=235)에 닿는다. 확인은
+  `ffmpeg -i issuing.mp4 -vf "crop=1280:6:0:0,signalstats,metadata=print:key=lavfi.signalstats.YMIN:file=-" -f null -`
+  로 가장자리 띠의 최솟값을 프레임마다 찍어 본다. 아래쪽 띠는 너구리 발과
+  그림자가 닿아 있어 어두운 값이 나오는 것이 정상이다.
+- 화면(완료 화면)의 배경은 `#F4F5F6` 라 이 클립을 그대로 올리면 흰 사각형이
+  떠 보인다. 그래서 연출이 도는 동안에는 **화면을 흰 바탕으로 바꾼다**
+  ([PaymentCompleteScreen] 의 `_waiting` 갈래).

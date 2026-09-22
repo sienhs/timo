@@ -61,20 +61,74 @@ class PaymentConstants {
   /// 시간이 걸려, 너무 일찍 그만두면 실패를 못 보여 준다.
   static const issuePollTimeout = Duration(minutes: 2);
 
+  /// 발행 연출 클립(`assets/videos/issuing.mp4`)의 비율. 자산이 1280x720 이다.
+  static const issuingClipAspectRatio = 16 / 9;
+
+  /// 클립에서 티켓을 **쓰는** 구간이 끝나는 지점. 여기까지만 되풀이한다.
+  ///
+  /// 이 뒤로는 너구리가 다 쓴 티켓을 들어 내미는 장면이라, 발행이 아직인데
+  /// 틀면 다 됐다고 말하는 꼴이 된다. 클립을 갈아 끼우면 이 값도 다시 잡는다.
+  static const issuingClipLoopEnd = Duration(seconds: 3, milliseconds: 400);
+
   static const completeTitle = '결제가 완료됐어요';
+
+  /// 발행이 엎어졌을 때의 제목.
+  ///
+  /// 이 자리에 '결제가 완료됐어요' 를 그대로 두면 바로 아래 환불 안내와 부딪힌다
+  /// — 결제는 됐는데 돈은 돌려준다는 말이 된다. 실제로 남는 것이 없으므로
+  /// 무엇이 안 됐는지를 제목이 말한다.
+  static const issueFailedTitle = '티켓을 발행하지 못했어요';
+
+  /// 발행을 기다리는 동안 띄우는 연출의 문구.
+  ///
+  /// 완료 화면의 제목('결제가 완료됐어요')과 다른 말을 쓴다. 결제는 이미 끝났고
+  /// 이 화면이 기다리는 것은 발행이라, 무엇을 기다리는지가 제목에 있어야 한다.
+  static const issuingCeremonyTitle = '티켓을 발행하고 있어요';
+  static const issuingCeremonySemantics = '티켓을 발행하고 있어요. 잠시만 기다려 주세요.';
+
+  /// 기다림이 길어졌을 때 연출의 안내를 바꾸는 시점.
+  ///
+  /// 진행률을 지어내지 않는다. 서버는 어디까지 갔는지 알려 주지 않으므로
+  /// 차오르는 막대를 그리면 거짓말이 된다. 시간이 꽤 흘렀다는 **사실만**
+  /// 말해서, 멈춘 화면이 아니라는 것을 알린다.
+  static const issuingHintDelay = Duration(seconds: 40);
+  static const issuingDescriptionLong = '조금만 더 기다려 주세요.\n거의 다 왔어요.';
+
+  /// 연출의 진행 바 폭. 화면 끝까지 늘이지 않는 이유는 눈이 가는 곳 때문이다 —
+  /// 클립과 문구가 가운데 모여 있는데 막대만 양끝까지 뻗으면 따로 논다.
+  static const issuingProgressWidth = 180.0;
+  static const issuingProgressHeight = 6.0;
 
   // 발행 진행 상태 배지와 그 아래 안내. 시안에는 '발행 중' 하나만 있다. 완료와
   // 실패는 같은 자리에 같은 모양으로, 색과 문구만 바꿔 보여 준다.
   static const issuingBadgeLabel = '티켓 발행 중';
   static const issuedBadgeLabel = '티켓 발행 완료';
   static const issueFailedBadgeLabel = '티켓 발행 실패';
+
+  /// 알림을 약속하지 않는다. 백엔드 `NotificationType` 에 발행 완료를 알리는
+  /// 종류가 없어서(입장 오픈 · 공연 오픈 · 관람 전날 · 새 매물 · 매물 판매)
+  /// '알림으로 알려드릴게요' 는 지키지 못할 말이다. 실제로 결과를 알려 주는
+  /// 것은 이 화면의 되묻기다.
   static const issuingDescription =
-      '티켓 발행에는 1~2분이 걸릴 수 있어요.\n완료되면 알림으로 알려드릴게요.';
+      '티켓 발행에는 1~2분이 걸릴 수 있어요.\n끝나면 이 화면에서 알려드릴게요.';
   static const issuedDescription = '티켓이 발행됐어요.\n내 티켓에서 바로 확인할 수 있어요.';
 
   /// 잔액 차감이나 발행이 실패한 경우다. 서버가 차감했던 금액을 되돌리고 주문을
   /// 취소한다. 실패 사유는 서버 내부 문구라 여기 찍지 않는다.
   static const issueFailedDescription = '티켓 발행에 실패했어요.\n결제된 금액은 자동으로 환불돼요.';
+
+  // [issuePollTimeout] 이 지나도 발행이 안 끝났을 때. 실패가 아니라 **지연**
+  // 이므로 실패 화면으로 넘기지 않는다. 연출은 그대로 두고(발행은 정말로
+  // 진행 중이다) 문구와 진행 바 색만 바꿔, 같은 화면이 아니라는 것을 알린다.
+  static const issueDelayedTitle = '발행이 조금 더 걸리고 있어요';
+  static const issueDelayedDescription =
+      '발행은 계속 진행 중이에요.\n내 티켓에서 이어서 확인할 수 있어요.';
+  static const issueDelayedSemantics =
+      '발행이 조금 더 걸리고 있어요. 내 티켓에서 이어서 확인할 수 있어요.';
+
+  /// 결과 화면 맨 위 마스코트의 크기. 원형 포스터(132)보다 조금 크게 잡는다 —
+  /// 마스코트는 모자와 꼬리까지 들어 있어 같은 값이면 얼굴이 더 작아 보인다.
+  static const resultMascotSize = 150.0;
 
   static const viewTicketLabel = '티켓 보러 가기';
   static const goHomeLabel = '홈으로';
@@ -86,6 +140,14 @@ class PaymentConstants {
   static const performedAtLabel = '일시';
   static const seatLabel = '좌석';
   static const paidAmountLabel = '결제 금액';
+
+  /// 발행이 엎어져 서버가 돈을 되돌리는 중일 때의 금액 라벨.
+  ///
+  /// 같은 자리에 '결제 금액' 을 두면 바로 위의 환불 안내와 정반대로 읽힌다 —
+  /// 돌려준다고 해 놓고 카드에서는 낸 돈을 세고 있는 꼴이다. 색도 함께 뺀다:
+  /// 코랄([PaymentColors.total])은 이 앱에서 **낸 돈**을 가리키는 색이라,
+  /// 라벨만 고치고 색을 두면 절반만 고친 것이 된다.
+  static const refundAmountLabel = '환불 예정 금액';
 
   /// 발표용 더미 주문. 서버 연동 시 이 상수를 지우고 응답으로 교체한다.
   static final sampleOrder = TicketOrder(
@@ -132,6 +194,12 @@ class PaymentColors {
   // 진하게 잡았다.
   static const issuingBadgeBackground = Color(0xFFFDF2D0);
   static const issuingBadgeForeground = Color(0xFFB07B12);
+
+  /// 지연된 연출의 진행 바 색. 발행 중 배지와 같은 앰버를 쓴다.
+  ///
+  /// 빨강을 쓰지 않는다 — 바로 옆 실패 화면과 같은 색이 되어 발행이 엎어진
+  /// 것으로 읽힌다. 이 상태는 실제로는 **아직 발행 중**이다.
+  static const delayedProgress = issuingBadgeForeground;
   static const issuedBadgeBackground = Color(0xFFDDF3E7);
   static const issuedBadgeForeground = Color(0xFF0F7A47);
   static const issueFailedBadgeBackground = Color(0xFFFCE4E1);
