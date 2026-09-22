@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/memory_concert.dart';
 import 'depth_service.dart';
+import 'image_download.dart';
 import 'person_layering.dart';
 import 'composition_service.dart';
 import 'segmentation_service.dart';
@@ -20,18 +21,26 @@ class CreationService {
   final layering = PersonLayering();
   static const _channel = MethodChannel('timo/image_pipeline');
 
+  /// 고른 사진을 앱 전용 폴더로 가져온다. 파이프라인은 이 경로만 읽는다.
+  ///
+  /// 출처가 셋이다 — 갤러리·카메라가 준 기기 파일(기본), 앱 에셋([asset]),
+  /// 서버 소재 주소([remote]). 어디서 왔든 결과는 같은 폴더의 파일 하나라
+  /// 그 뒤 단계는 출처를 모른다.
   Future<String> copyPhotoToPrivateStorage(
     String source, {
     bool asset = false,
+    bool remote = false,
   }) async {
     final root = await getApplicationDocumentsDirectory();
     final folder = Directory('${root.path}/photos');
     await folder.create(recursive: true);
-    final extension = source.split('.').last;
+    final extension = remote ? imageExtension(source) : source.split('.').last;
     final target = File(
       '${folder.path}/${DateTime.now().microsecondsSinceEpoch}.$extension',
     );
-    if (asset) {
+    if (remote) {
+      await downloadImage(source, target.path);
+    } else if (asset) {
       final data = await rootBundle.load(source);
       await target.writeAsBytes(
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),

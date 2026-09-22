@@ -11,6 +11,7 @@ import 'features/favorite/data/favorite_artist_store.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/memory/data/ticket_store.dart';
 import 'features/memory/data/tilt_setting.dart';
+import 'features/memory/data/viewer_guide_setting.dart';
 import 'features/notification/push_notification_service.dart';
 
 /// 백그라운드 수신은 Flutter 엔진이 이 진입점을 찾아 호출하므로 트리 셰이킹하면 안 된다.
@@ -54,7 +55,22 @@ Future<void> main() async {
     session,
     navigatorKey: navigatorKey,
   );
-  await pushNotificationService.start();
+  // 푸시 준비가 실패해도 앱은 켠다. FCM 토큰 발급은 네트워크가 없으면 예외를
+  // 던지는데(`FCM Registration failed`), 여기서 그대로 두면 runApp 에 닿지 못해
+  // 앱이 스플래시에서 멈춘다 — 오프라인으로 켠 사람이 소장품 하나 못 본다.
+  // 토큰은 나중에 갱신 스트림으로 들어오고, 등록은 그때 다시 시도한다.
+  try {
+    await pushNotificationService.start();
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'timo push',
+        context: ErrorDescription('푸시 알림을 준비하는 중'),
+      ),
+    );
+  }
 
   // 소장품(메모리 티켓) 저장소. 컬렉션 화면이 열리자마자 목록을 그려야 해서
   // 상자를 여기서 미리 연다. 여는 데 실패하면 소장품 기능만 빼고 앱은 켠다 —
@@ -87,6 +103,8 @@ Future<void> main() async {
       ticketStore: ticketStore,
       // 기울임 효과를 껐는지도 기기에 남는다. App 이 켜지면서 읽는다.
       tiltSettingStore: SharedPreferencesTiltSettingStore(),
+      // 소장품 조작법 안내를 봤는지도 기기에 남는다.
+      viewerGuideStore: SharedPreferencesViewerGuideStore(),
       // 로그아웃할 때 이 기기의 푸시 토큰을 서버에서 지우려면 화면이 이 서비스에
       // 닿아야 한다. 등록은 서비스가 세션을 구독해 알아서 하지만, 해제는 세션을
       // 비우기 전에 일어나야 해서 로그아웃하는 쪽이 직접 불러야 한다. 로딩 화면도

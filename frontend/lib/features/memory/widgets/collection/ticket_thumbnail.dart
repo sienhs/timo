@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/memory_ticket.dart';
 import '../../theme/timo_colors.dart';
+import '../ui/catalog_poster.dart';
 import '../ui/gradient_text.dart';
 import '../ui/local_image.dart';
 import '../../constants.dart';
@@ -77,17 +78,12 @@ class TicketThumbnail extends StatelessWidget {
           // 확정하지 않은 소장품은 눌러서 보여준다. 딱지만으로는 목록을 훑을
           // 때 눈에 안 들어오고, 흐리기만 하면 왜 흐린지 알 수 없다.
           if (!ticket.confirmed) ...[
-            const IgnorePointer(
-              child: ColoredBox(color: Color(0x73000000)),
-            ),
+            const IgnorePointer(child: ColoredBox(color: Color(0x73000000))),
             Positioned(
               top: 8,
               right: 8,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 7,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: TimoColors.gold,
                   borderRadius: BorderRadius.circular(999),
@@ -192,6 +188,18 @@ class TicketPlaceholder extends StatelessWidget {
     0, 0, 0, 1, 0,
   ]);
 
+  /// 서버 주소일 수도, 데모 에셋일 수도 있다. 못 읽거나 아예 없으면 바탕색만
+  /// 남아 예전 회색 칸과 같아진다.
+  Widget _poster() {
+    final image = catalogPosterImage(poster);
+    if (image == null) return const SizedBox.shrink();
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
@@ -205,16 +213,7 @@ class TicketPlaceholder extends StatelessWidget {
         children: [
           ColorFiltered(
             colorFilter: _greyscale,
-            child: Opacity(
-              opacity: 0.5,
-              child: Image.asset(
-                poster,
-                fit: BoxFit.cover,
-                // 서버가 주는 포스터는 주소라 여기서 열리지 않는다. 그때는
-                // 바탕색만 남아 예전 회색 칸과 같아진다.
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
+            child: Opacity(opacity: 0.5, child: _poster()),
           ),
           // 글자가 앉을 아래쪽을 밝게 덮어 대비를 만든다.
           const DecoratedBox(
@@ -272,4 +271,129 @@ class TicketPlaceholder extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// 서버에는 있는데 이 기기에는 없는 소장품 칸. 누르면 가져온다.
+///
+/// [TicketPlaceholder] 와 달리 색을 죽이지 않는다 — 만들지 않은 칸이 아니라
+/// **이미 만든** 칸이고, 다만 이 기기에 없을 뿐이다. 미리보기가 없으면 포스터를
+/// 대신 쓴다. 가져오는 중이면 아래 글자 대신 도는 표시가 앉는다.
+class RemoteTicketCard extends StatelessWidget {
+  const RemoteTicketCard({
+    super.key,
+    required this.poster,
+    required this.title,
+    this.previewUrl,
+    this.restoring = false,
+    this.radius = 16,
+  });
+  final String poster, title;
+  final String? previewUrl;
+  final bool restoring;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = catalogPosterImage(previewUrl ?? poster);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF15181F),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (image != null)
+              Image(
+                image: image,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x33000000), Color(0xCC000000)],
+                  stops: [0.3, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xCCFFFFFF),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  CollectionText.remoteLabel,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: TimoColors.ink,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  if (restoring)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.cloud_download_outlined,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 3),
+                        Text(
+                          CollectionText.restoreLabel,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

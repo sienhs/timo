@@ -28,16 +28,20 @@ import 'features/home/data/http_home_api.dart';
 import 'features/home/data/recent_search_store.dart';
 import 'features/home/state/home_api_scope.dart';
 import 'features/home/state/recent_search_scope.dart';
+import 'features/memory/data/goods_api.dart';
 import 'features/memory/data/memory_concert_api.dart';
 import 'features/memory/data/ticket_store.dart';
 import 'features/memory/data/tilt_setting.dart';
+import 'features/memory/data/viewer_guide_setting.dart';
 import 'features/memory/motion/ambient_motion.dart';
 import 'features/memory/motion/motion_tokens.dart';
 import 'features/memory/state/creation_job.dart';
 import 'features/memory/state/creation_job_scope.dart';
+import 'features/memory/state/goods_api_scope.dart';
 import 'features/memory/state/memory_concert_api_scope.dart';
 import 'features/memory/state/ticket_store_scope.dart';
 import 'features/memory/state/tilt_setting_scope.dart';
+import 'features/memory/state/viewer_guide_scope.dart';
 import 'features/memory/widgets/creation_notification_host.dart';
 import 'features/mypage/data/http_my_page_api.dart';
 import 'features/mypage/data/my_page_api.dart';
@@ -78,7 +82,9 @@ class App extends StatefulWidget {
     this.showApi,
     this.ticketStore,
     this.tiltSettingStore,
+    this.viewerGuideStore,
     this.memoryConcertApi,
+    this.goodsApi,
     this.resaleApi,
     this.push,
     this.navigatorKey,
@@ -138,9 +144,17 @@ class App extends StatefulWidget {
   /// 구현을 넘긴다. 안 넘기면(위젯 테스트) 앱을 끄면 사라진다.
   final TiltSettingStore? tiltSettingStore;
 
-  /// 소장품을 만들 수 있는 공연 카탈로그 API. 안 넘기면 목을 쓴다 — 아직
-  /// 백엔드에 이 주소가 없다([MemoryConcertApi] 주석).
+  /// 소장품 조작법 안내를 봤는지를 남길 기기 저장소. main 이 기기 설정 저장소
+  /// 구현을 넘긴다. 안 넘기면(위젯 테스트) 앱을 끄면 사라진다.
+  final ViewerGuideStore? viewerGuideStore;
+
+  /// 소장품을 만들 수 있는 공연 카탈로그 API. 안 넘기면 진짜 서버 구현을
+  /// 쓴다. 테스트는 목을 넣는다.
   final MemoryConcertApi? memoryConcertApi;
+
+  /// 소장품을 올리고 받아 오는 API. 안 넘기면 진짜 서버 구현을 쓴다. 테스트는
+  /// 목을 넣는다 — 위젯 테스트가 확정을 눌러도 서버로 나가지 않는다.
+  final GoodsApi? goodsApi;
 
   /// 양도마켓 화면이 쓰는 API. 안 넘기면 [_resaleApiKind] 가 고른다.
   final ResaleApi? resaleApi;
@@ -332,8 +346,16 @@ class _AppState extends State<App> {
     widget.tiltSettingStore ?? InMemoryTiltSettingStore(),
   );
 
+  /// 소장품 조작법 안내를 봤는가. 같은 이유로 앱에 하나만 두고
+  /// [ViewerGuideScope] 로 내려준다.
+  late final ViewerGuideSetting _viewerGuide = ViewerGuideSetting(
+    widget.viewerGuideStore ?? InMemoryViewerGuideStore(),
+  );
+
   late final MemoryConcertApi _memoryConcertApi =
-      widget.memoryConcertApi ?? MockMemoryConcertApi();
+      widget.memoryConcertApi ?? HttpMemoryConcertApi();
+
+  late final GoodsApi _goodsApi = widget.goodsApi ?? HttpGoodsApi();
 
   /// 양도마켓 화면이 쓰는 API. 다른 API 들과 같은 이유로 앱에 하나만 두고
   /// [ResaleApiScope] 로 내려준다.
@@ -379,6 +401,7 @@ class _AppState extends State<App> {
     // 기울임 설정도 같은 이유로 기다리지 않는다. 읽히기 전에 소장품을 열면
     // 기본값(켜짐)으로 잠깐 움직이다가 저장된 값으로 맞춰진다.
     _tiltSetting.restore().ignore();
+    _viewerGuide.restore().ignore();
 
     _session.addListener(_syncFavoriteShows);
     _syncFavoriteShows();
@@ -426,6 +449,7 @@ class _AppState extends State<App> {
     _bookingController.dispose();
     _creationJob.dispose();
     _tiltSetting.dispose();
+    _viewerGuide.dispose();
     // 저장소는 우리가 만든 것(테스트·실패 대비 기본값)만 정리한다. main 이
     // 넘긴 것은 앱과 수명이 같다. 세션을 다루는 방식과 같다.
     if (widget.ticketStore == null) _ticketStore.dispose();
@@ -460,41 +484,47 @@ class _AppState extends State<App> {
                         store: _ticketStore,
                         child: MemoryConcertApiScope(
                           api: _memoryConcertApi,
-                          child: TiltSettingScope(
-                            setting: _tiltSetting,
-                            child: ResaleApiScope(
-                              api: _resaleApi,
-                              child: CreationJobScope(
-                                job: _creationJob,
-                                child: FavoriteScope(
-                                  store: _favoriteStore,
-                                  child: NotificationApiScope(
-                                    api: _notificationApi,
-                                    child: PushNotificationScope(
-                                      push: _push,
-                                      child: MaterialApp(
-                                        title: 'TIMO',
-                                        theme: AppTheme.light,
-                                        navigatorKey: _navigatorKey,
-                                        // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
-                                        initialRoute: widget.initialRoute,
-                                        onGenerateInitialRoutes:
-                                            _generateInitialRoutes,
-                                        routes: AppRoutes.routes,
-                                        // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                                        // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                                        // 라우트가 아니라 앱 전체를 감싼다.
-                                        //
-                                        // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                                        // 애니메이션 채널도 같이 멈춘다.
-                                        builder: (context, child) {
-                                          AmbientMotion.instance.enabled =
-                                              !Motion.reduced(context);
-                                          return CreationNotificationHost(
+                          child: GoodsApiScope(
+                            api: _goodsApi,
+                            child: TiltSettingScope(
+                              setting: _tiltSetting,
+                              child: ViewerGuideScope(
+                                setting: _viewerGuide,
+                                child: ResaleApiScope(
+                                  api: _resaleApi,
+                                  child: CreationJobScope(
+                                    job: _creationJob,
+                                    child: FavoriteScope(
+                                      store: _favoriteStore,
+                                      child: NotificationApiScope(
+                                        api: _notificationApi,
+                                        child: PushNotificationScope(
+                                          push: _push,
+                                          child: MaterialApp(
+                                            title: 'TIMO',
+                                            theme: AppTheme.light,
                                             navigatorKey: _navigatorKey,
-                                            child: child!,
-                                          );
-                                        },
+                                            // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
+                                            initialRoute: widget.initialRoute,
+                                            onGenerateInitialRoutes:
+                                                _generateInitialRoutes,
+                                            routes: AppRoutes.routes,
+                                            // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                            // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                            // 라우트가 아니라 앱 전체를 감싼다.
+                                            //
+                                            // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                            // 애니메이션 채널도 같이 멈춘다.
+                                            builder: (context, child) {
+                                              AmbientMotion.instance.enabled =
+                                                  !Motion.reduced(context);
+                                              return CreationNotificationHost(
+                                                navigatorKey: _navigatorKey,
+                                                child: child!,
+                                              );
+                                            },
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),

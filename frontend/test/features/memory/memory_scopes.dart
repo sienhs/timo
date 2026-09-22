@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:timo/features/memory/data/goods_api.dart';
 import 'package:timo/features/memory/data/memory_concert_api.dart';
 import 'package:timo/features/memory/data/ticket_store.dart';
 import 'package:timo/features/memory/state/creation_job.dart';
 import 'package:timo/features/memory/state/creation_job_scope.dart';
+import 'package:timo/features/memory/state/goods_api_scope.dart';
 import 'package:timo/features/memory/state/memory_concert_api_scope.dart';
 import 'package:timo/features/memory/state/ticket_store_scope.dart';
 
@@ -15,15 +17,19 @@ Widget withMemoryScopes(
   Widget child, {
   TicketStore? store,
   MemoryConcertApi? concertApi,
+  GoodsApi? goodsApi,
 }) {
   final ticketStore = store ?? InMemoryTicketStore();
   return TicketStoreScope(
     store: ticketStore,
     child: MemoryConcertApiScope(
       api: concertApi ?? MockMemoryConcertApi(),
-      child: CreationJobScope(
-        job: CreationJob(store: ticketStore),
-        child: child,
+      child: GoodsApiScope(
+        api: goodsApi ?? MockGoodsApi(),
+        child: CreationJobScope(
+          job: CreationJob(store: ticketStore),
+          child: child,
+        ),
       ),
     ),
   );

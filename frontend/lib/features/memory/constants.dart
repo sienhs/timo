@@ -24,6 +24,20 @@ class CollectionText {
 
   /// 화면에는 없고 스크린리더만 읽는다 — 칸 제목 뒤에 붙는다.
   static const notOwnedLabel = '아직 만들지 않음';
+
+  /// "모두 보기" 가 비었을 때. 카탈로그는 입장을 마친 내 티켓이라, 아직 공연에
+  /// 다녀오지 않았으면 칸이 하나도 없다.
+  static const catalogEmptyTitle = '아직 입장한 공연이 없어요';
+  static const catalogEmptyBody = '공연에 입장하면 그 티켓이 여기에 쌓이고, 소장품을 만들 수 있어요.';
+
+  /// 서버에만 있는 칸. 누르면 이 기기로 가져온다.
+  static const restoreLabel = '가져오기';
+  static const remoteLabel = '다른 기기에서 만듦';
+
+  /// "내가 만든 소장품 보기" 위의 안내. 서버에 있는데 이 기기에 없는 것이
+  /// 있을 때만 뜬다.
+  static String pendingBanner(int count) => '다른 기기에서 만든 소장품 $count개가 있어요';
+  static const restoreAllLabel = '모두 가져오기';
   static const swipeHint = '좌우로 돌려 다른 소장품 보기';
 
   /// 로그인 전. 소장품은 내가 입장한 공연으로 만드는 것이라 누구인지 모르면
@@ -77,6 +91,68 @@ class CollectionLayout {
   static const personParallax = 22.0;
 }
 
+// ---- 카탈로그 -----------------------------------------------------------------
+class CatalogConstants {
+  /// 몰입 영상 자리를 채우는 앱 안의 데모 영상.
+  ///
+  /// 카탈로그 응답의 `videoUrl` 은 늘 null 이다 — 공연에 영상 컬럼이 없다
+  /// (백엔드 `CollectibleConcertResponseDto`). 컬럼이 생기면 서버 값이 그대로
+  /// 쓰이고 이 상수는 폴백으로만 남는다.
+  static const demoVideoAsset = 'assets/videos/official_demo.mp4';
+}
+
+/// 소장품을 서버에 올리고 되받아 올 때의 값들.
+class GoodsConstants {
+  /// 이미지 업로드·내려받기의 제한 시간. 공통 설정(연결 5초·수신 10초)은 JSON
+  /// 응답 기준이라 수 MB 짜리 이미지 여러 장에는 짧다 — 느린 회선에서 멀쩡한
+  /// 업로드가 중간에 끊긴다.
+  static const transferTimeout = Duration(minutes: 3);
+
+  /// 내 소장품 목록을 한 번에 받는 수. 서버 상한이 100 이고, 한 사람이 가진
+  /// 소장품은 입장을 마친 티켓 수를 넘지 못한다.
+  static const pageSize = 100;
+
+  /// 업로드 요청 하나에 담는 파일 크기의 합 상한(24MB).
+  ///
+  /// 서버는 요청 하나를 30MB 까지 받는다(`spring.servlet.multipart.max-request-size`).
+  /// multipart 경계·헤더와 base64 가 아닌 원 바이트라도 약간의 덧살이 붙으므로
+  /// 여유를 두고 자른다. 장당 한도(10MB)는 여기서 가리지 않는다 — 파일 하나를
+  /// 나눌 수는 없다.
+  static const uploadBatchBytes = 24 * 1024 * 1024;
+
+  /// 서버가 받는 인물 레이어 수 상한(백엔드 `GoodsJson.MAX_PERSON_LAYERS`).
+  /// 넘겨 보내면 400 이라 확정 전에 앱이 먼저 가린다.
+  static const maxPersonLayers = 2;
+}
+
+/// 소장품을 올리고 되받아 오는 동안 화면에 뜨는 문구.
+///
+/// 서버도 한국어 문구를 주지만 '굿즈' 라고 부르고 티켓 번호가 붙기도 한다
+/// (`이미 굿즈를 만든 티켓입니다. (ticketId=12)`). 앱이 아는 이유는 앱 말로
+/// 바꿔 보여주고, 모르는 이유만 서버 문구를 그대로 올린다.
+class GoodsText {
+  static const unreadableResponse = '소장품 정보를 읽지 못했어요.';
+
+  /// 확정 버튼이 서버를 기다리는 동안.
+  static const uploading = '올리는 중…';
+
+  static const alreadyExists = '이 티켓으로 만든 소장품이 이미 있어요.';
+  static const ticketNotOwned = '지금 내가 가진 티켓이 아니에요.';
+  static const ticketNotUsed = '입장을 마친 티켓으로만 소장품을 만들 수 있어요.';
+  static const imageDeleted = '올려 둔 사진이 지워졌어요. 다시 만든 뒤 확정해주세요.';
+  static const invalidLayers = '인물은 2명까지만 담을 수 있어요.';
+
+  /// 올리기 전에 앱이 먼저 가리는 것들.
+  static const missingBackground = '배경 사진을 찾을 수 없어 확정하지 못했어요.';
+
+  /// 서버에 있는 소장품을 이 기기로 가져올 때.
+  static const restoring = '소장품을 가져오는 중이에요';
+  static const restoreFailed = '소장품을 가져오지 못했어요. 다시 시도해주세요.';
+
+  /// 복원한 소장품의 처리 정보 첫 줄. 이 기기에서 만든 것과 구분된다.
+  static const restoredNote = '서버에 저장된 소장품을 이 기기로 가져왔어요';
+}
+
 // ---- 제작 --------------------------------------------------------------------
 class CreatorText {
   static const totalSteps = 6;
@@ -112,10 +188,14 @@ class CreatorText {
   static const noConcertsTitle = '만들 수 있는 공연이 없어요';
   static const noConcertsBody = '입장을 마친 공연으로 만들 수 있고, 한 공연에 하나씩만 만들어요.';
 
-  /// Photo tiles.
+  /// Photo tiles. 데모 소재는 앱에 든 것이고, 공연 소재는 서버가 그 공연에
+  /// 붙여 둔 것이다(`/concerts/{id}/kit`).
   static const stageLabel = '데모 무대';
   static const illustrationLabel = '데모 일러스트';
   static const analysisSampleLabel = '분석 테스트 사진';
+  static const kitStageLabel = '공연 무대';
+  static const kitPersonLabel = '공연 인물';
+  static const kitLoading = '공연 소재를 불러오는 중이에요';
   static const addPhotoLabel = '사진 추가';
 
   /// 사진 출처 시트. "+" 타일은 갤러리와 카메라 둘 중 하나를 고르게 한다.
@@ -158,6 +238,7 @@ class CreatorText {
 
   /// Errors.
   static const saveFailed = '소장품을 저장하지 못했어요. 다시 시도해주세요.';
+  static const kitFailed = '공연 소재를 불러오지 못했어요.';
   static const photoFailed = '사진 처리에 실패했어요. 다시 선택해주세요.';
   static const permissionFailed = '사진 접근 권한을 확인한 뒤 다시 선택해주세요.';
   static const cameraFailed = '카메라를 열 수 없어요. 카메라 권한을 확인한 뒤 다시 시도해주세요.';
@@ -238,6 +319,18 @@ class ViewerText {
   /// 기울임이 켜져 있을 때 버튼이 말하는 것 — 누르면 꺼진다.
   static const tiltOnTooltip = '기울임 효과 끄기';
   static const tiltOffTooltip = '기울임 효과 켜기';
+
+  /// 조작법 안내. 처음 열 때 한 번 뜨고, 앱바의 ? 로 다시 볼 수 있다.
+  static const guideTooltip = '조작법 보기';
+  static const guideTitle = '이렇게 감상해요';
+  static const guideSwipe = '좌우로 밀어 뒤집기';
+  static const guideSwipeBody = '카드를 옆으로 밀면 뒷면의 티켓 정보가 나와요';
+  static const guideHold = '길게 눌러 영상 보기';
+  static const guideHoldBody = '카드를 꾹 누르고 있으면 그날의 영상이 흘러요';
+  static const guideOk = '알겠어요';
+
+  /// 디버그 빌드에만 남는 개발용 버튼. 사용자가 볼 이유가 없는 처리 내역이다.
+  static const processingInfo = '처리 정보';
 }
 
 class ViewerConstants {
