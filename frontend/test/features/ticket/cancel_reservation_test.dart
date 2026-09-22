@@ -62,6 +62,18 @@ void main() {
       expect(find.text(TicketStrings.cancelReservation), findsOneWidget);
     });
 
+    // 시트는 여는 데 한 프레임이 걸려서, 그 사이 한 번 더 눌리면 두 장이
+    // 겹친다. pump 없이 이어 눌러 그 순간을 만든다.
+    testWidgets('빨리 두 번 눌러도 시트는 한 장만 열린다', (tester) async {
+      await pumpScreen(tester);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.cancelReservation), findsOneWidget);
+    });
+
     // 공연이 코앞이면 취소가 막힌다. 항목을 지우면 왜 못 하는지 알 길이 없다.
     testWidgets('24시간 이내 공연은 항목이 잠기고 이유가 붙는다', (tester) async {
       await pumpScreen(tester);

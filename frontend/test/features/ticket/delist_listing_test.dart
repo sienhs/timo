@@ -103,6 +103,25 @@ void main() {
       expect(find.text('${TicketStrings.tabListings} 0'), findsOneWidget);
     });
 
+    // 팝업도 여는 데 한 프레임이 걸린다. 두 장이 겹치면 확인을 두 번 받게 되고
+    // 취소 요청도 두 번 나간다.
+    testWidgets('빨리 두 번 눌러도 팝업은 한 장이고 요청도 한 번이다', (tester) async {
+      final api = SpyResaleApi(clock: now);
+      await pumpListings(tester, resaleApi: api);
+
+      await tester.tap(find.text(TicketStrings.delist));
+      await tester.tap(find.text(TicketStrings.delist));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
+
+      await tester.tap(find.text(TicketStrings.delistConfirmAgree));
+      await tester.pumpAndSettle();
+
+      expect(api.cancelled, [8]);
+      expect(find.byType(Dialog), findsNothing);
+    });
+
     // 화면이 미리 걸러도 시점 차이로 통과할 수 있다. 최종 판정은 서버 몫이다.
     testWidgets('서버가 거절하면 그 문구를 띄우고 목록은 그대로다', (tester) async {
       final api = SpyResaleApi(

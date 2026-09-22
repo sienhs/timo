@@ -211,6 +211,7 @@ void main() {
 
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(find.text(ShowDetailStrings.openAlarmOn), findsOneWidget);
       expect(find.text(ShowDetailStrings.unnotifyAction), findsOneWidget);
@@ -218,6 +219,7 @@ void main() {
 
       await tester.tap(find.text(ShowDetailStrings.unnotifyAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(find.text(ShowDetailStrings.openAlarmOff), findsOneWidget);
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
@@ -268,6 +270,7 @@ void main() {
 
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.shows, isEmpty);
       expect(favoriteApi.wishedIds, isEmpty);
@@ -279,6 +282,7 @@ void main() {
 
       await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
       // 하트는 화면부터 바꾸고 서버로는 조금 늦게 보낸다(연타 묶기).
 
       expect(favorites.favorites.hasShow(1), isTrue);
@@ -608,6 +612,7 @@ void main() {
 
       await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.hasShow(1), isTrue);
       expect(favoriteApi.wishedIds, [1]);
@@ -620,6 +625,7 @@ void main() {
 
       await tester.tap(find.byTooltip(ShowDetailStrings.unfavoriteAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.shows, isEmpty);
       expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
@@ -635,6 +641,7 @@ void main() {
 
       await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.shows, isEmpty);
       expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
@@ -646,6 +653,7 @@ void main() {
 
       await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
       await tester.pump();
+      await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.shows.single.isOnSale, isFalse);
     });

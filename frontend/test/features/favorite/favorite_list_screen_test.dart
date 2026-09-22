@@ -351,11 +351,16 @@ void main() {
   testWidgets('다른 곳에서 찜 목록이 바뀌면 화면도 따라 바뀐다', (tester) async {
     await pumpFavorites(tester, shows: [bigbang]);
 
-    await store.toggleShow(iu);
+    // 하트는 바로 반영되고 서버로는 조금 뒤에 나간다. 전송을 기다리려면 그
+    // 시각까지 직접 당겨 줘야 한다 — pumpAndSettle 은 프레임이 예약돼 있는
+    // 동안만 시간을 밀어서, 대기 중인 타이머는 건드리지 못한다.
+    final sent = store.toggleShow(iu);
+    await tester.pump(FavoriteLimits.toggleDebounce);
     await tester.pumpAndSettle();
 
     expect(cardTitles(tester), [iu.title, bigbang.title]);
     expect(find.text('${FavoriteStrings.showTab} 2'), findsOneWidget);
+    await sent;
   });
 
   /// 검색 칸을 누르면 키보드가 올라온다. 이때 화면을 줄이면 하단 바 위의 원형
