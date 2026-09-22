@@ -121,14 +121,17 @@ class FavoriteStrings {
   static const removed = '찜리스트에서 뺐어요';
   static const undo = '되돌리기';
 
-  /// 로그아웃 상태에서 공연 하트를 눌렀을 때. 아티스트 찜은 기기에 남으므로
-  /// 로그인 없이도 된다 — 이 안내는 공연에만 뜬다.
+  /// 로그아웃 상태에서 하트를 눌렀을 때. 아티스트 찜은 기기에 남지만 찜리스트는
+  /// 로그인해야 보이므로, 공연과 아티스트 모두 이 안내를 띄운다.
   static const loginRequired = '로그인하고 찜해 보세요';
   static const login = '로그인';
 
-  /// 찜리스트 공연 탭을 로그아웃 상태로 열었을 때.
+  /// 찜리스트를 로그아웃 상태로 열었을 때. 아티스트 찜은 기기에만 있어
+  /// 기기를 바꾸면 사라진다 — 공연과 안내 문구가 다른 이유다.
   static const guestShows = '로그인하면 찜한 공연이 보여요';
   static const guestShowsHint = '찜한 공연은 계정에 저장돼 기기를 바꿔도 남아요';
+  static const guestArtists = '로그인하면 찜한 아티스트가 보여요';
+  static const guestArtistsHint = '찜한 아티스트는 이 기기에 저장돼요';
 
   /// 서버에 남기지 못했을 때. 서버가 준 문구가 있으면 그쪽을 먼저 쓰고,
   /// 없을 때(예상 못 한 예외) 이 문구로 대신한다.

@@ -393,6 +393,48 @@ void main() {
       );
     });
 
+    testWidgets('로그아웃 상태에서 아티스트 하트를 누르면 로그인하라고 알린다', (tester) async {
+      // 아티스트 찜은 기기에 남지만 찜리스트는 로그인해야 보인다. 눌린 하트가
+      // 어디에도 나타나지 않으면 더 헷갈려 공연 하트와 같이 막는다.
+      await pumpSearch(tester, loggedIn: false);
+      await submit(tester, '아이유');
+
+      final heart = find
+          .descendant(
+            of: find.byType(RelatedArtistRow),
+            matching: find.byTooltip(HomeStrings.favorite),
+          )
+          .first;
+      await tester.ensureVisible(heart);
+      await tester.tap(heart);
+      await tester.pumpAndSettle();
+
+      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      expect(favorites.favorites.artists, isEmpty);
+      expect(
+        find.descendant(
+          of: find.byType(RelatedArtistRow),
+          matching: find.byTooltip(HomeStrings.unfavorite),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('로그아웃 상태면 기기에 남은 아티스트 찜도 빈 하트로 둔다', (tester) async {
+      await pumpSearch(tester, loggedIn: false);
+      await favorites.toggleArtist(const FavoriteArtist(name: '아이유'));
+
+      await submit(tester, '아이유');
+
+      expect(
+        find.descendant(
+          of: find.byType(RelatedArtistRow),
+          matching: find.byTooltip(HomeStrings.unfavorite),
+        ),
+        findsNothing,
+      );
+    });
+
     testWidgets('검색 결과가 오면 이미 찜한 아티스트의 사진이 최신으로 맞춰진다', (tester) async {
       await pumpSearch(tester, api: _PhotoArtistHomeApi());
       // 사진 없이 찜해 둔 아티스트. 사진 필드명이 어긋났던 동안 찜한 경우다.

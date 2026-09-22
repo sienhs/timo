@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
+import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
+import '../../auth/state/auth_session_scope.dart';
+import '../../favorite/constants.dart';
 import '../../favorite/state/favorite_scope.dart';
 import '../../favorite/utils/toggle_favorite_show.dart';
 import '../../shell/quick_menu_launcher.dart';
@@ -68,6 +71,9 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
 
   /// 더보기를 눌러 결과 카드를 전부 펼쳤는지. 새로 검색하면 다시 접힌다.
   bool _showAll = false;
+
+  bool get _isLoggedIn =>
+      AuthSessionScope.maybeOf(context)?.isLoggedIn ?? false;
 
   @override
   void initState() {
@@ -228,7 +234,14 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
   Future<void> _toggleFavoriteShow(ShowSummary show) =>
       toggleFavoriteShow(context, show.toFavorite());
 
+  /// 아티스트 찜은 기기에만 남지만 찜리스트는 로그인해야 보인다. 그래서 공연
+  /// 하트와 같이 로그아웃 상태면 찜하지 않고 안내한다 — 눌린 하트가 어디에도
+  /// 나타나지 않는 편이 더 헷갈린다.
   void _toggleFavoriteArtist(ArtistSummary artist) {
+    if (!_isLoggedIn) {
+      showInfoSnackBar(context, FavoriteStrings.loginRequired);
+      return;
+    }
     FavoriteScope.read(context).toggleArtist(artist.toFavorite());
   }
 
@@ -378,9 +391,14 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
                     const SizedBox(height: HomeMetrics.sectionTitleGap),
                     RelatedArtistRow(
                       artists: artists,
-                      favoriteNames: {
-                        for (final artist in favorites.artists) artist.name,
-                      },
+                      // 로그아웃이면 기기에 남은 찜이 있어도 빈 하트로 둔다.
+                      // 찜리스트에서 보이지 않는 것이 채워져 보이면 안 된다.
+                      favoriteNames: _isLoggedIn
+                          ? {
+                              for (final artist in favorites.artists)
+                                artist.name,
+                            }
+                          : const {},
                       onArtistPressed: (artist) => _search(artist.name),
                       onFavoritePressed: _toggleFavoriteArtist,
                     ),

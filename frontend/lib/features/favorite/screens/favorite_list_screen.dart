@@ -28,8 +28,11 @@ import '../widgets/favorite_summary_row.dart';
 ///
 /// 공연 탭과 아티스트 탭 둘인데 목록이 사는 곳이 다르다. **공연은 서버**라
 /// 화면에 들어올 때 받아 오고(기다림·실패는 [AsyncBoundary] 가 맡는다),
-/// 로그아웃 상태면 받을 것이 없어 로그인 안내를 대신 그린다. **아티스트는
-/// 기기**에 있어 기다리는 상태가 없다.
+/// **아티스트는 기기**에 있어 기다리는 상태가 없다.
+///
+/// 사는 곳과 무관하게 **두 탭 모두 로그인해야 보인다**. 아티스트 찜은 기기에
+/// 있어 로그아웃 상태로도 그릴 수는 있지만, 한 화면의 두 탭이 로그인 여부에
+/// 다르게 굴면 왜 한쪽만 비는지 알기 어렵다. 로그아웃이면 탭 카운트도 0 이다.
 ///
 /// 받아 온 목록은 [FavoriteScope] 에서 읽는다. 다른 화면에서 하트를 누르면
 /// 스코프가 알려 이 화면도 따라 바뀐다.
@@ -211,9 +214,32 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     );
   }
 
+  /// 아티스트 탭. 로그아웃이면 공연 탭과 같은 자리에 로그인 안내를 그린다.
+  Widget _artistTabBody(List<FavoriteArtist> artists) {
+    if (!_isLoggedIn) {
+      return FavoriteEmptyView(
+        title: FavoriteStrings.guestArtists,
+        hint: FavoriteStrings.guestArtistsHint,
+        actionLabel: FavoriteStrings.login,
+        onActionPressed: _goToLogin,
+      );
+    }
+
+    return _ArtistTab(
+      artists: artists,
+      keyword: _search.text,
+      sort: _artistSort,
+      onSortSelected: (sort) => setState(() => _artistSort = sort),
+      onArtistPressed: _searchArtist,
+      onUnfavoritePressed: _removeArtist,
+      onBrowsePressed: _browseShows,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final favorites = FavoriteScope.of(context).favorites;
+    final isLoggedIn = _isLoggedIn;
     final isShowTab = _tab == _showTab;
 
     return Scaffold(
@@ -234,7 +260,12 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
         children: [
           UnderlineTabBar(
             labels: const [FavoriteStrings.showTab, FavoriteStrings.artistTab],
-            counts: [favorites.shows.length, favorites.artists.length],
+            counts: [
+              favorites.shows.length,
+              // 로그아웃이면 기기에 남은 아티스트 찜이 있어도 세지 않는다.
+              // 안 보이는 목록의 개수가 탭에 떠 있으면 안 된다.
+              isLoggedIn ? favorites.artists.length : 0,
+            ],
             selectedIndex: _tab,
             onSelected: _selectTab,
           ),
@@ -254,16 +285,7 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
           Expanded(
             child: isShowTab
                 ? _showTabBody(favorites.shows)
-                : _ArtistTab(
-                    artists: favorites.artists,
-                    keyword: _search.text,
-                    sort: _artistSort,
-                    onSortSelected: (sort) =>
-                        setState(() => _artistSort = sort),
-                    onArtistPressed: _searchArtist,
-                    onUnfavoritePressed: _removeArtist,
-                    onBrowsePressed: _browseShows,
-                  ),
+                : _artistTabBody(favorites.artists),
           ),
         ],
       ),

@@ -249,13 +249,17 @@ void main() {
       expect(find.byType(FavoriteShowCard), findsNothing);
     });
 
-    testWidgets('로그아웃이어도 아티스트 탭은 그대로다', (tester) async {
-      // 아티스트 찜은 기기에 있다.
+    testWidgets('로그아웃 상태면 아티스트 탭에도 로그인 안내가 뜬다', (tester) async {
+      // 아티스트 찜은 기기에 있어 그릴 수는 있지만, 공연 탭과 같이 로그인해야
+      // 보인다. 탭 카운트도 기기에 둘이 있어도 0 이다.
       await pumpFavorites(tester, artists: seededArtists, loggedIn: false);
 
-      await openArtistTab(tester);
+      await tester.tap(find.text('${FavoriteStrings.artistTab} 0'));
+      await tester.pumpAndSettle();
 
-      expect(tileNames(tester), [iuArtist.name, bigbangArtist.name]);
+      expect(find.text(FavoriteStrings.guestArtists), findsOneWidget);
+      expect(find.text(FavoriteStrings.login), findsOneWidget);
+      expect(find.byType(FavoriteArtistTile), findsNothing);
     });
 
     testWidgets('목록을 못 받으면 다시 시도가 뜨고, 눌러 되살린다', (tester) async {
