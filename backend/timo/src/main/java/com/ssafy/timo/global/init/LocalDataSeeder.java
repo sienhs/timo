@@ -66,9 +66,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -76,9 +77,8 @@ import java.util.stream.Collectors;
  *
  * <p>시드 값은 이 클래스가 직접 들고 있다. 같은 데모 데이터를 v0 스텁도 갖고 있지만
  * ({@code com.ssafy.timo.stub.StubFixtures}) 거기서 가져오지 않는다. 스텁은 v1 이 갖춰지면 지울
- * 임시 코드라, 지우는 순간 이 시더가 함께 깨진다. 공연이 이 4건인 것은 스텁 때문이 아니라
- * {@code src/main/resources/static} 에 있는 포스터·프로필 이미지와 {@code db/seed-local.sql} 이
- * 넣는 아티스트가 그 4명이기 때문이다.
+ * 임시 코드라, 지우는 순간 이 시더가 함께 깨진다. 공연이 이 4건인 것은 스텁 때문이 아니라 가진
+ * 포스터·프로필 이미지와 {@code db/seed-local.sql} 이 넣는 아티스트가 그 4명이기 때문이다.
  *
  * <p>아티스트는 등록 API 가 없어 {@code db/seed-local.sql} 이 넣고, 여기서는 <b>이름으로 찾아</b> 쓴다.
  * id 를 박아 두지 않는 이유는, 그 SQL 의 순서나 id 가 바뀌어도 조용히 엉뚱한 아티스트가 붙지 않게
@@ -96,11 +96,20 @@ import java.util.stream.Collectors;
  * <p>{@code local}·{@code demo}·{@code prod} 프로필에서 등록된다. 운영에서는 RDS에 공연이 없을 때만
  * 한 번 실행돼 초기 데모 카탈로그를 만든다. 공연이 이미 있으면 {@link #run}이 즉시 건너뛴다.
  * 로컬·데모에서는 휘발성 DB를 전제로 매 기동 시 채워진다. 운영에서 이 빈이 무심코 다시 돌면 가짜
- * 공연이 쌓인다. {@code demo}는 실제 S3 버킷에 데모 이미지가 실제로 올라가는지 눈으로 확인하려고
- * 만든 프로필이다({@code application-demo.yml} 참고) - DB 는 {@code local} 과 같은 휘발성 도커
- * MySQL 을 그대로 쓰고 이미지 저장소만 실제 S3({@link com.ssafy.timo.global.storage.S3ImageStorage})로
- * 바뀐다. 그래서 이 프로필에서만 {@link #resolveImageKey} 가 정적 리소스를 실제로 업로드한다 -
- * {@code local} 에서는 지금처럼 그 경로를 key 로 그대로 쓴다(플레이스홀더는 진짜로 저장하지 않는다).
+ * 공연이 쌓인다. {@code demo}는 DB 는 {@code local} 과 같은 휘발성 도커 MySQL 을 그대로 쓰고 이미지
+ * 저장소만 실제 S3({@link com.ssafy.timo.global.storage.S3ImageStorage})로 바꾼 프로필이다
+ * ({@code application-demo.yml} 참고).
+ *
+ * <p><b>이미지 key 는 어느 프로필에서나 같다.</b> 시드에 적힌 key 가 그대로 DB 에 들어가고,
+ * 그 key 로 된 객체가 이미지 버킷에 있어야 화면에 보인다({@link ImageStorage#getUrl} 이 CDN 주소를
+ * 앞에 붙일 뿐이다). 운영은 예전부터 이 값을 그대로 넣고 있었으므로, 이미 들어간 운영 데이터와도
+ * 어긋나지 않는다.
+ *
+ * <p><b>버킷을 채우는 것은 {@code demo} 프로필 한 곳뿐이다</b>({@link #uploadSeedImages}).
+ * {@code src/main/resources/static} 의 파일을 읽어 <b>같은 key 로</b> 올린다 - 그래서 demo 로 한 번
+ * 띄우면 객체가 제자리에 놓이고, 그 뒤로는 정적 파일이 없어도(그 파일들을 지우는 것이
+ * {@code S15P21D206-278} 의 목적이다) local·prod 가 같은 key 를 그대로 쓴다. 운영은 이 경로를 타지
+ * 않으므로 jar 안에 이미지가 없어도 기동한다.
  *
  * <p><b>{@code ON_SALE} 공연은 실제 체인에도 등록한다.</b> {@code ReservationService}가 예매를
  * 받으려면 {@code Concert.isReadyForBooking()}(주최자·정가·온체인 showId)이 갖춰져 있어야 하는데,
@@ -263,8 +272,11 @@ public class LocalDataSeeder implements ApplicationRunner {
     /**
      * 공연 하나의 시드 정보.
      *
-     * <p>이미지는 URL 이 아니라 저장소 key 다. 로컬은 {@code src/main/resources/static} 이 그대로
-     * 정적 리소스로 서빙되므로, 여기 적은 key 가 곧 {@code /poster/...} 경로가 된다.
+     * <p>이미지는 URL 이 아니라 저장소 key 다. 이 key 로 된 객체가 이미지 버킷에 있어야 화면에
+     * 보이고({@link ImageStorage#getUrl} 이 CDN 주소를 앞에 붙인다), 그 객체를 올리는 것은
+     * {@code demo} 프로필의 {@link #uploadSeedImages} 하나뿐이다 - 클래스 상단 주석 참고.
+     * 여기 key 를 바꾸면 {@code src/main/resources/static} 아래 같은 경로에 파일을 두고 demo 로 한 번
+     * 띄워야 한다.
      *
      * <p>{@code status} · {@code viewCount} 는 등록 API 로는 정할 수 없는 값이다. 왜 여기서 들고
      * 있는지는 {@link #applySeedState} 참고.
@@ -288,10 +300,10 @@ public class LocalDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * 시드 공연 4건. {@code static/poster} 에 있는 포스터 하나에 공연 하나씩이다.
+     * 시드 공연 4건. 버킷의 {@code poster/} 아래 포스터 하나에 공연 하나씩이다.
      *
      * <p>상태·장르·조회수가 골고루 갈리도록 골랐다. 그래야 목록의 상태 필터와 인기순 정렬을 눌러 볼 수
-     * 있다. 로이킴 공연만 상세 이미지가 비어 있는데, {@code static/detail} 에 해당 파일이 없어서다 —
+     * 있다. 로이킴 공연만 상세 이미지가 비어 있는데, {@code detail/} 아래에 해당 객체가 없어서다 —
      * 상세 이미지가 없는 공연도 화면이 깨지지 않는지 확인하는 자리도 된다.
      *
      * <p><b>상태와 날짜를 서로 맞춰 둔다.</b> {@link ConcertStatus} 는 오픈 전 · 예매 중 · 종료를
@@ -379,10 +391,16 @@ public class LocalDataSeeder implements ApplicationRunner {
      *
      * <p>로컬은 {@code ddl-auto: create-drop} 이라 보통 매 기동마다 비어 있지만, DB 를 남겨 두고 앱만
      * 재시작하는 경우에 같은 공연이 다시 쌓이는 것을 막는다.
+     *
+     * <p>이미지 업로드({@link #uploadSeedImages})만 그 앞에 둔다. 버킷을 채우는 일은 DB 에 공연이
+     * 있는지와 무관한데, 건너뛰는 자리에 두면 DB 를 남겨 둔 채 demo 로 다시 띄웠을 때 조용히 아무것도
+     * 올리지 않는다.
      */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        uploadSeedImages();
+
         long existing = concertRepository.count();
         if (existing > 0) {
             log.info("공연이 이미 {}건 있어 시드를 건너뛴다.", existing);
@@ -393,7 +411,6 @@ public class LocalDataSeeder implements ApplicationRunner {
         seedSeats(venueId);
 
         Map<String, Long> artistIds = findArtistIdsByName();
-        resolveArtistImages(artistIds);
 
         // 좌석 상태는 예매 중인 공연에만 넣는다. 오픈 전이거나 끝난 공연에 팔린 자리가 있으면
         // 상태와 배치도가 어긋나, 화면을 보는 쪽이 어느 쪽을 믿어야 할지 알 수 없다.
@@ -832,8 +849,9 @@ public class LocalDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * {@code db/seed-local.sql} 이 넣는 프로필 이미지 경로. {@link #resolveArtistImages} 가 실제
-     * 업로드로 바꿀 때만 이름과 매칭시키는 용도라, SQL 값이 바뀌면 여기도 함께 고친다.
+     * 아티스트 프로필 이미지 key. {@code db/seed-local.sql} 이 로컬에 넣는 값과 같아야 한다 - 운영에는
+     * 그 SQL 이 돌지 않아 {@link #findArtistIdsByName} 이 여기 값으로 아티스트를 직접 만든다.
+     * 공연 이미지와 마찬가지로 {@link #uploadSeedImages} 가 이 key 로 객체를 올린다.
      */
     private static final Map<String, String> ARTIST_SEED_IMAGE_KEYS = Map.of(
             "김필", "artist/artist_kim_feel.jpg",
@@ -842,33 +860,46 @@ public class LocalDataSeeder implements ApplicationRunner {
             "Bruno Mars", "artist/artist_bruno_mars.jpg");
 
     /**
-     * {@code db/seed-local.sql} 이 넣은 아티스트 프로필 key 를 실제 업로드 결과로 덮어쓴다.
-     * {@code demo} 에서만 돈다 - SQL 로 미리 들어간 값이라 공연 이미지처럼 {@link #resolveImageKey} 를
-     * 만드는 시점에 함께 처리할 수 없어 따로 둔다.
+     * 시드가 참조하는 이미지를 클래스패스에서 읽어 <b>같은 key 로</b> 버킷에 올린다. {@code demo}
+     * 에서만 돈다 - 버킷을 처음 채우거나 이미지를 갈아 끼울 때 쓰는 자리다. aws CLI 가 없어도 이
+     * 프로필로 한 번 띄우면 객체가 제자리에 놓인다.
      *
-     * <p>불크 업데이트라({@link #applySeedState} 와 같은 이유로) 이미 로딩된 1차 캐시를 비운다 -
-     * 안 비우면 뒤이은 공연 생성이 갱신 전 값을 그대로 읽는다.
+     * <p>{@link ImageStorage#upload} 가 아니라 {@link ImageStorage#uploadTo} 를 쓰는 것이 요점이다.
+     * 전자는 저장소가 무작위 key 를 새로 만들어, 올릴 때마다 그 값을 시드와 이미 들어간 운영 DB 에
+     * 옮겨 적어야 한다. 시드 key 에 그대로 쓰면 몇 번을 돌려도 결과가 같고, 정적 파일을 지운 뒤에도
+     * 그 key 가 계속 유효하다.
+     *
+     * <p>{@code local}·{@code prod} 에서는 아무 일도 하지 않는다. local 은 저장소가
+     * {@code PlaceholderImageStorage} 라 올릴 곳이 없고, 운영은 jar 안에 이미지 원본이 없다 -
+     * 운영에서 이 경로를 켜면 {@link #loadClasspathImage} 가 그 자리에서 기동을 실패시킨다.
      */
-    private void resolveArtistImages(Map<String, Long> artistIds) {
+    private void uploadSeedImages() {
         if (!environment.matchesProfiles("demo")) {
             return;
         }
 
-        artistIds.forEach((name, id) -> {
-            String classpathKey = ARTIST_SEED_IMAGE_KEYS.get(name);
-            if (classpathKey == null) {
-                return;
+        Set<String> keys = new LinkedHashSet<>(ARTIST_SEED_IMAGE_KEYS.values());
+        for (ConcertSeed seed : concertSeeds()) {
+            if (seed.posterImageKey() != null) {
+                keys.add(seed.posterImageKey());
             }
-            String uploadedKey = imageStorage.upload(
-                    "demo-seed/" + UUID.randomUUID(), loadClasspathImage(classpathKey));
-            entityManager.createQuery("update Artist a set a.profileImageKey = :key where a.id = :id")
-                    .setParameter("key", uploadedKey)
-                    .setParameter("id", id)
-                    .executeUpdate();
-        });
+            keys.addAll(seed.imageKeys());
+        }
 
-        entityManager.flush();
-        entityManager.clear();
+        keys.forEach(key -> imageStorage.uploadTo(key, loadClasspathImage(key)));
+        log.info("데모 시드: 이미지 {}개를 버킷에 올렸다. keys={}", keys.size(), keys);
+    }
+
+    /** {@code src/main/resources/static/<imageKey>} 를 읽어 업로드 가능한 형태로 감싼다. */
+    private MultipartFile loadClasspathImage(String imageKey) {
+        String resourcePath = "static/" + imageKey;
+        try (var in = new ClassPathResource(resourcePath).getInputStream()) {
+            byte[] content = in.readAllBytes();
+            String contentType = URLConnection.guessContentTypeFromName(imageKey);
+            return new ClasspathMultipartFile(imageKey, contentType, content);
+        } catch (IOException e) {
+            throw new UncheckedIOException("데모 시드 이미지 로딩 실패: " + resourcePath, e);
+        }
     }
 
     /**
@@ -918,8 +949,8 @@ public class LocalDataSeeder implements ApplicationRunner {
         CommandConcertResponseDto created = concertService.create(new CommandConcertRequestDto(
                 seed.title(),
                 seed.genre(),
-                resolveImageKey(seed.posterImageKey()),
-                seed.imageKeys().stream().map(this::resolveImageKey).toList(),
+                seed.posterImageKey(),
+                seed.imageKeys(),
                 seed.description(),
                 seed.ageRating(),
                 seed.startDate(),
@@ -931,30 +962,6 @@ public class LocalDataSeeder implements ApplicationRunner {
         applySeedState(created.id(), seed);
 
         return created.id();
-    }
-
-    /**
-     * {@code local} 에서는 정적 리소스 경로를 그대로 key 로 쓴다({@code static/} 아래가 곧 서빙 경로라
-     * 손댈 필요가 없다). {@code demo} 에서만 그 파일을 실제로 읽어 {@link ImageStorage#upload} 로
-     * 올리고, 그 결과 key 로 바꾼다 - 클래스 상단 주석 참고.
-     */
-    private String resolveImageKey(String classpathKey) {
-        if (classpathKey == null || !environment.matchesProfiles("demo")) {
-            return classpathKey;
-        }
-        return imageStorage.upload("demo-seed/" + UUID.randomUUID(), loadClasspathImage(classpathKey));
-    }
-
-    /** {@code src/main/resources/static/<classpathKey>} 를 읽어 업로드 가능한 형태로 감싼다. */
-    private MultipartFile loadClasspathImage(String classpathKey) {
-        String resourcePath = "static/" + classpathKey;
-        try (var in = new ClassPathResource(resourcePath).getInputStream()) {
-            byte[] content = in.readAllBytes();
-            String contentType = URLConnection.guessContentTypeFromName(classpathKey);
-            return new ClasspathMultipartFile(classpathKey, contentType, content);
-        } catch (IOException e) {
-            throw new UncheckedIOException("데모 시드 이미지 로딩 실패: " + resourcePath, e);
-        }
     }
 
     /**
