@@ -168,7 +168,13 @@ void main() {
     }) {
       api = MockFavoriteApi(shows: shows);
       artistStore = InMemoryFavoriteArtistStore(artists);
-      store = FavoriteStore(api: api, artistStore: artistStore);
+      // 디바운스는 0 으로 둔다. 연타를 한 번으로 묶는지 보는 테스트만 실제
+      // 간격을 쓴다.
+      store = FavoriteStore(
+        api: api,
+        artistStore: artistStore,
+        toggleDebounce: Duration.zero,
+      );
       addTearDown(store.dispose);
     }
 
@@ -262,6 +268,74 @@ void main() {
 
       expect(store.favorites.shows, isEmpty);
       expect(store.favorites.artists, hasLength(1));
+    });
+
+    test('연타해도 요청은 한 번만 나간다', () async {
+      givenStore();
+
+      // 켜고 끄고 켰다. 손이 멈춘 뒤의 의도는 '켬' 하나다.
+      store.toggleShow(bigbang);
+      store.toggleShow(bigbang);
+      await store.toggleShow(bigbang);
+
+      expect(api.sendCount, 1);
+      expect(api.wishedIds, [bigbang.id]);
+      expect(store.favorites.hasShow(bigbang.id), isTrue);
+    });
+
+    test('연타가 제자리로 돌아오면 아무것도 보내지 않는다', () async {
+      givenStore();
+
+      store.toggleShow(bigbang);
+      await store.toggleShow(bigbang);
+
+      // 서버는 처음부터 이 상태였다. 보낼 것이 없다.
+      expect(api.sendCount, 0);
+      expect(store.favorites.hasShow(bigbang.id), isFalse);
+    });
+
+    test('연타 중에는 화면이 매번 바뀐다', () async {
+      givenStore();
+      var notified = 0;
+      store.addListener(() => notified++);
+
+      store.toggleShow(bigbang);
+      expect(store.favorites.hasShow(bigbang.id), isTrue);
+      await store.toggleShow(bigbang);
+
+      // 요청은 묶여도 하트는 누르는 족족 따라와야 한다.
+      expect(notified, 2);
+    });
+
+    test('손이 멈출 때까지 기다렸다 보낸다', () async {
+      api = MockFavoriteApi();
+      artistStore = InMemoryFavoriteArtistStore();
+      store = FavoriteStore(
+        api: api,
+        artistStore: artistStore,
+        toggleDebounce: const Duration(milliseconds: 40),
+      );
+      addTearDown(store.dispose);
+
+      final sent = store.toggleShow(bigbang);
+
+      // 아직 기다리는 중이다. 화면만 바뀌어 있다.
+      expect(api.sendCount, 0);
+      expect(store.favorites.hasShow(bigbang.id), isTrue);
+
+      await sent;
+      expect(api.sendCount, 1);
+    });
+
+    test('로그아웃하면 보내기를 기다리던 하트도 버린다', () async {
+      givenStore();
+
+      final sent = store.toggleShow(bigbang);
+      store.clearShows();
+      await sent;
+
+      // 앞사람의 찜이 로그아웃 뒤에 나가면 안 된다.
+      expect(api.sendCount, 0);
     });
 
     test('아티스트 찜은 기기에만 남는다', () async {

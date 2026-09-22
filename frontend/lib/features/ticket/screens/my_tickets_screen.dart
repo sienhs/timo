@@ -57,6 +57,17 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 양도 목록 탭의 조회. 시작하고 버리는 조건은 [_data] 와 같다.
   Future<List<MyTrade>>? _trades;
 
+  /// 카드에서 시작한 흐름(더보기 · 가격 수정 · 등록 취소)이 도는 중.
+  ///
+  /// 시트도 다이얼로그도 **여는 데 한 프레임이 걸린다.** 그 사이 같은 버튼이
+  /// 한 번 더 눌리면 시트가 두 장 겹치고, 확인까지 두 번 받으면 취소 요청도
+  /// 두 번 나간다. 여기 셋이 이 화면에서 서버를 바꾸는 유일한 입구라
+  /// [_guard] 하나로 막는다.
+  ///
+  /// `setState` 를 부르지 않는다. 눌린 직후부터 시트·다이얼로그가 화면을 덮어
+  /// 버튼이 어차피 안 보이므로, 이 값 때문에 목록을 다시 그릴 이유가 없다.
+  bool _acting = false;
+
   final _searchController = TextEditingController();
   int _tabIndex = 0;
   String _query = '';
@@ -160,6 +171,20 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 안내 스낵바. 하단 바에 가리지 않게 그 위로 띄운다.
   void _notify(String message) {
     showInfoSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
+  }
+
+  /// 카드에서 시작한 흐름을 한 번에 하나만 돌린다([_acting]).
+  ///
+  /// 흐름 안에서 서로를 부르는 것(더보기 → 등록 취소)은 이미 이 안이라 막히지
+  /// 않는다. 감싸는 자리는 카드의 버튼뿐이다.
+  Future<void> _guard(Future<void> Function() action) async {
+    if (_acting) return;
+    _acting = true;
+    try {
+      await action();
+    } finally {
+      _acting = false;
+    }
   }
 
   /// 카드 더보기(⋮). 고른 것이 있으면 그 흐름으로 이어간다.
@@ -457,7 +482,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           // 취소가 안 되는 티켓·양도 등록 중인 티켓에도 더보기를 연다. 시트가
           // 이유를 알려준다 — 버튼 자체를 지우면 왜 못 하는지 물어볼 자리가 없다.
           // 발행 중·입장 완료·회수·환불은 할 수 있는 일이 없어 열지 않는다.
-          onMore: ticket.isHeld ? () => _openMore(ticket) : null,
+          onMore: ticket.isHeld
+              ? () => _guard(() => _openMore(ticket))
+              : null,
         ),
       ),
       1 => _ticketList(
@@ -493,8 +520,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
           // 마켓이 열려 있는 동안은 가격이 고정이라 버튼을 안 낸다.
           onEditPrice: _hours?.isOpen ?? false
               ? null
-              : () => _editPrice(sales[index]),
-          onDelist: () => _delist(sales[index]),
+              : () => _guard(() => _editPrice(sales[index])),
+          onDelist: () => _guard(() => _delist(sales[index])),
         ),
       ),
     );

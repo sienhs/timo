@@ -1,10 +1,35 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../constants.dart';
 import '../models/favorite_artist.dart';
 import '../models/favorite_show.dart';
 import '../models/favorites.dart';
 import 'favorite_api.dart';
 import 'favorite_artist_store.dart';
+
+/// 서버로 보내기를 기다리는 하트 한 건.
+///
+/// 같은 공연을 연타하는 동안 이 객체 하나가 살아 있고, 타이머만 계속 새로
+/// 걸린다. 그래서 몇 번을 누르든 요청은 한 번이다.
+class _PendingToggle {
+  _PendingToggle({required this.show, required this.serverState});
+
+  /// 되돌릴 때 쓸 공연. 누를 때마다 최신 것으로 바꾼다 — 목록이 다시 도착해
+  /// 카드 내용이 바뀌었을 수 있다.
+  FavoriteShow show;
+
+  /// 연타가 시작되기 **전**의 상태. 서버가 아는 값이다.
+  ///
+  /// 보낼 때 지금 상태와 견줘 같으면 보내지 않는다(켰다 껐으면 서버는 그대로다).
+  final bool serverState;
+
+  /// 이 연타를 기다리는 호출부들. 하나의 전송 결과를 함께 받는다.
+  final Completer<void> done = Completer<void>();
+
+  Timer? timer;
+}
 
 /// 앱이 들고 있는 찜 목록.
 ///
@@ -21,11 +46,24 @@ import 'favorite_artist_store.dart';
 /// 눌린 채로 두면 서버에는 없는 찜이 다음에 앱을 켤 때 조용히 사라진다.
 /// 아티스트 쪽은 예전처럼 저장 실패를 삼킨다. 기기 저장소 오류는 사용자가
 /// 할 수 있는 일이 없고, 이번 실행 동안의 화면은 이미 맞다.
+///
+/// 서버로 **보내는 일만** 미룬다([FavoriteLimits.toggleDebounce]). 화면은
+/// 누르는 즉시 바뀌므로 사용자는 기다림을 느끼지 않는다.
 class FavoriteStore extends ChangeNotifier {
-  FavoriteStore({required this._api, required this._artistStore});
+  FavoriteStore({
+    required this._api,
+    required this._artistStore,
+    this._toggleDebounce = FavoriteLimits.toggleDebounce,
+  });
 
   final FavoriteApi _api;
   final FavoriteArtistStore _artistStore;
+
+  /// 하트를 누르고 서버로 보내기까지 기다리는 시간. 테스트는 0 을 넣는다.
+  final Duration _toggleDebounce;
+
+  /// 보내기를 기다리는 하트. 공연 번호로 찾는다.
+  final Map<int, _PendingToggle> _pending = {};
 
   Favorites _favorites = const Favorites();
 
@@ -44,7 +82,11 @@ class FavoriteStore extends ChangeNotifier {
 
   /// 들고 있던 찜 공연을 버린다. 로그아웃할 때다 — 다음 사람의 하트가 앞사람의
   /// 찜으로 채워져 보이면 안 된다.
+  ///
+  /// 보내기를 기다리던 하트도 **버린다.** 로그아웃한 뒤에 앞사람의 찜이 나가면
+  /// 안 되고, 나가 봐야 토큰이 없어 401 이다.
   void clearShows() {
+    _discardPending();
     if (_favorites.shows.isEmpty) return;
     _apply(_favorites.withShows(const []));
   }
@@ -56,26 +98,70 @@ class FavoriteStore extends ChangeNotifier {
     _apply(_favorites.withArtists(artists));
   }
 
-  /// 찜하거나 뺀다. 화면을 먼저 바꾸고 서버에 보낸다.
+  /// 찜하거나 뺀다. 화면을 **먼저** 바꾸고, 손이 멈추면 서버에 보낸다.
+  ///
+  /// 돌려주는 Future 는 그 전송이 끝날 때 완결된다. 연타한 경우 그 안의 모든
+  /// 호출이 같은 Future 를 받으므로, 화면은 지금처럼 `await` 한 자리에서 실패를
+  /// 잡아 알리면 된다. 보낼 것이 없으면(켰다 껐다) 조용히 성공으로 끝난다.
   ///
   /// 실패하면 이 공연만 되돌린다. 되돌리는 사이 다른 하트를 눌렀을 수도 있어
   /// 목록 전체를 이전 것으로 덮지는 않는다. 빼기가 실패해 되살릴 때는 맨 앞에
   /// 들어간다 — 원래 자리는 잃지만, 다음 [loadShows] 가 서버 순서로 맞춘다.
-  Future<void> toggleShow(FavoriteShow show) async {
-    final wasWished = _favorites.hasShow(show.id);
+  Future<void> toggleShow(FavoriteShow show) {
     _apply(_favorites.toggleShow(show));
-    try {
-      if (wasWished) {
-        await _api.removeShow(show.id);
-      } else {
-        await _api.addShow(show.id);
-      }
-    } catch (_) {
-      if (_favorites.hasShow(show.id) != wasWished) {
-        _apply(_favorites.toggleShow(show));
-      }
-      rethrow;
+    // 방금 뒤집었으니 지금의 반대가 서버가 아는 상태다. 연타 중이면 앞서 잡아
+    // 둔 값을 그대로 쓴다 — 그것이 이 연타가 시작되기 전의 상태다.
+    final pending = _pending[show.id] ??= _PendingToggle(
+      show: show,
+      serverState: !_favorites.hasShow(show.id),
+    );
+    pending.show = show;
+    pending.timer?.cancel();
+    pending.timer = Timer(_toggleDebounce, () => _flushToggle(show.id));
+    return pending.done.future;
+  }
+
+  /// 기다리던 하트를 서버로 보낸다.
+  Future<void> _flushToggle(int id) async {
+    final pending = _pending.remove(id);
+    if (pending == null) return;
+
+    final wished = _favorites.hasShow(id);
+    if (wished == pending.serverState) {
+      // 켰다 껐다 해서 제자리로 돌아왔다. 서버는 이미 그 상태다.
+      pending.done.complete();
+      return;
     }
+
+    try {
+      if (wished) {
+        await _api.addShow(id);
+      } else {
+        await _api.removeShow(id);
+      }
+      pending.done.complete();
+    } catch (e, stackTrace) {
+      // 요청이 나가 있는 동안 또 눌렀으면 그 의도가 더 최신이다. 되돌리지도,
+      // 실패를 알리지도 않는다 — 곧 나갈 요청이 서버를 맞춘다. 서버가 등록·해제를
+      // 멱등으로 받아 주기 때문에 실패한 요청이 닿았든 아니든 결과는 같다.
+      if (_pending.containsKey(id)) {
+        pending.done.complete();
+        return;
+      }
+      if (_favorites.hasShow(id) != pending.serverState) {
+        _apply(_favorites.toggleShow(pending.show));
+      }
+      pending.done.completeError(e, stackTrace);
+    }
+  }
+
+  /// 기다리던 하트를 보내지 않고 버린다. 화면은 건드리지 않는다.
+  void _discardPending() {
+    for (final pending in _pending.values) {
+      pending.timer?.cancel();
+      if (!pending.done.isCompleted) pending.done.complete();
+    }
+    _pending.clear();
   }
 
   /// 찜리스트에서 뺀다. 목록에 없으면 아무 일도 하지 않는다.
@@ -112,5 +198,26 @@ class FavoriteStore extends ChangeNotifier {
     if (next == _favorites) return;
     _favorites = next;
     notifyListeners();
+  }
+
+  /// 앱이 내려간다. 기다리던 하트는 **보내고** 간다.
+  ///
+  /// 한 번 누르고 곧바로 앱을 닫는 경우가 여기다. 그냥 버리면 눌린 하트가
+  /// 다음에 켤 때 사라져 있다. 화면은 이미 없으므로 결과는 보지 않는다.
+  @override
+  void dispose() {
+    for (final pending in _pending.values) {
+      pending.timer?.cancel();
+      final wished = _favorites.hasShow(pending.show.id);
+      if (wished != pending.serverState) {
+        (wished
+                ? _api.addShow(pending.show.id)
+                : _api.removeShow(pending.show.id))
+            .ignore();
+      }
+      if (!pending.done.isCompleted) pending.done.complete();
+    }
+    _pending.clear();
+    super.dispose();
   }
 }
