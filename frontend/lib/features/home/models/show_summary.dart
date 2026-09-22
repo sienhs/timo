@@ -51,6 +51,10 @@ class ShowSummary {
   /// "예매 진행 중". 백엔드 `ConcertStatus` 의 상수명과 같다.
   static const onSaleStatus = 'ON_SALE';
 
+  /// 예매가 마감되는 시점. 공연 시작 이만큼 전부터는 선점·결제가 막힌다.
+  /// 백엔드 `Concert.BOOKING_CUTOFF_HOURS` 와 같은 값이다.
+  static const bookingCutoff = Duration(hours: 2);
+
   /// 서버가 준 공연 id. 상세 조회에 쓴다.
   final int id;
 
@@ -94,6 +98,24 @@ class ShowSummary {
   bool opensAfter(DateTime now) {
     final openAt = ticketOpenAt;
     return openAt != null && openAt.isAfter(now);
+  }
+
+  /// 지금 이 공연을 예매할 수 있는가. 인기 공연 줄의 상태 뱃지가 이걸로 가른다.
+  ///
+  /// [status] 만 보지 않는 이유는 [opensAfter] 와 같은 성질이다. 서버의
+  /// `ON_SALE` 은 "예매 기간에 들어섰다" 는 거친 라벨이라 마감을 반영하지
+  /// 않는다 — 공연 시작 [bookingCutoff] 전 마감부터 공연 종료까지 컬럼은
+  /// `ON_SALE` 로 남는다(백엔드 `ConcertRepository.openScheduled` 주석). 다일
+  /// 공연이면 그 구간이 며칠이라, 상태만 보고 찍으면 `예매중` 뱃지를 달고
+  /// 들어간 상세에서 예매 버튼이 막혀 있다. 정확한 판정은 상세 응답의
+  /// `bookable` 이 답하지만 목록 응답에는 그 필드가 없어, 백엔드
+  /// `Concert.bookingBlockReason` 과 같은 식을 여기서 유도한다.
+  ///
+  /// 공연 시작일이 없으면 언제 마감인지 모르므로 예매할 수 없는 것으로 본다.
+  bool isBookableNow(DateTime now) {
+    final start = startAt;
+    if (status != onSaleStatus || start == null) return false;
+    return now.isBefore(start.subtract(bookingCutoff));
   }
 
   /// 카드에 찍는 기간 문구. (예: `2026.07.05 ~ 07.07`)

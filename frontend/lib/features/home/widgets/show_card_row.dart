@@ -5,7 +5,7 @@ import '../models/show_summary.dart';
 import 'show_poster_card.dart';
 
 /// 카드에 얹을 뱃지를 정한다. 뱃지가 없으면 null 을 준다.
-typedef ShowBadgeBuilder = Widget? Function(ShowSummary show, int index);
+typedef ShowBadgeBuilder = Widget? Function(ShowSummary show);
 
 /// 공연 카드를 가로로 늘어놓는 줄. 오픈 예정·인기 공연이 함께 쓴다.
 ///
@@ -45,7 +45,7 @@ class ShowCardRow extends StatelessWidget {
               ),
               child: ShowPosterCard(
                 show: shows[index],
-                badge: buildBadge?.call(shows[index], index),
+                badge: buildBadge?.call(shows[index]),
                 onPressed: () => onShowPressed(shows[index]),
               ),
             ),

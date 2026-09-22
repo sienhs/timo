@@ -312,8 +312,14 @@ class HomeStrings {
   static const emptyAllShowsList = '아직 등록된 공연이 없어요.';
   static const emptyBookableList = '지금 예매할 수 있는 공연이 없어요.';
 
-  /// 순위 뱃지. (예: `1위`)
-  static String rank(int rank) => '$rank위';
+  /// 인기 공연 카드의 예매 상태 뱃지.
+  ///
+  /// 살 수 있는 둘(예매중 · 오픈예정)은 색으로 갈라 멀리서도 구분되게 하고,
+  /// 마감은 색 없이 둔다 — 지금 살 수 없는 공연이 색으로 앞에 나설 이유가
+  /// 없다. 색을 빼도 글자가 남으므로 색각 이상에서도 구분된다.
+  static const bookingOnSale = '예매중';
+  static const bookingUpcoming = '오픈예정';
+  static const bookingClosed = '예매 마감';
 
   /// 티켓 오픈 시각을 남은 기간에 따라 다르게 읽어 준다.
   ///

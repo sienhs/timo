@@ -22,6 +22,7 @@ import 'package:timo/features/home/widgets/artist_avatar_cell.dart';
 import 'package:timo/features/home/widgets/artist_section.dart';
 import 'package:timo/features/home/widgets/home_banner_carousel.dart';
 import 'package:timo/features/home/widgets/home_section_header.dart';
+import 'package:timo/features/home/widgets/show_card_badges.dart';
 import 'package:timo/features/home/widgets/show_card_row_skeleton.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 import 'package:timo/routes/app_routes.dart';
@@ -278,10 +279,10 @@ void main() {
         );
       }
 
-      // 인기 1위 카드에 순위 뱃지가 붙는다. 카드 줄까지 끌어 올려야
-      // 뱃지가 만들어진다 — 섹션 제목만 보이는 자리에서는 아직 없다.
-      await scrollTo(tester, find.text(HomeStrings.rank(1)));
-      expect(find.text(HomeStrings.rank(1)), findsOneWidget);
+      // 인기 공연 카드에는 예매 상태 뱃지가 붙는다. 섹션 제목을 화면 위에
+      // 붙여야 그 아래 카드 줄이 만들어진다.
+      await scrollTo(tester, find.text(HomeStrings.popularSection));
+      expect(find.byType(BookingStatusBadge), findsWidgets);
     });
 
     testWidgets('배너는 인기 공연 앞 세 건이다', (tester) async {
@@ -385,15 +386,94 @@ void main() {
     expect(find.text(MockHomeApi.peggyGou.title), findsNothing);
   });
 
-  testWidgets('인기 공연 카드에는 순위 뱃지가 붙는다', (tester) async {
+  testWidgets('인기 공연 카드에는 줄에 남은 수만큼 예매 상태 뱃지가 붙는다', (tester) async {
     await pumpHome(tester);
 
-    // 카드는 제목보다 아래에 있어 제목이 보이는 시점엔 아직 안 만들어졌다.
-    await scrollTo(tester, find.text(HomeStrings.rank(1)));
+    // 카드 줄은 섹션 제목보다 아래에 있어, 제목을 위로 붙여야 만들어진다.
+    await scrollTo(tester, find.text(HomeStrings.popularSection));
 
-    expect(find.text(HomeStrings.rank(1)), findsOneWidget);
-    expect(find.text(HomeStrings.rank(2)), findsOneWidget);
+    final bookable = MockHomeApi.popular.where((show) => show.isOpenOrUpcoming);
+    expect(find.byType(BookingStatusBadge), findsNWidgets(bookable.length));
     expect(find.byType(ShowPosterCard), findsWidgets);
+  });
+
+  group('예매 상태 뱃지', () {
+    final now = DateTime(2026, 10, 20, 9);
+
+    /// 뱃지만 따로 띄운다. 홈을 거치면 기준 시각이 실제 시계라 마감 경계를
+    /// 고정할 수 없다 — 경계는 시각의 함수라 테스트가 도는 날에 따라 답이 바뀐다.
+    Future<void> pumpBadge(WidgetTester tester, ShowSummary show) async {
+      await tester.pumpWidget(
+        MaterialApp(home: BookingStatusBadge(show: show, now: now)),
+      );
+    }
+
+    ShowSummary showWith({required String status, DateTime? startAt}) =>
+        ShowSummary(
+          id: 1,
+          title: '공연',
+          venueName: '고척돔',
+          status: status,
+          startAt: startAt,
+        );
+
+    testWidgets('예매 기간 안이면 예매중이다', (tester) async {
+      await pumpBadge(
+        tester,
+        showWith(
+          status: ShowSummary.onSaleStatus,
+          startAt: now.add(const Duration(hours: 3)),
+        ),
+      );
+
+      expect(find.text(HomeStrings.bookingOnSale), findsOneWidget);
+    });
+
+    testWidgets('공연 시작 두 시간 전부터는 상태가 ON_SALE 이어도 마감이다', (tester) async {
+      // 서버는 이 구간에서도 컬럼을 ON_SALE 로 두고, 공연이 끝나야 내린다.
+      // 그대로 믿고 `예매중` 을 찍으면 들어간 상세에서 예매가 막혀 있다.
+      await pumpBadge(
+        tester,
+        showWith(
+          status: ShowSummary.onSaleStatus,
+          startAt: now.add(ShowSummary.bookingCutoff),
+        ),
+      );
+
+      expect(find.text(HomeStrings.bookingClosed), findsOneWidget);
+    });
+
+    testWidgets('마감 직전은 아직 예매중이다', (tester) async {
+      await pumpBadge(
+        tester,
+        showWith(
+          status: ShowSummary.onSaleStatus,
+          startAt: now.add(
+            ShowSummary.bookingCutoff + const Duration(minutes: 1),
+          ),
+        ),
+      );
+
+      expect(find.text(HomeStrings.bookingOnSale), findsOneWidget);
+    });
+
+    testWidgets('아직 열리지 않았으면 오픈예정이다', (tester) async {
+      await pumpBadge(
+        tester,
+        showWith(
+          status: ShowSummary.upcomingStatus,
+          startAt: now.add(const Duration(days: 30)),
+        ),
+      );
+
+      expect(find.text(HomeStrings.bookingUpcoming), findsOneWidget);
+    });
+
+    testWidgets('공연 시작일이 없으면 언제 마감인지 모르므로 마감이다', (tester) async {
+      await pumpBadge(tester, showWith(status: ShowSummary.onSaleStatus));
+
+      expect(find.text(HomeStrings.bookingClosed), findsOneWidget);
+    });
   });
 
   group('티켓 오픈 뱃지 문구', () {
