@@ -94,6 +94,26 @@ class BookingController extends ChangeNotifier {
     _selectedZone = null;
   }
 
+  /// 구역 화면에 들어왔다. 다른 구역에서 고른 자리는 버린다.
+  ///
+  /// [startBooking] 이 공연에 대해 하는 일을 구역에 대해 한다. **고른 자리는
+  /// 예매 흐름 하나가 공유하는데 구역 화면은 구역마다 새로 열린다.** 여기서
+  /// 비우지 않으면 A구역 배치도를 보면서 하단 바에는 B구역 자리가 적힌 채로
+  /// 결제까지 갈 수 있다(실제로 그렇게 됐다).
+  ///
+  /// 잡아 둔 자리도 같이 놓는다. 그 자리를 잡았던 화면은 이미 사라졌고,
+  /// 사라지면서 서버 쪽 선점도 풀었다.
+  ///
+  /// **알림을 보내지 않는다.** 화면이 세워지는 중(initState)에 불리는데 거기서
+  /// 리스너를 깨우면 빌드 도중 리빌드를 걸게 된다 — [startBooking] 과 같은 이유다.
+  void enterZone(int zoneId) {
+    final zone = _selectedZone;
+    if (zone == null || zone.id == zoneId) return;
+    _selectedSeat = null;
+    _selectedZone = null;
+    _hold = null;
+  }
+
   /// 좌석을 고른다.
   ///
   /// 요구사항의 "한 계정은 하나의 공연에서 티켓을 1매만 보유할 수 있다"에

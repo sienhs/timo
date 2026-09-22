@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../models/zone.dart';
 
+/// 구역 번호 → 구역색. 구역도·좌석 배치도·잔여좌석 목록이 같은 색을 써야 해서
+/// 한 곳에서만 정한다.
+///
+/// 서버 구역 번호는 1 부터라, 구역 다섯 개면 A·B·C·D·E 가 아래 표의 1·2·3·4·0
+/// 번째 색을 쓴다. C구역은 갈색(#AD6534)이었는데 탁해 보여 진한 주황으로
+/// 바꿨다(사용자 결정).
 Color zoneColor(int id) => const [
   Color(0xFF7950B5),
   Color(0xFF356DB5),
   Color(0xFF168577),
-  Color(0xFFAD6534),
+  Color(0xFFC2410C),
   Color(0xFFB64E79),
 ][id.abs() % 5];
 
@@ -273,12 +279,18 @@ class _ZoneOutline extends CustomClipper<Path> {
           ..quadraticBezierTo(w, h, w * .96, h)
           ..lineTo(0, h)
           ..close(),
+      // 아래로 갈수록 넓어진다. 좌석표가 그렇기 때문이다(C구역은 1열 18석에서
+      // 10열 22석으로 늘어난다). 반대로 그려 두면 구역도와 좌석도가 서로 다른
+      // 모양을 말한다.
+      //
+      // 기울기와 호는 옆 구역들과 어울리게 얕게 둔다(사용자 결정). 세게 주면
+      // C구역만 튀어 배치도 전체가 기울어 보인다.
       _ZoneShape.rear =>
         Path()
-          ..moveTo(0, 0)
-          ..quadraticBezierTo(w * .5, h * .1, w, 0)
-          ..lineTo(w * .98, h * .85)
-          ..quadraticBezierTo(w * .5, h * 1.1, w * .02, h * .85)
+          ..moveTo(w * .035, 0)
+          ..quadraticBezierTo(w * .5, h * .08, w * .965, 0)
+          ..lineTo(w, h * .92)
+          ..quadraticBezierTo(w * .5, h, 0, h * .92)
           ..close(),
       _ZoneShape.rearLeft =>
         Path()

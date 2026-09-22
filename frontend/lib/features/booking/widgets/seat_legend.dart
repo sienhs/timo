@@ -38,6 +38,9 @@ class SeatLegend extends StatelessWidget {
   }
 }
 
+/// 범례 칩 한 변.
+const _chipSize = 11.0;
+
 class _LegendChip extends StatelessWidget {
   const _LegendChip({
     required this.label,
@@ -54,12 +57,16 @@ class _LegendChip extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 11,
-          height: 11,
+          width: _chipSize,
+          height: _chipSize,
           decoration: BoxDecoration(
             color: colors.fill,
             border: Border.all(color: colors.border, width: 1),
-            borderRadius: const BorderRadius.all(Radius.circular(2)),
+            // 배치도 칸과 같은 비율로 깎는다. 범례가 네모인데 자리가 둥글면
+            // 같은 것을 가리키는 표시로 읽히지 않는다.
+            borderRadius: const BorderRadius.all(
+              Radius.circular(_chipSize * seatCellRadiusRatio),
+            ),
           ),
         ),
         const SizedBox(width: 5),

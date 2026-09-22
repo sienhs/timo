@@ -153,6 +153,45 @@ void main() {
     expect(controller.selectedSeat?.id, 11);
   });
 
+  testWidgets('다른 구역에서 고른 자리는 들고 오지 않는다', (tester) async {
+    // 구역 화면은 구역마다 새로 열리지만 고른 자리는 예매 흐름이 공유한다.
+    // 비우지 않으면 A구역 배치도를 보면서 하단 바에는 B구역 자리가 적힌다.
+    controller.selectSeat(
+      const Zone(
+        id: 99,
+        name: '다른 구역',
+        price: 100000,
+        seatCount: 1,
+        availableCount: 1,
+        rowCount: 1,
+        seatsPerRow: 1,
+      ),
+      const Seat(id: 999, row: 1, number: 1, status: SeatStatus.available),
+    );
+    expect(controller.selectedSeat?.id, 999);
+
+    await pumpSeats(tester);
+
+    expect(controller.selectedSeat, isNull);
+    expect(find.text('좌석을 선택해주세요'), findsOneWidget);
+  });
+
+  testWidgets('고른 좌석을 다시 누르면 선택이 풀린다', (tester) async {
+    await pumpSeats(tester);
+
+    await tester.tap(find.byKey(const ValueKey(11)));
+    await tester.pump();
+    expect(controller.selectedSeat?.id, 11);
+
+    await tester.tap(find.byKey(const ValueKey(11)));
+    await tester.pump();
+
+    expect(controller.selectedSeat, isNull);
+    // 하단 바도 처음 상태로 돌아간다.
+    expect(find.text('좌석을 선택해주세요'), findsOneWidget);
+    expect(find.text('1층 A블록 1열 1번'), findsNothing);
+  });
+
   // 회색 자리를 눌렀을 때 안내를 띄우지 않는 게 의도다. 고를 수 없다는 것이
   // 색으로 이미 보이고, 배치도를 훑다 회색을 스치듯 누르는 일이 잦다.
   testWidgets('예매 완료 좌석은 눌러도 아무 일이 없다', (tester) async {
@@ -193,9 +232,18 @@ void main() {
 
   group('선점', () {
     /// 좌석을 고르고 결제하기 → 확인 다이얼로그에서 [agree] 를 누른다.
-    Future<void> checkout(WidgetTester tester, {bool agree = true}) async {
-      await tester.tap(find.byKey(const ValueKey(11)));
-      await tester.pump();
+    ///
+    /// [select] 를 끄면 좌석을 고르는 단계를 건너뛴다. 이미 고른 자리를 또
+    /// 누르면 선택이 풀리기 때문에, 미리 골라 둔 테스트는 이 길로 들어온다.
+    Future<void> checkout(
+      WidgetTester tester, {
+      bool agree = true,
+      bool select = true,
+    }) async {
+      if (select) {
+        await tester.tap(find.byKey(const ValueKey(11)));
+        await tester.pump();
+      }
       await tester.tap(find.text('결제하기'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(agree ? '예' : '아니요'));
@@ -210,7 +258,7 @@ void main() {
       await tester.pump();
       expect(api.held, isEmpty);
 
-      await checkout(tester);
+      await checkout(tester, select: false);
 
       expect(api.held, [11]);
       expect(controller.hold?.seatId, 11);
