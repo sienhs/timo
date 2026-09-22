@@ -138,24 +138,25 @@ class _MarketConcertsScreenState extends State<MarketConcertsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: ResaleAppBar(
-        title: ResaleStrings.marketTitle,
-        // 남은 시간은 열려 있을 때만 뜻이 있다. 닫혀 있을 때의 카운트다운은
-        // 본문 한가운데가 맡는다.
-        trailing: hours != null && hours.isOpen
-            ? MarketHoursCountdown(
-                hours: hours,
-                clock: widget.clock,
-                onElapsed: _reload,
-                semanticsLabel: ResaleStrings.openRemainingSemantics,
-                style: MarketHoursCountdown.appBarStyle,
-              )
-            : null,
-      ),
+      // 상단 바에 남은 시간을 적지 않는다(사용자 결정). 마감까지 몇 시간씩
+      // 남은 숫자가 제목 옆에서 계속 줄어드는 것이 볼 일과 상관없이 눈에
+      // 걸린다. 닫혀 있을 때의 카운트다운은 본문 한가운데가 맡는다.
+      appBar: ResaleAppBar(title: ResaleStrings.marketTitle),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
+            // 세는 일만 남긴다. 그리지는 않는다([Offstage]) — 마감 시각이 되면
+            // 본문이 닫힘 안내로 바뀌어야 하고, 그 신호가 이 카운트다운이다.
+            if (hours != null && hours.isOpen)
+              Offstage(
+                child: MarketHoursCountdown(
+                  hours: hours,
+                  clock: widget.clock,
+                  onElapsed: _reload,
+                  semanticsLabel: ResaleStrings.openRemainingSemantics,
+                ),
+              ),
             Expanded(child: _body()),
             // 로그인 전에는 줄 자체를 내지 않는다. 눌리지 않는 버튼을 세워 두면
             // 왜 안 되는지는 안 알려주면서 자리만 차지한다 — 로그인하라는 말은

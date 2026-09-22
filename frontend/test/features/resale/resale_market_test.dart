@@ -28,6 +28,7 @@ import 'package:timo/features/resale/screens/listing_register_screen.dart';
 import 'package:timo/features/resale/screens/market_concerts_screen.dart';
 import 'package:timo/features/resale/screens/market_listings_screen.dart';
 import 'package:timo/features/resale/state/resale_api_scope.dart';
+import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/resale/widgets/listable_ticket_card.dart';
 import 'package:timo/features/resale/widgets/listing_row_card.dart';
 import 'package:timo/features/resale/widgets/market_concert_card.dart';
@@ -265,6 +266,64 @@ void main() {
           .map((card) => card.listing.price)
           .toList();
       expect(prices, [150000, 163000, 168000, 176000]);
+
+      await closeScreen(tester);
+    });
+
+    // 내 매물은 살 수 없지만 **내릴 수는** 있다. 내릴 길이 내 티켓 탭에만
+    // 있으면 여기서 내 매물을 보고도 손을 못 댄다.
+    testWidgets('내 매물을 누르면 구매가 아니라 등록 취소 팝업이 열린다', (tester) async {
+      await pump(
+        tester,
+        api: MockResaleApi(latency: Duration.zero, clock: () => _whileOpen),
+        home: MarketConcertsScreen(clock: () => _whileOpen),
+      );
+
+      // 목의 내 매물은 2027 RE:MIND 의 R구역 11열 2번(132,000)뿐이다.
+      await tester.tap(find.text('2027 RE:MIND'));
+      await settle(tester);
+      expect(find.text(ResaleStrings.ownListingDelist), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ListingRowCard, '132,000 MSR'));
+      await settle(tester);
+
+      // 구매 화면으로 가지 않는다. 내 티켓의 양도 목록 탭과 같은 팝업이다.
+      expect(find.byType(ListingPurchaseScreen), findsNothing);
+      expect(find.text(TicketStrings.delistConfirmTitle), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.text('R구역 11열 2번'),
+        ),
+        findsOneWidget,
+      );
+
+      await closeScreen(tester);
+    });
+
+    // 그대로 두면 아무 일도 없어야 한다. 팝업만 닫히고 매물은 그대로다.
+    testWidgets('등록 취소를 확인하면 그 매물이 목록에서 사라진다', (tester) async {
+      await pump(
+        tester,
+        api: MockResaleApi(latency: Duration.zero, clock: () => _whileOpen),
+        home: MarketConcertsScreen(clock: () => _whileOpen),
+      );
+
+      await tester.tap(find.text('2027 RE:MIND'));
+      await settle(tester);
+      final before = tester.widgetList<ListingRowCard>(
+        find.byType(ListingRowCard),
+      ).length;
+
+      await tester.tap(find.widgetWithText(ListingRowCard, '132,000 MSR'));
+      await settle(tester);
+      await tester.tap(find.text(TicketStrings.delistConfirmAgree));
+      await settle(tester);
+
+      // 마켓은 올라가 있는 매물만 준다. 내린 줄은 다시 받은 목록에 없다.
+      expect(find.text(ResaleStrings.ownListingDelist), findsNothing);
+      expect(find.widgetWithText(ListingRowCard, '132,000 MSR'), findsNothing);
+      expect(find.byType(ListingRowCard), findsNWidgets(before - 1));
 
       await closeScreen(tester);
     });

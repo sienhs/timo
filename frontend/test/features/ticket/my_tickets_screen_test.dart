@@ -9,6 +9,7 @@ import 'package:timo/features/auth/state/auth_session_scope.dart';
 import 'package:timo/features/resale/constants.dart';
 import 'package:timo/features/resale/data/mock_resale_api.dart';
 import 'package:timo/features/resale/data/resale_api.dart';
+import 'package:timo/features/resale/models/my_trade.dart';
 import 'package:timo/features/resale/state/resale_api_scope.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/mock_ticket_api.dart';
@@ -23,6 +24,8 @@ import 'package:timo/features/ticket/widgets/past_ticket_card.dart';
 import 'package:timo/features/ticket/widgets/ticket_list_skeleton.dart';
 import 'package:timo/features/ticket/widgets/ticket_tab_bar.dart';
 import 'package:timo/features/ticket/widgets/upcoming_ticket_card.dart';
+
+import 'spy_resale_api.dart';
 
 void main() {
   /// 테스트가 보는 '지금'. 언제 돌려도 결과가 같아야 해서 고정한다.
@@ -275,12 +278,16 @@ void main() {
   group('티켓 상태별 카드', () {
     /// 상태 시나리오는 카드가 여덟 장이라 기본 화면 높이(600)에 다 안 그려진다.
     /// 목록이 보이는 것만 만들기 때문이다. 화면을 길게 늘여 전부 그리게 한다.
-    Future<void> pumpStates(WidgetTester tester) async {
+    Future<void> pumpStates(WidgetTester tester, {ResaleApi? resaleApi}) async {
       tester.view.physicalSize = const Size(1080, 9000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await pumpScreen(tester, scenario: TicketMockScenario.states);
+      await pumpScreen(
+        tester,
+        scenario: TicketMockScenario.states,
+        resaleApi: resaleApi,
+      );
       await tester.pumpAndSettle();
     }
 
@@ -336,17 +343,71 @@ void main() {
       expect(find.byIcon(Icons.more_vert), findsNWidgets(2));
     });
 
-    // 등록 중인 티켓에도 더보기를 열어 왜 못 하는지 알려준다.
-    testWidgets('양도 등록 중이면 두 항목이 잠기고 이유가 붙는다', (tester) async {
+    // 등록 중인 티켓의 위 자리는 등록이 아니라 취소다. 올라가 있는 티켓에
+    // `양도 등록하기` 를 잠긴 채로 두면 할 수 있는 일이 하나도 없게 된다.
+    testWidgets('양도 등록 중이면 등록 자리가 등록 취소로 바뀐다', (tester) async {
       await pumpStates(tester);
 
       await tester.tap(find.byIcon(Icons.more_vert).first);
       await tester.pumpAndSettle();
 
-      expect(tileEnabled(tester, TicketStrings.registerListing), isFalse);
-      expect(find.text(TicketStrings.alreadyListed), findsOneWidget);
+      expect(find.text(TicketStrings.cancelListing), findsOneWidget);
+      expect(find.text(TicketStrings.registerListing), findsNothing);
+      // 예매 취소는 그대로 잠긴다. 먼저 내려야 한다.
       expect(tileEnabled(tester, TicketStrings.cancelReservation), isFalse);
       expect(find.text(TicketStrings.cancelWhileListed), findsOneWidget);
+    });
+
+    // 좌석으로 매물을 맞춰 찾는데 맞는 것이 없다. 예매 목과 마켓 목의 시안
+    // 데이터는 서로 다른 공연이라 이 시나리오에서는 늘 없다.
+    testWidgets('매물을 못 찾으면 등록 취소가 잠기고 양도 목록 탭으로 보낸다', (tester) async {
+      await pumpStates(tester);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+
+      expect(tileEnabled(tester, TicketStrings.cancelListing), isFalse);
+      expect(find.text(TicketStrings.cancelListingUnknown), findsOneWidget);
+    });
+
+    // 맞는 매물이 있으면 양도 목록 탭까지 가지 않고 여기서 내린다. 팝업과
+    // 취소 요청은 그 탭의 `등록 취소` 와 같은 것을 쓴다.
+    testWidgets('매물을 찾으면 여기서 바로 내리고 그 매물 번호가 나간다', (tester) async {
+      // 목의 등록 중 티켓과 같은 좌석(공연 11, R석 12열 24번)이어야 맞는다.
+      final api = SpyResaleApi(
+        clock: now,
+        extraTrades: [
+          MyTrade(
+            type: MyTradeType.sale,
+            listingId: 777,
+            status: MyTradeStatus.listed,
+            concertId: 11,
+            concertTitle: '2026 REMIND: 리센느',
+            venueName: '올림픽공원 체조경기장',
+            sectionName: 'R석',
+            seatRow: 12,
+            seatNumber: 24,
+            price: 140000,
+            faceValue: 154000,
+            occurredAt: now(),
+          ),
+        ],
+      );
+      await pumpStates(tester, resaleApi: api);
+
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      expect(tileEnabled(tester, TicketStrings.cancelListing), isTrue);
+
+      await tester.tap(find.text(TicketStrings.cancelListing));
+      await tester.pumpAndSettle();
+      // 양도 목록 탭과 같은 확인 팝업이다.
+      expect(find.text(TicketStrings.delistConfirmTitle), findsOneWidget);
+
+      await tester.tap(find.text(TicketStrings.delistConfirmAgree));
+      await tester.pumpAndSettle();
+
+      expect(api.cancelled, [777]);
     });
 
     // 예매 행이 판 사람 것이라 취소는 404 다. 다시 파는 것은 된다.

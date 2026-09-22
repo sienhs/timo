@@ -161,6 +161,11 @@ class ResaleStrings {
   /// 버튼을 잠그고 이유를 적는 쪽이 낫다.
   static const ownListing = '내가 등록한 매물이에요';
 
+  /// 목록에서의 내 매물 칩. 구매 화면의 [ownListing] 과 달리 **누르면 무엇이
+  /// 되는지**까지 적는다 — "내가 등록한 매물이에요" 만 있으면 못 사는 줄이라는
+  /// 뜻으로만 읽히고, 그 자리에서 내릴 수 있다는 것을 알 길이 없다.
+  static const ownListingDelist = '내 매물 · 눌러서 등록 취소';
+
   /// 온체인 체결이 실패했을 때(`TransferFailedException`). 서버 문구는 재시도만
   /// 권하는데, 잔액 부족이면 다시 시도해도 같다. 무엇을 보고 와야 하는지 적는다.
   static const transferFailedError = '결제하지 못했어요. 잔액이 모자라거나 매물 상태가 바뀌었을 수 있어요';

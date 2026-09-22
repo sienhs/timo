@@ -169,19 +169,54 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   }
 
   /// 카드 더보기(⋮). 고른 것이 있으면 그 흐름으로 이어간다.
+  ///
+  /// 매물은 시트를 열 때와 고른 뒤 **두 번** 찾는다. 시트가 열려 있는 동안
+  /// 목록이 다시 도착해 그새 팔렸을 수 있어, 눌린 시점의 값으로 보낸다.
   Future<void> _openMore(MyTicket ticket) async {
     final action = await showTicketMoreSheet(
       context,
       ticket: ticket,
       now: _now,
+      listingFound: _listingFor(ticket) != null,
     );
     if (action == null || !mounted) return;
     switch (action) {
       case TicketMoreAction.registerListing:
         await _openRegister(ticket);
+      case TicketMoreAction.cancelListing:
+        if (_listingFor(ticket) case final trade?) {
+          await _delist(trade);
+        } else {
+          // 시트를 열 때는 있었는데 고르는 사이 사라졌다. 이 자리에서 할 수
+          // 있는 게 없으므로 이유만 알린다.
+          _notify(TicketStrings.cancelListingUnknown);
+        }
       case TicketMoreAction.cancelReservation:
         await _cancelReservation(ticket);
     }
+  }
+
+  /// 이 티켓으로 올려 둔 매물. 없으면 null.
+  ///
+  /// 티켓 응답에 매물 번호가 없고 매물 응답에 티켓 번호가 없어([MyTrade] 주석)
+  /// **좌석으로 맞춘다** — 한 공연에 같은 좌석은 하나뿐이라 공연·구역·행·번호가
+  /// 같으면 같은 티켓이다. 서버가 한쪽에 번호를 실어 주면 이 함수가 사라진다.
+  ///
+  /// 올라가 있는 매물([MyTrade.isOnSale])만 본다. 같은 좌석을 내렸다 다시 올린
+  /// 이력이 여럿 있어도 지금 올라가 있는 것은 한 건이다.
+  MyTrade? _listingFor(MyTicket ticket) {
+    final sales = _sales;
+    if (sales == null) return null;
+    for (final trade in sales) {
+      if (!trade.isOnSale) continue;
+      if (trade.concertId == ticket.concertId &&
+          trade.sectionName == ticket.sectionName &&
+          trade.seatRow == ticket.seatRow &&
+          trade.seatNumber == ticket.seatNumber) {
+        return trade;
+      }
+    }
+    return null;
   }
 
   /// 양도마켓의 등록 화면으로 간다. 등록하고 돌아왔으면 목록을 다시 받는다 —
@@ -242,7 +277,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 띄운다. 성공 안내는 따로 없다. 다시 받은 목록에 "등록을 취소했어요" 회색
   /// 카드가 남는다.
   Future<void> _delist(MyTrade trade) async {
-    final confirmed = await showDelistListingDialog(context, trade: trade);
+    final confirmed = await showDelistListingDialog(
+      context,
+      concertTitle: trade.concertTitle,
+      seatLabel: trade.seatLabel,
+      price: trade.price,
+    );
     if (!confirmed || !mounted) return;
 
     final api = ResaleApiScope.of(context);

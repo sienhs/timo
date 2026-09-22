@@ -220,8 +220,9 @@ NotificationApi _notificationApiFor(String kind) => switch (kind) {
 /// 양도마켓 화면이 어느 [ResaleApi] 를 쓸지 고르는 실행 인자.
 ///
 /// ```bash
-/// flutter run --dart-define=RESALE_API=mock    # 시안 데이터로. 백엔드 불필요
-/// flutter run                                   # 기본값. 실제 서버(v1)
+/// flutter run --dart-define=RESALE_API=mock           # 시안 데이터로. 백엔드 불필요
+/// flutter run --dart-define=RESALE_API=mock-closed    # 마켓이 닫힌 화면
+/// flutter run                                          # 기본값. 실제 서버(v1)
 /// ```
 ///
 /// 내 티켓([_ticketApiKind])과 같은 장치다. 마켓에는 서버로 만들기 어려운
@@ -233,6 +234,8 @@ ResaleApi _resaleApiFor(String kind) => switch (kind) {
   'mock' => MockResaleApi(),
   'mock-empty' => MockResaleApi(scenario: ResaleMockScenario.empty),
   'mock-error' => MockResaleApi(scenario: ResaleMockScenario.error),
+  // 닫힘 화면은 창 밖에만 나와 낮에는 볼 수가 없다. 이걸로 언제든 본다.
+  'mock-closed' => MockResaleApi(scenario: ResaleMockScenario.closed),
   _ => HttpResaleApi(),
 };
 
