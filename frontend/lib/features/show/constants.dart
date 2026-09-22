@@ -45,6 +45,15 @@ class ShowDetailMetrics {
   /// 하단 바의 안내 문구와 버튼 사이.
   static const bottomBarGap = 10.0;
 
+  /// 하단 바에 버튼이 둘 설 때(예매 + 양도 마켓 알림) 그 둘 사이. 문구와
+  /// 버튼 사이보다 좁다 — 버튼 둘은 같은 묶음으로 읽혀야 한다.
+  static const bottomBarActionGap = 8.0;
+
+  /// 안내 스낵바와 하단 바 사이 틈. 스낵바는 이 화면의 바 높이만큼 띄워
+  /// 올린다(`_snackBarBottomMargin`) — 바를 `Scaffold.bottomNavigationBar`
+  /// 가 아니라 본문 안에 그려서 Flutter 가 대신 올려 주지 않는다.
+  static const snackBarGap = 12.0;
+
   /// 안내 문구 앞 시계 아이콘 크기.
   static const countdownIconSize = 15.0;
 
@@ -94,18 +103,27 @@ class ShowDetailStrings {
 
   static const bookAction = '예매하러 가기';
 
-  /// 오픈 알림 버튼. 알림은 서버가 **그 공연을 찜한 회원**에게 보낸다
-  /// (백엔드 `ConcertOpenSweep` — 7일 전·하루 전·1시간 전). 따로 신청할 곳이
-  /// 없어 이 버튼이 찜을 그대로 켜고 끈다. 문구에 둘을 같이 적는 이유도
-  /// 그래서다 — `오픈 알림 받기` 만 적으면 눌렀을 때 찜 목록에 들어가는 것이
-  /// 설명되지 않고, 상단 하트가 같이 채워지는 것도 오작동으로 읽힌다.
-  static const notifyAction = '오픈 알림 및 찜하기';
-  static const unnotifyAction = '오픈 알림 및 찜 해제';
+  /// 오픈 알림 버튼. **찜과는 다른 신청이다.** 상단 하트는 찜 목록에만 넣고,
+  /// 알림은 이 버튼으로 따로 켜고 끈다 — 백엔드가 알림 신청을 찜과 별개로
+  /// 들고 있어(`AlarmController` 의 `CONCERT_OPEN`) 하나를 풀어도 다른 하나는
+  /// 그대로다. 그래서 문구에 찜을 적지 않는다.
+  static const notifyAction = '오픈 알림 받기';
+  static const unnotifyAction = '오픈 알림 해제하기';
 
-  /// 버튼을 눌러 찜이 실제로 바뀌었을 때의 안내. 로그인 안내·실패는 찜 공통
-  /// 동작(`toggleFavoriteShow`)이 따로 알린다.
+  /// 양도 마켓 알림 버튼. 신청한 공연에 새 양도 매물이 올라오면 알려 준다
+  /// (백엔드 `MARKET_LISTING`). 오픈 알림과 따로 신청하고 따로 푼다.
+  ///
+  /// 예매 중인 공연에만 세운다. 끝난 공연에는 사고팔 표가 없고, 오픈 전에는
+  /// 아직 아무도 표를 갖고 있지 않아 올라올 매물이 없다.
+  static const marketAlarmAction = '양도 마켓 알림 받기';
+  static const marketAlarmOffAction = '양도 마켓 알림 해제하기';
+
+  /// 알림 버튼을 눌렀을 때의 안내. 종류마다 켠 말과 끈 말이 따로 있다 —
+  /// 버튼이 둘이라 '알림을 신청했어요' 로 뭉치면 어느 쪽을 켰는지 알 수 없다.
   static const openAlarmOn = '오픈 알림을 신청했어요. 예매가 열리기 전에 알려드릴게요.';
   static const openAlarmOff = '오픈 알림을 껐어요.';
+  static const marketAlarmOn = '양도 마켓 알림을 신청했어요. 새 매물이 올라오면 알려드릴게요.';
+  static const marketAlarmOff = '양도 마켓 알림을 껐어요.';
 
   /// 이미 끝난 공연의 하단 바. 버튼은 잠기고 이 문구가 대신 선다.
   ///

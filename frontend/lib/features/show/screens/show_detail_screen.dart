@@ -81,42 +81,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Future<void> _toggleFavorite(ShowDetail detail) =>
       toggleFavoriteShow(context, detail.toFavorite());
 
-  /// 하단 바의 오픈 알림 버튼. 찜을 켜고 끄는 것과 같은 일을 한다.
-  ///
-  /// 서버에 '알림만 신청' 하는 길이 없다. 오픈 알림은 백엔드
-  /// `ConcertOpenSweep` 이 **그 공연을 찜한 회원**에게 보내므로, 알림을 받는
-  /// 방법은 찜뿐이다. 상단 하트와 같은 동작을 부르는 것도 그래서다 — 둘이
-  /// 다른 일을 하면 하트로 찜을 뺀 사람에게 알림이 안 가는 이유를 설명할 수
-  /// 없다.
-  Future<void> _toggleOpenAlarm(ShowDetail detail) async {
-    final store = FavoriteScope.read(context);
-    final wasWished = store.favorites.hasShow(detail.id);
-
-    await _toggleFavorite(detail);
-
-    if (!mounted) return;
-    // 로그인 안내와 실패는 위에서 이미 알렸다. 찜이 실제로 바뀌었을 때만
-    // 결과를 덧붙인다 — 실패한 뒤에 '신청했어요' 가 뜨면 거짓말이 된다.
-    if (store.favorites.hasShow(detail.id) == wasWished) return;
-    _notify(
-      wasWished
-          ? ShowDetailStrings.openAlarmOff
-          : ShowDetailStrings.openAlarmOn,
-    );
-  }
-
-  /// 알림 신청 결과를 한 줄로 알린다. 앱 공통 안내 상자를 쓴다.
-  ///
-  /// 띄우기 전에 떠 있던 것을 걷어낸다(공통 동작이 맡는다). 켜고 바로 끄면
-  /// 먼저 뜬 '신청했어요' 가 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에
-  /// 신청했다는 말이 남는다.
-  ///
-  /// 아래 여백은 기본값을 쓴다. 하단 바를 `Scaffold.bottomNavigationBar` 가
-  /// 아니라 본문 안에 그려서 Flutter 가 스낵바를 올려 주지 않기 때문이다.
-  void _notify(String message) {
-    showSuccessSnackBar(context, message);
-  }
-
   @override
   Widget build(BuildContext context) {
     final loaded = _loaded;
@@ -130,11 +94,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       body: AsyncBoundary<ShowDetail>(
         future: _detail,
         onRetry: _reload,
-        builder: (context, detail) => _LoadedShow(
-          detail: detail,
-          clock: widget.clock,
-          onNotifyPressed: () => _toggleOpenAlarm(detail),
-        ),
+        builder: (context, detail) =>
+            _LoadedShow(detail: detail, clock: widget.clock),
       ),
     );
   }
@@ -146,17 +107,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 /// 공연을 받아야 무엇을 그릴지 정해지는데, 그 판단을 Scaffold 자리에서 하면
 /// 로딩·실패 분기가 본문과 하단 바 두 곳으로 갈라진다.
 class _LoadedShow extends StatefulWidget {
-  const _LoadedShow({
-    required this.detail,
-    required this.clock,
-    required this.onNotifyPressed,
-  });
+  const _LoadedShow({required this.detail, required this.clock});
 
   final ShowDetail detail;
   final DateTime Function() clock;
-
-  /// 오픈 알림 버튼을 눌렀을 때. 화면이 찜을 켜고 끈다.
-  final VoidCallback onNotifyPressed;
 
   @override
   State<_LoadedShow> createState() => _LoadedShowState();
@@ -172,6 +126,22 @@ class _LoadedShowState extends State<_LoadedShow> {
   late final ValueNotifier<DateTime> _now = ValueNotifier(widget.clock());
 
   Timer? _tick;
+
+  /// 하단 바. 안내 스낵바를 그 위로 띄우려고 높이를 잰다.
+  final GlobalKey _bottomBarKey = GlobalKey();
+
+  /// 예매 오픈 알림을 신청했는가.
+  ///
+  /// **아직 화면 안에서만 켜지고 꺼진다.** 서버에 알림 신청 API 가 이미 있지만
+  /// (`AlarmController` — `PUT/DELETE /api/v1/alarms/{concertId}/{type}`,
+  /// 상태는 `GET /api/v1/alarms/{concertId}`) 붙이는 일은 다른 사람 몫이라
+  /// 여기서는 버튼이 갈리는 모양까지만 만들어 둔다. 붙일 때는 이 두 필드를
+  /// 서버에서 받은 값으로 바꾸고 아래 두 함수 안에서 요청을 보내면 된다 —
+  /// 화면 트리와 버튼 쪽은 그대로 둘 수 있다.
+  bool _openAlarmOn = false;
+
+  /// 양도 매물 알림을 신청했는가. 오픈 알림과 따로 켜고 끈다.
+  bool _marketAlarmOn = false;
 
   @override
   void initState() {
@@ -195,6 +165,51 @@ class _LoadedShowState extends State<_LoadedShow> {
       _now.value = now;
       if (widget.detail.isOpenAt(now)) timer.cancel();
     });
+  }
+
+  /// 오픈 알림 버튼을 눌렀을 때.
+  void _toggleOpenAlarm() {
+    setState(() => _openAlarmOn = !_openAlarmOn);
+    _notify(
+      _openAlarmOn
+          ? ShowDetailStrings.openAlarmOn
+          : ShowDetailStrings.openAlarmOff,
+    );
+  }
+
+  /// 양도 마켓 알림 버튼을 눌렀을 때.
+  void _toggleMarketAlarm() {
+    setState(() => _marketAlarmOn = !_marketAlarmOn);
+    _notify(
+      _marketAlarmOn
+          ? ShowDetailStrings.marketAlarmOn
+          : ShowDetailStrings.marketAlarmOff,
+    );
+  }
+
+  /// 알림 신청 결과를 한 줄로 알린다. 앱 공통 안내 상자를 쓴다.
+  ///
+  /// 띄우기 전에 떠 있던 것을 걷어낸다(공통 동작이 맡는다). 켜고 바로 끄면
+  /// 먼저 뜬 '신청했어요' 가 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에
+  /// 신청했다는 말이 남는다.
+  ///
+  /// 아래 여백은 기본값을 쓴다. 하단 바를 `Scaffold.bottomNavigationBar` 가
+  /// 아니라 본문 안에 그려서 Flutter 가 스낵바를 올려 주지 않기 때문이다.
+  void _notify(String message) {
+    showSuccessSnackBar(context, message, bottomMargin: _snackBarBottomMargin);
+  }
+
+  /// 안내 스낵바를 띄울 높이. 하단 바를 **재서** 정한다.
+  ///
+  /// 숫자로 적어 두지 않는 이유는 바 높이가 상태마다 다르기 때문이다 — 예매
+  /// 중에는 버튼이 둘이고, 오픈 전에는 버튼 위에 남은 시간 한 줄이 더 붙는다.
+  /// 한 값으로 적으면 어느 한 상태에서는 안내가 버튼을 덮는다.
+  ///
+  /// 아직 재지 못했으면 기본 여백(스낵바 쪽 기본값)에 맡긴다.
+  double? get _snackBarBottomMargin {
+    final box = _bottomBarKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    return box.size.height + ShowDetailMetrics.snackBarGap;
   }
 
   /// 예매를 시작한다. 로그인부터 확인한다.
@@ -293,13 +308,15 @@ class _LoadedShowState extends State<_LoadedShow> {
         ValueListenableBuilder<DateTime>(
           valueListenable: _now,
           builder: (context, now, _) => ShowDetailBottomBar(
+            key: _bottomBarKey,
             detail: detail,
             now: now,
-            // 상단 하트와 같은 값을 본다. 알림 버튼으로 켠 찜이 하트에도
-            // 채워져야 둘이 같은 것을 가리킨다는 게 보인다.
-            isFavorite: FavoriteScope.of(context).favorites.hasShow(detail.id),
+            // 상단 하트(찜)와는 별개다. 찜을 풀어도 알림 신청은 그대로다.
+            isOpenAlarmOn: _openAlarmOn,
+            isMarketAlarmOn: _marketAlarmOn,
             onBookPressed: _startBooking,
-            onNotifyPressed: widget.onNotifyPressed,
+            onOpenAlarmPressed: _toggleOpenAlarm,
+            onMarketAlarmPressed: _toggleMarketAlarm,
           ),
         ),
       ],

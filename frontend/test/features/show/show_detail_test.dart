@@ -206,55 +206,85 @@ void main() {
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
 
-    // 서버는 '그 공연을 찜한 회원' 에게 오픈 알림을 보낸다. 알림 신청은 찜과
-    // 같은 일이라, 버튼이 상단 하트와 같은 곳을 건드려야 한다.
-    testWidgets('알림 버튼이 공연을 찜하고, 하트도 같이 채워진다', (tester) async {
+    testWidgets('신청하면 버튼이 해제로 바뀌고, 다시 누르면 돌아온다', (tester) async {
       await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
 
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
 
-      expect(favorites.favorites.hasShow(1), isTrue);
-      expect(favoriteApi.wishedIds, [1]);
       expect(find.text(ShowDetailStrings.openAlarmOn), findsOneWidget);
-      expect(
-        find.byTooltip(ShowDetailStrings.unfavoriteAction),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('이미 찜했으면 버튼이 해제로 바뀌고, 누르면 찜이 빠진다', (tester) async {
-      await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
-
-      await tester.tap(find.text(ShowDetailStrings.notifyAction));
-      await tester.pump();
-
       expect(find.text(ShowDetailStrings.unnotifyAction), findsOneWidget);
       expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
 
       await tester.tap(find.text(ShowDetailStrings.unnotifyAction));
       await tester.pump();
 
-      expect(favorites.favorites.shows, isEmpty);
       expect(find.text(ShowDetailStrings.openAlarmOff), findsOneWidget);
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
 
-    // 찜은 서버에 남으므로 로그인해야 한다. 안내만 띄우고 버튼은 그대로다.
-    testWidgets('로그아웃 상태면 찜하지 않고 로그인하라고 알린다', (tester) async {
-      await pumpDetail(
-        tester,
-        detailOpening(after: const Duration(hours: 1)),
-        loggedIn: false,
-      );
+    // 아직 아무도 표를 갖고 있지 않아 올라올 매물이 없다.
+    testWidgets('양도 마켓 알림 버튼은 세우지 않는다', (tester) async {
+      await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
+
+      expect(find.text(ShowDetailStrings.marketAlarmAction), findsNothing);
+    });
+  });
+
+  group('예매 중', () {
+    testWidgets('양도 마켓 알림 버튼이 예매 버튼과 함께 선다', (tester) async {
+      await pumpDetail(tester, detailOpening());
+
+      expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
+      expect(find.text(ShowDetailStrings.marketAlarmAction), findsOneWidget);
+      // 오픈은 이미 했으니 오픈 알림을 신청할 자리가 아니다.
+      expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
+    });
+
+    testWidgets('신청하면 버튼이 해제로 바뀌고, 다시 누르면 돌아온다', (tester) async {
+      await pumpDetail(tester, detailOpening());
+
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmAction));
+      await tester.pump();
+
+      expect(find.text(ShowDetailStrings.marketAlarmOn), findsOneWidget);
+      expect(find.text(ShowDetailStrings.marketAlarmOffAction), findsOneWidget);
+
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmOffAction));
+      await tester.pump();
+
+      expect(find.text(ShowDetailStrings.marketAlarmOff), findsOneWidget);
+      expect(find.text(ShowDetailStrings.marketAlarmAction), findsOneWidget);
+      // 예매 버튼은 알림을 켜고 끄는 동안에도 자리를 지킨다.
+      expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
+    });
+  });
+
+  // 알림 신청은 찜과 별개다(백엔드 `AlarmController` — 찜을 하거나 풀어도 알림
+  // 신청은 바뀌지 않는다). 하나를 눌러 다른 하나가 따라 움직이면 안 된다.
+  group('찜과 알림', () {
+    testWidgets('알림 버튼은 찜 목록을 건드리지 않는다', (tester) async {
+      await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
 
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
 
       expect(favorites.favorites.shows, isEmpty);
-      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
-      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
+      expect(favoriteApi.wishedIds, isEmpty);
+      expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
+    });
+
+    testWidgets('하트는 알림 버튼을 건드리지 않는다', (tester) async {
+      await pumpDetail(tester, detailOpening(after: const Duration(hours: 1)));
+
+      await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
+      await tester.pump();
+      // 하트는 화면부터 바꾸고 서버로는 조금 늦게 보낸다(연타 묶기).
+
+      expect(favorites.favorites.hasShow(1), isTrue);
+      expect(favoriteApi.wishedIds, [1]);
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
+      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
     });
   });
 
@@ -287,6 +317,9 @@ void main() {
 
       expect(find.text(ShowDetailStrings.closedNotice), findsOneWidget);
       expect(find.text(ShowDetailStrings.bookAction), findsNothing);
+      // 사고팔 표가 없는 공연이라 알림도 세우지 않는다.
+      expect(find.text(ShowDetailStrings.marketAlarmAction), findsNothing);
+      expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
 
       final button = tester.widget<FilledButton>(find.byType(FilledButton));
       expect(button.onPressed, isNull);
@@ -341,6 +374,9 @@ void main() {
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNotNull,
       );
+      // 매진이면 양도 매물을 기다리는 사람이 가장 많다. 취소표를 보러 가는
+      // 길과 함께 선다.
+      expect(find.text(ShowDetailStrings.marketAlarmAction), findsOneWidget);
     });
   });
 
@@ -586,6 +622,22 @@ void main() {
       await tester.pump();
 
       expect(favorites.favorites.shows, isEmpty);
+      expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
+    });
+
+    // 찜은 서버에 남으므로 로그인해야 한다. 안내만 띄우고 하트는 빈 채로 둔다.
+    testWidgets('로그아웃 상태면 찜하지 않고 로그인하라고 알린다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(after: const Duration(hours: 1)),
+        loggedIn: false,
+      );
+
+      await tester.tap(find.byTooltip(ShowDetailStrings.favoriteAction));
+      await tester.pump();
+
+      expect(favorites.favorites.shows, isEmpty);
+      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
       expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
     });
 
