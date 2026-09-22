@@ -41,10 +41,16 @@ class MyPageMetrics {
   static const historyTopGap = 12.0;
   static const transactionVerticalPadding = 12.0;
   static const transactionLineGap = 4.0;
-  static const seeAllTopGap = 8.0;
 
-  /// 사용 내역 카드에 보여 주는 최근 건수. 나머지는 '전체 내역 보기' 가 맡는다.
-  static const recentTransactionCount = 4;
+  /// 코인 내역 카드에 보여 주는 최근 건수.
+  static const recentTransactionCount = 20;
+
+  /// 코인 내역 목록이 차지할 수 있는 최대 높이.
+  ///
+  /// 내역이 쌓이는 대로 카드가 길어지면 마이페이지가 한없이 늘어난다. 한 줄이
+  /// 대략 66 이라 네 줄쯤 되는 높이에서 자르고, 나머지는 카드 안에서 스크롤로
+  /// 본다.
+  static const historyMaxHeight = 300.0;
 
   /// 불러오는 동안 카드 자리를 지키는 높이. 응답이 오면 내용 높이로 바뀐다.
   static const loadingCardHeight = 160.0;
@@ -156,8 +162,7 @@ class MyPageStrings {
   /// 로그인 안 한 채로 충전 화면에 들어왔을 때.
   static const chargeLoginPrompt = '로그인하고 버섯을 충전해 보세요.';
 
-  static const historyTitle = '사용 내역';
-  static const seeAllHistory = '전체 내역 보기';
+  static const historyTitle = '코인 내역';
 
   /// 걸러 본 종류에 해당하는 내역이 없을 때.
   static const noTransactions = '아직 내역이 없어요.';

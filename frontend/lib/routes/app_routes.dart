@@ -121,6 +121,7 @@ class AppRoutes {
   /// 아이디와 비밀번호를 한 화면에서 받는다. 예전에는 따로였다.
   static const signupAccount = '/signup/account';
   static const signupNickname = '/signup/nickname';
+
   /// 가입 직후 지갑을 준비하는 연출. 영상이 끝나면 스스로 완료 화면으로 바뀐다.
   static const signupWallet = '/signup/wallet';
   static const signupComplete = '/signup/complete';

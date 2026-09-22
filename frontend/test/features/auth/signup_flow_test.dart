@@ -871,7 +871,17 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text(AuthStrings.logout), 200);
+      // 코인 내역 카드가 제 안에 목록을 하나 더 들고 있어, 굴릴 목록을 집어 준다.
+      await tester.scrollUntilVisible(
+        find.text(AuthStrings.logout),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(MyPageScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text(AuthStrings.logout), findsOneWidget);
     });
   });

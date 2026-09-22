@@ -19,9 +19,11 @@ import 'package:timo/features/mypage/data/mock_wallet_ledger.dart';
 import 'package:timo/features/mypage/data/my_page_api.dart';
 import 'package:timo/features/mypage/models/member_profile.dart';
 import 'package:timo/features/mypage/models/wallet_summary.dart';
+import 'package:timo/features/mypage/models/wallet_transaction.dart';
 import 'package:timo/features/mypage/screens/coin_charge_screen.dart';
 import 'package:timo/features/mypage/screens/my_page_screen.dart';
 import 'package:timo/features/mypage/state/my_page_api_scope.dart';
+import 'package:timo/features/mypage/widgets/transaction_history_card.dart';
 import 'package:timo/features/mypage/widgets/transaction_tile.dart';
 import 'package:timo/features/notification/notification_destination.dart';
 import 'package:timo/features/notification/push_notification_scope.dart';
@@ -175,8 +177,17 @@ void main() {
   ///
   /// `scrollUntilVisible` 은 위젯이 만들어지는(캐시 범위에 들어오는) 순간
   /// 멈춰서 아직 화면 아래에 걸쳐 있을 수 있다. 그래서 끝까지 끌어올린다.
+  ///
+  /// 내릴 목록을 집어 준다. 코인 내역 카드가 제 안에 목록을 하나 더 들고 있어
+  /// 그냥 두면 어느 쪽을 굴릴지 고르지 못한다.
   Future<void> scrollTo(WidgetTester tester, Finder finder) async {
-    await tester.scrollUntilVisible(finder, 200);
+    final page = find
+        .descendant(
+          of: find.byType(MyPageScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(finder, 200, scrollable: page);
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
   }
@@ -223,7 +234,7 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
-    testWidgets('닉네임 인사말 · 잔액 · 최근 내역 4건이 시안대로 보인다', (tester) async {
+    testWidgets('닉네임 인사말 · 잔액 · 코인 내역이 시안대로 보인다', (tester) async {
       await pumpMyPage(tester, loggedIn: true);
       await settle(tester);
 
@@ -240,55 +251,53 @@ void main() {
       expect(find.text(MyPageStrings.charge), findsOneWidget);
 
       expect(find.text(MyPageStrings.historyTitle), findsOneWidget);
-      expect(
-        find.byType(TransactionTile),
-        findsNWidgets(MyPageMetrics.recentTransactionCount),
-      );
+      // 목의 거래 4건이 그대로 다 보인다. 거르는 장치도, 더 보는 입구도 없다.
+      expect(find.byType(TransactionTile), findsNWidgets(4));
       expect(find.text('-176,000 MSR'), findsOneWidget);
       expect(find.text('+150,000 MSR'), findsOneWidget);
       expect(find.text('09.12 19:42 · 양도 마켓'), findsOneWidget);
       expect(find.text(MyPageStrings.balanceAfter('23,400')), findsOneWidget);
-      await scrollTo(tester, find.text(MyPageStrings.seeAllHistory));
-      expect(find.text(MyPageStrings.seeAllHistory), findsOneWidget);
       await scrollTo(tester, find.text(AuthStrings.logout));
       expect(find.text(AuthStrings.logout), findsOneWidget);
     });
 
-    testWidgets('필터를 누르면 충전(늘어난 것)·사용(줄어든 것)만 남는다', (tester) async {
-      await pumpMyPage(tester, loggedIn: true);
+    testWidgets('거래가 하나도 없으면 빈 상태 문구를 보여 준다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true, api: _EmptyWalletApi());
       await settle(tester);
-
-      await tester.tap(find.text('충전'));
-      await tester.pump();
-      expect(find.byType(TransactionTile), findsNWidgets(2));
-      expect(find.text('+150,000 MSR'), findsOneWidget);
-      expect(find.text('+98,000 MSR'), findsOneWidget);
-      expect(find.text('-176,000 MSR'), findsNothing);
-
-      await tester.tap(find.text('사용'));
-      await tester.pump();
-      expect(find.byType(TransactionTile), findsNWidgets(2));
-      expect(find.text('-176,000 MSR'), findsOneWidget);
-      expect(find.text('-121,000 MSR'), findsOneWidget);
-      expect(find.text('+150,000 MSR'), findsNothing);
-
-      await tester.tap(find.text('전체'));
-      await tester.pump();
-      expect(
-        find.byType(TransactionTile),
-        findsNWidgets(MyPageMetrics.recentTransactionCount),
-      );
-    });
-
-    testWidgets('해당 종류의 내역이 없으면 빈 상태 문구를 보여 준다', (tester) async {
-      await pumpMyPage(tester, loggedIn: true, api: _OnlyDebitsApi());
-      await settle(tester);
-
-      await tester.tap(find.text('충전'));
-      await tester.pump();
 
       expect(find.byType(TransactionTile), findsNothing);
       expect(find.text(MyPageStrings.noTransactions), findsOneWidget);
+    });
+
+    /// 내역은 계속 쌓이는데 카드가 그만큼 길어지면 마이페이지가 한없이 늘어난다.
+    /// 목록만 정해진 높이에서 자르고 그 안에서 굴린다.
+    testWidgets('내역이 많아도 카드는 정해진 높이를 넘지 않고 그 안에서 스크롤된다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true, api: _ManyTransactionsApi());
+      await settle(tester);
+
+      final list = find.descendant(
+        of: find.byType(TransactionHistoryCard),
+        matching: find.byType(Scrollable),
+      );
+      expect(
+        tester.getSize(list).height,
+        lessThanOrEqualTo(MyPageMetrics.historyMaxHeight),
+      );
+
+      // 잘린 아래쪽도 굴리면 닿는다.
+      final firstBefore = tester
+          .widgetList<TransactionTile>(find.byType(TransactionTile))
+          .first
+          .transaction
+          .title;
+      await tester.drag(list, const Offset(0, -400));
+      await tester.pumpAndSettle();
+      final firstAfter = tester
+          .widgetList<TransactionTile>(find.byType(TransactionTile))
+          .first
+          .transaction
+          .title;
+      expect(firstAfter, isNot(firstBefore));
     });
 
     testWidgets('실패하면 문구와 다시 시도가 보이고, 다시 시도하면 채워진다', (tester) async {
@@ -358,20 +367,6 @@ void main() {
       );
       expect(find.text('133,000'), findsOneWidget);
       expect(find.text('123,000'), findsNothing);
-    });
-
-    testWidgets('전체 내역 보기를 누르면 준비 중 안내가 뜬다', (tester) async {
-      await pumpMyPage(tester, loggedIn: true);
-      await settle(tester);
-
-      await scrollTo(tester, find.text(MyPageStrings.seeAllHistory));
-      await tester.tap(find.text(MyPageStrings.seeAllHistory));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text(MyPageStrings.notReady(MyPageStrings.seeAllHistory)),
-        findsOneWidget,
-      );
     });
 
     testWidgets('알림을 누르면 알림함이 열린다', (tester) async {
@@ -449,7 +444,8 @@ void main() {
 }
 
 /// 줄어든 거래만 있는 지갑. 필터의 빈 상태를 보는 데 쓴다.
-class _OnlyDebitsApi implements MyPageApi {
+/// 높이 제한을 보는 목. 카드가 담는 20건을 다 채운다.
+class _ManyTransactionsApi implements MyPageApi {
   @override
   Future<MemberProfile> fetchProfile() => Future.value(MockMyPageData.profile);
 
@@ -457,13 +453,32 @@ class _OnlyDebitsApi implements MyPageApi {
   Future<WalletSummary> fetchWallet() => Future.value(
     WalletSummary(
       balance: 0,
-      transactions: MockMyPageData.wallet.transactions
-          .where((t) => !t.isCredit)
-          .toList(),
+      transactions: [
+        for (var i = 0; i < MyPageMetrics.recentTransactionCount; i++)
+          WalletTransaction(
+            title: '거래 $i',
+            amount: -1000 * (i + 1),
+            balanceAfter: 0,
+            occurredAt: DateTime(2026, 9, 15, 12, i),
+            source: '양도 마켓',
+          ),
+      ],
     ),
   );
 
-  /// 이 목은 필터의 빈 상태만 본다. 충전은 쓰지 않는다.
+  @override
+  Future<WalletSummary> charge(int amount) => throw UnimplementedError();
+}
+
+class _EmptyWalletApi implements MyPageApi {
+  @override
+  Future<MemberProfile> fetchProfile() => Future.value(MockMyPageData.profile);
+
+  @override
+  Future<WalletSummary> fetchWallet() =>
+      Future.value(const WalletSummary(balance: 0, transactions: []));
+
+  /// 이 목은 빈 상태만 본다. 충전은 쓰지 않는다.
   @override
   Future<WalletSummary> charge(int amount) => throw UnimplementedError();
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
-import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/constants.dart';
 import '../../auth/state/auth_api_scope.dart';
@@ -172,11 +171,7 @@ class _MemberViewState extends State<_MemberView> {
                 onChargePressed: _openCharge,
               ),
               const SizedBox(height: MyPageMetrics.cardGap),
-              TransactionHistoryCard(
-                transactions: wallet.transactions,
-                onSeeAllPressed: () =>
-                    _notifyNotReady(context, MyPageStrings.seeAllHistory),
-              ),
+              TransactionHistoryCard(transactions: wallet.transactions),
             ],
           ),
         ),
@@ -271,12 +266,4 @@ class _GuestView extends StatelessWidget {
       ),
     );
   }
-}
-
-void _notifyNotReady(BuildContext context, String label) {
-  showInfoSnackBar(
-    context,
-    MyPageStrings.notReady(label),
-    bottomMargin: snackBarGapAboveBar,
-  );
 }
