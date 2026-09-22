@@ -172,26 +172,6 @@ void main() {
   /// 목 응답이 도착해 화면이 채워질 때까지.
   Future<void> settle(WidgetTester tester) => tester.pumpAndSettle();
 
-  /// 본문은 ListView 라 화면 밖 위젯은 아직 만들어지지도 않았다. 찾으려는
-  /// 것이 나올 때까지 내린다. (기본 테스트 화면은 폰보다 낮다.)
-  ///
-  /// `scrollUntilVisible` 은 위젯이 만들어지는(캐시 범위에 들어오는) 순간
-  /// 멈춰서 아직 화면 아래에 걸쳐 있을 수 있다. 그래서 끝까지 끌어올린다.
-  ///
-  /// 내릴 목록을 집어 준다. 코인 내역 카드가 제 안에 목록을 하나 더 들고 있어
-  /// 그냥 두면 어느 쪽을 굴릴지 고르지 못한다.
-  Future<void> scrollTo(WidgetTester tester, Finder finder) async {
-    final page = find
-        .descendant(
-          of: find.byType(MyPageScreen),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(finder, 200, scrollable: page);
-    await tester.ensureVisible(finder);
-    await tester.pumpAndSettle();
-  }
-
   group('로그인 안 한 상태', () {
     testWidgets('안내와 로그인 버튼이 보이고, 누르면 로그인 화면으로 간다', (tester) async {
       await pumpMyPage(tester, loggedIn: false);
@@ -257,8 +237,37 @@ void main() {
       expect(find.text('+150,000 MSR'), findsOneWidget);
       expect(find.text('09.12 19:42 · 양도 마켓'), findsOneWidget);
       expect(find.text(MyPageStrings.balanceAfter('23,400')), findsOneWidget);
-      await scrollTo(tester, find.text(AuthStrings.logout));
       expect(find.text(AuthStrings.logout), findsOneWidget);
+    });
+
+    /// 로그아웃을 보려고 마이페이지를 내릴 일은 없어야 한다. 굴러도 되는 것은
+    /// 코인 내역 목록 하나뿐이다.
+    testWidgets('페이지는 굴리지 않고, 로그아웃은 내리지 않아도 보인다', (tester) async {
+      await pumpMyPage(tester, loggedIn: true, api: _ManyTransactionsApi());
+      await settle(tester);
+
+      final scrollables = find.descendant(
+        of: find.byType(MyPageScreen),
+        matching: find.byType(Scrollable),
+      );
+      expect(scrollables, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(TransactionHistoryCard),
+          matching: scrollables,
+        ),
+        findsOneWidget,
+      );
+
+      // 화면 안에 다 들어온다 — 끌어올리지 않고도 누를 수 있다.
+      final logout = find.text(AuthStrings.logout);
+      expect(logout, findsOneWidget);
+      expect(
+        tester.getRect(logout).bottom,
+        lessThanOrEqualTo(
+          tester.view.physicalSize.height / tester.view.devicePixelRatio,
+        ),
+      );
     });
 
     testWidgets('거래가 하나도 없으면 빈 상태 문구를 보여 준다', (tester) async {
@@ -396,7 +405,6 @@ void main() {
       final session = await pumpMyPage(tester, loggedIn: true);
       await settle(tester);
 
-      await scrollTo(tester, find.text(AuthStrings.logout));
       await tester.tap(find.text(AuthStrings.logout));
       await tester.pumpAndSettle();
 
@@ -416,7 +424,6 @@ void main() {
       );
       await settle(tester);
 
-      await scrollTo(tester, find.text(AuthStrings.logout));
       await tester.tap(find.text(AuthStrings.logout));
       await tester.pumpAndSettle();
 
@@ -430,7 +437,6 @@ void main() {
       final session = await pumpMyPage(tester, loggedIn: true);
       await settle(tester);
 
-      await scrollTo(tester, find.text(AuthStrings.logout));
       await tester.tap(find.text(AuthStrings.logout));
       await tester.pumpAndSettle();
 

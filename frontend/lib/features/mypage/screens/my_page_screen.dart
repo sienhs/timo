@@ -143,47 +143,62 @@ class _MemberViewState extends State<_MemberView> {
     }
   }
 
+  /// 페이지 자체는 굴리지 않는다. 인사말·잔액·로그아웃은 제 높이를 다 차지하고,
+  /// 남는 자리를 코인 내역 카드가 받아 그 안에서 굴린다. 내역이 아무리 쌓여도
+  /// 로그아웃을 보려고 페이지를 내릴 일은 없다.
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(
         MyPageMetrics.horizontalPadding,
         MyPageMetrics.greetingTopGap,
         MyPageMetrics.horizontalPadding,
         MyPageMetrics.bottomGap,
       ),
-      children: [
-        AsyncBoundary<MemberProfile>(
-          future: _profile,
-          onRetry: _reloadProfile,
-          loading: const _GreetingPlaceholder(),
-          builder: (context, profile) => _Greeting(nickname: profile.nickname),
-        ),
-        const SizedBox(height: MyPageMetrics.greetingBottomGap),
-        AsyncBoundary<WalletSummary>(
-          future: _wallet,
-          onRetry: _reloadWallet,
-          loading: const _WalletPlaceholder(),
-          builder: (context, wallet) => Column(
-            children: [
-              MushroomBalanceCard(
-                balance: wallet.balance,
-                onChargePressed: _openCharge,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AsyncBoundary<MemberProfile>(
+            future: _profile,
+            onRetry: _reloadProfile,
+            loading: const _GreetingPlaceholder(),
+            builder: (context, profile) =>
+                _Greeting(nickname: profile.nickname),
+          ),
+          const SizedBox(height: MyPageMetrics.greetingBottomGap),
+          // 남은 높이까지만 차지한다(loose). 내역이 적으면 그만큼만 높아진다.
+          Flexible(
+            child: AsyncBoundary<WalletSummary>(
+              future: _wallet,
+              onRetry: _reloadWallet,
+              loading: const _WalletPlaceholder(),
+              builder: (context, wallet) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MushroomBalanceCard(
+                    balance: wallet.balance,
+                    onChargePressed: _openCharge,
+                  ),
+                  const SizedBox(height: MyPageMetrics.cardGap),
+                  Flexible(
+                    child: TransactionHistoryCard(
+                      transactions: wallet.transactions,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: MyPageMetrics.cardGap),
-              TransactionHistoryCard(transactions: wallet.transactions),
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: MyPageMetrics.logoutTopGap),
-        // 화면의 primary 는 충전하기 하나다. 로그아웃은 보조 스타일로 둔다.
-        Center(
-          child: OutlinedButton(
-            onPressed: _logout,
-            child: const Text(AuthStrings.logout),
+          const SizedBox(height: MyPageMetrics.logoutTopGap),
+          // 화면의 primary 는 충전하기 하나다. 로그아웃은 보조 스타일로 둔다.
+          Center(
+            child: OutlinedButton(
+              onPressed: _logout,
+              child: const Text(AuthStrings.logout),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
