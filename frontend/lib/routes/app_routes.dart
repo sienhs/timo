@@ -21,6 +21,7 @@ import '../features/mypage/screens/coin_charge_screen.dart';
 import '../features/shell/screens/main_shell_screen.dart';
 import '../features/ticket/models/my_ticket.dart';
 import '../features/ticket/screens/entry_qr_screen.dart';
+import '../features/ticket/screens/quick_entry_qr_screen.dart';
 import '../features/ticket/screens/my_tickets_screen.dart';
 import '../features/show/screens/show_detail_screen.dart';
 import '../features/payment/models/order_target.dart';
@@ -146,9 +147,12 @@ class AppRoutes {
     collection: (_) => const CollectionScreen(),
     // 목록이 이미 들고 있는 티켓을 그대로 넘긴다. id 만 넘겨 여기서 다시
     // 조회하면 입장 직전에 네트워크를 한 번 더 타게 된다.
-    entryQr: (context) => EntryQrScreen(
-      ticket: ModalRoute.of(context)!.settings.arguments! as MyTicket,
-    ),
+    entryQr: (context) {
+      final ticket = ModalRoute.of(context)!.settings.arguments as MyTicket?;
+      return ticket == null
+          ? const QuickEntryQrScreen()
+          : EntryQrScreen(ticket: ticket);
+    },
     // 예매 흐름 밖에서 열리면(딥링크·화면 단위 테스트) 공연 번호가 없다.
     // 그때만 기본 공연으로 대신한다.
     zoneSelection: (context) => ZoneSelectionScreen(

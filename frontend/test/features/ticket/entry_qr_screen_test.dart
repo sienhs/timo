@@ -158,6 +158,15 @@ void main() {
       expect(find.text(TicketStrings.qrRemaining), findsNothing);
     });
 
+    testWidgets('입장 완료 상태를 확인하면 이미 입장한 QR이라고 알린다', (tester) async {
+      api.failure = const ApiException('입장 QR 을 발급할 수 없는 티켓입니다.', status: 409);
+      api.tickets = [ticket.copyWith(status: TicketStatus.used)];
+      await pumpScreen(tester);
+
+      expect(find.text(TicketStrings.qrAlreadyUsed), findsOneWidget);
+      expect(retryButton, findsNothing);
+    });
+
     testWidgets('다시 시도를 누르면 다시 요청하고, 되면 QR 이 나온다', (tester) async {
       api.failure = const ApiException('인터넷 연결을 확인해주세요.');
       await pumpScreen(tester);
@@ -376,9 +385,10 @@ class _FakeEntryPassApi implements TicketApi {
     );
   }
 
+  List<MyTicket> tickets = [];
+
   @override
-  Future<List<MyTicket>> fetchMyTickets() =>
-      throw UnimplementedError('입장 QR 화면은 목록을 부르지 않는다');
+  Future<List<MyTicket>> fetchMyTickets() async => tickets;
 
   @override
   Future<void> cancelReservation(int reservationId) =>

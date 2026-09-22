@@ -11,6 +11,7 @@ import '../../../core/widgets/poster_image.dart';
 import '../constants.dart';
 import '../models/entry_pass.dart';
 import '../models/my_ticket.dart';
+import '../models/ticket_status.dart';
 import '../state/ticket_api_scope.dart';
 import '../widgets/qr_countdown_bar.dart';
 import '../widgets/qr_notice_box.dart';
@@ -34,8 +35,8 @@ import '../widgets/qr_notice_box.dart';
 /// 그때마다 QR 자리가 하얗게 비었다 채워지면 화면이 깜빡인다. 흐린 QR 은 이미
 /// 만료된 것이라 검표기가 읽어도 통과하지 않는다.
 ///
-/// 실패하면 QR 자리에 서버 문구와 다시 시도를 둔다. 사유(입장 시간대 밖, 발행
-/// 전, 양도 등록 중 …)는 서버만 알아 문구를 그대로 쓴다.
+/// 실패하면 QR 자리에 문구와 다시 시도를 둔다. 409 일 때 내 티켓 상태가 입장
+/// 완료면 이를 알리고 재시도는 숨긴다. 나머지 사유는 서버 문구를 그대로 쓴다.
 ///
 /// 화면을 벗어나면 타이머를 끈다. 켜 둔 채로 두면 목록으로 돌아간 뒤에도 매초
 /// 깨어나 배터리를 먹는다.
@@ -75,6 +76,7 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
 
   /// 마지막 발급 실패. 다시 시도하면 지운다.
   ApiException? _error;
+  bool _alreadyUsed = false;
 
   Timer? _ticker;
 
@@ -101,6 +103,7 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
     setState(() {
       _issuing = true;
       _error = null;
+      _alreadyUsed = false;
     });
     _request();
   }
@@ -118,12 +121,34 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
         _pass = pass;
         _measure(pass);
         _issuing = false;
+        _alreadyUsed = false;
       });
     } on ApiException catch (e) {
+      var displayError = e;
+      var alreadyUsed = false;
+      if (e.status == 409) {
+        try {
+          final tickets = await api.fetchMyTickets();
+          alreadyUsed = tickets.any(
+            (ticket) =>
+                ticket.ticketId == widget.ticket.ticketId &&
+                ticket.status == TicketStatus.used,
+          );
+          if (alreadyUsed) {
+            displayError = const ApiException(
+              TicketStrings.qrAlreadyUsed,
+              status: 409,
+            );
+          }
+        } on ApiException {
+          // 목록 확인이 실패하면 원래 발급 오류를 보여준다.
+        }
+      }
       if (!mounted) return;
       setState(() {
-        _error = e;
+        _error = displayError;
         _issuing = false;
+        _alreadyUsed = alreadyUsed;
       });
     }
   }
@@ -161,6 +186,7 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
               progress: _progress,
               issuing: _issuing,
               error: _error,
+              alreadyUsed: _alreadyUsed,
               onRefresh: _reissue,
             ),
             const SizedBox(height: 16),
@@ -244,7 +270,7 @@ class _InfoLine extends StatelessWidget {
 /// QR 과 남은 시간을 담은 흰 상자.
 ///
 /// QR 자리는 늘 정사각 한 칸이다. 처음 받는 동안은 로딩, 실패하면 문구와
-/// 다시 시도, 받았으면 QR 이 그 칸에 들어간다. 칸 크기를 상태마다 다르게 두면
+/// 필요한 경우 다시 시도, 받았으면 QR 이 그 칸에 들어간다. 칸 크기를 다르게 두면
 /// 응답이 올 때마다 아래 안내 상자가 위아래로 뛴다.
 ///
 /// 남은 시간과 안내는 QR 이 있을 때만 그린다. 아직 받지 못했거나 실패한
@@ -258,6 +284,7 @@ class _QrPanel extends StatelessWidget {
     required this.progress,
     required this.issuing,
     required this.error,
+    required this.alreadyUsed,
     required this.onRefresh,
   });
 
@@ -266,6 +293,7 @@ class _QrPanel extends StatelessWidget {
   final double progress;
   final bool issuing;
   final ApiException? error;
+  final bool alreadyUsed;
 
   /// 새로고침 버튼과 다시 시도 버튼이 함께 쓴다. 둘 다 "새로 받기" 다.
   final VoidCallback onRefresh;
@@ -290,7 +318,10 @@ class _QrPanel extends StatelessWidget {
           AspectRatio(
             aspectRatio: 1,
             child: error != null
-                ? _IssueError(message: error.message, onRetry: onRefresh)
+                ? _IssueError(
+                    message: error.message,
+                    onRetry: alreadyUsed ? null : onRefresh,
+                  )
                 : pass == null
                 ? const Center(child: CircularProgressIndicator())
                 : _QrImage(
@@ -385,7 +416,7 @@ class _QrImage extends StatelessWidget {
   }
 }
 
-/// 발급에 실패했을 때 QR 자리에 들어가는 안내. 문구는 서버 것 그대로다.
+/// 발급에 실패했을 때 QR 자리에 들어가는 안내. 입장 완료면 재시도를 숨긴다.
 ///
 /// 목록 화면의 실패 안내([AsyncBoundary])와 같은 꼴이지만 그 위젯을 쓰지
 /// 않는다. 저쪽은 Future 하나의 성공·실패를 가르는 틀이고, 이 화면은 같은
@@ -395,7 +426,7 @@ class _IssueError extends StatelessWidget {
   const _IssueError({required this.message, required this.onRetry});
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -412,11 +443,13 @@ class _IssueError extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text(AsyncBoundary.retryLabel),
-          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text(AsyncBoundary.retryLabel),
+            ),
+          ],
         ],
       ),
     );
