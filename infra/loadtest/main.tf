@@ -190,6 +190,7 @@ output "test" {
     db_engine          = var.db_engine_version
     redis_host         = aws_elasticache_replication_group.test.primary_endpoint_address
     redis_port         = aws_elasticache_replication_group.test.port
+    redis_cluster_id   = one(aws_elasticache_replication_group.test.member_clusters)
     queue_active_limit = var.waiting_queue_active_limit
   }
 }

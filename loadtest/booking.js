@@ -10,6 +10,10 @@ const duration = new Trend('flow_ms', true);
 const holdTime = new Trend('hold_ms', true);
 const queueJoinTime = new Trend('queue_join_ms', true);
 const queueAdmissionTime = new Trend('queue_admission_ms', true);
+const queuePolls = new Counter('queue_poll_attempts');
+const queueWaitingResponses = new Counter('queue_waiting_responses');
+const queueAdmittedResponses = new Counter('queue_admitted_responses');
+const queueAdmissionTimeouts = new Counter('queue_admission_timeouts');
 const completed = new Counter('completed_flows');
 export const options = {
   setupTimeout: '15m',
@@ -41,14 +45,22 @@ export default function (tokens) {
     queueJoinTime.add(queue.timings.duration);
     if (queue.status !== 200) return;
     let admission = queue.json('admissionToken');
+    if (admission) queueAdmittedResponses.add(1);
+    else queueWaitingResponses.add(1);
     for (let attempt = 0; !admission && attempt < 30; attempt++) {
       sleep(1);
       const status = http.get(`${base}/api/v1/concerts/1/queue`, params('queue_status'));
       if (status.status !== 200) return;
+      queuePolls.add(1);
       admission = status.json('admissionToken');
+      if (admission) queueAdmittedResponses.add(1);
+      else queueWaitingResponses.add(1);
     }
     queueAdmissionTime.add(Date.now() - queueStart);
-    if (!admission) return;
+    if (!admission) {
+      queueAdmissionTimeouts.add(1);
+      return;
+    }
     if (http.get(`${base}/api/v1/concerts/1`, params('concert')).status !== 200) return;
     const sections = http.get(`${base}/api/v1/sections?concertId=1`, params('sections'));
     if (sections.status !== 200 || !sections.json('sections').some(s => s.id === section)) return;

@@ -17,10 +17,10 @@ function execute(failAt) {
   assert.equal(metrics.flow_ms.length, 1);
   return calls;
 }
-assert.equal(execute().length, 5);
+assert.equal(execute().length, 7);
 assert.equal(execute(1).length, 1);
-assert.equal(execute(4).at(-1)[0], 'del');
-assert.equal(execute(5).length, 5);
+assert.equal(execute(4).at(-1)[0], 'get');
+assert.equal(execute(5).length, 7);
 const summaryContext = vm.createContext({
   __ENV: { BASE_URL: 'http://test', SUMMARY_PATH: 'C:/results/test run/summary.json' },
   Rate: class {}, Trend: class {}, Counter: class {},
