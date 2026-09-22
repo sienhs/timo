@@ -30,10 +30,7 @@ class _TicketOrgelState extends State<TicketOrgel>
   /// Rotation of the platform in radians; slot i sits at
   /// `angle + slotOffset(i)`. Only the user moves it.
   double angle = 0;
-  late final AnimationController settle = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  )..addListener(() => setState(() => angle = settle.value));
+  late final AnimationController settle;
   double radius = 1;
 
   int get slots =>
@@ -54,6 +51,13 @@ class _TicketOrgelState extends State<TicketOrgel>
   @override
   void initState() {
     super.initState();
+    // Create the ticker while this state is active. Creating it lazily from
+    // `settleTo` can happen during disposal, when inherited widgets such as
+    // TickerMode can no longer be read from the context.
+    settle = AnimationController.unbounded(
+      vsync: this,
+      value: 0,
+    )..addListener(() => setState(() => angle = settle.value));
     // Open centred so the ring is visible at once; with an even count no
     // slot is centred, so the newest ticket (index 0) takes the front.
     angle = widget.tickets.length.isOdd ? 0 : -slotOffset(0);
