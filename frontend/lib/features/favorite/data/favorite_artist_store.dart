@@ -13,6 +13,11 @@ import '../models/favorite_artist.dart';
 /// 앱에서는 [SharedPreferencesFavoriteArtistStore] 가 기기 설정 저장소에,
 /// 테스트는 [InMemoryFavoriteArtistStore] 를 꽂는다 — 위젯 테스트는 플러그인을
 /// 못 쓴다.
+///
+/// 로그아웃할 때 비우지 않는다. 공연 찜(`FavoriteStore.clearShows`)과 다른
+/// 점인데, 계정에 매달린 것이 아니라 최근 검색어처럼 이 기기의 기록이기
+/// 때문이다. 한 기기를 여럿이 쓰면 앞사람의 아티스트 찜이 남지만, 찜리스트와
+/// 하트가 로그인해야 보이므로 로그아웃 상태에서 드러나지는 않는다.
 abstract class FavoriteArtistStore {
   /// 기기에 남아 있던 목록. 없으면 빈 목록이다.
   Future<List<FavoriteArtist>> load();
