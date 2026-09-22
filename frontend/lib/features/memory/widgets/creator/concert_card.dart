@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../motion/press_scale.dart';
 import '../../theme/timo_colors.dart';
+import '../ui/catalog_poster.dart';
 import '../ui/paper_card.dart';
 
 /// 소장품을 만들 공연 하나. 포스터와 사실 몇 줄이 전부다.
@@ -15,12 +16,11 @@ class ConcertCard extends StatelessWidget {
     required this.title,
     required this.date,
     required this.venue,
-    required this.seat,
     required this.poster,
     required this.selected,
     required this.onTap,
   });
-  final String title, date, venue, seat, poster;
+  final String title, date, venue, poster;
   final bool selected;
   final VoidCallback onTap;
 
@@ -37,15 +37,7 @@ class ConcertCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  poster,
-                  width: 64,
-                  height: 88,
-                  fit: BoxFit.cover,
-                ),
-              ),
+              CatalogPoster(poster, width: 64, height: 88, borderRadius: 8),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -63,7 +55,6 @@ class ConcertCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     _Fact(Icons.calendar_today_outlined, date),
                     _Fact(Icons.place_outlined, venue),
-                    _Fact(Icons.event_seat_outlined, seat),
                   ],
                 ),
               ),

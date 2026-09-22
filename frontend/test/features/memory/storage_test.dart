@@ -188,68 +188,106 @@ void main() {
       '$root/preview.png': 'goods/1/preview.png',
       '$root/person1.png': 'goods/1/person1.png',
       '$root/person1-depth.png': 'goods/1/person1-depth.png',
+      '$root/person1-parts.png': 'goods/1/person1-parts.png',
       '$root/person2.png': 'goods/1/person2.png',
       '$root/person2-depth.png': 'goods/1/person2-depth.png',
     };
 
+    test('올릴 이미지 경로는 한 번씩만 나온다', () {
+      // 업로드는 이 순서대로 key 를 돌려주므로 순서와 중복이 곧 짝짓기다.
+      expect(ticket.imagePaths, [
+        '$root/background.png',
+        '$root/source.png',
+        '$root/people.png',
+        '$root/depth.png',
+        '$root/preview.png',
+        '$root/person1.png',
+        '$root/person1-depth.png',
+        '$root/person1-parts.png',
+        '$root/person2.png',
+        '$root/person2-depth.png',
+      ]);
+    });
+
     test('각 컬럼이 올라간다', () {
       final goods = ticket.toGoodsJson(keys: keys);
 
-      expect(goods['client_goods_id'], 'ticket-1');
-      expect(goods['concert_id'], 'concert-1024');
-      expect(goods['background_key'], 'goods/1/background.png');
-      expect(goods['source_background_key'], 'goods/1/source.png');
-      expect(goods['person_composite_key'], 'goods/1/people.png');
-      expect(goods['depth_map_key'], 'goods/1/depth.png');
-      expect(goods['preview_key'], 'goods/1/preview.png');
+      expect(goods['clientGoodsId'], 'ticket-1');
+      expect(goods['backgroundKey'], 'goods/1/background.png');
+      expect(goods['sourceBackgroundKey'], 'goods/1/source.png');
+      expect(goods['personCompositeKey'], 'goods/1/people.png');
+      expect(goods['depthMapKey'], 'goods/1/depth.png');
+      expect(goods['previewKey'], 'goods/1/preview.png');
       // 한국어 라벨('빛줄기')이 아니라 enum 이름으로 나가야 한다.
-      expect(goods['effect_type'], 'godRays');
-      expect(goods['background_framing'], {
+      expect(goods['effectType'], 'godRays');
+      expect(goods['backgroundFraming'], {
         'contain': false,
         'scale': 1.8,
         'x': -0.5,
         'y': 0.2,
       });
-      expect(goods['render_metadata'], {
+      expect(goods['renderMetadata'], {
         'demoDepth': false,
         'manualPersonLayout': true,
       });
-      // 좌석·게이트·예매 번호·입장 안내는 소장품에 저장하지 않는다.
-      expect(goods['concert_snapshot'], {
-        'title': '빛으로 남은 밤',
-        'artist': 'TIMO STAGE',
-        'date': '2026.09.26',
-        'venue': '서울 메모리 홀',
-      });
     });
 
-    test('인물 레이어가 DDL 스키마대로 변환된다', () {
+    test('회원·공연·공연 스냅샷은 보내지 않는다', () {
+      // 요청자는 토큰에서, 공연은 티켓에서 서버가 정한다. 공연 스냅샷도 서버가
+      // 티켓을 보고 채운다 — 앱이 보내면 서버가 모르는 필드다.
+      final goods = ticket.toGoodsJson(keys: keys);
+
+      expect(goods.keys, isNot(contains('concertId')));
+      expect(goods.keys, isNot(contains('concertSnapshot')));
+      expect(goods.keys, isNot(contains('ownerId')));
+      expect(goods.keys, isNot(contains('memberId')));
+    });
+
+    test('인물 레이어가 서버 규약대로 변환된다', () {
       final layers =
-          ticket.toGoodsJson(keys: keys)['person_layers']
+          ticket.toGoodsJson(keys: keys)['personLayers']
               as List<Map<String, dynamic>>;
 
       expect(layers, hasLength(2));
       expect(layers[0], {
-        'cutout_key': 'goods/1/person1.png',
-        'depth_map_key': 'goods/1/person1-depth.png',
-        'depth_strength': 'strong',
+        'cutoutKey': 'goods/1/person1.png',
+        'depthMapKey': 'goods/1/person1-depth.png',
+        'depthStrength': 'strong',
+        'layered': true,
         // Rect 는 left·right 로 들고 있어서 width 가 0.30000000000000004 로
         // 나온다. 자리 수까지 못 박을 값이 아니다.
         'left': closeTo(0.1, 1e-9),
         'top': closeTo(0.2, 1e-9),
         'width': closeTo(0.3, 1e-9),
         'height': closeTo(0.5, 1e-9),
-        'layer_order': 0,
+        'layerOrder': 0,
+        // 부위 맵은 층에 한 장뿐이지만 부위마다 실린다. 서버가 읽을 주소를
+        // 붙여 주는 자리가 거기뿐이라 그렇다.
+        'parts': [
+          {
+            'label': 'head',
+            'depth': 0.8,
+            'share': 0.2,
+            'partMapKey': 'goods/1/person1-parts.png',
+          },
+          {
+            'label': 'torso',
+            'depth': 0.5,
+            'share': 0.8,
+            'partMapKey': 'goods/1/person1-parts.png',
+          },
+        ],
       });
-      expect(layers[1]['depth_strength'], 'off');
-      expect(layers[1]['layer_order'], 1);
+      expect(layers[1]['depthStrength'], 'off');
+      expect(layers[1]['layerOrder'], 1);
+      expect(layers[1]['parts'], isEmpty);
     });
 
     test('배경 시차용 밴드는 보내지 않는다', () {
-      // 로컬 경로일 뿐이라 다른 기기에서 의미가 없다. depth_map_key 로
+      // 로컬 경로일 뿐이라 다른 기기에서 의미가 없다. depthMapKey 로
       // 셰이더가 다시 만든다.
       final goods = ticket.toGoodsJson(keys: keys);
-      expect(goods['render_metadata'], isNot(contains('depthLayers')));
+      expect(goods['renderMetadata'], isNot(contains('depthLayers')));
       expect(goods.toString(), isNot(contains('band0')));
     });
 
@@ -270,7 +308,7 @@ void main() {
       );
 
       final config =
-          failed.toGoodsJson(keys: const {'bg.png': 'k'})['transition_config']
+          failed.toGoodsJson(keys: const {'bg.png': 'k'})['transitionConfig']
               as Map<String, dynamic>;
 
       // 사진과 첫 프레임이 같다(distance 0)고 볼 때의 값과 같다.
@@ -287,7 +325,7 @@ void main() {
 
     test('분석에 성공한 전환 설정은 그대로 간다', () {
       final config =
-          ticket.toGoodsJson(keys: keys)['transition_config']
+          ticket.toGoodsJson(keys: keys)['transitionConfig']
               as Map<String, dynamic>;
 
       expect(config['brightness'], 0.05);
@@ -316,8 +354,7 @@ void main() {
     });
 
     test('배경 키가 없으면 바로 실패한다', () {
-      // background_key 는 NOT NULL 이다. 여기서 안 던지면 서버가 거절할
-      // 때까지 모른다.
+      // 서버가 필수로 받는다. 여기서 안 던지면 서버가 거절할 때까지 모른다.
       expect(
         () => ticket.toGoodsJson(keys: const {}),
         throwsA(isA<ArgumentError>()),
@@ -329,14 +366,14 @@ void main() {
         keys: const {'$root/background.png': 'goods/1/background.png'},
       );
 
-      expect(goods['background_key'], 'goods/1/background.png');
-      expect(goods['source_background_key'], isNull);
-      expect(goods['person_composite_key'], isNull);
-      expect(goods['depth_map_key'], isNull);
-      expect(goods['preview_key'], isNull);
+      expect(goods['backgroundKey'], 'goods/1/background.png');
+      expect(goods['sourceBackgroundKey'], isNull);
+      expect(goods['personCompositeKey'], isNull);
+      expect(goods['depthMapKey'], isNull);
+      expect(goods['previewKey'], isNull);
       expect(
-        (goods['person_layers'] as List).first,
-        containsPair('cutout_key', isNull),
+        (goods['personLayers'] as List).first,
+        containsPair('cutoutKey', isNull),
       );
     });
   });

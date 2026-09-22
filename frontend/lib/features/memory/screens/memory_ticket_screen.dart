@@ -1,13 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
+import '../data/goods_failure.dart';
+import '../data/goods_uploader.dart';
 import '../models/memory_ticket.dart';
 import '../motion/motion_tokens.dart';
 import '../motion/reveal.dart';
 import 'memory_page_route.dart';
 import 'story_share_screen.dart';
+import '../state/goods_api_scope.dart';
 import '../state/ticket_store_scope.dart';
 import '../state/tilt_setting_scope.dart';
+import '../state/viewer_guide_scope.dart';
 import '../theme/timo_colors.dart';
 import '../utils/palette_extractor.dart';
 import '../widgets/ui/aurora_background.dart';
@@ -17,6 +22,7 @@ import '../widgets/ui/local_image.dart';
 import '../widgets/ui/overlay_service.dart';
 import '../widgets/viewer/immersive_video.dart';
 import '../widgets/viewer/memory_ticket_card.dart';
+import '../widgets/viewer/viewer_guide.dart';
 
 /// 완성된 소장품 한 장을 보는 화면.
 ///
@@ -52,6 +58,29 @@ class _MemoryTicketScreenState extends State<MemoryTicketScreen> {
   late MemoryTicket ticket = widget.ticket;
   bool get created => widget.created;
 
+  @override
+  void initState() {
+    super.initState();
+    // 처음 여는 사람에게만 조작법을 보여준다. 첫 프레임 뒤에 띄워야 화면이
+    // 먼저 그려지고 그 위에 안내가 앉는다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final guide = ViewerGuideScope.read(context);
+      if (guide.seen) return;
+      showViewerGuide(context).then((_) => guide.markSeen());
+    });
+  }
+
+  /// 서버에 올리는 중. 그동안 확정 버튼이 잠긴다 — 두 번 누르면 같은 이미지를
+  /// 두 번 올리고, 두 번째 요청은 멱등 키가 같아 서버가 먼저 만든 것을 돌려줄
+  /// 뿐이라 올린 만큼이 고아로 남는다.
+  bool uploading = false;
+
+  /// 확정 = 서버에 올리기.
+  ///
+  /// **서버가 받은 뒤에 기기에 저장한다.** 순서가 반대면 "확정했는데 서버에는
+  /// 없는" 소장품이 남고, 그 소장품은 고칠 수도 없다(확정본은 다시 만들기가
+  /// 막힌다).
   Future<void> confirm() async {
     final answer = await OverlayService.choose(
       context,
@@ -63,28 +92,40 @@ class _MemoryTicketScreenState extends State<MemoryTicketScreen> {
       },
     );
     if (answer != 'confirm' || !mounted) return;
-    final confirmed = ticket.copyWith(confirmed: true);
+
+    final uploader = GoodsUploader(GoodsApiScope.of(context));
+    final store = TicketStoreScope.read(context);
+    setState(() => uploading = true);
+
     try {
-      // TODO(AI 연동): 여기서 이미지를 올리고
-      // POST /api/v1/tickets/{ticketId}/goods 를 부른다. 서버가 받은 뒤에
-      // 저장해야 "확정했는데 서버에는 없는" 소장품이 남지 않는다.
-      await TicketStoreScope.read(context).save(confirmed);
-    } catch (_) {
-      if (mounted) OverlayService.notify(context, ViewerText.confirmFailed);
-      return;
+      final goods = await uploader.upload(ticket);
+      final confirmed = ticket.copyWith(
+        confirmed: true,
+        goodsId: goods.goodsId,
+      );
+      await store.save(confirmed);
+      if (!mounted) return;
+      setState(() {
+        ticket = confirmed;
+        uploading = false;
+      });
+      OverlayService.notify(context, ViewerText.confirmed);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => uploading = false);
+      OverlayService.notify(context, goodsFailureMessage(error));
     }
-    if (!mounted) return;
-    setState(() => ticket = confirmed);
-    OverlayService.notify(context, ViewerText.confirmed);
   }
 
   late final paletteFuture = PaletteExtractor.extract(
     widget.ticket.backgroundPath,
   );
 
+  /// 개발용. 어떤 모델이 돌았고 무엇이 실패했는지 — 사용자가 볼 이유는 없고
+  /// 우리가 결과를 따질 때만 필요해서 디버그 빌드에만 버튼이 있다.
   void showProcessingInfo(BuildContext context) => OverlayService.choose(
     context,
-    title: '처리 정보',
+    title: ViewerText.processingInfo,
     message: [
       ...ticket.processingNotes,
       ticket.demoDepth
@@ -129,6 +170,11 @@ class _MemoryTicketScreenState extends State<MemoryTicketScreen> {
                 ),
                 icon: const Icon(Icons.ios_share_rounded, size: 22),
               ),
+            IconButton(
+              tooltip: ViewerText.guideTooltip,
+              onPressed: () => showViewerGuide(context),
+              icon: const Icon(Icons.help_outline_rounded, size: 22),
+            ),
             IconButton(
               tooltip: tilt.enabled
                   ? ViewerText.tiltOnTooltip
@@ -211,71 +257,23 @@ class _MemoryTicketScreenState extends State<MemoryTicketScreen> {
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(22, 4, 22, 6),
                         child: _DraftBar(
-                          onEdit: widget.onEdit == null
+                          onEdit: widget.onEdit == null || uploading
                               ? null
                               : () => widget.onEdit!(context),
-                          onConfirm: confirm,
+                          onConfirm: uploading ? null : confirm,
+                          uploading: uploading,
                         ),
                       ),
                     ),
-                  Reveal(
-                    index: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 4, 22, 14),
-                      child: GlassPanel(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                        borderColor: palette.accent.withValues(alpha: 0.35),
-                        child: Column(
-                          children: [
-                            const Row(
-                              children: [
-                                Expanded(
-                                  child: _Hint(
-                                    icon: Icons.swipe_rounded,
-                                    text: '좌우로 밀어 뒤집기',
-                                  ),
-                                ),
-                                SizedBox(
-                                  height: 28,
-                                  child: VerticalDivider(width: 1),
-                                ),
-                                Expanded(
-                                  child: _Hint(
-                                    icon: Icons.touch_app_rounded,
-                                    text: '길게 눌러 영상 보기',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    [
-                                      ticket.demoDepth
-                                          ? '데모 깊이 효과'
-                                          : 'Depth Anything V2 깊이 효과',
-                                      // 확정 전에는 아직 고칠 수 있다.
-                                      if (ticket.confirmed) '제작 완료 · 수정 불가',
-                                    ].join(' · '),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: TimoColors.textTertiary,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () => showProcessingInfo(context),
-                                  child: const Text('처리 정보'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  // 조작법은 처음 열 때 안내로 보여주고, 처리 내역은 개발자만
+                  // 본다. 카드 아래에는 확정 줄 말고 아무것도 두지 않는다.
+                  if (kDebugMode)
+                    TextButton(
+                      onPressed: () => showProcessingInfo(context),
+                      child: const Text(ViewerText.processingInfo),
+                    )
+                  else
+                    const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -291,9 +289,16 @@ class _MemoryTicketScreenState extends State<MemoryTicketScreen> {
 /// 제목·설명·아이콘을 갖춘 상자였는데, 안내가 카드보다 커져서 무엇을 보는
 /// 화면인지 흐려졌다. 할 수 있는 일(버튼)을 먼저 놓고 상태는 아래 한 줄로 만다.
 class _DraftBar extends StatelessWidget {
-  const _DraftBar({required this.onEdit, required this.onConfirm});
+  const _DraftBar({
+    required this.onEdit,
+    required this.onConfirm,
+    this.uploading = false,
+  });
   final VoidCallback? onEdit;
-  final VoidCallback onConfirm;
+
+  /// 올리는 중에는 null 이다. 같은 소장품을 두 번 올리지 않게 잠근다.
+  final VoidCallback? onConfirm;
+  final bool uploading;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -312,7 +317,7 @@ class _DraftBar extends StatelessWidget {
           Expanded(
             flex: 2,
             child: GlowButton(
-              label: ViewerText.confirmLabel,
+              label: uploading ? GoodsText.uploading : ViewerText.confirmLabel,
               onPressed: onConfirm,
             ),
           ),
@@ -336,28 +341,6 @@ class _DraftBar extends StatelessWidget {
             style: TextStyle(fontSize: 11.5, color: TimoColors.textTertiary),
           ),
         ],
-      ),
-    ],
-  );
-}
-
-class _Hint extends StatelessWidget {
-  const _Hint({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Icon(icon, size: 18, color: TimoColors.accent),
-      const SizedBox(width: 8),
-      Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
-          color: TimoColors.textPrimary,
-        ),
       ),
     ],
   );

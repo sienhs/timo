@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../constants.dart';
+import '../models/concert_kit.dart';
 import '../models/memory_concert.dart';
 import '../state/creation_job_scope.dart';
 import '../state/memory_concert_api_scope.dart';
@@ -27,6 +28,7 @@ import '../models/ticket_effect.dart';
 import '../models/photo_framing.dart';
 import '../theme/timo_colors.dart';
 import '../widgets/ui/glow_button.dart';
+import '../widgets/ui/catalog_poster.dart';
 import '../widgets/ui/local_image.dart';
 import '../widgets/ui/paper_card.dart';
 import '../state/creation_job.dart';
@@ -62,6 +64,14 @@ class _CreatorScreenState extends State<CreatorScreen> {
   final picker = ImagePicker();
   late int step = widget.initialConcert == null ? 0 : 1;
   late MemoryConcert? concert = widget.initialConcert;
+
+  /// 고른 공연의 소재. 공연을 고른 순간 받기 시작해 사진 단계에 닿을 때쯤
+  /// 와 있다. 받지 못하면 데모 소재로 채운다 — 소재 없는 공연이 정상이다.
+  Future<ConcertKit>? _kit;
+
+  /// 공연을 고르지 않고 사진 단계에 올 수는 없지만, 혹시 그러면 데모다. 한 번
+  /// 만들어 둔다 — 빌드마다 새 Future 를 주면 FutureBuilder 가 매번 처음부터다.
+  final _demoKit = Future.value(ConcertKit.demo);
   String? background;
   String? backgroundAsset;
   PhotoFraming framing = const PhotoFraming();
@@ -85,8 +95,21 @@ class _CreatorScreenState extends State<CreatorScreen> {
     super.initState();
     // 스코프는 구독이 아니라 읽기라 initState 에서 꺼내도 된다.
     _concerts = MemoryConcertApiScope.of(context).getConcerts();
+    final initial = widget.initialConcert;
+    if (initial != null) _kit = _loadKit(initial);
     recoverLostPhoto();
   }
+
+  /// 소재를 못 받아도 만들기는 이어져야 한다. 서버 소재는 있으면 좋은 것이고
+  /// 데모 소재와 갤러리 사진이 늘 있다.
+  Future<ConcertKit> _loadKit(MemoryConcert of) => MemoryConcertApiScope.of(
+    context,
+  ).getKit(of.id).then((kit) => kit.orDemo(), onError: (_) => ConcertKit.demo);
+
+  void _selectConcert(MemoryConcert picked) => setState(() {
+    concert = picked;
+    _kit = _loadKit(picked);
+  });
 
   Future<void> recoverLostPhoto() async {
     final response = await picker.retrieveLostData();
@@ -134,8 +157,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
     }
   }
 
-  Future<void> selectPhotoAndProcess({String? asset}) async {
-    String? source = asset;
+  /// [asset] 은 타일에서 고른 소재(앱 에셋 경로 또는 서버 주소). 없으면
+  /// 갤러리·카메라를 묻는다.
+  Future<void> selectPhotoAndProcess({KitAsset? asset}) async {
+    String? source = asset?.source;
     if (source == null) {
       final from = await showPhotoSourceSheet(context);
       if (from == null || !mounted) return;
@@ -153,11 +178,12 @@ class _CreatorScreenState extends State<CreatorScreen> {
     try {
       path = await service.copyPhotoToPrivateStorage(
         source,
-        asset: asset != null,
+        asset: asset?.isAsset ?? false,
+        remote: asset != null && !asset.isAsset,
       );
       if (step == 1) {
         background = path;
-        backgroundAsset = asset;
+        backgroundAsset = asset?.source;
         framing = const PhotoFraming();
       } else {
         Map<String, dynamic> person;
@@ -183,7 +209,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
             return;
           }
         }
-        person['sourceAsset'] = asset;
+        person['sourceAsset'] = asset?.source;
         if (people.length > personIndex) {
           people[personIndex] = person;
         } else {
@@ -268,19 +294,34 @@ class _CreatorScreenState extends State<CreatorScreen> {
     _ => true,
   };
 
-  String tileLabel(int i) => step == 1
-      ? '${CreatorText.stageLabel} ${i + 1}'
-      : i == 2
-      ? CreatorText.analysisSampleLabel
-      : '${CreatorText.illustrationLabel} ${i + 1}';
+  /// 데모 소재는 예전 이름 그대로, 서버 소재는 공연 것이라고 부른다.
+  String tileLabel(int i, KitAsset asset) {
+    if (!asset.isAsset) {
+      return '${step == 1 ? CreatorText.kitStageLabel : CreatorText.kitPersonLabel} ${i + 1}';
+    }
+    return step == 1
+        ? '${CreatorText.stageLabel} ${i + 1}'
+        : i == 2
+        ? CreatorText.analysisSampleLabel
+        : '${CreatorText.illustrationLabel} ${i + 1}';
+  }
 
-  bool tileSelected(String asset) => step == 1
-      ? backgroundAsset == asset
+  bool tileSelected(KitAsset asset) => step == 1
+      ? backgroundAsset == asset.source
       : people.length > personIndex &&
-            people[personIndex]['sourceAsset'] == asset;
+            people[personIndex]['sourceAsset'] == asset.source;
 
-  Widget photoGrid() {
-    final assets = step == 1 ? CreatorText.backgrounds : CreatorText.people;
+  /// 공연 소재가 아직 오지 않았으면 기다리는 한 줄, 왔으면 그 소재로 타일을.
+  Widget photoGrid() => FutureBuilder<ConcertKit>(
+    future: _kit ?? _demoKit,
+    builder: (context, snapshot) {
+      final kit = snapshot.data;
+      if (kit == null) return const _KitLoading();
+      return photoGridFor(step == 1 ? kit.backgrounds : kit.people);
+    },
+  );
+
+  Widget photoGridFor(List<KitAsset> assets) {
     final chosen = step == 1
         ? background
         : people.length > personIndex
@@ -302,10 +343,10 @@ class _CreatorScreenState extends State<CreatorScreen> {
                 index: i,
                 scaleFrom: 0.94,
                 child: SelectionTile(
-                  label: tileLabel(i),
+                  label: tileLabel(i, assets[i]),
                   selected: tileSelected(assets[i]),
                   onTap: () => selectPhotoAndProcess(asset: assets[i]),
-                  child: Image.asset(assets[i], fit: BoxFit.cover),
+                  child: _KitImage(assets[i]),
                 ),
               ),
             Reveal(
@@ -474,12 +515,16 @@ class _CreatorScreenState extends State<CreatorScreen> {
     builder: (context, concerts) {
       // 이미 만든 티켓은 내리지 않는다. 티켓 한 장에 소장품은 하나뿐이라
       // 골라 봤자 예전 것을 덮어쓸 뿐이다. 고치는 길은 컬렉션 쪽에 있다.
+      //
+      // 기준은 둘이다 — 서버가 아는 것(`goodsId`, 다른 기기에서 만든 것 포함)과
+      // 이 기기에만 있는 확정 전 임시본. 서버만 보면 임시본을 덮어쓰고, 기기만
+      // 보면 다른 기기에서 만든 티켓을 골라 서버가 409 로 막는다.
       final made = {
         for (final t in TicketStoreScope.of(context).readAll()) t.ticketId,
       };
       final pickable = [
         for (final c in concerts)
-          if (!made.contains(c.ticketId)) c,
+          if (c.goodsId == null && !made.contains(c.ticketId)) c,
       ];
       if (pickable.isEmpty) return const _NoConcerts();
       return Column(
@@ -491,13 +536,11 @@ class _CreatorScreenState extends State<CreatorScreen> {
                 padding: const EdgeInsets.only(bottom: 14),
                 child: ConcertCard(
                   title: pickable[i].title,
-                  date:
-                      '${pickable[i].date} ${pickable[i].ticketDetails['시간']}',
+                  date: [pickable[i].date, ?pickable[i].time].join(' '),
                   venue: pickable[i].venue,
-                  seat: pickable[i].ticketDetails['좌석']!,
                   poster: pickable[i].poster,
                   selected: concert?.id == pickable[i].id,
-                  onTap: () => setState(() => concert = pickable[i]),
+                  onTap: () => _selectConcert(pickable[i]),
                 ),
               ),
             ),
@@ -911,31 +954,81 @@ class _NoConcerts extends StatelessWidget {
   const _NoConcerts();
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 60),
-    child: Column(
-      children: [
-        const Reveal(child: TimoMascot.sad(size: 140)),
-        const SizedBox(height: 24),
-        const Reveal(
-          index: 1,
-          child: Text(
-            CreatorText.noConcertsTitle,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: TimoColors.ink,
+  Widget build(BuildContext context) => SizedBox(
+    // 단계 화면의 Column 은 왼쪽 정렬이라(제목·설명이 그렇다) 이 안내를 그대로
+    // 두면 글자 폭만큼만 차지해 왼쪽으로 붙는다. 화면 폭을 다 차지해야
+    // 마스코트와 글이 가운데에 선다.
+    width: double.infinity,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Column(
+        children: [
+          const Reveal(child: TimoMascot.sad(size: 140)),
+          const SizedBox(height: 24),
+          const Reveal(
+            index: 1,
+            child: Text(
+              CreatorText.noConcertsTitle,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: TimoColors.ink,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Reveal(
-          index: 2,
-          child: Text(
-            CreatorText.noConcertsBody,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: TimoColors.inkSecondary),
+          const SizedBox(height: 8),
+          const Reveal(
+            index: 2,
+            child: Text(
+              CreatorText.noConcertsBody,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: TimoColors.inkSecondary),
+            ),
           ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 소재 타일 한 장. 앱 에셋이든 서버 주소든 같은 모양으로 채운다.
+class _KitImage extends StatelessWidget {
+  const _KitImage(this.asset);
+  final KitAsset asset;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = catalogPosterImage(asset.source);
+    if (image == null) return const ColoredBox(color: TimoColors.placeholder);
+    return Image(
+      image: image,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) =>
+          const ColoredBox(color: TimoColors.placeholder),
+    );
+  }
+}
+
+/// 공연 소재를 받는 동안. 타일 자리를 비워 두고 한 줄만 말한다 — 데모 소재를
+/// 먼저 그리면 곧 공연 소재로 바뀌어 눈앞에서 타일이 갈린다.
+class _KitLoading extends StatelessWidget {
+  const _KitLoading();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 40),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        SizedBox(width: 10),
+        Text(
+          CreatorText.kitLoading,
+          style: TextStyle(fontSize: 13, color: TimoColors.inkSecondary),
         ),
       ],
     ),
