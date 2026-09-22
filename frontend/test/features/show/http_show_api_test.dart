@@ -116,6 +116,20 @@ void main() {
       expect(detail.status, ShowStatus.onSale);
       expect(detail.artists.single.name, '김필');
       expect(detail.artists.single.photoUrl, 'artist/artist_kim_feel.jpg');
+      expect(detail.imageUrls, ['detail/poster_detail_kim.jpg']);
+    });
+
+    test('상세 이미지 순서를 유지하고 필드가 없으면 빈 목록을 쓴다', () async {
+      final json = concertJson()
+        ..['imageUrls'] = ['detail/first.jpg', 'detail/second.jpg'];
+      givenServer((_) => jsonResponse(json));
+      expect((await api.fetchShowDetail(7)).imageUrls, [
+        'detail/first.jpg',
+        'detail/second.jpg',
+      ]);
+
+      json.remove('imageUrls');
+      expect((await api.fetchShowDetail(7)).imageUrls, isEmpty);
     });
 
     test('가격을 상세 응답에서 구역 순서대로 읽는다', () async {
