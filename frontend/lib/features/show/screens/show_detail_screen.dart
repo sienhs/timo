@@ -277,11 +277,13 @@ class _LoadedShowState extends State<_LoadedShow> {
                       title: ShowDetailStrings.artistSection,
                       child: ShowArtistList(artists: detail.artists),
                     ),
-                    const SizedBox(height: ShowDetailMetrics.sectionGap),
-                    const _Section(
-                      title: ShowDetailStrings.noticeSection,
-                      child: ShowNotice(paragraphs: ShowDetailStrings.notice),
-                    ),
+                    if (detail.imageUrls.isNotEmpty) ...[
+                      const SizedBox(height: ShowDetailMetrics.sectionGap),
+                      _Section(
+                        title: ShowDetailStrings.noticeSection,
+                        child: ShowNotice(imageUrls: detail.imageUrls),
+                      ),
+                    ],
                   ],
                 ),
               ),

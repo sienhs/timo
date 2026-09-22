@@ -110,7 +110,7 @@ enum ShowBookingPhase {
 /// 순간 앱이 스스로 버튼을 여는 동작은 그대로 두고, 시각만 봐서는 알 수 없는
 /// 사정은 [bookable] 로 막는다.
 ///
-/// 서버가 주는 설명글·상세 이미지·연령등급·조회수는 담지 않는다. 시안에 그릴
+/// 서버가 주는 설명글·연령등급·조회수는 담지 않는다. 시안에 그릴
 /// 자리가 없어서다. 화면에 안 쓰는 값을 모델에 두면 어디까지가 실제로 쓰이는
 /// 정보인지 읽는 사람이 매번 확인해야 한다.
 class ShowDetail {
@@ -126,6 +126,7 @@ class ShowDetail {
     this.blockReason,
     required this.zonePrices,
     required this.artists,
+    this.imageUrls = const [],
   });
 
   /// 공연 상세 응답을 읽는다. 가격도 이 응답 안에 들어 있다.
@@ -146,6 +147,9 @@ class ShowDetail {
     artists: (json['artists'] as List? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(ShowArtist.fromJson)
+        .toList(),
+    imageUrls: (json['imageUrls'] as List? ?? const [])
+        .whereType<String>()
         .toList(),
   );
 
@@ -189,6 +193,9 @@ class ShowDetail {
   final List<ZonePrice> zonePrices;
 
   final List<ShowArtist> artists;
+
+  /// 공연별 상세 안내 이미지. 서버 응답 순서를 유지한다.
+  final List<String> imageUrls;
 
   /// 화면에 찍는 공연 일시. (예: `2026.11.01 (일) 19:00`)
   ///

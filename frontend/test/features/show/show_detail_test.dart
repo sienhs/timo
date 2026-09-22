@@ -30,6 +30,7 @@ import 'package:timo/features/show/models/show_artist.dart';
 import 'package:timo/features/show/models/show_detail.dart';
 import 'package:timo/features/show/models/zone_price.dart';
 import 'package:timo/features/show/screens/show_detail_screen.dart';
+import 'package:timo/features/show/widgets/show_notice.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 정해진 공연 하나만 돌려주는 가짜 API.
@@ -87,6 +88,7 @@ void main() {
     List<ZonePrice> zonePrices = const [
       ZonePrice(zoneName: '1층 A블록', price: 154000),
     ],
+    List<String> imageUrls = const [],
   }) => ShowDetail(
     id: 1,
     title: title,
@@ -100,6 +102,7 @@ void main() {
     blockReason: blockReason,
     zonePrices: zonePrices,
     artists: const [ShowArtist(name: '아이유')],
+    imageUrls: imageUrls,
   );
 
   /// 화면을 단독으로 띄운다. [clock] 을 주면 그 시계로 시간이 흐른다.
@@ -493,7 +496,74 @@ void main() {
     expect(find.text('154,000원'), findsOneWidget);
     expect(find.text(ShowDetailStrings.artistSection), findsOneWidget);
     expect(find.text('아이유'), findsOneWidget);
+    expect(find.text(ShowDetailStrings.noticeSection), findsNothing);
+  });
+
+  testWidgets('NOTICE 이미지를 서버 순서대로 표시한다', (tester) async {
+    await pumpDetail(
+      tester,
+      detailOpening(
+        imageUrls: const [
+          'https://example.com/first.jpg',
+          'https://example.com/second.jpg',
+        ],
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.text(ShowDetailStrings.noticeSection),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+
     expect(find.text(ShowDetailStrings.noticeSection), findsOneWidget);
+    final images = tester.widgetList<Image>(find.byType(Image)).toList();
+    expect(images.map((image) => (image.image as NetworkImage).url), [
+      'https://example.com/first.jpg',
+      'https://example.com/second.jpg',
+    ]);
+    expect(images.every((image) => image.fit == BoxFit.fitWidth), isTrue);
+  });
+
+  testWidgets('NOTICE 이미지 로딩과 실패 문구를 표시한다', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ShowNotice(imageUrls: ['https://example.com/a.jpg']),
+        ),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    final loading = image.loadingBuilder!(
+      tester.element(find.byType(Image)),
+      const SizedBox(),
+      const ImageChunkEvent(cumulativeBytesLoaded: 1, expectedTotalBytes: 2),
+    );
+    final error = image.errorBuilder!(
+      tester.element(find.byType(Image)),
+      Exception('load failed'),
+      null,
+    );
+
+    expect(loading, isA<Center>());
+    expect(error, isA<Center>());
+    expect(
+      (loading as Center).child,
+      isA<Text>().having(
+        (text) => text.data,
+        'message',
+        ShowDetailStrings.noticeImageLoading,
+      ),
+    );
+    expect(
+      (error as Center).child,
+      isA<Text>().having(
+        (text) => text.data,
+        'message',
+        ShowDetailStrings.noticeImageError,
+      ),
+    );
   });
 
   group('찜', () {

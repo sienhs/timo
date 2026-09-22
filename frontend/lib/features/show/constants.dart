@@ -39,8 +39,8 @@ class ShowDetailMetrics {
   static const artistGap = 20.0;
   static const artistNameGap = 8.0;
 
-  /// 안내 문단 사이 간격.
-  static const noticeParagraphGap = 12.0;
+  /// 상세 안내 이미지 사이 간격.
+  static const noticeImageGap = 12.0;
 
   /// 하단 바의 안내 문구와 버튼 사이.
   static const bottomBarGap = 10.0;
@@ -82,20 +82,8 @@ class ShowDetailStrings {
   static const artistSection = '아티스트';
   static const noticeSection = 'NOTICE';
 
-  /// 공연 안내문. 서버 응답에 없는 값이라 앱이 들고 있는다.
-  ///
-  /// 공연마다 다를 수 있는 성질의 글이지만, 지금 담긴 내용(포인트 결제 · 1인
-  /// 1매)은 공연이 아니라 이 서비스의 규칙이라 모든 공연에서 같다. 공연별
-  /// 안내가 생기면 서버에서 받아 온다.
-  ///
-  /// 문단 사이 간격은 화면이 준다 — 문자열에 빈 줄을 넣으면 간격을 바꿀 때
-  /// 문구를 고쳐야 한다.
-  static const notice = [
-    '본 공연은 포인트로만 결제하실 수 있습니다.',
-    '예매 전 보유 포인트를 반드시 확인해 주시기 바라며, 포인트가 부족할 경우 '
-        '결제 과정에서 예매가 정상적으로 진행되지 않을 수 있습니다.',
-    '또한 본 공연은 1인 1매에 한해 예매 가능하오니 이용에 참고해 주시기 바랍니다.',
-  ];
+  static const noticeImageLoading = '안내 이미지를 불러오는 중이에요.';
+  static const noticeImageError = '안내 이미지를 불러오지 못했어요.';
 
   /// 상태 뱃지. 오픈 전후로 갈린다.
   ///
