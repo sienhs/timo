@@ -1,3 +1,5 @@
+import 'package:flutter/physics.dart';
+
 import '../../core/utils/formatters.dart';
 
 /// 공연 상세 화면 치수. 시안(폰 폭 375 기준)에서 잰 값이다.
@@ -50,6 +52,30 @@ class ShowDetailMetrics {
   /// 하단 바에 버튼이 둘 설 때(예매 + 양도 마켓 알림) 그 둘 사이. 문구와
   /// 버튼 사이보다 좁다 — 버튼 둘은 같은 묶음으로 읽혀야 한다.
   static const bottomBarActionGap = 8.0;
+
+  /// 펼친 하단 바 위쪽 손잡이 줄의 높이.
+  static const bottomBarHandleHeight = 28.0;
+
+  /// 접힌 바가 펼친 바의 몇 분의 일을 남기는가.
+  static const bottomBarCollapsedFraction = 1 / 3;
+
+  /// 접힌 바 손잡이 줄의 최소 높이. 버튼 하나가 겨우 서는 공연(잠긴 버튼만)은
+  /// 1/3 이 손가락 하나보다 얇아진다.
+  static const bottomBarCollapsedMinHeight = 48.0;
+
+  /// 하단 바 위쪽 모서리 둥글기.
+  static const bottomBarRadius = 16.0;
+
+  /// 하단 바를 놓았을 때 제자리로 가는 스프링. 감쇠비 1 이라 튕겨 넘치지 않고
+  /// 빠르게 붙는다 — 넘치면 펼친 끝에서 바가 한 번 들렸다 내려앉아 보인다.
+  static final bottomBarSpring = SpringDescription.withDampingRatio(
+    mass: 1,
+    stiffness: 420,
+  );
+
+  /// 손을 뗄 때 이보다 빠르게(px/s) 밀었으면 멈춘 위치와 상관없이 민 방향으로
+  /// 접거나 편다.
+  static const bottomBarFlingVelocity = 300.0;
 
   /// 안내 스낵바와 하단 바 사이 틈. 스낵바는 이 화면의 바 높이만큼 띄워
   /// 올린다(`_snackBarBottomMargin`) — 바를 `Scaffold.bottomNavigationBar`
@@ -126,6 +152,10 @@ class ShowDetailStrings {
   /// 사고팔 표가 없고, 오픈 전에는 아직 아무도 표가 없어 올라올 매물이 없다.
   static const marketAlarmAction = '양도 마켓 알림 받기';
   static const marketAlarmOffAction = '양도 마켓 알림 해제하기';
+
+  /// 하단 바 손잡이의 스크린리더 이름. 누르면 일어날 일을 말한다.
+  static const collapseBottomBar = '예매 버튼 접기';
+  static const expandBottomBar = '예매 버튼 펼치기';
 
   /// 알림 버튼을 눌렀을 때의 안내. 종류마다 켠 말과 끈 말이 따로 있다 —
   /// 버튼이 둘이라 '알림을 신청했어요' 로 뭉치면 어느 쪽을 켰는지 알 수 없다.
