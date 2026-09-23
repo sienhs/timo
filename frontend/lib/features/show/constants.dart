@@ -152,6 +152,9 @@ class ShowDetailStrings {
   static const marketAlarmOn = '양도 마켓 알림을 신청했어요. 새 매물이 올라오면 알려드릴게요.';
   static const marketAlarmOff = '양도 마켓 알림을 껐어요.';
 
+  /// 로그아웃 상태에서 알림 버튼을 눌렀을 때. 찜 하트의 안내와 같은 말투다.
+  static const alarmLoginRequired = '로그인하고 알림을 받아 보세요';
+
   /// 이미 끝난 공연의 하단 바. 버튼은 잠기고 이 문구가 대신 선다.
   ///
   /// 매진에는 붙이지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다.

@@ -6,6 +6,9 @@ import 'core/network/api_client.dart';
 import 'core/network/api_exception.dart';
 import 'core/network/auth_interceptor.dart';
 import 'core/theme/app_theme.dart';
+import 'features/alarm/data/alarm_api.dart';
+import 'features/alarm/data/http_alarm_api.dart';
+import 'features/alarm/state/alarm_api_scope.dart';
 import 'features/auth/data/auth_api.dart';
 import 'features/auth/data/http_auth_api.dart';
 import 'features/auth/data/token_storage.dart';
@@ -89,6 +92,7 @@ class App extends StatefulWidget {
     this.push,
     this.navigatorKey,
     this.notificationApi,
+    this.alarmApi,
   });
 
   /// 처음 띄울 화면. 앱은 로딩 화면에서 시작해 애니메이션이 끝나면 홈으로
@@ -170,6 +174,10 @@ class App extends StatefulWidget {
 
   /// 알림함 화면이 쓰는 API. 안 넘기면 [_notificationApiKind] 가 고른다.
   final NotificationApi? notificationApi;
+
+  /// 공연 상세의 알림 신청 버튼이 쓰는 API. 안 넘기면 진짜 서버 구현을 쓴다.
+  /// 테스트는 목을 넣는다.
+  final AlarmApi? alarmApi;
 
   @override
   State<App> createState() => _AppState();
@@ -375,6 +383,10 @@ class _AppState extends State<App> {
   late final NotificationApi _notificationApi =
       widget.notificationApi ?? _notificationApiFor(_notificationApiKind);
 
+  /// 공연 상세의 알림 신청 버튼이 쓰는 API. 다른 API 들과 같은 이유로 앱에 하나만
+  /// 두고 [AlarmApiScope] 로 내려준다.
+  late final AlarmApi _alarmApi = widget.alarmApi ?? HttpAlarmApi();
+
   /// '제작중' job. 제작 화면이 시작하고, 완료 배너가 결과를 받는다. 둘이 서로
   /// 다른 라우트라 라우트보다 위에서 만들어 [CreationJobScope] 로 내려준다.
   /// 예매 컨트롤러를 여기서 만드는 것과 같은 이유다.
@@ -499,33 +511,36 @@ class _AppState extends State<App> {
                                     job: _creationJob,
                                     child: FavoriteScope(
                                       store: _favoriteStore,
-                                      child: NotificationApiScope(
-                                        api: _notificationApi,
-                                        child: PushNotificationScope(
-                                          push: _push,
-                                          child: MaterialApp(
-                                            title: 'TIMO',
-                                            theme: AppTheme.light,
-                                            navigatorKey: _navigatorKey,
-                                            // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
-                                            initialRoute: widget.initialRoute,
-                                            onGenerateInitialRoutes:
-                                                _generateInitialRoutes,
-                                            routes: AppRoutes.routes,
-                                            // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
-                                            // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
-                                            // 라우트가 아니라 앱 전체를 감싼다.
-                                            //
-                                            // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
-                                            // 애니메이션 채널도 같이 멈춘다.
-                                            builder: (context, child) {
-                                              AmbientMotion.instance.enabled =
-                                                  !Motion.reduced(context);
-                                              return CreationNotificationHost(
-                                                navigatorKey: _navigatorKey,
-                                                child: child!,
-                                              );
-                                            },
+                                      child: AlarmApiScope(
+                                        api: _alarmApi,
+                                        child: NotificationApiScope(
+                                          api: _notificationApi,
+                                          child: PushNotificationScope(
+                                            push: _push,
+                                            child: MaterialApp(
+                                              title: 'TIMO',
+                                              theme: AppTheme.light,
+                                              navigatorKey: _navigatorKey,
+                                              // 기본은 로딩 화면. 끝나면 홈으로 교체된다.
+                                              initialRoute: widget.initialRoute,
+                                              onGenerateInitialRoutes:
+                                                  _generateInitialRoutes,
+                                              routes: AppRoutes.routes,
+                                              // 소장품 제작은 화면 밖에서 도는 job 이라, 어느
+                                              // 화면에 있든 끝나면 배너로 알려야 한다. 그래서
+                                              // 라우트가 아니라 앱 전체를 감싼다.
+                                              //
+                                              // 기기의 '동작 줄이기' 설정을 켜면 앰비언트
+                                              // 애니메이션 채널도 같이 멈춘다.
+                                              builder: (context, child) {
+                                                AmbientMotion.instance.enabled =
+                                                    !Motion.reduced(context);
+                                                return CreationNotificationHost(
+                                                  navigatorKey: _navigatorKey,
+                                                  child: child!,
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
                                       ),

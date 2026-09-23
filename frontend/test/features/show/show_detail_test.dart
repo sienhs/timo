@@ -4,6 +4,10 @@ import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/features/alarm/constants.dart';
+import 'package:timo/features/alarm/data/mock_alarm_api.dart';
+import 'package:timo/features/alarm/models/alarm_status.dart';
+import 'package:timo/features/alarm/state/alarm_api_scope.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
@@ -79,6 +83,9 @@ void main() {
   /// 공연 찜을 들고 있는 가짜 서버.
   late MockFavoriteApi favoriteApi;
 
+  /// 알림 신청을 들고 있는 가짜 서버. 따로 넘기지 않으면 아무것도 신청하지 않은 서버다.
+  late MockAlarmApi alarmApi;
+
   ShowDetail detailOpening({
     Duration? after,
     ShowStatus? status,
@@ -123,6 +130,7 @@ void main() {
     DateTime Function()? clock,
     bool loggedIn = true,
     ShowApi? api,
+    MockAlarmApi? alarms,
   }) async {
     usePhoneSize(tester);
     // 좌석 선택 화면은 예매 컨트롤러와 예매 API 를 위에서 받는다. 앱에서는
@@ -146,31 +154,36 @@ void main() {
     );
     addTearDown(favorites.dispose);
 
+    alarmApi = alarms ?? MockAlarmApi();
+
     await tester.pumpWidget(
       AuthSessionScope(
         session: session,
-        child: ShowApiScope(
-          api: api ?? _FixedShowApi(detail),
-          child: BookingApiScope(
-            api: MockBookingApi(latency: Duration.zero),
-            child: BookingScope(
-              controller: controller,
-              child: FavoriteScope(
-                store: favorites,
-                child: MaterialApp(
-                  theme: AppTheme.light,
-                  home: ShowDetailScreen(
-                    showId: detail.id,
-                    clock: clock ?? () => now,
-                  ),
-                  // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
-                  routes: {
-                    AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen(
-                      concertId: BookingConstants.fallbackConcertId,
+        child: AlarmApiScope(
+          api: alarmApi,
+          child: ShowApiScope(
+            api: api ?? _FixedShowApi(detail),
+            child: BookingApiScope(
+              api: MockBookingApi(latency: Duration.zero),
+              child: BookingScope(
+                controller: controller,
+                child: FavoriteScope(
+                  store: favorites,
+                  child: MaterialApp(
+                    theme: AppTheme.light,
+                    home: ShowDetailScreen(
+                      showId: detail.id,
+                      clock: clock ?? () => now,
                     ),
-                    AppRoutes.login: (_) =>
-                        const Scaffold(body: Text('로그인 화면')),
-                  },
+                    // 예매 버튼이 실제로 좌석 선택으로 가는지 보려면 목적지가 필요하다.
+                    routes: {
+                      AppRoutes.zoneSelection: (_) => const ZoneSelectionScreen(
+                        concertId: BookingConstants.fallbackConcertId,
+                      ),
+                      AppRoutes.login: (_) =>
+                          const Scaffold(body: Text('로그인 화면')),
+                    },
+                  ),
                 ),
               ),
             ),
@@ -259,6 +272,91 @@ void main() {
       expect(find.text(ShowDetailStrings.marketAlarmAction), findsOneWidget);
       // 예매 버튼은 알림을 켜고 끄는 동안에도 자리를 지킨다.
       expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
+    });
+  });
+
+  // 버튼의 켜짐·꺼짐은 서버의 신청 상태를 따른다. 화면을 나갔다 들어와도
+  // 신청한 알림이 켜진 채로 보여야 한다.
+  group('알림 신청 서버 연동', () {
+    testWidgets('들어오면 서버의 신청 상태로 버튼을 그린다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(after: const Duration(hours: 1)),
+        alarms: MockAlarmApi(
+          statuses: {1: const AlarmStatus(concertOpen: true)},
+        ),
+      );
+
+      expect(find.text(ShowDetailStrings.unnotifyAction), findsOneWidget);
+      expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
+    });
+
+    testWidgets('신청과 해제가 서버에 남는다', (tester) async {
+      await pumpDetail(tester, detailOpening());
+
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmAction));
+      await tester.pump();
+      expect(alarmApi.statusOf(1), const AlarmStatus(marketListing: true));
+
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmOffAction));
+      await tester.pump();
+      expect(alarmApi.statusOf(1), AlarmStatus.none);
+    });
+
+    testWidgets('실패하면 버튼을 되돌리고 이유를 알린다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(after: const Duration(hours: 1)),
+        alarms: MockAlarmApi(failing: true),
+      );
+
+      await tester.tap(find.text(ShowDetailStrings.notifyAction));
+      await tester.pump();
+
+      expect(find.text(AlarmStrings.toggleFailed), findsOneWidget);
+      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
+      expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
+    });
+
+    testWidgets('보내는 동안 다시 눌러도 한 번만 나간다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(),
+        alarms: MockAlarmApi(latency: const Duration(milliseconds: 300)),
+      );
+      // 들어올 때 묻는 신청 상태도 같은 만큼 늦게 온다. 그것부터 받아 둔다.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmAction));
+      await tester.pump();
+      // 버튼은 먼저 바뀌어 있다. 해제 버튼을 눌러도 앞 요청이 끝나기 전이라 무시된다.
+      await tester.tap(find.text(ShowDetailStrings.marketAlarmOffAction));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(alarmApi.sendCount, 1);
+      expect(alarmApi.statusOf(1), const AlarmStatus(marketListing: true));
+      expect(find.text(ShowDetailStrings.marketAlarmOffAction), findsOneWidget);
+    });
+
+    testWidgets('로그아웃 상태면 묻지도 보내지도 않고 로그인을 안내한다', (tester) async {
+      await pumpDetail(
+        tester,
+        detailOpening(after: const Duration(hours: 1)),
+        loggedIn: false,
+        alarms: MockAlarmApi(
+          statuses: {1: const AlarmStatus(concertOpen: true)},
+        ),
+      );
+
+      // 서버에 신청이 있어도 누구의 것인지 모르니 꺼진 채로 그린다.
+      expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
+
+      await tester.tap(find.text(ShowDetailStrings.notifyAction));
+      await tester.pump();
+
+      expect(find.text(ShowDetailStrings.alarmLoginRequired), findsOneWidget);
+      expect(find.text(ShowDetailStrings.unnotifyAction), findsNothing);
+      expect(alarmApi.sendCount, 0);
     });
   });
 

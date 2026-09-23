@@ -132,4 +132,7 @@ class _FakePush implements PushNotifications {
 
   @override
   Future<void> registerDevice() async {}
+
+  @override
+  Stream<int> get unreadCounts => const Stream.empty();
 }
