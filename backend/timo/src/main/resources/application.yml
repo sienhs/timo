@@ -82,6 +82,24 @@ scheduling:
 entry-pass:
   ttl: 30s
 
+# 네이버 캡차. 자격증명(client-id·client-secret)은 프로파일마다 달라
+# application-{profile}.yml 에 있다. 나머지는 환경이 갈릴 이유가 없어 여기 한 곳에만 둔다.
+naver:
+  captcha:
+    base-url: https://openapi.naver.com
+    # 발급한 캡차 키의 수명. 이 안에 풀지 못하면 키가 사라져 다시 받아야 한다.
+    key-ttl: PT2M
+    # 캡차 통과 기록의 수명. 대기열 입장 유효 시간을 그대로 따라간다 - 통과 기록이 입장 자격보다
+    # 오래 살아 있으면 대기열에서 밀려난 뒤에도 좌석 조회를 이어갈 수 있다. 대기열 값이 정의되지
+    # 않은 프로파일(local·test)에서는 WaitingQueueServiceImpl 과 같은 기본값(PT5M)으로 떨어진다.
+    passed-ttl: ${waiting-queue.admission-ttl:PT5M}
+    # 사용자 한 명이 1분 동안 받을 수 있는 캡차 수. 네이버 API 호출 한도를 아끼는 것이 목적이다.
+    issue-limit-per-minute: 10
+    # 네이버로 동시에 나갈 수 있는 호출 수 상한. 넘으면 기다리지 않고 바로 502 다 - 네이버가
+    # 느려질 때 요청 처리 스레드 풀(좌석 조회·예매와 공유)이 캡차 하나 때문에 고갈되는 것을 막는다.
+    # 부하테스트로 실측 전 추정치다(infra/loadtest, docs/BE_CAPTCHA_TASK_BREAKDOWN.md 참고).
+    max-concurrent-calls: 50
+
 # 양도 마켓 운영 시간(매일, 양 끝 포함). 남의 매물 조회와 구매는 이 창 안에서만, 가격 수정은 창 밖에서만
 # 받고 판정은 서버 시계로 한다. 등록은 시간 무관 - 닫힌 시간에 올린 매물이 08:00 에 한꺼번에 드러난다.
 # 환경마다 다르면 "로컬은 되는데 배포하면 409" 가 나므로 여기 한 곳에만 둔다.

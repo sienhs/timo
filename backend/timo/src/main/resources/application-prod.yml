@@ -99,3 +99,10 @@ seed:
     nickname: ${SEED_ADMIN_NICKNAME}
     username: ${SEED_ADMIN_USERNAME}
     password: ${SEED_ADMIN_PASSWORD}
+
+# 네이버 캡차 자격증명. 기본값을 두지 않아 값이 없으면 기동이 실패한다 - 캡차 없이 좌석 조회가
+# 열리는 것보다 뜨지 않는 편이 낫다. 두 값은 infra 의 backend_secret 으로 주입한다.
+naver:
+  captcha:
+    client-id: ${NAVER_CAPTCHA_CLIENT_ID}
+    client-secret: ${NAVER_CAPTCHA_CLIENT_SECRET}

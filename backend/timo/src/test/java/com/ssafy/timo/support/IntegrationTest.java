@@ -1,5 +1,6 @@
 package com.ssafy.timo.support;
 
+import com.ssafy.timo.domain.captcha.CaptchaProbeConfig;
 import com.ssafy.timo.global.exception.ExceptionProbeConfig;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -49,6 +50,9 @@ import java.lang.annotation.Target;
  * <p>{@link ExceptionProbeConfig} 를 함께 올린다. 예외 처리 규약은 도메인 컨트롤러가 아니라
  * 전용 프로브 컨트롤러로 검증해야 하는데, 그것만 따로 등록하면 컨텍스트가 하나 더 뜨기 때문이다.
  * 프로브는 테스트 소스에만 있고 {@code /test/**} 경로만 쓴다.
+ *
+ * <p>{@link CaptchaProbeConfig} 도 같은 이유로 함께 올린다. {@code RequireCaptchaInterceptor} 의
+ * 동작을 도메인 API(좌석 조회, B9)와 무관하게 확인한다.
  */
 @Documented
 @Inherited
@@ -57,7 +61,7 @@ import java.lang.annotation.Target;
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
-@Import({ExceptionProbeConfig.class, MarketHoursTestConfig.class})
+@Import({ExceptionProbeConfig.class, MarketHoursTestConfig.class, CaptchaProbeConfig.class})
 @Transactional
 public @interface IntegrationTest {
 }

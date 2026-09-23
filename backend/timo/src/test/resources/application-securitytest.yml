@@ -49,3 +49,9 @@ app:
 # (ConcertStatusSchedulerTest).
 scheduling:
   enabled: false
+
+# 네이버 캡차 자격증명. 위 solapi 와 같은 사정으로 더미를 둔다.
+naver:
+  captcha:
+    client-id: test-captcha-client-id
+    client-secret: test-captcha-client-secret

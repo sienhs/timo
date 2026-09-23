@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.seat.controller;
 
+import com.ssafy.timo.domain.captcha.annotation.RequireCaptcha;
 import com.ssafy.timo.domain.seat.dto.CommandSeatRequestDto;
 import com.ssafy.timo.domain.seat.dto.CommandSeatResponseDto;
 import com.ssafy.timo.domain.seat.dto.SeatHoldCancelResponseDto;
@@ -25,6 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>요청 검증 실패는 {@link com.ssafy.timo.global.exception.GlobalExceptionHandler} 가
  * Problem Details 로 변환하므로 여기서 따로 처리하지 않는다.
+ *
+ * <p><b>{@code findSeats} 의 {@code @RequireCaptcha} 는 여기, v1 구현에만 붙인다.</b> 다른 메서드
+ * 애노테이션과 달리 {@link SeatApi} 에 두지 않는다 - 인터페이스에 두면 같은 메서드를 구현하는
+ * {@code /api/v0/seats} 스텁까지 캡차 통과 기록을 요구하게 되는데, 스텁은 프론트 연동용 고정 데이터라
+ * 캡차와 무관해야 한다.
  */
 @RestController
 @RequestMapping(SeatController.BASE_PATH)
@@ -37,6 +43,7 @@ public class SeatController implements SeatApi {
     private final SeatHoldRetryService seatHoldRetryService;
 
     @Override
+    @RequireCaptcha
     public ResponseEntity<SectionSeatListResponseDto> findSeats(Long concertId, Long sectionId) {
         return ResponseEntity.ok(seatService.findSeats(concertId, sectionId));
     }

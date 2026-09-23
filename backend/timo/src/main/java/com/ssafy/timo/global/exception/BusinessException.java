@@ -13,14 +13,27 @@ public class BusinessException extends RuntimeException {
 
     private final BaseErrorCode errorCode;
 
+    /**
+     * 재시도를 권할 때만 채운다({@code null} 이면 안 채운다). {@link GlobalExceptionHandler} 가
+     * {@code Retry-After} 헤더로 그대로 내보낸다. 아무 실패에나 채우면 안 된다 - 원인이 확실하고
+     * ("지금 자리가 없다") 곧 풀린다는 근거가 있을 때만 쓴다. 이유를 모르는 실패에 아무 숫자나
+     * 주면 클라이언트가 그 숫자를 근거 있는 값으로 믿고 재시도 로직을 짠다.
+     */
+    private final Long retryAfterSeconds;
+
     public BusinessException(BaseErrorCode errorCode) {
-        super(errorCode.getMessage());
-        this.errorCode = errorCode;
+        this(errorCode, errorCode.getMessage(), null);
     }
 
     /** 같은 코드지만 상황별로 구체적인 사유를 담고 싶을 때. */
     public BusinessException(BaseErrorCode errorCode, String message) {
+        this(errorCode, message, null);
+    }
+
+    /** 재시도 대기 시간(초)까지 함께 담을 때. */
+    public BusinessException(BaseErrorCode errorCode, String message, Long retryAfterSeconds) {
         super(message);
         this.errorCode = errorCode;
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 }
