@@ -19,6 +19,7 @@ import '../models/trending_keyword.dart';
 import '../state/home_api_scope.dart';
 import '../state/recent_search_scope.dart';
 import '../utils/favorite_targets.dart';
+import '../widgets/artist_section_skeleton.dart';
 import '../widgets/home_section_header.dart';
 import '../widgets/recent_search_chips.dart';
 import '../widgets/recommended_artist_row.dart';
@@ -26,7 +27,9 @@ import '../widgets/related_artist_row.dart';
 import '../widgets/search_field.dart';
 import '../widgets/search_top_bar.dart';
 import '../widgets/show_banner_card.dart';
+import '../widgets/show_card_list_skeleton.dart';
 import '../widgets/trending_keyword_list.dart';
+import '../widgets/trending_keyword_skeleton.dart';
 
 /// 공연 검색. 홈 상단의 검색 바를 누르면 열린다.
 ///
@@ -333,6 +336,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
         AsyncBoundary<List<ArtistSummary>>(
           future: _recommended,
           onRetry: _reloadRecommended,
+          loading: const ArtistSectionSkeleton(rows: 1),
           builder: (context, artists) => RecommendedArtistRow(
             artists: artists,
             onArtistPressed: (artist) => _search(artist.name),
@@ -342,6 +346,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
         AsyncBoundary<TrendingKeywords>(
           future: _trending,
           onRetry: _reloadTrending,
+          loading: const TrendingKeywordSkeleton(),
           builder: (context, trending) => TrendingKeywordList(
             trending: trending,
             onKeywordPressed: _search,
@@ -366,6 +371,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
         AsyncBoundary<List<ShowSummary>>(
           future: shows,
           onRetry: _retryShows,
+          loading: const _ResultSkeleton(),
           builder: (context, shows) => _ResultSection(
             shows: shows,
             keyword: _keyword,
@@ -380,6 +386,10 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
         AsyncBoundary<List<ArtistSummary>>(
           future: artists,
           onRetry: _retryArtists,
+          // 관련 아티스트는 없을 수도 있는 섹션이라 기다리는 동안 자리를
+          // 비워 둔다. 뼈대를 세우면 아티스트가 없는 검색어에서 잠깐 떴다가
+          // 사라진다.
+          loading: const SizedBox.shrink(),
           builder: (context, artists) => artists.isEmpty
               ? const SizedBox.shrink()
               : Column(
@@ -478,6 +488,30 @@ class _ResultSection extends StatelessWidget {
               ),
             ),
       ],
+    );
+  }
+}
+
+/// 검색 결과를 기다리는 동안의 자리.
+///
+/// 제목은 뼈대로 두지 않고 그대로 적는다 — 무엇을 기다리는 중인지는 받아
+/// 보기 전에도 알고, 회색 막대로 덮으면 오히려 읽을 것이 하나도 없어진다.
+/// 카드는 미리보기 개수([HomeMetrics.searchPreviewCount])만큼만 세운다.
+class _ResultSkeleton extends StatelessWidget {
+  const _ResultSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: HomeStrings.loading,
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(title: HomeStrings.resultSection),
+          SizedBox(height: HomeMetrics.sectionTitleGap),
+          ShowCardListSkeleton(count: HomeMetrics.searchPreviewCount),
+        ],
+      ),
     );
   }
 }

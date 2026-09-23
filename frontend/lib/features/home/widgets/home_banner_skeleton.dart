@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import 'skeleton_box.dart';
+import '../../../core/widgets/skeleton_box.dart';
 
 /// 배너를 불러오는 동안 그 자리에 두는 빈 배너. 높이와 여백을
 /// [HomeBannerCarousel] 과 같게 잡아, 데이터가 오는 순간 아래 섹션이 밀리지

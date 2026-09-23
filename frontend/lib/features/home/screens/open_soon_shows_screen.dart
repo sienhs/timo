@@ -7,6 +7,7 @@ import '../constants.dart';
 import '../models/show_summary.dart';
 import '../state/home_api_scope.dart';
 import '../widgets/show_list_app_bar.dart';
+import '../widgets/show_list_skeleton.dart';
 import '../widgets/show_list_view.dart';
 
 /// 오픈 예정 공연 전체. 홈의 "티켓 오픈 예정" 더보기로 들어온다.
@@ -46,6 +47,7 @@ class _OpenSoonShowsScreenState extends State<OpenSoonShowsScreen> {
         child: AsyncBoundary<List<ShowSummary>>(
           future: _shows,
           onRetry: _reload,
+          loading: const ShowListSkeleton(),
           builder: (context, shows) {
             // 홈의 오픈 예정 줄과 같은 기준으로 한 번 더 거른다. 서버가
             // `status` 로 걸러 주지만 오픈 시각이 지나도 상태가 밀리지 않은

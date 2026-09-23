@@ -8,6 +8,7 @@ import '../state/creation_job_scope.dart';
 import '../state/memory_concert_api_scope.dart';
 import '../state/ticket_store_scope.dart';
 import '../widgets/creator/concert_card.dart';
+import '../widgets/creator/concert_list_skeleton.dart';
 import '../widgets/creator/processing_orbit.dart';
 import '../widgets/creator/processing_stage.dart';
 import '../widgets/creator/photo_frame.dart';
@@ -208,6 +209,19 @@ class _CreatorScreenState extends State<CreatorScreen> {
           } else {
             return;
           }
+        }
+        // 누끼가 나와도 사람이라는 근거가 없으면 한 번 묻는다. 데모 진행은
+        // 방금 스스로 고른 길이라 다시 묻지 않는다.
+        if (person['segmented'] == true &&
+            !CreationService.personDetected(person)) {
+          if (!mounted) return;
+          final choice = await OverlayService.choose(
+            context,
+            title: CreatorText.noPersonTitle,
+            message: CreatorText.noPersonBody,
+            choices: const {'keep': '이대로 진행', 'other': '다른 사진 선택'},
+          );
+          if (choice != 'keep') return;
         }
         person['sourceAsset'] = asset?.source;
         if (people.length > personIndex) {
@@ -512,6 +526,7 @@ class _CreatorScreenState extends State<CreatorScreen> {
   Widget concertList() => AsyncBoundary<List<MemoryConcert>>(
     future: _concerts,
     onRetry: _reloadConcerts,
+    loading: const ConcertListSkeleton(),
     builder: (context, concerts) {
       // 이미 만든 티켓은 내리지 않는다. 티켓 한 장에 소장품은 하나뿐이라
       // 골라 봤자 예전 것을 덮어쓸 뿐이다. 고치는 길은 컬렉션 쪽에 있다.

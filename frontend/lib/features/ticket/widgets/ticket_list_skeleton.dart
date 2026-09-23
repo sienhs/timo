@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../home/widgets/skeleton_box.dart';
+import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 import 'ticket_card.dart';
 
@@ -8,7 +8,7 @@ import 'ticket_card.dart';
 ///
 /// 스피너 하나를 가운데 두는 대신 카드 모양을 미리 그린다. 목록이 어떤
 /// 모양으로 채워질지 보여 주면 기다리는 시간이 짧게 느껴지고, 카드가 들어올 때
-/// 화면이 덜 흔들린다. 홈이 쓰는 [SkeletonBox] 를 그대로 쓴다.
+/// 화면이 덜 흔들린다. 공용 [SkeletonBox] 를 쌓아 만든다.
 class TicketListSkeleton extends StatelessWidget {
   const TicketListSkeleton({super.key});
 

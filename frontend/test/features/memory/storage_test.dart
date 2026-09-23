@@ -381,4 +381,27 @@ void main() {
   test('draft validation returns all errors', () {
     expect(CreationService.validateDraft(null, null, []), hasLength(3));
   });
+
+  test('a cutout without a face or a pose is not taken for a person', () {
+    expect(
+      CreationService.personDetected({
+        'analysis': {'faceAvailable': false, 'poseAvailable': false},
+      }),
+      isFalse,
+    );
+    // 옆모습이라 얼굴은 못 찾아도 자세가 잡히면 사람으로 본다.
+    expect(
+      CreationService.personDetected({
+        'analysis': {'faceAvailable': false, 'poseAvailable': true},
+      }),
+      isTrue,
+    );
+    expect(
+      CreationService.personDetected({
+        'analysis': {'faceAvailable': true, 'poseAvailable': false},
+      }),
+      isTrue,
+    );
+    expect(CreationService.personDetected({'analysis': {}}), isFalse);
+  });
 }

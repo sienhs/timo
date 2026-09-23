@@ -82,8 +82,29 @@ class PosterImage extends StatelessWidget {
                 image,
               ),
               fit: fit,
+              // 그림이 내려오는 동안은 회색 자리를 둔다. 응답이 온 뒤에도
+              // 포스터는 한참 더 걸려서, 이게 없으면 목록·배너의 스켈레톤이
+              // 걷힌 자리가 빈 칸으로 남았다가 그림이 튀어 들어온다.
+              frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
+                  wasSynchronouslyLoaded || frame != null
+                  ? child
+                  : const _LoadingBox(),
               errorBuilder: (_, _, _) => const _Placeholder(),
             ),
+    );
+  }
+}
+
+/// 그림을 기다리는 동안의 자리. 못 읽었을 때의 [_Placeholder] 와 달리
+/// 아이콘을 두지 않는다 — 오는 중인 그림이 '없는 그림' 으로 보이면 안 된다.
+class _LoadingBox extends StatelessWidget {
+  const _LoadingBox();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppColors.surfaceMuted,
+      child: SizedBox.expand(),
     );
   }
 }

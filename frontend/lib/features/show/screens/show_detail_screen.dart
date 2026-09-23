@@ -23,6 +23,7 @@ import '../utils/favorite_target.dart';
 import '../widgets/show_artist_list.dart';
 import '../widgets/show_detail_app_bar.dart';
 import '../widgets/show_detail_bottom_bar.dart';
+import '../widgets/show_detail_skeleton.dart';
 import '../widgets/show_detail_summary.dart';
 import '../widgets/show_notice.dart';
 import '../widgets/zone_price_card.dart';
@@ -98,6 +99,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       body: AsyncBoundary<ShowDetail>(
         future: _detail,
         onRetry: _reload,
+        loading: const ShowDetailSkeleton(),
         builder: (context, detail) =>
             _LoadedShow(detail: detail, clock: widget.clock),
       ),

@@ -191,6 +191,20 @@ class HomeMetrics {
   /// 불러오는 동안 그리는 빈 카드 수. 폰 폭(360)에 카드 두 장 반이 보인다.
   static const skeletonCardCount = 3;
 
+  /// 뼈대에 그리는 탭 글자 한 개의 폭. '예매 가능 12' 정도를 덮는 길이다.
+  static const skeletonTabLabelWidth = 64.0;
+
+  /// 뼈대에 그리는 섹션 제목 줄의 폭.
+  static const skeletonSectionTitleWidth = 120.0;
+
+  /// 뼈대에 그리는 순위 숫자의 폭. 실제 자리([trendingRankWidth])보다 좁다 —
+  /// 한 자리 숫자가 들어갈 만큼만 칠하고 나머지는 여백으로 둔다.
+  static const skeletonRankWidth = 12.0;
+
+  /// 뼈대에 그리는 검색어 줄의 두 가지 길이.
+  static const skeletonKeywordWideWidth = 160.0;
+  static const skeletonKeywordNarrowWidth = 110.0;
+
   // 검색 화면
   /// 상단 바(뒤로가기 · 로고)와 검색 필드 사이, 필드와 첫 섹션 사이 간격.
   static const searchFieldTopGap = 4.0;

@@ -16,6 +16,7 @@ import '../models/memory_ticket.dart';
 import '../state/goods_api_scope.dart';
 import '../state/memory_concert_api_scope.dart';
 import '../state/ticket_store_scope.dart';
+import '../widgets/collection/collection_skeleton.dart';
 import '../widgets/collection/collection_view.dart';
 import '../widgets/ui/glow_button.dart';
 import '../widgets/ui/overlay_service.dart';
@@ -208,6 +209,7 @@ class _CollectionScreenState extends State<CollectionScreen> {
     return AsyncBoundary<_Catalog>(
       future: catalog,
       onRetry: _reloadCatalog,
+      loading: const CollectionSkeleton(),
       builder: (context, catalog) {
         final slots = _buildSlots(catalog, tickets);
         return CollectionView(

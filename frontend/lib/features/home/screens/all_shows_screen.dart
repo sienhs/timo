@@ -8,6 +8,7 @@ import '../constants.dart';
 import '../models/show_summary.dart';
 import '../state/home_api_scope.dart';
 import '../widgets/show_list_app_bar.dart';
+import '../widgets/show_list_skeleton.dart';
 import '../widgets/show_list_view.dart';
 
 /// 공연 전체 조회. 홈의 "인기 공연" 더보기로 들어온다.
@@ -56,6 +57,7 @@ class _AllShowsScreenState extends State<AllShowsScreen> {
         child: AsyncBoundary<List<ShowSummary>>(
           future: _shows,
           onRetry: _reload,
+          loading: const ShowListSkeleton(hasTabs: true),
           builder: (context, shows) {
             final bookable = shows
                 .where((show) => show.isOpenOrUpcoming)

@@ -79,6 +79,9 @@ class ResaleMetrics {
 class ResaleStrings {
   ResaleStrings._();
 
+  /// 목록을 받아 오는 동안 뼈대에 붙이는 안내. 스크린 리더가 읽는다.
+  static const loading = '불러오는 중이에요.';
+
   /// 서버 응답을 JSON 으로 읽지 못했을 때. 프록시가 HTML 을 준 경우 등.
   static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
 
@@ -193,6 +196,7 @@ class ResaleStrings {
   static const transferringBadge = '티켓 양도 중';
   static const transferredBadge = '티켓 양도 완료';
   static const transferFailedBadge = '티켓 양도 실패';
+
   /// 체결 응답이 오면 양도는 이미 끝나 있다(서버 `PurchaseService`). 예전에는
   /// "1~2분이 걸릴 수 있어요" 라고 기다리게 했는데, 이제 기다릴 것이 없다.
   static const transferDescription =

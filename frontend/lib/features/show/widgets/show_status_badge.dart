@@ -31,9 +31,9 @@ class ShowStatusBadge extends StatelessWidget {
             ? ShowDetailStrings.onSaleBadge
             : ShowDetailStrings.upcomingBadge,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: isOpen ? AppColors.onPrimary : AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+          color: isOpen ? AppColors.onPrimary : AppColors.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

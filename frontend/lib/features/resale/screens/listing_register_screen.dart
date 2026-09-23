@@ -17,6 +17,7 @@ import '../widgets/listing_price_editor.dart';
 import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_bottom_bar.dart';
 import '../widgets/resale_empty_view.dart';
+import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_search_field.dart';
 
 /// 양도 등록. 티켓을 고르고(1단계) 판매가를 정해(2단계) 마켓에 올린다.
@@ -219,6 +220,7 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
     return AsyncBoundary<List<ListableTicket>>(
       future: _tickets!,
       onRetry: _reload,
+      loading: const ResaleListSkeleton(),
       builder: (context, tickets) => _step == _RegisterStep.pickTicket
           ? _ticketPicker(tickets)
           : _priceForm(),

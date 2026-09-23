@@ -262,6 +262,10 @@ void main() {
 
     await tester.tap(find.text(HomeStrings.searchHint));
     await tester.pumpAndSettle();
+    // 검색 화면이 뜨면서 추천 아티스트·인기 검색어를 부른다. 기다리는 동안은
+    // 뼈대(정지 화면)라 pumpAndSettle 이 그 자리에서 끝나므로, 목 응답 지연만큼
+    // 따로 넘겨 준다 — 안 넘기면 남은 타이머로 테스트가 실패한다.
+    await tester.pump(HomeMetrics.mockLatency);
 
     expect(find.byType(ShowSearchScreen), findsOneWidget);
   });
@@ -335,6 +339,8 @@ void main() {
     await scrollTo(tester, find.text('옥주현'));
     await tester.tap(find.text('옥주현'));
     await tester.pumpAndSettle();
+    // 검색 화면이 부르는 목 응답을 끝까지 흘려 준다(위 주석 참고).
+    await tester.pump(HomeMetrics.mockLatency);
 
     expect(find.byType(ShowSearchScreen), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -404,7 +410,9 @@ void main() {
     /// 고정할 수 없다 — 경계는 시각의 함수라 테스트가 도는 날에 따라 답이 바뀐다.
     Future<void> pumpBadge(WidgetTester tester, ShowSummary show) async {
       await tester.pumpWidget(
-        MaterialApp(home: BookingStatusBadge(show: show, now: now)),
+        MaterialApp(
+          home: BookingStatusBadge(show: show, now: now),
+        ),
       );
     }
 

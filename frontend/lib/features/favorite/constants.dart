@@ -101,6 +101,9 @@ class FavoriteStrings {
   static const showTab = '공연';
   static const artistTab = '아티스트';
 
+  /// 목록을 받아 오는 동안 뼈대에 붙이는 안내. 스크린 리더가 읽는다.
+  static const loading = '찜한 공연을 불러오는 중이에요.';
+
   static const showSearchHint = '찜한 공연을 검색해 보세요';
   static const artistSearchHint = '찜한 아티스트를 검색해 보세요';
   static const clearSearch = '검색어 지우기';
