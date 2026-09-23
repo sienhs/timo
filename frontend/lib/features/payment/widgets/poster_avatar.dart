@@ -32,6 +32,15 @@ class PosterAvatar extends StatelessWidget {
                 // 원본이 표시 크기보다 훨씬 크므로 표시할 만큼만 디코딩한다.
                 cacheWidth: (diameter * MediaQuery.devicePixelRatioOf(context))
                     .round(),
+                // 그림이 내려오는 동안은 회색 자리를 둔다 — 완료 화면이
+                // 빈 동그라미로 열렸다가 채워지지 않게.
+                frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
+                    wasSynchronouslyLoaded || frame != null
+                    ? child
+                    : PosterPlaceholder.loading(
+                        width: diameter,
+                        height: diameter,
+                      ),
                 errorBuilder: (_, _, _) =>
                     PosterPlaceholder(width: diameter, height: diameter),
               ),

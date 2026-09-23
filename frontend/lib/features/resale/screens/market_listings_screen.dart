@@ -14,6 +14,7 @@ import '../state/resale_api_scope.dart';
 import '../widgets/listing_row_card.dart';
 import '../widgets/market_hours_countdown.dart';
 import '../widgets/resale_app_bar.dart';
+import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_empty_view.dart';
 import '../widgets/sort_tab_row.dart';
 
@@ -141,6 +142,7 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
               child: AsyncBoundary<List<Listing>>(
                 future: _listings!,
                 onRetry: _reload,
+                loading: const ResaleListSkeleton(withPoster: false),
                 builder: (context, listings) => _list(listings),
               ),
             ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants.dart';
-import 'skeleton_box.dart';
+import '../../../core/widgets/skeleton_box.dart';
 
 /// 공연 카드 줄을 불러오는 동안 그 자리에 두는 빈 카드들.
 ///

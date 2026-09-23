@@ -85,6 +85,10 @@ class ShowDetailStrings {
 
   static const appBarTitle = '공연 상세';
 
+  /// 공연을 받아 오는 동안 뼈대에 붙이는 안내. 화면에 글자로 뜨지는 않고
+  /// 스크린 리더가 읽는다.
+  static const loading = '공연을 불러오는 중이에요.';
+
   /// 서버 응답을 JSON 으로 읽지 못했을 때. 프록시가 HTML 을 준 경우 등.
   static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
 

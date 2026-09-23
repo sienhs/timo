@@ -509,6 +509,17 @@ class CreationService {
     'UPPER_BODY' => '상반신',
     _ => '분류 불가',
   };
+
+  /// 누끼는 나왔지만 사람이라는 근거가 하나도 없는 경우. MODNet 은 사람이
+  /// 아니어도 화면에서 두드러지는 물체를 잘라내므로, 얼굴도 자세도 못 찾았다면
+  /// 인물 사진이 아닐 수 있다. 막지는 않고 물어보기만 한다 — 옆모습·역광처럼
+  /// 사람인데도 둘 다 놓치는 사진이 있어서다.
+  static bool personDetected(Map<String, dynamic> person) {
+    final analysis = person['analysis'] as Map?;
+    return analysis?['faceAvailable'] == true ||
+        analysis?['poseAvailable'] == true;
+  }
+
   static List<String> validateDraft(
     MemoryConcert? concert,
     String? background,

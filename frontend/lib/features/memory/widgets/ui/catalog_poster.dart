@@ -45,6 +45,10 @@ class CatalogPoster extends StatelessWidget {
               child: Image(
                 image: image,
                 fit: BoxFit.cover,
+                // 그림이 오는 동안에도 같은 회색 자리를 둔다. 컬렉션은
+                // 포스터가 여러 장 한꺼번에 떠서 빈 칸이 특히 눈에 띈다.
+                frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
+                    wasSynchronouslyLoaded || frame != null ? child : _empty,
                 errorBuilder: (_, _, _) => _empty,
               ),
             ),

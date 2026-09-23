@@ -20,6 +20,7 @@ import '../utils/toggle_favorite_show.dart';
 import '../widgets/favorite_artist_tile.dart';
 import '../widgets/favorite_empty_view.dart';
 import '../widgets/favorite_filter_chips.dart';
+import '../widgets/favorite_list_skeleton.dart';
 import '../widgets/favorite_search_field.dart';
 import '../widgets/favorite_show_card.dart';
 import '../widgets/favorite_summary_row.dart';
@@ -206,6 +207,7 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     return AsyncBoundary<List<FavoriteShow>>(
       future: pending,
       onRetry: _reloadShows,
+      loading: const FavoriteListSkeleton(),
       builder: (context, _) => _ShowTab(
         shows: shows,
         keyword: _search.text,

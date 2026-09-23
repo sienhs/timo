@@ -16,6 +16,9 @@ class CollectionText {
   static const createLabel = '소장품 만들기';
   static const createTooltip = '새 소장품 만들기';
 
+  /// 카탈로그를 받아 오는 동안 뼈대에 붙이는 안내. 스크린 리더가 읽는다.
+  static const loading = '컬렉션을 불러오는 중이에요.';
+
   /// 아직 확정하지 않은 소장품 위에 뜨는 딱지.
   static const draftBadge = '임시';
 
@@ -157,6 +160,9 @@ class GoodsText {
 class CreatorText {
   static const totalSteps = 6;
   static const appBarTitle = '공연 추억 만들기';
+
+  /// 공연 목록을 받아 오는 동안 뼈대에 붙이는 안내. 스크린 리더가 읽는다.
+  static const loadingConcerts = '공연을 불러오는 중이에요.';
   static const brand = 'TIMO';
   static const titles = [
     '소장품을 만들 공연을\n선택해주세요',
@@ -235,6 +241,11 @@ class CreatorText {
   static const notificationTitle = '소장품 제작이 완료되었어요!';
   static const notificationBody = '완성된 소장품을 확인해볼까요?';
   static const notificationTime = 'now';
+
+  /// 누끼는 됐는데 얼굴도 자세도 못 찾았을 때. 사람이 아닌 사진일 수 있다는
+  /// 확인일 뿐이라 막지 않는다 — 옆모습·역광이면 사람이어도 여기 걸린다.
+  static const noPersonTitle = '사람이 잘 보이지 않는 사진 같아요';
+  static const noPersonBody = '얼굴과 자세를 찾지 못했어요. 이대로 진행하면 입체감과 자동 배치가 단순해져요.';
 
   /// Errors.
   static const saveFailed = '소장품을 저장하지 못했어요. 다시 시도해주세요.';

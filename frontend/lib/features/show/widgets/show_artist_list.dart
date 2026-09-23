@@ -46,9 +46,9 @@ class _ArtistCell extends StatelessWidget {
           const SizedBox(height: ShowDetailMetrics.artistNameGap),
           Text(
             artist.name,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textPrimary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -79,9 +79,9 @@ class _ArtistFace extends StatelessWidget {
       child: Center(
         child: Text(
           artist.name.characters.first,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
         ),
       ),
     );

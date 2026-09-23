@@ -16,6 +16,7 @@ import '../widgets/market_countdown.dart';
 import '../widgets/purchase_transferring_view.dart';
 import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_bottom_bar.dart';
+import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_summary_card.dart';
 
 /// 양도 티켓 구매 확인 화면. 무엇을 얼마에 사는지 확인하고 결제한다.
@@ -185,6 +186,8 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
               child: AsyncBoundary<ListingDetail>(
                 future: _listing!,
                 onRetry: _reload,
+                // 카드 한 장짜리 화면이라 그 한 장만 비워 둔다.
+                loading: const ResaleListSkeleton(count: 1, withPoster: false),
                 builder: (context, listing) => SingleChildScrollView(
                   padding: const EdgeInsets.all(
                     ResaleMetrics.horizontalPadding,

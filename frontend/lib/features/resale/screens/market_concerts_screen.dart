@@ -14,6 +14,7 @@ import '../widgets/market_closed_view.dart';
 import '../widgets/market_concert_card.dart';
 import '../widgets/market_hours_countdown.dart';
 import '../widgets/resale_app_bar.dart';
+import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_bottom_bar.dart';
 import '../widgets/resale_empty_view.dart';
 import '../widgets/resale_search_field.dart';
@@ -230,6 +231,7 @@ class _MarketConcertsScreenState extends State<MarketConcertsScreen> {
           child: AsyncBoundary<List<MarketConcert>>(
             future: _concerts!,
             onRetry: _reload,
+            loading: const ResaleListSkeleton(),
             builder: (context, concerts) => _list(concerts),
           ),
         ),
