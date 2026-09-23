@@ -5,10 +5,15 @@ spring:
     password: ${DB_PASSWORD}
   jpa:
     hibernate:
-      # RDS 스키마는 Terraform의 SSM bootstrap SQL이 만든다. 운영 기동 시 Hibernate가
-      # 제약·인덱스 등을 임의로 추가하지 않고 엔티티와의 불일치만 검증하게 한다.
+      # RDS 스키마는 Terraform의 SSM bootstrap SQL이 만든다.
+      # 운영 기동 시 Hibernate가 제약·인덱스 등을 임의로 추가하지 않고 엔티티와의 불일치만 검증하게 한다.
       ddl-auto: validate
     show-sql: false
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:db/seed-venue.sql,classpath:db/seed-concerts.sql
+      encoding: UTF-8
   data:
     redis:
       host: ${REDIS_HOST}
@@ -27,8 +32,6 @@ logging:
     root: info
 
 management:
-  # Prometheus가 /actuator/prometheus를 pull한다. 별도 OTLP metrics push는 이 컨테이너의
-  # localhost:4318에 수신기가 없어 주기적인 연결 실패를 유발하므로 운영에서 끈다.
   otlp:
     metrics:
       export:
@@ -62,15 +65,11 @@ jwt:
 entry-pass:
   secret: ${ENTRY_PASS_SECRET}
 
-# 배포 환경은 실제 API(/api/v1/**) 만 연다. 기본값도 false 지만, 운영에 스텁이 올라가면
-# 인증 없이 가짜 토큰을 내주는 셈이라 의도를 명시해 둔다.
+# 배포 환경은 실제 API(/api/v1/**) 만 연다. 기본값도 false 지만, 운영에 스텁이 올라가면 인증 없이 가짜 토큰을 내주는 셈이라 의도를 명시해 둔다.
 api:
   stub:
     enabled: false
 
-# infra/modules/image-storage 의 runtime_environment 출력이 이 두 값과 AWS_ACCESS_KEY_ID/
-# AWS_SECRET_ACCESS_KEY/AWS_REGION 을 함께 내려준다. 자격증명은 SDK 기본 체인이 환경변수에서
-# 바로 읽으므로 여기 따로 옮겨 적지 않는다.
 app:
   image:
     bucket-name: ${S3_PUBLIC_BUCKET_NAME}
@@ -86,3 +85,17 @@ solapi:
   api-key: ${SOLAPI_API_KEY}
   api-secret: ${SOLAPI_API_SECRET}
   sender-phone-number: ${SOLAPI_SENDER_PHONE}
+
+# ProdCatalogSeeder가 DB가 빈 최초 1회만 만드는 계정. 코드에 하드코딩하지 않고 환경변수로 받는다.
+# 특히 seed.admin은 로그인 가능한 계정이라 비밀번호가 저장소에 남으면 안 된다.
+seed:
+  organizer:
+    phone-number: ${SEED_ORGANIZER_PHONE}
+    name: ${SEED_ORGANIZER_NAME}
+    nickname: ${SEED_ORGANIZER_NICKNAME}
+  admin:
+    phone-number: ${SEED_ADMIN_PHONE}
+    name: ${SEED_ADMIN_NAME}
+    nickname: ${SEED_ADMIN_NICKNAME}
+    username: ${SEED_ADMIN_USERNAME}
+    password: ${SEED_ADMIN_PASSWORD}

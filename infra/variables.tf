@@ -195,6 +195,55 @@ variable "admin_private_key" {
   }
 }
 
+variable "seed_organizer_phone" {
+  description = "Phone number for the one-time seed organizer account ProdCatalogSeeder creates."
+  type        = string
+  sensitive   = true
+}
+
+variable "seed_organizer_name" {
+  description = "Display name for the one-time seed organizer account."
+  type        = string
+}
+
+variable "seed_organizer_nickname" {
+  description = "Nickname for the one-time seed organizer account."
+  type        = string
+}
+
+variable "seed_admin_phone" {
+  description = "Phone number for the one-time seed admin account ProdCatalogSeeder creates."
+  type        = string
+  sensitive   = true
+}
+
+variable "seed_admin_name" {
+  description = "Display name for the one-time seed admin account."
+  type        = string
+}
+
+variable "seed_admin_nickname" {
+  description = "Nickname for the one-time seed admin account."
+  type        = string
+}
+
+variable "seed_admin_username" {
+  description = "Login username for the one-time seed admin account."
+  type        = string
+  sensitive   = true
+}
+
+variable "seed_admin_password" {
+  description = "Login password for the one-time seed admin account. Never commit the real value."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.seed_admin_password) >= 10 && !startswith(var.seed_admin_password, "REPLACE_WITH_")
+    error_message = "Set seed_admin_password to a real value of at least 10 characters; do not leave the example value."
+  }
+}
+
 variable "gitlab_project_path" {
   description = "Exact GitLab project path, for example group/project"
   type        = string
