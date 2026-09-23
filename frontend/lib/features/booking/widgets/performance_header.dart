@@ -4,10 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../models/performance.dart';
 
-/// 좌석 선택 화면 상단의 공연 정보 바.
-///
-/// 시안 보강: 좌석 선택 두 화면에는 공연 정보가 없어서, 어떤 공연을
-/// 예매 중인지 결제 화면에 가서야 알 수 있었다. 한 줄만 얇게 붙였다.
+/// 좌석 선택 화면 상단의 공연 정보 바. 시안에는 없다 — 어떤 공연을 예매 중인지
+/// 결제 화면에 가서야 알 수 있어 한 줄만 얇게 붙였다.
 class PerformanceHeader extends StatelessWidget {
   const PerformanceHeader({super.key, required this.performance});
 

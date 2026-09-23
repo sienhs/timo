@@ -4,10 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_action_button.dart';
 import '../constants.dart';
 
-/// 티켓 카드 한 장의 껍데기. 흰 바탕, 테두리, 둥근 모서리.
-///
-/// 예정·지난·양도 카드가 같은 상자 안에 들어간다. 상자 모양을 카드마다 적으면
-/// 테두리 색이나 모서리 반경이 조금씩 갈린다.
+/// 티켓 카드 한 장의 껍데기. 흰 바탕, 테두리, 둥근 모서리. 예정·지난·양도
+/// 카드가 같은 상자를 쓴다.
 class TicketCard extends StatelessWidget {
   const TicketCard({super.key, required this.child});
 

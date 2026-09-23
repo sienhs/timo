@@ -3,10 +3,7 @@ class TicketMetrics {
   TicketMetrics._();
 
   /// 목록을 한 번에 받아 오는 개수. 서버 최대치(100)를 그대로 쓴다.
-  ///
-  /// 페이지를 나누지 않는 이유: 예정/지난을 가르는 기준(공연 날짜)이 서버에
-  /// 없어 어차피 다 받아야 나눌 수 있다. 티켓이 100장 넘는 사람이 나오면
-  /// 서버에 필터를 요청한다.
+  /// 예정/지난을 가르는 공연 날짜가 서버 필터에 없어 다 받아야 나눌 수 있다.
   static const pageSize = 100;
 
   /// 예매를 취소할 수 있는 마지막 시점. 공연 시작 이 시간 전까지다.
@@ -14,32 +11,22 @@ class TicketMetrics {
   static const cancelDeadline = Duration(hours: 24);
 
   /// 입장 QR 이 열리는 시각. 공연 시작 이만큼 전부터.
-  ///
   /// 백엔드 `EntryPassService.ENTRY_OPENS_BEFORE_START` 와 같아야 한다. 앱이
-  /// 더 일찍 열면 버튼은 눌리는데 서버가 409 로 거절해 "왜 안 되지" 만 남는다.
+  /// 더 일찍 열면 버튼은 눌리는데 서버가 409 로 거절한다.
   static const qrOpensBefore = Duration(hours: 2);
 
-  /// 입장 QR 이 닫히는 시각. 공연 시작 이만큼 뒤까지.
-  ///
-  /// 백엔드 `EntryPassService.ENTRY_CLOSES_AFTER_START` 와 같아야 한다. 종료
-  /// 시각이 아니라 시작 시각 기준인 것도 서버와 같다 — 여러 날 공연이면 종료일이
-  /// 며칠 뒤라 그동안 내내 열린 채가 된다.
+  /// 입장 QR 이 닫히는 시각. 공연 시작 이만큼 뒤까지(종료가 아니라 시작 기준).
+  /// 백엔드 `EntryPassService.ENTRY_CLOSES_AFTER_START` 와 같아야 한다.
   static const qrClosesAfter = Duration(hours: 6);
 
-  /// 검색 칸을 띄우기 시작하는 티켓 수.
-  ///
-  /// 시안에는 티켓 2장짜리 목록 위에도 검색 칸이 있다. 두 줄을 눈으로 훑는
-  /// 편이 빠른 자리에 검색을 두면 화면만 좁아진다.
+  /// 검색 칸을 띄우기 시작하는 티켓 수. 이보다 적으면 눈으로 훑는 편이 빨라 숨긴다.
   static const searchVisibleFrom = 5;
 
   /// 가짜 API 의 응답 지연. 실제 서버처럼 로딩 상태가 보이게 한다.
   static const mockLatency = Duration(milliseconds: 400);
 
-  /// 가짜 API 가 주문 상세를 몇 번째 물었을 때 발행을 끝내는가.
-  ///
-  /// 결제 완료 화면이 몇 초마다 묻는 것을 서버 없이 볼 수 있게, 처음 몇 번은
-  /// "발행 중" 으로 답하고 그 뒤에 끝낸다. 실제 서버는 체인 트랜잭션 두 개가
-  /// 확정되기까지 몇 초가 걸린다.
+  /// 가짜 API 가 주문 상세를 몇 번째 물었을 때 발행을 끝내는가. 결제 완료
+  /// 화면의 폴링을 서버 없이 볼 수 있게 처음 몇 번은 "발행 중" 으로 답한다.
   static const mockIssueAfterPolls = 2;
 
   /// 가짜 API 가 내주는 입장 QR 의 수명. 서버 기본값(`entry-pass.ttl`, 30초)과
@@ -52,10 +39,8 @@ class TicketMetrics {
   static const cardPadding = 14.0;
   static const cardGap = 12.0;
 
-  /// 카드 왼쪽 포스터. 폭은 고정이고 **높이는 오른쪽 글 묶음(제목 + 정보 줄)에
-  /// 맞춰 늘어난다**(사용자 피드백 — 아래가 좌석 줄과 나란해야 한다). 그래서
-  /// [posterHeight] 는 실제 카드가 아니라 뼈대 카드(`TicketListSkeleton`)가 쓰는
-  /// 대표값이다. 제목이 한 줄일 때의 글 묶음 높이에 맞췄다.
+  /// 카드 왼쪽 포스터. 폭은 고정이고 높이는 오른쪽 글 묶음에 맞춰 늘어난다.
+  /// [posterHeight] 는 뼈대 카드(`TicketListSkeleton`)만 쓰는 대표값이다.
   static const posterWidth = 68.0;
   static const posterHeight = 102.0;
   static const posterRadius = 8.0;
@@ -64,10 +49,8 @@ class TicketMetrics {
   static const qrPosterWidth = 96.0;
   static const qrPosterHeight = 128.0;
 
-  /// 남은 시간이 이 안쪽이면 카운트다운을 경고색으로 바꾼다.
-  ///
-  /// 5초는 검표기가 QR 을 읽고 서버가 판정하기까지 걸리는 시간(보통 1~2초)에
-  /// 여유를 둔 값이다. 이보다 적게 남았으면 내밀지 말고 새로 받는 편이 낫다.
+  /// 남은 시간이 이 안쪽이면 카운트다운을 경고색으로 바꾼다. 검표기가 읽고
+  /// 서버가 판정하기까지(보통 1~2초)에 여유를 둔 값이다.
   static const qrWarningThreshold = Duration(seconds: 5);
 
   /// 만료된 QR 을 덮는 흰색의 불투명도. 검은 칸이 연한 회색으로 보일 만큼
@@ -92,9 +75,6 @@ class TicketStrings {
   static const unreadableResponse = '서버 응답을 읽을 수 없어요. 잠시 후 다시 시도해주세요.';
 
   /// 공연까지 남은 날 배지. 오늘이면 `D-DAY`.
-  ///
-  /// 시안은 날짜가 다른 두 카드에 모두 `D-Day` 가 붙어 있는데, 그대로 두면
-  /// 9일 남은 공연과 오늘 공연이 구분되지 않는다.
   static String dday(int days) => days == 0 ? 'D-DAY' : 'D-$days';
 
   static const screenTitle = '내 티켓';
@@ -116,14 +96,8 @@ class TicketStrings {
   /// 공연 날짜가 아직 안 정해진 공연. 서버가 `startDate` 를 비워 준다.
   static const dateUndecided = '일정 미정';
 
-  /// QR 버튼이 안 열린 카드의 안내 줄. 시안에는 없다.
-  ///
-  /// 없으면 카드마다 버튼이 다른 이유를 알 수 없다. 첫 카드만 초록 버튼인 것을
-  /// 보고 "왜 이 공연만 입장이 되지" 로 읽힌다.
-  ///
-  /// 시각은 [TicketMetrics.qrOpensBefore] 에서 가져온다. "공연 당일" 이라고
-  /// 적어 두면 당일 아침에 눌러 보고 안 열려 의아해한다 — 실제 규칙은 시작
-  /// 2시간 전이고, 서버가 그 폭을 바꾸면 문구도 따라가야 한다.
+  /// QR 버튼이 안 열린 카드의 안내 줄. 시안에는 없다. 시각은
+  /// [TicketMetrics.qrOpensBefore] 에서 가져와 서버가 폭을 바꾸면 문구도 따라간다.
   static String get qrOpensBeforeShow =>
       '입장 QR 은 공연 시작 ${TicketMetrics.qrOpensBefore.inHours}시간 전에 열려요';
 
@@ -144,10 +118,7 @@ class TicketStrings {
   /// 다시 만들 수 없고, 보는 자리는 컬렉션이다.
   static const collectibleAlready = '이미 만든 추억이에요. 컬렉션에서 볼 수 있어요.';
 
-  // 티켓을 지금 쓸 수 없는 카드. 시안에 없다. 버튼을 지우고 그 자리에 사정을
-  // 적는다. 발행 중·실패·환불은 165번 때 합의했다가 168번에서 서버가 값을 안
-  // 준다고 걷어냈고, 서버가 티켓 상태를 주게 되어 되살렸다(S15P21D206-331).
-  // 양도 등록 중·입장 완료는 331번에서 새로 정했다(사용자 결정).
+  // 티켓을 지금 쓸 수 없는 카드. 시안에 없다. 버튼을 지우고 그 자리에 사정을 적는다.
 
   /// 예매 취소로 회수된 티켓.
   static const cancelledNotice = '예매를 취소했어요.';
@@ -166,23 +137,16 @@ class TicketStrings {
   /// 붙인다 — 사용자가 한 일이 아니라 발행 실패의 뒷처리다.
   static const refundedNotice = '발행에 실패해 환불됐어요.';
 
-  /// 양도 마켓에 올라가 있는 티켓. 팔리기 전까지 입장·취소가 막힌다.
-  ///
-  /// 내리는 길을 양도 목록 탭으로 보내지 않는다 — 이 카드의 더보기(⋮)에서
-  /// 바로 된다([TicketStrings.cancelListing]). 탭 이름을 외워 옮겨 가게 하면
-  /// 취소 경로가 없는 것처럼 읽힌다.
-  ///
-  /// 폰 폭(375)에서 한 줄에 들어가는 길이다. 길면 "있어 / 요." 처럼 낱말
-  /// 중간에서 꺾인다(에뮬레이터로 확인).
+  /// 양도 마켓에 올라가 있는 티켓. 팔리기 전까지 입장·취소가 막힌다. 내리는 길은
+  /// 이 카드의 더보기([cancelListing])라 양도 목록 탭으로 보내지 않는다.
+  /// 폰 폭(375)에서 한 줄에 들어가는 길이다.
   static const listedNotice = '양도 등록 중이에요. 더보기에서 취소할 수 있어요.';
 
   /// 게이트에서 입장 처리가 끝난 티켓. QR 을 다시 받아도 서버가 거절한다.
   static const usedNotice = '입장 완료';
 
-  /// 앱이 모르는 상태가 왔을 때. 서버에 상태가 하나 늘면 나온다.
-  ///
-  /// 무슨 일인지 단정하지 않는다. 취소인지 다른 무엇인지 앱이 모르는 상황이라,
-  /// 아는 만큼만 — 지금 할 수 있는 게 없다는 것만 — 말한다.
+  /// 앱이 모르는 상태가 왔을 때. 서버에 상태가 하나 늘면 나온다. 무슨 일인지
+  /// 단정하지 않고 지금 할 수 있는 게 없다는 것만 말한다.
   static const unknownStatusNotice = '지금은 이용할 수 없어요.';
 
   // 빈 목록. 탭마다 할 말이 다르다.
@@ -240,8 +204,7 @@ class TicketStrings {
 
   static const cancelReservation = '예매 취소하기';
   static const cancelConfirmTitle = '예매를 취소할까요?';
-  // "같은 자리를 다시 잡을 수는 없어요" 는 뺐다(사용자 결정). 팝업이 길어지고,
-  // 취소를 망설이게 하는 정보라기보다 취소 뒤의 사정이라 여기서 할 말이 아니다.
+  // "같은 자리를 다시 잡을 수는 없어요" 는 취소 뒤의 사정이라 여기서는 뺐다.
   static const cancelConfirmBody = '취소하면 티켓이 회수되고 결제 금액이 전액 환불돼요.';
   static const cancelConfirmAgree = '예매 취소하기';
   static const cancelConfirmKeep = '그대로 둘게요';
@@ -262,11 +225,9 @@ class TicketStrings {
   /// 못 찾았을 때만 남는다.
   static const alreadyListed = '이미 양도 등록 중이에요';
 
-  /// 양도 등록 취소: 올라가 있는 것은 아는데 어느 매물인지 못 찾았다.
-  ///
-  /// 티켓 응답에 매물 번호가 없어 좌석으로 맞춰 찾는데(`_listingFor`), 거래
-  /// 목록이 아직 안 왔거나 실패했으면 맞출 상대가 없다. 이럴 때만 양도 목록
-  /// 탭으로 보낸다 — 거기서는 매물 자체를 받아 그리므로 번호가 있다.
+  /// 양도 등록 취소: 올라가 있는 것은 아는데 어느 매물인지 못 찾았다. 티켓
+  /// 응답에 매물 번호가 없어 좌석으로 맞춰 찾는데(`_listingFor`), 거래 목록이
+  /// 아직 안 왔으면 맞출 상대가 없다. 이럴 때만 양도 목록 탭으로 보낸다.
   static const cancelListingUnknown = '양도 목록 탭에서 취소할 수 있어요';
 
   /// 환불 금액. 수수료 없이 정가 전액이다.
@@ -286,9 +247,7 @@ class TicketStrings {
   static String listedPrice(String price) => '$price 등록';
 
   /// 양도 마감(공연 시작)까지 하루 안쪽일 때. `마감까지 07:31` 처럼 시:분이다.
-  ///
-  /// 초는 찍지 않는다. 이 화면은 새로 고칠 때만 시각을 다시 재므로 초까지
-  /// 찍으면 멈춘 숫자가 된다.
+  /// 초는 찍지 않는다 — 새로 고칠 때만 시각을 다시 재므로 멈춘 숫자가 된다.
   static String deadlineIn(Duration remaining) {
     final hours = remaining.inHours.toString().padLeft(2, '0');
     final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');

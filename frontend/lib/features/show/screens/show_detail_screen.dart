@@ -28,12 +28,8 @@ import '../widgets/show_detail_summary.dart';
 import '../widgets/show_notice.dart';
 import '../widgets/zone_price_card.dart';
 
-/// 공연 상세. 홈에서 들어오는 유일한 화면이고, 예매 흐름 진입도 여기서만
-/// 일어난다.
-///
-/// 공연 번호를 받아 **화면이 직접** 조회한다. 기다리는 동안과 실패는
-/// [AsyncBoundary] 가 맡는다. 라우트가 미리 받아 넘겨주던 방식은 목업이라
-/// 가능했던 것이고, 서버에 물으려면 기다리는 상태가 화면 안에 있어야 한다.
+/// 공연 상세. 홈에서 들어오는 유일한 화면이고, 예매 흐름 진입도 여기서만 일어난다.
+/// 공연 번호를 받아 화면이 직접 조회하고, 기다리는 동안과 실패는 [AsyncBoundary] 가 맡는다.
 class ShowDetailScreen extends StatefulWidget {
   const ShowDetailScreen({
     super.key,
@@ -71,10 +67,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return future;
   }
 
-  /// 다시 불러온다. 실패 화면의 '다시 시도' 가 쓴다.
-  ///
-  /// 스스로 다시 부르는 길(당겨서 새로 고침, 주기적 갱신)은 두지 않았다.
-  /// 서버가 상세 조회마다 조회수를 1 올리기 때문이다.
+  /// 다시 불러온다. 실패 화면의 '다시 시도' 가 쓴다. 당겨서 새로 고침 같은 자동
+  /// 재조회는 두지 않는다 — 서버가 상세 조회마다 조회수를 1 올린다.
   void _reload() {
     final next = _fetch();
     setState(() {
@@ -107,11 +101,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 }
 
-/// 공연을 받아 온 뒤의 화면. 본문과 하단 바를 함께 그린다.
-///
-/// 하단 바를 `Scaffold.bottomNavigationBar` 가 아니라 여기에 두는 이유:
-/// 공연을 받아야 무엇을 그릴지 정해지는데, 그 판단을 Scaffold 자리에서 하면
-/// 로딩·실패 분기가 본문과 하단 바 두 곳으로 갈라진다.
+/// 공연을 받아 온 뒤의 화면. 본문과 하단 바를 함께 그린다. 하단 바를 여기 두는 것은
+/// 공연을 받아야 무엇을 그릴지 정해져서다 — Scaffold 자리에서 하면 로딩·실패 분기가 갈라진다.
 class _LoadedShow extends StatefulWidget {
   const _LoadedShow({required this.detail, required this.clock});
 
@@ -123,12 +114,9 @@ class _LoadedShow extends StatefulWidget {
 }
 
 class _LoadedShowState extends State<_LoadedShow> {
-  /// 지금 시각. 오픈 시각을 넘기는 순간 화면을 다시 열지 않아도 상태 뱃지와
-  /// 하단 바가 함께 바뀌어야 해서 화면이 들고 있는다.
-  ///
-  /// `setState` 가 아니라 [ValueNotifier] 인 이유: 1초마다 화면 전체를 다시
-  /// 그리면 포스터·안내문까지 매초 재빌드된다. 시간에 기대는 두 곳만
-  /// 구독한다.
+  /// 지금 시각. 오픈 시각을 넘기는 순간 상태 뱃지와 하단 바가 함께 바뀌어야 해서 화면이 든다.
+  /// `setState` 가 아니라 [ValueNotifier] 인 것은 1초마다 화면 전체가 재빌드되지 않게
+  /// 시간에 기대는 두 곳만 구독하려는 것이다.
   late final ValueNotifier<DateTime> _now = ValueNotifier(widget.clock());
 
   Timer? _tick;
@@ -137,9 +125,7 @@ class _LoadedShowState extends State<_LoadedShow> {
   final GlobalKey _bottomBarKey = GlobalKey();
 
   /// 이 공연에 대한 내 알림 신청 상태. 버튼 두 개가 이것으로 켜짐과 꺼짐을 그린다.
-  ///
-  /// 공연 상세 응답에는 이 값이 없어(로그인 없이 열리는 화면이라) 따로 묻는다.
-  /// 로그아웃 상태면 묻지 않고 둘 다 꺼진 채로 둔다.
+  /// 상세 응답에는 이 값이 없어 따로 묻고, 로그아웃 상태면 묻지 않고 둘 다 꺼진 채로 둔다.
   AlarmStatus _alarms = AlarmStatus.none;
 
   /// 신청 상태를 어느 로그인 상태에서 물었는가. 로그인 상태가 바뀔 때만 다시
@@ -208,12 +194,9 @@ class _LoadedShowState extends State<_LoadedShow> {
     });
   }
 
-  /// 알림 버튼을 눌렀을 때. 버튼부터 바꾸고 서버에 보낸다.
-  ///
-  /// 찜 하트와 같은 규칙이다. 로그아웃 상태면 부르지 않고 안내만 한다(서버가
-  /// 401 을 준다). 실패하면 버튼을 되돌리고 서버가 준 문구로 알린다. 신청했다는
-  /// 안내는 서버가 받은 뒤에 띄운다 — 먼저 띄우면 실패했을 때 '신청했어요' 와
-  /// 실패 안내가 연달아 뜬다.
+  /// 알림 버튼을 눌렀을 때. 버튼부터 바꾸고 서버에 보낸다. 로그아웃 상태면 부르지 않고
+  /// 안내만 한다(서버가 401 을 준다). 실패하면 버튼을 되돌리고 서버가 준 문구로 알린다.
+  /// 신청했다는 안내는 서버가 받은 뒤에 띄운다 — 먼저 띄우면 실패 안내와 연달아 뜬다.
   Future<void> _toggleAlarm(AlarmType type) async {
     if (!(AuthSessionScope.maybeRead(context)?.isLoggedIn ?? false)) {
       showInfoSnackBar(
@@ -264,40 +247,25 @@ class _LoadedShowState extends State<_LoadedShow> {
               : ShowDetailStrings.marketAlarmOff,
       };
 
-  /// 알림 신청 결과를 한 줄로 알린다. 앱 공통 안내 상자를 쓴다.
-  ///
-  /// 띄우기 전에 떠 있던 것을 걷어낸다(공통 동작이 맡는다). 켜고 바로 끄면
-  /// 먼저 뜬 '신청했어요' 가 다 사라질 때까지 줄을 서서, 방금 끈 사람 눈앞에
-  /// 신청했다는 말이 남는다.
-  ///
-  /// 아래 여백은 기본값을 쓴다. 하단 바를 `Scaffold.bottomNavigationBar` 가
-  /// 아니라 본문 안에 그려서 Flutter 가 스낵바를 올려 주지 않기 때문이다.
+  /// 알림 신청 결과를 한 줄로 알린다. 떠 있던 안내는 공통 동작이 걷어내므로, 켜고 바로
+  /// 꺼도 먼저 뜬 '신청했어요' 가 남지 않는다.
   void _notify(String message) {
     showSuccessSnackBar(context, message, bottomMargin: _snackBarBottomMargin);
   }
 
-  /// 안내 스낵바를 띄울 높이. 하단 바를 **재서** 정한다.
-  ///
-  /// 숫자로 적어 두지 않는 이유는 바 높이가 상태마다 다르기 때문이다 — 예매
-  /// 중에는 버튼이 둘이고, 오픈 전에는 버튼 위에 남은 시간 한 줄이 더 붙는다.
-  /// 한 값으로 적으면 어느 한 상태에서는 안내가 버튼을 덮는다.
-  ///
-  /// 아직 재지 못했으면 기본 여백(스낵바 쪽 기본값)에 맡긴다.
+  /// 안내 스낵바를 띄울 높이. 바 높이가 상태마다 달라(예매 중은 버튼 둘, 오픈 전은
+  /// 남은 시간 한 줄 추가) 숫자로 적지 않고 하단 바를 재서 정한다.
+  /// 아직 재지 못했으면 null 을 돌려 스낵바 쪽 기본 여백에 맡긴다.
   double? get _snackBarBottomMargin {
     final box = _bottomBarKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return null;
     return box.size.height + ShowDetailMetrics.snackBarGap;
   }
 
-  /// 예매를 시작한다. 로그인부터 확인한다.
-  ///
-  /// 좌석을 다 고르고 결제 직전에 막는 것보다 들어가기 전에 막는 편이 낫다.
-  /// 서버는 좌석을 **잡을 때** 요청자를 요구하므로 로그인 없이도 배치도까지는
-  /// 그려진다. 그대로 두면 자리를 고르고 확인 다이얼로그까지 누른 뒤에야
-  /// 로그인하라는 말을 듣게 된다.
-  ///
-  /// 로그인 화면은 성공하면 홈으로 가며 이 화면까지 걷어낸다. 그래서 여기서
-  /// 예매를 이어 갈 일은 없고, 로그인 화면으로 보내는 데서 끝난다.
+  /// 예매를 시작한다. 로그인부터 확인한다 — 서버는 좌석을 **잡을 때** 요청자를
+  /// 요구하므로 로그인 없이도 배치도까지는 그려지는데, 그대로 두면 자리를 다 고른
+  /// 뒤에야 로그인하라는 말을 듣게 된다. 로그인 화면은 성공하면 홈으로 가며 이
+  /// 화면까지 걷어내므로 여기서 예매를 이어 갈 일은 없다.
   Future<void> _startBooking() async {
     if (!AuthSessionScope.of(context).isLoggedIn) {
       Navigator.pushNamed(context, AppRoutes.login);
@@ -355,8 +323,7 @@ class _LoadedShowState extends State<_LoadedShow> {
                         phase: detail.phaseAt(now),
                       ),
                     ),
-                    // 가격은 구역 목록에서 따로 받아 오는데, 그 조회는 로그인해야
-                    // 열린다. 못 받았으면 빈 카드를 세우는 대신 자리를 접는다.
+                    // 가격이 비어 오면 빈 카드를 세우는 대신 자리를 접는다.
                     if (detail.zonePrices.isNotEmpty) ...[
                       const SizedBox(height: ShowDetailMetrics.sectionGap),
                       _Section(
@@ -369,10 +336,8 @@ class _LoadedShowState extends State<_LoadedShow> {
                       title: ShowDetailStrings.artistSection,
                       child: ShowArtistList(artists: detail.artists),
                     ),
-                    // 안내 이미지가 없어도 자리를 접지 않는다. 이미지가
-                    // 없으면 ShowNotice 가 공통 규정을 대신 적는다 - 예매
-                    // 마감·양도·환불은 공연과 무관하게 늘 같은 규칙이라,
-                    // 주최사가 이미지를 안 올렸다고 안 보여 줄 이유가 없다.
+                    // 안내 이미지가 없어도 자리를 접지 않는다. 예매 마감·양도·환불은 공연과
+                    // 무관하게 늘 같은 규칙이라 ShowNotice 가 공통 규정을 대신 적는다.
                     const SizedBox(height: ShowDetailMetrics.sectionGap),
                     _Section(
                       title: ShowDetailStrings.noticeSection,

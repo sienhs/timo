@@ -4,15 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import 'token_storage.dart';
 
-/// 가입·로그인 요청의 `X-Device-Id` 헤더 값.
-///
-/// 서버가 (회원, 기기) 한 쌍으로 로그인 세션(리프레시 토큰)을 관리한다. 그래서
-/// 이 값은 **같은 기기에서는 늘 같아야** 한다. 켤 때마다 바뀌면 같은 폰에
-/// 세션이 여럿 생겨, 폰을 잃어버렸을 때 한쪽이 끊기지 않고 남는다.
-///
-/// 앱을 켤 때 [restore] 로 기기 저장소에서 읽어 오고, 처음이면 만들어 저장한다.
-/// [restore] 를 부르기 전에 [value] 를 읽으면(테스트) 그 자리에서 하나 만들어
-/// 쓴다. 로그아웃해도 지우지 않는다.
+/// 가입·로그인 요청의 `X-Device-Id` 헤더 값. 서버가 (회원, 기기) 한 쌍으로 세션을
+/// 관리하므로 같은 기기에서는 늘 같아야 한다. 앱을 켤 때 [restore] 로 기기
+/// 저장소에서 읽고 처음이면 만들어 저장한다. 로그아웃해도 지우지 않는다.
 class DeviceId {
   DeviceId._();
 
@@ -38,10 +32,7 @@ class DeviceId {
   static void reset() => _value = null;
 
   /// UUID v4 (예: `3f2b1c9e-8d4a-4b6f-9c1d-2e7a5b8c0d1f`). 36자라 서버 한계
-  /// 64자 안에 든다.
-  ///
-  /// uuid 패키지를 붙이지 않은 이유: 필요한 건 무작위 문자열 하나라 표준 모양만
-  /// 맞추면 되고, 그 정도는 몇 줄로 끝난다.
+  /// 64자 안에 든다. 무작위 문자열 하나면 되어 uuid 패키지는 붙이지 않았다.
   static String generate() {
     final random = Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));

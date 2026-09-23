@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_search_field.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../core/widgets/underline_tab_bar.dart';
@@ -21,25 +22,12 @@ import '../widgets/favorite_artist_tile.dart';
 import '../widgets/favorite_empty_view.dart';
 import '../widgets/favorite_filter_chips.dart';
 import '../widgets/favorite_list_skeleton.dart';
-import '../widgets/favorite_search_field.dart';
 import '../widgets/favorite_show_card.dart';
 import '../widgets/favorite_summary_row.dart';
 
-/// 찜리스트. 빠른 메뉴의 '찜' 에서 들어온다.
-///
-/// 공연 탭과 아티스트 탭 둘인데 목록이 사는 곳이 다르다. **공연은 서버**라
-/// 화면에 들어올 때 받아 오고(기다림·실패는 [AsyncBoundary] 가 맡는다),
-/// **아티스트는 기기**에 있어 기다리는 상태가 없다.
-///
-/// 사는 곳과 무관하게 **두 탭 모두 로그인해야 보인다**. 아티스트 찜은 기기에
-/// 있어 로그아웃 상태로도 그릴 수는 있지만, 한 화면의 두 탭이 로그인 여부에
-/// 다르게 굴면 왜 한쪽만 비는지 알기 어렵다. 로그아웃이면 탭 카운트도 0 이다.
-///
-/// 받아 온 목록은 [FavoriteScope] 에서 읽는다. 다른 화면에서 하트를 누르면
-/// 스코프가 알려 이 화면도 따라 바뀐다.
-///
-/// 검색 칸·필터 칩·정렬은 모두 **받아 둔 목록을 좁혀 보는 것**이다. 서버에
-/// 다시 묻지 않으므로 글자를 칠 때마다 바로 거른다.
+/// 찜리스트. 공연은 서버에서 받아 오고(기다림·실패는 [AsyncBoundary]), 아티스트
+/// 는 기기에 있지만 두 탭 모두 로그인해야 보인다. 목록은 [FavoriteScope] 에서
+/// 읽고, 검색·필터·정렬은 받아 둔 목록을 좁혀 볼 뿐 서버에 다시 묻지 않는다.
 class FavoriteListScreen extends StatefulWidget {
   const FavoriteListScreen({super.key});
 
@@ -73,9 +61,8 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 로그인한 채로 들어왔거나 이 화면에서 로그인하고 돌아왔을 때 받아 온다.
-    // 로그아웃되면 들고 있던 것을 버린다 — 그러면 공연 탭이 로그인 안내로
-    // 바뀐다(양도마켓·충전 화면과 같은 방식).
+    // 로그인 상태면 받아 오고, 로그아웃되면 들고 있던 것을 버린다 — 그러면
+    // 공연 탭이 로그인 안내로 바뀐다.
     if (_isLoggedIn) {
       _shows ??= FavoriteScope.read(context).loadShows();
     } else {
@@ -124,12 +111,9 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     Navigator.pushNamed(context, AppRoutes.showSearch);
   }
 
-  /// 목록에서 뺀다. 잘못 눌렀을 때를 위해 되돌리기를 같이 띄운다 — 목록에서
-  /// 사라지는 것이 곧 결과라 확인 다이얼로그까지 세우면 매번 두 번 누르게 된다.
-  ///
-  /// 카드는 서버 응답을 기다리지 않고 바로 빠진다. 서버가 거절하면 저장소가
-  /// 되돌려 카드가 다시 나타나므로, 되돌리기 안내 자리에 오류를 띄운다
-  /// (오류 스낵바가 앞의 안내를 걷어낸다).
+  /// 목록에서 뺀다. 확인 다이얼로그 대신 되돌리기를 같이 띄운다. 카드는 서버
+  /// 응답을 기다리지 않고 바로 빠지고, 서버가 거절하면 저장소가 되돌려 카드가
+  /// 다시 나타나므로 되돌리기 안내 자리에 오류를 띄운다.
   Future<void> _removeShow(FavoriteShow show) async {
     final removal = FavoriteScope.read(context).removeShow(show.id);
     _showUndo(() => toggleFavoriteShow(context, show));
@@ -148,12 +132,9 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     _showUndo(() => store.toggleArtist(artist));
   }
 
-  /// 하단 바와 원형 버튼에 가리지 않게 그 위로 띄운다. 이전 안내가 남아 있으면
-  /// 걷어낸다 — 연달아 뺐을 때 안내가 줄지어 기다릴 이유가 없다.
-  ///
-  /// 떠 있는 시간은 다른 토스트와 같은 2초다. Flutter 는 버튼이 달린 토스트를
-  /// 기본으로 저절로 사라지지 않게 두므로, [SnackBar.persist] 를 꺼야 시간이
-  /// 지나면 내려간다.
+  /// 하단 바와 원형 버튼 위로 띄우고, 이전 안내가 남아 있으면 걷어낸다. 버튼이
+  /// 달린 토스트는 저절로 사라지지 않으므로 [SnackBar.persist] 를 꺼야 2초 뒤
+  /// 내려간다.
   void _showUndo(VoidCallback onUndo) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -189,10 +170,8 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
   }
 
   /// 공연 탭. 로그아웃이면 로그인 안내, 로그인 상태면 서버에서 받아 온 목록이다.
-  ///
-  /// [AsyncBoundary] 가 주는 값 대신 저장소가 들고 있는 [shows] 를 그린다.
-  /// 받아 온 뒤에도 하트를 누르면 목록이 바뀌는데, 그건 저장소가 알리는
-  /// 것이라 Future 가 준 값은 이미 낡았다.
+  /// [AsyncBoundary] 가 주는 값 대신 저장소의 [shows] 를 그린다 — 받아 온 뒤에도
+  /// 하트로 목록이 바뀌므로 Future 가 준 값은 이미 낡았다.
   Widget _showTabBody(List<FavoriteShow> shows) {
     final pending = _shows;
     if (pending == null) {
@@ -251,10 +230,8 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
     final isShowTab = _tab == _showTab;
 
     return Scaffold(
-      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 하단 바 위의 원형 버튼이
-      // 키보드 위로 따라 올라와 본문 한가운데에 떠 있게 된다(공연 검색 화면과
-      // 같은 사정). 대신 목록 아래 여백에 키보드 높이를 더해 마지막 항목까지
-      // 스크롤로 닿게 한다([_listBottomPadding]).
+      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 원형 버튼이 키보드 위로
+      // 따라 올라온다. 대신 목록 아래 여백에 키보드 높이를 더한다.
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text(FavoriteStrings.appBarTitle),
@@ -282,11 +259,12 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
             padding: const EdgeInsets.symmetric(
               horizontal: FavoriteMetrics.horizontalPadding,
             ),
-            child: FavoriteSearchField(
+            child: AppSearchField(
               controller: _search,
               hintText: isShowTab
                   ? FavoriteStrings.showSearchHint
                   : FavoriteStrings.artistSearchHint,
+              clearLabel: FavoriteStrings.clearSearch,
             ),
           ),
           const SizedBox(height: FavoriteMetrics.searchFieldBottomGap),
@@ -312,10 +290,8 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
   }
 }
 
-/// 공연 탭. 필터 칩 → `총 N개`·정렬 → 카드 목록 → 안내 한 줄.
-///
-/// 찜한 공연이 하나도 없으면 칩·정렬 없이 빈 화면만 그린다. 거를 것이 없는데
-/// 조작부가 있으면 눌러도 아무 일이 없다.
+/// 공연 탭. 필터 칩 → `총 N개`·정렬 → 카드 목록 → 안내 한 줄. 찜한 공연이
+/// 하나도 없으면 칩·정렬 없이 빈 화면만 그린다.
 class _ShowTab extends StatelessWidget {
   const _ShowTab({
     required this.shows,

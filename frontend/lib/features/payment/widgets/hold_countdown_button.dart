@@ -17,9 +17,7 @@ class HoldCountdownButton extends StatefulWidget {
   });
 
   /// 남은 시간이 있을 때 눌렀을 때 실행된다. 시간이 끝나면 버튼은 비활성된다.
-  ///
-  /// null 을 넘기면 시간이 남았어도 비활성이다. 주문 요청이 나가 있는 동안
-  /// 결제 화면이 그렇게 잠근다.
+  /// null 을 넘기면 시간이 남았어도 비활성이다(주문 요청이 나가 있는 동안).
   final VoidCallback? onPressed;
 
   final Duration duration;

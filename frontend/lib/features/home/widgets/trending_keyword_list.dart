@@ -4,10 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/trending_keyword.dart';
 
-/// 실시간 인기 검색어. 제목 · 집계 시각 한 줄 아래 순위 목록이다.
-///
-/// 줄을 누르면 그 검색어로 검색한다. 등락은 삼각형 아이콘 + 색 + 시맨틱
-/// 라벨("상승"/"하락") 세트라 색을 못 보는 사람도 방향을 안다.
+/// 실시간 인기 검색어. 제목 · 집계 시각 한 줄 아래 순위 목록이다. 줄을 누르면
+/// 그 검색어로 검색한다. 등락은 아이콘 + 색 + 시맨틱 라벨 세트라 색을 못 봐도 안다.
 class TrendingKeywordList extends StatelessWidget {
   const TrendingKeywordList({
     super.key,

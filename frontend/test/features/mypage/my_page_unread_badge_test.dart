@@ -20,10 +20,8 @@ import 'package:timo/features/notification/push_notification_service.dart';
 import 'package:timo/features/notification/state/notification_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 마이페이지 종 위의 안 읽음 점.
-///
-/// 점은 상단 바가 보일 때만 뜻이 있어서, 화면에 들어올 때와 알림함에서 돌아왔을
-/// 때만 개수를 묻는다. 그 두 시점이 맞는지를 본다.
+/// 마이페이지 종 위의 안 읽음 점. 화면에 들어올 때와 알림함에서 돌아왔을 때만
+/// 개수를 묻는다. 그 두 시점이 맞는지를 본다.
 void main() {
   void usePhoneSize(WidgetTester tester) {
     tester.view.physicalSize = const Size(1080, 2400);

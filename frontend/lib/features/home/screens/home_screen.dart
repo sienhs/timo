@@ -25,16 +25,9 @@ import '../widgets/show_card_row_skeleton.dart';
 /// 아직 안 열린 것, 인기는 예매로 이어지는 것) 섹션이 정해서 넘긴다.
 typedef _ShowSelector = List<ShowSummary> Function(List<ShowSummary> shows);
 
-/// 홈. `MainShellScreen` 의 첫 번째 탭 본문이다.
-///
-/// Scaffold 를 두지 않는다 — 셸이 이미 Scaffold 와 하단 바를 들고 있고,
-/// 여기서 하나 더 만들면 하단 바 위에 또 다른 화면이 얹힌 모양이 된다.
-///
-/// 이 화면은 섹션을 순서대로 세우고 탭을 어디로 보낼지만 정한다. 섹션의
-/// 내부 배치는 각 위젯이 안다. 공연 두 줄(오픈 예정 · 인기)은 서버에서
-/// 받아 오고, 배너는 인기 공연의 앞 몇 건을 그대로 올린다. 아티스트도 같은
-/// 길로 받아 오지만 서버 API 가 아직 없어 구현이 목업을 돌려준다 — 이 화면은
-/// 그 사정을 모른다.
+/// 홈. `MainShellScreen` 의 첫 번째 탭 본문이라 Scaffold 를 두지 않는다(셸이
+/// 이미 들고 있다). 섹션을 순서대로 세우고 탭을 어디로 보낼지만 정하며,
+/// 배너는 인기 공연 응답의 앞 몇 건을 그대로 올린다.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -99,12 +92,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 스크롤 알림으로 '당기는 중'을 알아낸다.
-  ///
-  /// `metrics.pixels` 를 보지 않는다 — 안드로이드 기본 물리(Clamping)는
-  /// 스크롤 위치를 0 아래로 내리지 않고, 넘친 양을 [OverscrollNotification]
-  /// 으로만 알려 준다. `dragDetails` 가 있는 알림만 세는 것도 같은 이유다.
-  /// 손가락이 끌 때만 안내를 띄우고, 관성으로 튀는 건 무시한다.
+  /// 스크롤 알림으로 '당기는 중'을 알아낸다. 안드로이드 기본 물리는 스크롤
+  /// 위치를 0 아래로 내리지 않고 [OverscrollNotification] 으로만 알려 주므로
+  /// `metrics.pixels` 를 보지 않는다. `dragDetails` 가 있는 알림만 세어 관성은 무시한다.
   bool _onScroll(ScrollNotification notification) {
     if (notification is OverscrollNotification) {
       final isPullingDownAtTop =
@@ -192,10 +182,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.only(top: 8, bottom: HomeMetrics.bottomGap),
       children: [
-        // 배너 API 가 없어 인기 공연 응답을 같이 쓴다. 인기 줄과 같은 Future
-        // 라 요청은 한 번만 나간다. 실패 문구는 인기 줄이 이미 보여 주므로
-        // 여기서는 자리를 비운다 — 같은 문구가 위아래 두 번 뜨면 화면이 실패로
-        // 도배된다.
+        // 배너 API 가 없어 인기 공연 응답을 같이 쓴다(같은 Future 라 요청은 한 번).
+        // 실패 문구는 인기 줄이 이미 보여 주므로 여기서는 자리를 비운다.
         AsyncBoundary<List<ShowSummary>>(
           future: _popular,
           onRetry: _reloadPopular,
@@ -246,9 +234,8 @@ class _HomeScreenState extends State<HomeScreen> {
           future: _popular,
           onRetry: _reloadPopular,
           select: _bookable,
-          // 순위 뱃지를 달지 않는다. 순위는 섹션 제목과 왼쪽부터의 차례로 이미
-          // 드러나지만, 이 줄에는 오픈 전 공연과 마감된 공연이 섞여 들어와도
-          // 카드만 보고는 구분할 수 없다. 자리를 그쪽에 준다.
+          // 순위 뱃지 대신 예매 상태를 단다. 이 줄에는 오픈 전·마감 공연이 섞여
+          // 들어와 카드만 보고는 구분할 수 없다.
           badgeBuilder: (show) => BookingStatusBadge(show: show),
         ),
       ],
@@ -303,7 +290,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openShowDetail(BuildContext context, int showId) {
     Navigator.pushNamed(context, AppRoutes.showDetail, arguments: showId);
   }
-
 }
 
 class _EmptyRow extends StatelessWidget {

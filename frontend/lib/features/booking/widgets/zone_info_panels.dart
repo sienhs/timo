@@ -17,9 +17,8 @@ class RemainingSeatsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return _ZoneInfoPanel(
       note: '구역을 선택하면 그 구역의 좌석으로 이동합니다.',
-      // 표기된 수와 실제로 고를 수 있는 수가 다른 이유는 알아야 하지만, 목록
-      // 위에 늘 두 줄로 깔려 있으면 정작 봐야 할 구역·좌석 수를 밀어낸다.
-      // 그래서 물음표를 눌렀을 때만 편다(사용자 결정).
+      // 표기된 수와 고를 수 있는 수가 다른 이유를 늘 두 줄로 깔면 정작 봐야 할
+      // 구역·좌석 수를 밀어내므로, 물음표를 눌렀을 때만 편다.
       hint: '선점 중인 좌석이 있어 실제로 고를 수 있는 자리는 더 적을 수 있어요.',
       rows: [
         for (final zone in zones)
@@ -34,9 +33,7 @@ class RemainingSeatsPanel extends StatelessWidget {
   }
 }
 
-/// '좌석가격보기' 패널.
-///
-/// 요구사항상 좌석 등급이 없어 구역마다 같은 값이 찍히는 게 정상이지만, 서버
+/// '좌석가격보기' 패널. 좌석 등급이 없어 구역마다 같은 값이 정상이지만 서버
 /// 데이터는 층마다 가격이 갈린다. 어느 쪽이든 서버가 준 값을 그대로 보여준다.
 class ZonePricePanel extends StatelessWidget {
   const ZonePricePanel({super.key, required this.zones});

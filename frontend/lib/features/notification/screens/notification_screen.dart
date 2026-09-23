@@ -14,14 +14,9 @@ import '../notification_destination.dart';
 import '../state/notification_api_scope.dart';
 import '../widgets/notification_tile.dart';
 
-/// 알림함. 마이페이지 상단의 알림 아이콘으로 들어온다.
-///
-/// 최신순이고 아래로 내리면 이어서 받는다. **이 앱에서 쪽을 나눠 받는 첫 화면이다.**
-/// 다른 목록은 한 번에 다 받아 오는데, 알림은 쌓이기만 해서 그럴 수가 없다.
-///
-/// 알림을 누르면 읽음으로 바꾸고 그 알림이 가리키는 화면으로 간다. 어디로 갈지는
-/// 푸시를 눌렀을 때와 같은 규칙([destinationFor])을 쓴다 — 두 경우가 갈리면
-/// 사용자는 같은 알림을 어디서 눌렀느냐에 따라 다른 곳에 도착하게 된다.
+/// 알림함. 마이페이지 상단의 알림 아이콘으로 들어온다. 최신순이고 아래로 내리면
+/// 이어서 받는다. 알림을 누르면 읽음으로 바꾸고, 푸시를 눌렀을 때와 같은 규칙
+/// ([destinationFor])으로 고른 화면으로 간다.
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key, this.now});
 
@@ -79,13 +74,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _loadMoreIfNotScrollable();
   }
 
-  /// 받은 목록이 화면을 못 채웠으면 이어서 다음 쪽을 받는다.
-  ///
-  /// 다음 쪽은 스크롤이 끝에 다가올 때 받는데, 목록이 짧으면 **스크롤 자체가 안
-  /// 생겨 그 순간이 영영 오지 않는다.** 그러면 아래쪽 동그라미만 계속 돌고 다음
-  /// 쪽은 안 온다. 긴 화면 기기에서는 한 쪽(20건)으로도 안 채워질 수 있다.
-  ///
-  /// 그려진 뒤에 재야 스크롤할 거리를 알 수 있어 다음 프레임에서 본다.
+  /// 받은 목록이 화면을 못 채웠으면 이어서 다음 쪽을 받는다. 목록이 짧으면 스크롤이
+  /// 안 생겨 끝에 닿는 순간이 오지 않기 때문이다. 스크롤 거리는 그려진 뒤에야 알 수
+  /// 있어 다음 프레임에서 본다.
   void _loadMoreIfNotScrollable() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -106,8 +97,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Future<void> _loadMore() async {
     // 이어 받기가 실패한 뒤에는 저절로 다시 시도하지 않는다. 스크롤이 끝에 있는
-    // 동안 계속 재시도하며 같은 실패를 반복하게 되기 때문이다. 아래쪽 안내를
-    // 눌러야 다시 시도한다.
+    // 동안 같은 실패를 반복하기 때문이다. 아래쪽 안내를 눌러야 다시 시도한다.
     if (_loadingMore || _loadMoreFailed || !_hasNext) return;
     setState(() => _loadingMore = true);
     try {
@@ -151,11 +141,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  /// 화면을 먼저 바꾸고 서버에는 뒤따라 알린다.
-  ///
-  /// 서버 응답을 기다렸다 바꾸면, 그 사이 다음 화면으로 넘어가 버려서 돌아왔을 때
-  /// 까지 안 읽음으로 보인다. 알림 하나를 읽었다는 것은 되돌릴 만큼 중요한 값이
-  /// 아니라, 서버에 못 알려도 화면은 그대로 두고 다음에 받을 때 맞춘다.
+  /// 화면을 먼저 바꾸고 서버에는 뒤따라 알린다. 응답을 기다리면 그 사이 다음
+  /// 화면으로 넘어가 돌아올 때까지 안 읽음으로 보인다. 서버에 못 알려도 되돌리지
+  /// 않고 다음에 받을 때 맞춘다.
   void _markReadLocally(AppNotification notification) {
     setState(() {
       final index = _items.indexWhere((n) => n.id == notification.id);
@@ -300,12 +288,8 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// 오른쪽 아래 '모두 읽음'.
-///
-/// 앱의 다른 행동 버튼(`충전하기` · `예매하러 가기`)과 같은 초록 채움 버튼이다.
-/// 다만 가로를 다 채우지 않는다 — 공통 버튼은 화면 아래에 깔리는 것을 전제로
-/// 너비를 꽉 채우는데, 이 버튼은 목록 위에 떠 있어 글자만큼만 차지해야 한다.
-/// 그래서 최소 너비만 풀고 높이는 공통 값(짧은 버튼)을 쓴다.
+/// 오른쪽 아래 '모두 읽음'. 다른 행동 버튼과 같은 초록 채움 버튼이지만 목록 위에
+/// 떠 있어 가로를 다 채우지 않는다 — 최소 너비만 풀고 높이는 공통 값(짧은 버튼)을 쓴다.
 class _MarkAllReadButton extends StatelessWidget {
   const _MarkAllReadButton({required this.onPressed});
 

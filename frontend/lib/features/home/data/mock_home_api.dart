@@ -5,14 +5,9 @@ import '../models/trending_keyword.dart';
 import 'home_api.dart';
 import 'mock_home_data.dart';
 
-/// 서버 없이 쓰는 가짜 [HomeApi]. 화면 테스트가 쓴다.
-///
-/// 응답마다 [latency] 만큼 기다려 실제 서버처럼 로딩 상태가 보이게 한다.
-/// 테스트에서 기다릴 필요가 없으면 `Duration.zero` 를 넣는다.
-///
-/// 티켓 오픈 일시는 **실행 시각 기준 상대값**이다. 고정 날짜로 두면 그 날이
-/// 지나는 순간 `오늘 14:00 오픈` · `5일 후 오픈` 뱃지가 전부 지난 날짜로
-/// 바뀌어, 세 가지 뱃지 형태를 한 번에 볼 수 없다.
+/// 서버 없이 쓰는 가짜 [HomeApi]. 화면 테스트가 쓴다. 응답마다 [latency] 만큼
+/// 기다려 로딩 상태가 보이게 한다(기다릴 필요가 없으면 `Duration.zero`).
+/// 티켓 오픈 일시는 실행 시각 기준 상대값이라 세 가지 뱃지 형태가 늘 보인다.
 class MockHomeApi implements HomeApi {
   const MockHomeApi({
     this.latency = HomeMetrics.mockLatency,
@@ -96,16 +91,9 @@ class MockHomeApi implements HomeApi {
     return DateTime(now.year, now.month, now.day);
   }
 
-  /// 당일 오픈을 흉내 낼 시각. 지금으로부터 두 시간 뒤다.
-  ///
-  /// 오늘의 고정 시각(`_today + 22시간`)으로 두면 그 시각을 넘긴 뒤로는 이미
-  /// 오픈한 공연이 되어, 홈의 오픈 예정 줄이 걸러 버린다
-  /// ([ShowSummary.opensAfter]) — 밤에 돌린 테스트만 깨진다. 늘 앞으로의
-  /// 시각이어야 한다.
-  ///
-  /// 밤 10시가 넘으면 두 시간 뒤가 내일이 되어 뱃지가 `1일 후 오픈` 으로
-  /// 바뀐다. 당일 뱃지를 하루 내내 보여 주는 것보다 "오픈 예정인데 이미
-  /// 지났다" 는 어긋난 상태를 만들지 않는 쪽이 낫다.
+  /// 당일 오픈을 흉내 낼 시각. 지금으로부터 두 시간 뒤다. 오늘의 고정 시각으로
+  /// 두면 그 시각을 넘긴 뒤로는 [ShowSummary.opensAfter] 가 걸러 버려 밤에 돌린
+  /// 테스트만 깨진다.
   static DateTime get _soon => DateTime.now().add(const Duration(hours: 2));
 
   /// 오픈이 빠른 순. 이미 오픈한 공연은 없다 — 서버도 `SCHEDULED` 만 준다.

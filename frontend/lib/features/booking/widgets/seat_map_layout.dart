@@ -3,11 +3,8 @@ import 'package:flutter/painting.dart';
 import '../models/seat.dart';
 import '../models/zone.dart';
 
-/// 구역이 공연장에서 어느 자리인지.
-///
-/// 구역도([VenueMap])가 그리는 자리 관계와 같다. 거기서는 무대 아래 좌·우에 두
-/// 구역, 그 뒤에 가로로 긴 구역, 맨 아래에 2층이 온다. 좌석 배치도도 같은
-/// 판단을 써야 두 그림이 어긋나지 않는다.
+/// 구역이 공연장에서 어느 자리인지. 구역도([VenueMap])가 그리는 자리 관계와
+/// 같아야 두 그림이 어긋나지 않는다.
 enum SeatZonePlace {
   /// 무대 왼편(A). 무대가 위쪽과 **오른쪽**에 있다.
   stageLeft,
@@ -37,11 +34,8 @@ class ZoneSurroundings {
     this.front,
   });
 
-  /// 구역 목록에서 이 구역의 자리와 이웃을 읽는다.
-  ///
-  /// 구역도와 같은 규칙(목록 순서가 곧 자리)이다. 목록을 못 받았거나 모르는
-  /// 구역이면 무대만 위에 둔 기본 모습으로 돌아간다 — 배치도를 아예 못 그리는
-  /// 것보다 낫다.
+  /// 구역 목록에서 이 구역의 자리와 이웃을 읽는다. 구역도와 같은 규칙(목록 순서가
+  /// 곧 자리)이다. 목록을 못 받았거나 모르는 구역이면 무대만 위에 둔 기본 모습이다.
   factory ZoneSurroundings.of(List<Zone> zones, int zoneId) {
     final index = zones.indexWhere((zone) => zone.id == zoneId);
     if (index < 0) return const ZoneSurroundings();
@@ -61,11 +55,8 @@ class ZoneSurroundings {
     };
   }
 
-  /// 2층 줄에서 몇 번째인지로 좌·우를 가른다.
-  ///
-  /// 구역도가 2층 줄을 나누는 규칙과 같다(첫째가 왼쪽, 마지막이 오른쪽,
-  /// 가운데는 치우치지 않음). 두 그림이 서로 다른 기울기를 그리지 않도록
-  /// 규칙을 하나만 둔다.
+  /// 2층 줄에서 몇 번째인지로 좌·우를 가른다. 구역도가 2층 줄을 나누는 규칙과
+  /// 같다(첫째가 왼쪽, 마지막이 오른쪽, 가운데는 치우치지 않음).
   static SeatZonePlace _balconyPlace(int index, int count) {
     if (index == 0) return SeatZonePlace.balconyLeft;
     if (index == count - 1) return SeatZonePlace.balconyRight;
@@ -82,15 +73,9 @@ class ZoneSurroundings {
   final String? front;
 }
 
-/// 구역 배치도의 좌표 계산.
-///
-/// 좌석 칸, 고정 열 라벨, 무대가 **같은 셈을 따로 하면 반드시 어긋난다.**
-/// 열마다 배율이 다르고 통로만큼 자리가 밀리기 때문에, 한 줄이라도 다르게
-/// 세면 라벨이 가리키는 열과 실제 열이 달라진다. 그래서 위젯이 아니라 이
-/// 객체가 모든 자리를 계산하고, 그리는 쪽은 받아 쓰기만 한다.
-///
-/// 좌표는 배치도 안쪽(여백을 뺀 영역)의 왼쪽 위를 원점으로 한다. 열 라벨 폭은
-/// 포함하지 않는다 — 라벨은 좌석과 다른 층에 그려지기 때문이다.
+/// 구역 배치도의 좌표 계산. 좌석 칸·열 라벨·무대가 같은 셈을 따로 하면 반드시
+/// 어긋나므로 이 객체가 모든 자리를 계산하고 그리는 쪽은 받아 쓰기만 한다.
+/// 좌표는 여백을 뺀 영역의 왼쪽 위가 원점이고 열 라벨 폭은 포함하지 않는다.
 class SeatMapLayout {
   SeatMapLayout({
     required this.rowCount,
@@ -136,16 +121,11 @@ class SeatMapLayout {
   final SeatZonePlace place;
 
   /// 열마다 앞·뒤로 빈 칸이 몇 개인지. 비워 두면 모든 열이 꽉 찬 것으로 본다.
-  ///
-  /// **여기가 배치도 모양을 만든다.** 서버가 열마다 다른 수의 좌석을 주면
-  /// (앞열 15석, 뒷열 25석처럼) 짧은 열에 빈 칸이 생기고, 그만큼 그 열을 무대
-  /// 쪽으로 밀어 사다리꼴이 된다. 지금 데이터는 모든 열이 꽉 차 있어 밀 것이
-  /// 없고 직사각형으로 보인다.
+  /// 서버가 열마다 다른 수의 좌석을 주면 짧은 열에 빈 칸이 생기고, 그만큼 그
+  /// 열을 무대 쪽으로 밀어 사다리꼴이 된다.
   final List<({int leading, int trailing})> rowMargins;
 
-  /// 맨 뒷열 좌석 한 변. 권장 터치 타겟(44pt) 기준이다.
-  ///
-  /// 앞열은 이보다 작아진다([frontScale]). 대신 배치도 전체를 확대할 수 있으므로
+  /// 좌석 한 변. 권장 터치 타겟(44pt) 기준이다. 배치도 전체를 확대할 수 있으므로
   /// 정확히 누르기 어려우면 손가락으로 벌리면 된다.
   static const cellSize = 44.0;
 
@@ -179,11 +159,8 @@ class SeatMapLayout {
   static const aisleDepth = 20.0;
 
   /// 짧은 열을 어느 쪽으로 붙일지. -1 이면 왼쪽, 0 이면 가운데, 1 이면 오른쪽.
-  ///
-  /// 무대가 있는 쪽으로 붙인다. A구역은 오른편이 무대라 오른쪽으로, B구역은
-  /// 왼편이 무대라 왼쪽으로 모인다 — 구역도의 기울기와 같은 방향이다.
-  /// 2층도 같은 규칙을 따른다. 왼쪽 2층은 무대가 오른쪽 위에 있어 그쪽으로,
-  /// 오른쪽 2층은 왼쪽 위로 모인다 — 구역도의 기울기와 같다.
+  /// 무대가 있는 쪽으로 붙인다 — A구역은 오른편이 무대라 오른쪽으로, B구역은
+  /// 왼쪽으로 모이고 2층도 같은 규칙이다. 구역도의 기울기와 같은 방향이다.
   double get _alignment => switch (place) {
     SeatZonePlace.stageLeft || SeatZonePlace.balconyLeft => 1,
     SeatZonePlace.stageRight || SeatZonePlace.balconyRight => -1,
@@ -200,12 +177,9 @@ class SeatMapLayout {
   bool get hasSideStage =>
       place == SeatZonePlace.stageLeft || place == SeatZonePlace.stageRight;
 
-  /// 세로 통로를 둘 자리. 값은 **통로 바로 뒤에 오는 칸 번호**(0부터)다.
-  /// 예를 들어 7 이면 여덟 번째 칸 앞에 길이 난다.
-  ///
-  /// 서버는 통로를 빈 자리로 알려 주기도 하지만 대개 격자를 꽉 채워 준다.
-  /// 그대로 그리면 20석이 한 덩어리로 붙어 실제 공연장처럼 보이지 않으므로,
-  /// 자리 수에 맞춰 덩어리를 나눈다.
+  /// 세로 통로를 둘 자리. 값은 통로 바로 뒤에 오는 칸 번호(0부터)다. 서버는 대개
+  /// 격자를 꽉 채워 주는데 그대로 그리면 20석이 한 덩어리로 붙어 보이므로 자리
+  /// 수에 맞춰 덩어리를 나눈다.
   late final List<int> columnAisles = _dividers(
     seatsPerRow,
     wide: 15,
@@ -262,13 +236,9 @@ class SeatMapLayout {
   double _rawX(int column) =>
       column * (cellSize + cellGap) + _aislesBefore(column) * aisleWidth;
 
-  /// 짧은 열을 옆으로 미는 거리.
-  ///
-  /// 기울기가 0 이면 앞뒤 빈 자리를 반씩 나눠 가운데에 놓고, 1 이면 뒤쪽 빈
-  /// 자리를 전부 앞으로 당겨 오른쪽 끝에 붙인다(-1 이면 왼쪽 끝).
-  ///
-  /// 칸 수가 아니라 **길이로 재는 이유**: 빈 자리 사이에 통로가 끼어 있으면
-  /// 칸 수로 센 거리가 실제 길이와 24px 씩 어긋난다.
+  /// 짧은 열을 옆으로 미는 거리. 기울기가 0 이면 앞뒤 빈 자리를 반씩 나눠 가운데에
+  /// 놓고, 1 이면 오른쪽 끝에 붙인다(-1 이면 왼쪽 끝). 빈 자리 사이에 통로가 끼면
+  /// 칸 수로 센 거리가 실제와 어긋나므로 길이로 잰다.
   double _shiftOf(int row) {
     final margin = _marginAt(row);
     if (margin.leading == 0 && margin.trailing == 0) return 0;
@@ -289,11 +259,8 @@ class SeatMapLayout {
   double get sideBandLeft =>
       place == SeatZonePlace.stageRight ? 0 : contentWidth + sideBandGap;
 
-  /// 맨 앞열에서 자리가 놓인 구간. 위쪽 무대 띠를 이 줄에 맞춘다.
-  ///
-  /// 격자 전체 너비로 깔면, 앞열이 짧은 구역에서 자리도 없는 쪽까지 무대가 쭉
-  /// 삐져나온다(사용자 확인). 무대는 맨 앞줄 바로 앞에 있는 것이니 그 줄에
-  /// 맞추는 것이 맞다.
+  /// 맨 앞열에서 자리가 놓인 구간. 위쪽 무대 띠를 이 줄에 맞춘다. 격자 전체
+  /// 너비로 깔면 앞열이 짧은 구역에서 자리도 없는 쪽까지 무대가 삐져나온다.
   double get frontRowLeft => occupiedSpan(0).left;
 
   double get frontRowWidth => occupiedSpan(0).width;
@@ -309,11 +276,8 @@ class SeatMapLayout {
       ? stageBandHeight + bandGap + neighborHeight + stageGap
       : stageBandHeight + stageGap;
 
-  /// [row] 의 위쪽 좌표. 앞 열들의 높이와 통로 깊이를 모두 더한 값이다.
-  ///
-  /// 열은 곧은 수평선이다. 무대를 감싸듯 굽혀도 봤지만 맨 앞줄 가운데가 볼록
-  /// 튀어나와 배치도가 기울어 보였다(사용자 확인). 무대를 향한 방향은 사다리꼴과
-  /// 무대 띠가 이미 말해 준다.
+  /// [row] 의 위쪽 좌표. 앞 열들의 높이와 통로 깊이를 모두 더한 값이다. 열은 곧은
+  /// 수평선이다 — 무대를 감싸듯 굽히면 맨 앞줄 가운데가 볼록 튀어 기울어 보인다.
   double rowTop(int row) {
     var top = frontDepth + row * (cellSize + cellGap);
     for (var i = 0; i < row; i++) {
@@ -327,11 +291,8 @@ class SeatMapLayout {
   double get rowsBottom =>
       rowCount <= 0 ? frontDepth : rowTop(rowCount - 1) + cellSize;
 
-  /// 좌석 왼쪽 좌표.
-  ///
-  /// 칸 크기는 어느 열에서나 44px 로 같다(사용자 결정). 열마다 길이가 달라지는
-  /// 것은 **자리 수가 다를 때뿐**이고, 그때 짧은 열이 [_shiftOf] 만큼 무대 쪽으로
-  /// 밀리며 사다리꼴이 된다.
+  /// 좌석 왼쪽 좌표. 칸 크기는 어느 열에서나 44px 로 같고, 자리 수가 다른 짧은
+  /// 열만 [_shiftOf] 만큼 무대 쪽으로 밀리며 사다리꼴이 된다.
   double seatLeft(int row, int column) =>
       contentLeft + _rawX(column) + _shiftOf(row);
 

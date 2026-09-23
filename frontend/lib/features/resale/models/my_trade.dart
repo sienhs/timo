@@ -22,12 +22,9 @@ enum MyTradeType {
   );
 }
 
-/// 내 거래 내역 항목의 상태. 서버 `MyTradeStatus` 와 값이 같다.
-///
-/// 매물 상태(`ListingStatus`)와 체결 상태(`TradeStatus`)를 합친 응답 전용
-/// 값이다. 서버가 둘을 한 집합으로 내보내는 이유는 종류를 먼저 가르지 않고도
-/// 상태를 읽게 하려는 것이라, 앱도 같은 모양으로 받는다. 판매에는 [listed] ·
-/// [sold] · [canceled] 만, 구매에는 [pending] · [confirmed] · [failed] 만 온다.
+/// 내 거래 내역 항목의 상태. 서버 `MyTradeStatus` 와 값이 같다. 매물 상태와
+/// 체결 상태를 합친 응답 전용 값이라 판매에는 [listed] · [sold] · [canceled]
+/// 만, 구매에는 [pending] · [confirmed] · [failed] 만 온다.
 enum MyTradeStatus {
   /// (판매) 마켓에 올라가 있다. 아직 안 팔렸다.
   listed('LISTED'),
@@ -47,10 +44,8 @@ enum MyTradeStatus {
   /// (구매) 온체인 전송이 실패했다.
   failed('FAILED'),
 
-  /// 서버가 준 값을 앱이 모른다. 서버에 상태가 하나 늘었을 때만 나온다.
-  ///
-  /// 올라가 있는 매물로 치지 않는다. 모르는 상태에 취소 버튼을 열어 주면 서버가
-  /// 거절할 요청을 사용자가 먼저 시도하게 된다.
+  /// 서버가 준 값을 앱이 모른다. 올라가 있는 매물로 치지 않는다 — 모르는
+  /// 상태에 취소 버튼을 열어 주면 서버가 거절할 요청을 먼저 시도하게 된다.
   unknown('');
 
   const MyTradeStatus(this.wireName);
@@ -64,17 +59,9 @@ enum MyTradeStatus {
 }
 
 /// 내 거래 내역의 항목 하나. 서버 `MyTradeSummaryResponseDto` 한 건이다.
-///
-/// 판매와 구매가 같은 모양으로 한 목록에 섞여 온다(`GET /market/listings/me`).
-/// 내 티켓의 양도 목록 탭은 이 중 판매([isSale])만 그린다 — 시안이 그렇고,
-/// 양도로 산 티켓은 "내 티켓" 이라 예정 공연 탭에 나와야 맞다. 그게 지금 안
-/// 되는 사정(체결해도 예매 행이 판매자 것으로 남는다)은 백엔드
-/// `TicketTransferService` 주석에 있다. 구매를 보여 주기로 하면 거르는 조건만
-/// 바뀐다.
-///
-/// 거래 상대는 어느 쪽에도 없다. `ticketId` · `tokenId` 도 없어 이 항목을 예매
-/// 목록의 티켓과 이어 붙일 방법이 없다. 좌석 등급(`grade`)은 구역 이름에 이미
-/// 들어 있어 담지 않는다.
+/// 판매와 구매가 같은 모양으로 한 목록에 섞여 오고(`GET /market/listings/me`),
+/// 내 티켓의 양도 목록 탭은 이 중 판매([isSale])만 그린다. 거래 상대 ·
+/// `ticketId` · `tokenId` 는 없어 예매 목록의 티켓과 이어 붙일 수 없다.
 class MyTrade {
   const MyTrade({
     required this.type,
@@ -161,11 +148,9 @@ class MyTrade {
   /// 카드에 찍는 좌석. (예: `R석 12열 24번`)
   String get seatLabel => formatSeatLabel(sectionName, seatRow, seatNumber);
 
-  /// 양도 마감까지 남은 시간. 공연이 시작하면 더 팔 수 없으므로 시작 시각이
-  /// 마감이다. 응답에 마감 시각이 따로 없다 — 매물 상세의 `closedAt` 은 팔리거나
-  /// 내려간 시각이지 마감이 아니다.
-  ///
-  /// 날짜가 미정이거나 이미 지났으면 null 이라 화면이 카운트다운을 그리지 않는다.
+  /// 양도 마감(공연 시작)까지 남은 시간. 응답에 마감 시각이 따로 없다 — 상세의
+  /// `closedAt` 은 팔리거나 내려간 시각이지 마감이 아니다. 날짜가 미정이거나
+  /// 이미 지났으면 null 이라 화면이 카운트다운을 그리지 않는다.
   Duration? remaining(DateTime now) {
     final start = startAt;
     if (start == null || !start.isAfter(now)) return null;

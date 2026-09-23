@@ -1,8 +1,5 @@
 /// 마이페이지가 보여 주는 내 정보. 서버 `MemberMeResponseDto` 에서 화면에
-/// 필요한 것만 꺼낸 것이다.
-///
-/// 응답에는 실명·전화번호도 오지만 여기 담지 않는다. 화면이 쓰지 않는
-/// 개인정보를 모델에 들고 다니면 로그·스냅샷에 새어 나갈 자리가 늘어난다.
+/// 필요한 것만 꺼낸다. 실명·전화번호는 로그·스냅샷에 새지 않게 담지 않는다.
 class MemberProfile {
   const MemberProfile({required this.memberId, required this.nickname});
 

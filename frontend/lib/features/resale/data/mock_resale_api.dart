@@ -25,28 +25,15 @@ enum ResaleMockScenario {
   /// 모든 요청이 실패한다. 오류 화면과 다시 시도를 볼 때.
   error,
 
-  /// 마켓이 **늘 닫혀 있다.** 데이터는 [design] 과 같다.
-  ///
-  /// 닫힘 화면은 하루 중 정해진 때(창 밖)에만 나와서, 낮에는 코드를 고쳤다
-  /// 되돌리는 것 말고는 눈으로 볼 방법이 없었다. 판정이 서버로 넘어간 뒤로는
-  /// 기기 시각을 바꿔도 안 된다. 그 길을 다시 만든다.
+  /// 마켓이 늘 닫혀 있다. 데이터는 [design] 과 같다. 닫힘 화면은 창 밖
+  /// 시간에만 나와 기기 시각을 바꿔도 볼 수 없어서 둔다.
   closed,
 }
 
 /// 서버 없이 쓰는 가짜 [ResaleApi]. 테스트와 시안 확인용이다 —
-/// `flutter run --dart-define=RESALE_API=mock`.
-///
-/// 상태를 실제로 바꾼다. 사면 그 매물이 목록에서 사라지고, 등록하면 내 티켓이
-/// 목록에서 빠지며 그 공연의 매물 수가 는다. 화면이 서버 없이도 흐름대로
-/// 움직이는지 눈으로 확인하기 위해서다.
-///
-/// **날짜는 실행 시각 기준 상대값이다.** 시안에 적힌 날짜(2026.02.20 등)를
-/// 그대로 박으면 그 날이 지나는 순간 전부 지난 공연이 된다. 공연명·장소·좌석·
-/// 가격은 시안 그대로다.
-///
-/// 포스터만은 백엔드가 필요하다. 주소가 백엔드의 정적 파일을 가리켜서, 서버를
-/// 안 띄우면 회색 자리가 그려진다. 앱 에셋으로 두면 화면이 받는 값이 서버
-/// 응답과 달라져, 정작 연동했을 때 포스터가 깨지는 것을 목으로는 못 잡는다.
+/// `flutter run --dart-define=RESALE_API=mock`. 상태를 실제로 바꾼다(사면
+/// 목록에서 사라지고, 등록하면 내 티켓이 빠지며 매물 수가 는다). 날짜는 실행
+/// 시각 기준 상대값이고, 포스터는 백엔드 정적 파일이라 서버 없이는 회색이다.
 class MockResaleApi implements ResaleApi {
   MockResaleApi({
     this.latency = ResaleMetrics.mockLatency,
@@ -146,9 +133,8 @@ class MockResaleApi implements ResaleApi {
     _requireOpen();
     if (scenario == ResaleMockScenario.empty) return const [];
 
-    // 매물이 있는 공연만, 공연마다 매물 수와 최저가를 모은다. 서버가 group by
-    // 한 번으로 하는 일이다 — 매물 0 인 공연은 내보내지 않는다. 시안의 공연
-    // 카드에는 `0 건` 이 있지만, 들어가 봐야 빈 화면인 공연은 서버가 주지 않는다.
+    // 매물이 있는 공연만, 공연마다 매물 수와 최저가를 모은다. 서버처럼 매물
+    // 0 인 공연은 내보내지 않는다.
     final grouped = <int, List<_MockListing>>{};
     for (final listing in _openListings) {
       grouped.putIfAbsent(listing.concertId, () => []).add(listing);
@@ -434,11 +420,8 @@ class MockResaleApi implements ResaleApi {
     ];
   }
 
-  /// 매물 여덟. 첫 공연에 넷을 몰아 둔다 — 시안의 매물 목록이 그 화면이다.
-  ///
-  /// 시안의 매물 줄은 정가 186,000원에 -12% 라고 적혀 있지만 함께 적힌 등록가
-  /// (176,000원)와 맞지 않는다. 할인율은 서버가 정가와 등록가에서 계산해 주는
-  /// 값이라 여기서도 계산해 넣어, 화면의 세 숫자가 서로 맞게 한다.
+  /// 매물 여덟. 첫 공연에 넷을 몰아 둔다. 할인율은 서버처럼 정가와 등록가에서
+  /// 계산해 넣어 화면의 세 숫자가 서로 맞게 한다.
   List<_MockListing> _initialListings() {
     // 어제 등록된 것으로 둔다. 시안의 "등록한 지 하루 된 매물" 모양이다.
     final listedAt = clock().subtract(const Duration(days: 1, hours: 5));

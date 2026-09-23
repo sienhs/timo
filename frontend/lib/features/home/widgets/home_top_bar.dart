@@ -4,11 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/timo_logo.dart';
 import '../constants.dart';
 
-/// 로고와 검색 입구. 스크롤을 따라 올라가도록 AppBar 가 아니라 본문 위젯이다
-/// (시안에서 검색 바가 배너와 함께 스크롤된다).
-///
-/// 여기서는 입력을 받지 않는다. 누르면 검색 화면으로 넘어가고 입력·결과는
-/// 그쪽이 맡는다. 홈에 입력 상태를 두면 홈이 검색 결과까지 알아야 한다.
+/// 로고와 검색 입구. 스크롤을 따라 올라가도록 AppBar 가 아니라 본문 위젯이다.
+/// 입력은 받지 않고 누르면 검색 화면으로 넘어간다 — 입력·결과는 그쪽이 맡는다.
 class HomeTopBar extends StatelessWidget {
   const HomeTopBar({super.key, required this.onSearchPressed});
 

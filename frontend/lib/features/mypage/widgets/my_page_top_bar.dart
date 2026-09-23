@@ -4,13 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
 /// 뒤로가기 · 제목 · 알림 입구. 마이페이지는 셸의 탭 본문이라 AppBar 를 둘
-/// Scaffold 가 없어 본문 위젯으로 그린다.
-///
-/// [hasUnreadNotifications] 가 참이면 알림 아이콘에 점을 찍는다. 알림 API 가
-/// 아직 없어 지금은 화면이 늘 거짓을 넘긴다.
-///
-/// 충전 화면도 같은 상단 바를 쓴다(시안이 같은 모양이다). 제목만 다르므로
-/// [title] 로 받고 기본값은 마이페이지다.
+/// Scaffold 가 없어 본문 위젯으로 그린다. [hasUnreadNotifications] 가 참이면
+/// 알림 아이콘에 점을 찍는다. 충전 화면도 같은 상단 바를 써서 [title] 만 다르다.
 class MyPageTopBar extends StatelessWidget {
   const MyPageTopBar({
     super.key,

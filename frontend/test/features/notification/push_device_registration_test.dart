@@ -8,15 +8,9 @@ import 'package:timo/features/notification/notification_destination.dart';
 import 'package:timo/features/notification/push_notification_service.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 앱이 뜨면서 이 기기를 푸시 대상으로 등록하는지.
-///
-/// **왜 앱이 부르나(S15P21D206-358).** 푸시 서비스는 `main` 에서 앱보다 먼저
-/// 시작한다. 그런데 요청에 인증 헤더를 붙이는 인터셉터는 앱 위젯이 뜨면서 꽂힌다.
-/// 서비스가 시작하면서 혼자 등록하면 헤더 없이 나가 401 로 튕기고, 재발급도 그
-/// 인터셉터의 일이라 다시 시도되지 않았다. 그래서 등록만 앱 쪽으로 옮겼다.
-///
-/// 저장된 로그인으로 앱을 다시 켠 경우에만 생기던 구멍이다. 로그인할 때는 세션이
-/// 바뀌면서 저절로 등록되고, 그때는 앱이 이미 떠 있어 헤더가 붙는다.
+/// 앱이 뜨면서 이 기기를 푸시 대상으로 등록하는지. 인증 헤더 인터셉터는 앱 위젯이
+/// 뜨면서 꽂히므로 푸시 서비스가 시작하며 혼자 등록하면 401 로 튕긴다 — 그래서
+/// 등록은 앱이 부른다. 저장된 로그인으로 앱을 다시 켠 경우에만 생기는 구멍이다.
 void main() {
   Future<_RecordingPush> pumpApp(
     WidgetTester tester, {
@@ -29,8 +23,7 @@ void main() {
 
     await tester.pumpWidget(
       App(
-        // 어느 화면으로 시작하든 상관없다. 여기서 볼 것은 앱이 뜨는 순간의
-        // 등록이다. 홈은 배너가 저절로 넘어가는 타이머를 들고 있어 테스트가
+        // 볼 것은 앱이 뜨는 순간의 등록뿐이다. 홈은 배너 타이머 때문에 테스트가
         // 끝나지 않으므로 타이머가 없는 화면으로 띄운다.
         initialRoute: AppRoutes.login,
         session: session,

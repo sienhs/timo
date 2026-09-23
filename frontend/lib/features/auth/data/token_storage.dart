@@ -1,14 +1,8 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// 로그인 정보(토큰·회원 번호·기기 식별자)를 기기에 넣고 빼는 약속.
-///
-/// 앱에서는 [SecureTokenStorage] 가 안드로이드 Keystore / iOS Keychain 에
-/// 암호화해서 저장하고, 테스트에서는 [InMemoryTokenStorage] 를 꽂는다. 위젯
-/// 테스트는 플러그인(플랫폼 채널)을 못 쓰기 때문에, 이 분리가 없으면 로그인
-/// 상태가 얽힌 화면을 테스트할 수 없다.
-///
-/// 값은 전부 문자열이다. 숫자·시각은 쓰는 쪽([AuthSession])이 문자열로 바꿔
-/// 넣고 읽을 때 다시 해석한다. 저장소는 "문자열 서랍" 이상을 알 필요가 없다.
+/// 로그인 정보(토큰·회원 번호·기기 식별자)를 기기에 넣고 빼는 약속. 앱은
+/// [SecureTokenStorage], 플러그인을 못 쓰는 위젯 테스트는 [InMemoryTokenStorage]
+/// 를 꽂는다. 값은 전부 문자열이고 숫자·시각은 쓰는 쪽([AuthSession])이 바꾼다.
 abstract class TokenStorage {
   /// 없으면 null.
   Future<String?> read(String key);

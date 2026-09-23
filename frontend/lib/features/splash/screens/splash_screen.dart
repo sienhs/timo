@@ -8,17 +8,10 @@ import '../../../routes/app_routes.dart';
 import '../../notification/push_notification_scope.dart';
 import '../constants.dart';
 
-/// 앱을 켤 때 처음 보이는 로딩 화면.
-///
-/// 시안 '로딩 1~4' 는 한 애니메이션의 네 장면이다. 'ticket moa' 에서 T·I·M·O
-/// 네 글자만 대문자로 남고(로딩 2) 나머지가 빠져 'TIMO' 가 되고(로딩 3),
-/// 마지막에 로고 이미지로 바뀐다(로딩 4). 장면은 크로스페이드로 넘어가고,
-/// 마지막 장면까지 보인 뒤 홈으로 **교체** 이동한다 — push 로 쌓으면 홈에서
-/// 뒤로 가기를 눌렀을 때 이 화면으로 돌아온다.
-///
-/// 서버는 부르지 않는다. 로그인 정보 되살리기는 main 이 앱을 띄우기 전에
-/// 끝내고, 홈 데이터는 홈이 스켈레톤을 보이며 직접 가져온다. 그래서 이 화면은
-/// 정해진 시간만 머무는 브랜드 화면이다. 장면별 시간은 [SplashMetrics].
+/// 앱을 켤 때 처음 보이는 로딩 화면. 'ticket moa' 가 'TIMO' 를 거쳐 로고로 바뀌는
+/// 네 장면을 크로스페이드로 넘기고, 끝나면 홈으로 **교체** 이동한다 — push 로
+/// 쌓으면 홈에서 뒤로 가기가 이 화면으로 돌아온다. 서버는 부르지 않는다.
+/// 로그인 되살리기는 main 이, 홈 데이터는 홈이 직접 맡는다. 시간은 [SplashMetrics].
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -39,10 +32,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // 첫 프레임이 그려진 뒤부터 시간을 센다. initState 시점엔 화면에 아직
-    // 아무것도 없다 — 느린 기기나 디버그 빌드는 첫 프레임까지 1초 넘게
-    // 걸리는데, 그때부터 세면 첫 장면이 보이기도 전에 지나간다(에뮬레이터에서
-    // 확인). 그 사이 화면이 사라졌을 수도 있어 mounted 를 본다.
+    // 첫 프레임이 그려진 뒤부터 시간을 센다. initState 부터 세면 첫 프레임이 느린
+    // 기기에서 첫 장면이 보이기도 전에 지나간다. 그 사이 사라졌을 수 있어 mounted 를 본다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scheduleNext();
     });
@@ -51,9 +42,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 마지막 장면의 로고를 지금 미리 디코딩해 둔다. 원본이 2820×1472 라 장면이
-    // 바뀌는 순간 읽으면 디코딩하는 동안 빈 화면이 한 번 보인다(에뮬레이터에서
-    // 확인). 화면 배율(MediaQuery)이 필요해 initState 가 아니라 여기서 한다.
+    // 마지막 장면의 로고(원본 2820×1472)를 미리 디코딩해 둔다. 장면이 바뀔 때 읽으면
+    // 빈 화면이 한 번 보인다. 화면 배율(MediaQuery)이 필요해 initState 가 아니라 여기서 한다.
     if (!_logoPrecached) {
       _logoPrecached = true;
       TimoLogo.precache(context, height: SplashMetrics.logoHeight);
@@ -80,13 +70,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   /// 홈으로 넘기고, 알림을 눌러 앱이 켜진 것이면 그 화면까지 이어서 연다.
-  ///
-  /// **알림 목적지를 여기서 여는 이유.** 홈으로 갈 때 쓰는 `pushReplacementNamed`
-  /// 는 맨 위 화면을 갈아치운다. 푸시 쪽이 앱을 켜자마자 목적지를 열어 두면 이
-  /// 줄이 그걸 홈으로 덮어써 사라진다. 그래서 푸시 쪽은 목적지를 들고만 있고,
-  /// 홈을 세운 직후인 여기서 받아 위에 쌓는다.
-  ///
-  /// 홈을 덮지 않고 위에 쌓는 것은 뒤로가기로 홈에 돌아올 수 있게 하려는 것이다.
+  /// 홈은 교체 이동이라 푸시 쪽이 먼저 열어 둔 목적지는 덮여 사라진다. 그래서 푸시
+  /// 쪽은 목적지를 들고만 있고, 홈을 세운 직후 여기서 받아 위에 쌓는다.
   void _goHome() {
     final destination = PushNotificationScope.maybeOf(
       context,

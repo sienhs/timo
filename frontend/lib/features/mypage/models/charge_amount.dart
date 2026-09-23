@@ -1,14 +1,9 @@
 import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 
-/// 충전 화면에 입력된 금액과, 그 금액을 보낼 수 있는지의 판정.
-///
-/// 화면이 "얼마인가" 와 "보내도 되는가" 를 따로 들고 있으면 버튼 활성 조건과
-/// 안내 문구 조건이 갈라진다. 둘을 한 값에 묶어 화면은 [canSubmit] 과
-/// [errorMessage] 만 본다.
-///
-/// 한도는 서버 규약이 아직 없어 화면이 잡는 값이다. 규약이 나오면 [min]·[max]
-/// 만 바꾸면 버튼·문구·입력칸 자릿수가 함께 따라온다.
+/// 충전 화면에 입력된 금액과, 그 금액을 보낼 수 있는지의 판정. 화면은
+/// [canSubmit] 과 [errorMessage] 만 본다. 한도는 서버 규약이 아직 없어 화면이
+/// 잡는 값이라, [min]·[max] 만 바꾸면 버튼·문구·입력칸 자릿수가 함께 따라온다.
 class ChargeAmount {
   const ChargeAmount(this.value);
 

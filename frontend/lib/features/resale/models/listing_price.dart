@@ -1,14 +1,8 @@
 import '../constants.dart';
 
-/// 양도 등록 화면에 입력된 판매가와, 그 값을 보낼 수 있는지의 판정.
-///
-/// 화면이 "얼마인가" 와 "보내도 되는가" 를 따로 들고 있으면 버튼 활성 조건과
-/// 안내 문구 조건이 갈라진다. 둘을 한 값에 묶어 화면은 [canSubmit] 과
-/// [errorMessage] 만 본다(충전 화면의 `ChargeAmount` 와 같은 방식이다).
-///
-/// 상한은 화면이 정한 값이 아니라 **티켓의 정가**다. 서버도 같은 자리에서
-/// 거절하므로(`ListPriceExceedsFacePriceException`) 등록 버튼을 눌러 놓고
-/// 실패를 받느니 입력 단계에서 막는다.
+/// 양도 등록 화면에 입력된 판매가와, 그 값을 보낼 수 있는지의 판정. 화면은
+/// [canSubmit] 과 [errorMessage] 만 본다. 상한은 티켓의 정가다 — 서버도 같은
+/// 자리에서 거절하므로(`ListPriceExceedsFacePriceException`) 입력 단계에서 막는다.
 class ListingPrice {
   const ListingPrice({required this.value, required this.faceValue});
 

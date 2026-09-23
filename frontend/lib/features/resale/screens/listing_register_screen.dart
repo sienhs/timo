@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/app_search_field.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
@@ -18,29 +19,17 @@ import '../widgets/resale_app_bar.dart';
 import '../widgets/resale_bottom_bar.dart';
 import '../widgets/resale_empty_view.dart';
 import '../widgets/resale_list_skeleton.dart';
-import '../widgets/resale_search_field.dart';
 
-/// 양도 등록. 티켓을 고르고(1단계) 판매가를 정해(2단계) 마켓에 올린다.
-///
-/// 두 단계를 한 화면에 둔 이유는 되돌아가기가 잦기 때문이다. 가격을 정하다
-/// 다른 티켓을 고르러 돌아가는 일이 흔한데, 라우트를 나누면 그때마다 티켓
-/// 목록을 다시 받게 된다.
-///
-/// 마켓이 닫혀 있어도 등록은 된다. 서버가 등록은 시간과 무관하게 받고, 닫힌
-/// 시간에 올린 매물은 다음 오픈에 목록에 드러난다(백엔드 `MarketApi` 주석).
-/// 그래서 이 화면에는 마감 시간도 운영 상태도 없다.
-///
-/// 등록에 성공하면 결과로 true 를 넘기며 닫힌다. 공연 목록이 그걸 받아 매물
-/// 수를 다시 받는다.
+/// 양도 등록. 티켓을 고르고(1단계) 판매가를 정해(2단계) 마켓에 올린다. 두
+/// 단계를 한 화면에 둔 이유는 되돌아가기가 잦아서다 — 라우트를 나누면 그때마다
+/// 티켓 목록을 다시 받는다. 등록은 마켓이 닫혀 있어도 되므로 이 화면에는 운영
+/// 상태가 없다. 성공하면 결과로 true 를 넘기며 닫힌다.
 class ListingRegisterScreen extends StatefulWidget {
   const ListingRegisterScreen({super.key, this.initialTicketId});
 
-  /// 미리 골라 둘 티켓. 내 티켓 카드의 `양도 등록하기` 로 들어왔을 때 그 카드의
-  /// 티켓 번호다 — 이미 어느 티켓인지 정하고 온 사람에게 다시 고르게 하지
-  /// 않는다. 마켓 첫 화면의 버튼으로 들어왔으면 null 이라 고르기부터 한다.
-  ///
-  /// 목록에 없는 번호(이미 올렸거나 취소한 티켓)면 고르지 않은 채 목록을
-  /// 보여 준다. 없는 티켓을 골라 둔 것처럼 보이면 안 된다.
+  /// 미리 골라 둘 티켓. 내 티켓 카드의 `양도 등록하기` 로 들어왔을 때 그 티켓
+  /// 번호이고, 마켓 첫 화면에서 왔으면 null 이다. 목록에 없는 번호(이미
+  /// 올렸거나 취소한 티켓)면 고르지 않은 채 목록을 보여 준다.
   final int? initialTicketId;
 
   @override
@@ -101,9 +90,7 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
   }
 
   /// 목록을 받고, 미리 고를 티켓이 있으면 그 자리에서 골라 가격 단계로 간다.
-  ///
-  /// 목록이 오기 전에는 고를 수 없어 여기서 한다. 처음 받을 때 한 번만이다 —
-  /// 다시 받을 때([_reload])는 사용자가 이미 고른 것을 건드리지 않는다.
+  /// 처음 받을 때 한 번만이다 — 다시 받을 때([_reload])는 이미 고른 것을 건드리지 않는다.
   Future<List<ListableTicket>> _fetchTickets() async {
     final tickets = await ResaleApiScope.of(context).fetchListableTickets();
     _preselect(tickets);
@@ -227,12 +214,8 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
     );
   }
 
-  /// 고를 티켓이 하나도 안 남았을 때의 자리.
-  ///
-  /// 검색이 빗나간 것과 애초에 양도할 티켓이 없는 것을 갈라 둔다. 다음에 할
-  /// 일이 다르기 때문이다 — 검색은 검색어를 지우면 되지만, 티켓이 없는 쪽은
-  /// 이 화면에서 할 수 있는 일이 없다. 그 자리에서 뒤로가기 말곤 길이 없으면
-  /// 막다른 길이라, 예매 쪽으로 보낸다.
+  /// 고를 티켓이 하나도 안 남았을 때의 자리. 검색이 빗나간 것과 양도할 티켓이
+  /// 없는 것을 갈라 둔다 — 티켓이 없는 쪽은 여기서 할 일이 없어 예매 쪽으로 보낸다.
   Widget _emptyPicker() {
     final keyword = _query.trim();
     if (keyword.isNotEmpty) {
@@ -261,8 +244,9 @@ class _ListingRegisterScreenState extends State<ListingRegisterScreen> {
             ResaleMetrics.horizontalPadding,
             8,
           ),
-          child: ResaleSearchField(
+          child: AppSearchField(
             controller: _searchController,
+            hintText: ResaleStrings.searchHint,
             onChanged: (value) => setState(() => _query = value),
           ),
         ),

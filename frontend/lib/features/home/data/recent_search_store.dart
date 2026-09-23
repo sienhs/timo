@@ -1,16 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 최근 검색어를 기기에 넣고 빼는 약속.
-///
-/// 앱에서는 [SharedPreferencesRecentSearchStore] 가 기기 설정 저장소에 남기고,
-/// 테스트는 [InMemoryRecentSearchStore] 를 꽂는다. 위젯 테스트는 플러그인
-/// (플랫폼 채널)을 못 쓰기 때문이다 — 인증의 `TokenStorage` 와 같은 분리다.
-///
-/// 보안 저장소(`TokenStorage`)를 같이 쓰지 않는다. 검색어는 민감 정보가 아니고,
-/// 저쪽은 로그아웃할 때 비우는 자리라 검색어까지 딸려 지워진다.
-///
-/// 규칙(최신순 · 중복 제거 · 최대 개수)은 여기 없다. `RecentSearches` 가 정하고,
-/// 저장소는 받은 목록을 그대로 남긴다.
+/// 최근 검색어를 기기에 넣고 빼는 약속. 앱은 [SharedPreferencesRecentSearchStore],
+/// 플러그인을 못 쓰는 위젯 테스트는 [InMemoryRecentSearchStore] 를 꽂는다. 규칙
+/// (최신순 · 중복 제거 · 최대 개수)은 `RecentSearches` 가 정하고 저장소는 그대로 남긴다.
 abstract class RecentSearchStore {
   /// 저장된 목록. 없으면 빈 목록.
   Future<List<String>> load();

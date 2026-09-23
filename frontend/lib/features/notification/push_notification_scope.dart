@@ -2,15 +2,9 @@ import 'package:flutter/widgets.dart';
 
 import 'push_notification_service.dart';
 
-/// 화면에 [PushNotifications] 를 내려주는 InheritedWidget.
-///
-/// 앱은 맨 위에서 푸시 서비스를 하나 만들어 여기에 담고, 화면이 [maybeOf] 로 꺼내
-/// 쓴다. `MyPageApiScope` 와 같은 방식이다. 지금 꺼내 쓰는 곳은 둘이다 —
-/// 마이페이지(로그아웃할 때 기기 해제)와 로딩 화면(알림으로 켜졌는지 확인).
-///
-/// 다른 스코프들과 달리 [maybeOf] 만 두고 없을 때 단언하지 않는다. 두 화면 모두
-/// 스코프 없이 띄우는 테스트가 있고([AuthSessionScope] 를 읽는 방식과 같다),
-/// 푸시는 그 테스트들이 신경 쓸 일이 아니기 때문이다.
+/// 화면에 [PushNotifications] 를 내려주는 InheritedWidget. 마이페이지(로그아웃
+/// 때 기기 해제)와 로딩 화면(알림으로 켜졌는지 확인)이 쓴다. [maybeOf] 만 두고
+/// 없을 때 단언하지 않는다 — 두 화면 모두 스코프 없이 띄우는 테스트가 있다.
 class PushNotificationScope extends InheritedWidget {
   const PushNotificationScope({
     super.key,

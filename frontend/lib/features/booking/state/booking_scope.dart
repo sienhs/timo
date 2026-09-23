@@ -2,11 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import 'booking_controller.dart';
 
-/// 예매 플로우 전체에 [BookingController] 를 내려주는 InheritedNotifier.
-///
-/// provider·riverpod 같은 패키지를 붙이지 않은 이유는, 공유해야 할 상태가
-/// 컨트롤러 하나뿐이고 Flutter 기본 위젯으로 충분하기 때문이다.
-/// 상태가 늘어나면 이 파일만 바꿔 패키지로 갈아탈 수 있다.
+/// 예매 플로우 전체에 [BookingController] 를 내려주는 InheritedNotifier. 공유할
+/// 상태가 컨트롤러 하나뿐이라 provider 같은 패키지 없이 기본 위젯으로 충분하다.
 class BookingScope extends InheritedNotifier<BookingController> {
   const BookingScope({
     super.key,
@@ -29,11 +26,9 @@ class BookingScope extends InheritedNotifier<BookingController> {
     return controller!;
   }
 
-  /// 스코프가 없을 수도 있는 자리에서 쓴다.
-  ///
-  /// 결제 화면처럼 예매 흐름 밖에서 단독으로 열릴 수 있는 화면의 라우트가
-  /// 이걸 써야 한다. [read] 를 쓰면 AppRoutes.routes 가 BookingScope 를
-  /// 필수로 요구하게 되어, 스코프 없이 라우트만 띄우는 테스트가 깨진다.
+  /// 스코프가 없을 수도 있는 자리에서 쓴다. 결제 화면처럼 예매 흐름 밖에서
+  /// 단독으로 열릴 수 있는 화면의 라우트가 쓴다. [read] 를 쓰면 스코프 없이
+  /// 라우트만 띄우는 테스트가 깨진다.
   static BookingController? maybeRead(BuildContext context) =>
       context.getInheritedWidgetOfExactType<BookingScope>()?.notifier;
 }

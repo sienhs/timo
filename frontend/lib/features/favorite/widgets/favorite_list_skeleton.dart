@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 
-/// 찜한 공연을 불러오는 동안 공연 탭 자리에 두는 뼈대.
-///
-/// 상태 칩 줄 · '총 N개' 줄 · 카드 몇 장을 실제 탭과 같은 높이로 세운다.
-/// 스피너 하나만 두면 칩 줄까지 사라졌다가 되돌아와, 탭을 옮길 때마다 화면
-/// 위쪽이 통째로 들썩인다.
+/// 찜한 공연을 불러오는 동안 공연 탭 자리에 두는 뼈대. 상태 칩 줄 · '총 N개'
+/// 줄 · 카드 몇 장을 실제 탭과 같은 높이로 세워 화면 위쪽이 들썩이지 않게 한다.
 class FavoriteListSkeleton extends StatelessWidget {
   const FavoriteListSkeleton({super.key});
 

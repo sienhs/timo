@@ -4,15 +4,9 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/quick_menu_item.dart';
 
-/// 하단 바 위에 뜨는 빠른 메뉴 패널을 연다.
-///
-/// 고른 항목을 돌려주고, 패널 밖을 눌러 닫았으면 null 이다. 라우팅·안내는
-/// 호출부가 한다 — 패널은 무엇을 골랐는지만 알려주고 그 다음 일은 모른다.
-///
-/// 화면에 `isOpen` 같은 상태를 두지 않으려고 Navigator 에 얹는다. 다만
-/// [showDialog] 는 화면을 어둡게 덮어 하단 바가 가려지므로, 배리어가 투명한
-/// [showGeneralDialog] 를 쓴다. 시안에서도 배경이 어두워지지 않고 패널만
-/// 바 위에 겹친다.
+/// 하단 바 위에 뜨는 빠른 메뉴 패널을 연다. 고른 항목을 돌려주고 밖을 눌러 닫았으면
+/// null 이다. 라우팅·안내는 호출부가 한다. [showDialog] 는 화면을 어둡게 덮어 하단
+/// 바가 가려지므로 배리어가 투명한 [showGeneralDialog] 를 쓴다.
 Future<QuickMenuItem?> showQuickMenu(BuildContext context) {
   return showGeneralDialog<QuickMenuItem>(
     context: context,
@@ -80,10 +74,8 @@ class _QuickMenuPanel extends StatelessWidget {
   }
 }
 
-/// 4열 격자. 행 수는 항목 수에서 나온다.
-///
-/// GridView 가 아니라 Row 를 쌓는다. 패널은 내용만큼만 높아야 하는데
-/// GridView 는 스스로 높이를 정하지 못해 shrinkWrap · 비율 지정이 따라붙는다.
+/// 4열 격자. 행 수는 항목 수에서 나온다. GridView 는 스스로 높이를 정하지 못해
+/// shrinkWrap · 비율 지정이 따라붙으므로 Row 를 쌓는다.
 class _QuickMenuGrid extends StatelessWidget {
   const _QuickMenuGrid();
 

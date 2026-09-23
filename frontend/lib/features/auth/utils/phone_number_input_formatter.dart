@@ -5,11 +5,7 @@ import '../constants.dart';
 import 'signup_validators.dart';
 
 /// 전화번호 입력칸에 붙이는 포매터. 치는 대로 `010-1234-5678` 모양을 만든다.
-///
-/// 숫자 외 문자는 걷어내고 11자리까지만 받는다. 커서는 항상 끝으로 보낸다.
-/// 가운데를 고칠 때 커서가 끝으로 튀는 단점이 있지만, 전화번호는 보통 처음부터
-/// 다시 치므로 하이픈 위치를 따라가며 커서를 옮기는 계산은 하지 않았다.
-///
+/// 숫자 외 문자는 걷어내고 11자리까지만 받으며 커서는 항상 끝으로 보낸다.
 /// 저장할 때는 하이픈을 뺀 숫자만 쓴다([SignupValidators.digitsOnly]).
 class PhoneNumberInputFormatter extends TextInputFormatter {
   const PhoneNumberInputFormatter();

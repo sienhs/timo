@@ -4,13 +4,8 @@ import 'mock_show_detail_data.dart';
 import 'show_api.dart';
 
 /// 서버 없이 쓰는 가짜 [ShowApi]. 화면 테스트가 쓴다.
-///
 /// 응답마다 [latency] 만큼 기다려 실제 서버처럼 로딩 상태가 보이게 한다.
 /// 테스트에서 기다릴 필요가 없으면 `Duration.zero` 를 넣는다.
-///
-/// 내 티켓·예매와 달리 실행 인자(`--dart-define`)로 고를 수 있게 하지 않았다.
-/// 저쪽은 서버 데이터로 만들 수 없는 화면이 있어서 필요했지만, 공연 상태
-/// 네 가지는 로컬 시드 공연 넷에 하나씩 들어 있어 서버로 다 볼 수 있다.
 class MockShowApi implements ShowApi {
   const MockShowApi({this.latency = ShowDetailMetrics.mockLatency});
 

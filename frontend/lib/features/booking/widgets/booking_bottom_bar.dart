@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 
-/// 좌석 선택 화면 하단의 선택 좌석 · 결제 금액 바.
-///
-/// [seatLabel] 또는 [amount] 가 null 이면 아직 좌석을 고르지 않은 상태로
-/// 보고 버튼을 잠근다. 시안에는 '선택 전' 상태가 없어서 여기서 정했다.
+/// 좌석 선택 화면 하단의 선택 좌석 · 결제 금액 바. [seatLabel] 또는 [amount] 가
+/// null 이면 아직 좌석을 고르지 않은 것으로 보고 버튼을 잠근다.
 class BookingBottomBar extends StatelessWidget {
   const BookingBottomBar({
     super.key,
@@ -63,10 +61,7 @@ class BookingBottomBar extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: onPressed,
-                child: Text(actionLabel),
-              ),
+              FilledButton(onPressed: onPressed, child: Text(actionLabel)),
             ],
           ),
         ),
@@ -93,8 +88,9 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Text(label, style: textTheme.labelMedium),
         const SizedBox(height: 3),

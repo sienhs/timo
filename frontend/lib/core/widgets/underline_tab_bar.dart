@@ -2,18 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// 본문을 통째로 갈아끼우는 큰 탭. 고른 탭 아래에 초록 밑줄이 그어진다.
-///
-/// 내 티켓(`TicketTabBar`)에 있던 것을 올렸다. 찜리스트가 같은 이유(탭마다
-/// 본문이 아예 다른 위젯이고, 옆으로 쓸어 넘기지 않는다)로 같은 탭을 쓰게
-/// 되어 두 도메인이 같은 모양을 각자 들고 있을 이유가 없어졌다.
-///
-/// Material 의 `TabBar` 를 쓰지 않는다. 그쪽은 `TabController` 와 `TabBarView`
-/// 를 함께 끌고 오는데, 본문이 아예 다른 위젯이라 얻을 게 없다.
-///
-/// 개수([counts])는 라벨 뒤에 붙는다(`공연 4`). 세어 본 적이 없는 탭은 항목을
-/// null 로 주면 숫자 없이 그린다 — 0 을 먼저 찍었다가 실제 값으로 바뀌면
-/// "없다" 고 읽었다가 번복되는 꼴이 된다.
+/// 본문을 통째로 갈아끼우는 큰 탭. 고른 탭 아래에 초록 밑줄이 그어진다. 본문이
+/// 아예 다른 위젯이라 Material `TabBar` 대신 직접 그린다. 개수([counts])는
+/// 라벨 뒤에 붙고, 아직 세지 않은 탭은 null 로 주면 숫자 없이 그린다.
 class UnderlineTabBar extends StatelessWidget {
   const UnderlineTabBar({
     super.key,

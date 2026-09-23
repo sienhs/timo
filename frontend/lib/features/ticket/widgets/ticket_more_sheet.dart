@@ -7,25 +7,9 @@ import '../models/my_ticket.dart';
 /// 티켓 카드 더보기(⋮)에서 고른 것.
 enum TicketMoreAction { registerListing, cancelListing, cancelReservation }
 
-/// 티켓 하나로 할 수 있는 일을 담은 바텀시트.
-///
-/// 시안에는 이 자리가 없다. 카드에 버튼을 하나 더 붙이면 시안의 배치가
-/// 깨지고, 예매 취소는 자주 쓰는 기능도 아니라 한 겹 안으로 넣었다.
-///
-/// 양도와 예매 취소 둘이다. 양도를 위에, 되돌릴 수 없는 예매 취소를 아래에
-/// 둔다. 요구사항대로 둘 중 유리한 쪽을 고르는 자리라 한 시트에 나란히 있다.
-///
-/// 위 자리는 **한 자리 두 상태**다. 안 올라가 있으면 `양도 등록하기`, 올라가
-/// 있으면 `양도 등록 취소하기` 다. 두 항목을 나란히 두지 않는 이유는 티켓
-/// 하나가 올라가 있거나 없거나 둘 중 하나라서 — 나란히 두면 어느 쪽이든 늘
-/// 하나는 잠긴 채고, 잠긴 줄만 늘어난다.
-///
-/// 할 수 없는 항목은 **지우지 않고 비활성으로** 두고 이유를 그 아래 한 줄로
-/// 적는다. 없으면 왜 못 하는지 알 길이 없다. 이유는 서버가 준 티켓 정보로
-/// 미리 안다(S15P21D206-331) — 양도로 받은 티켓인지, 공연이 코앞인지.
-///
-/// [listingFound] 는 등록 취소를 열 수 있는지다. 티켓 응답에 매물 번호가 없어
-/// 호출부가 좌석으로 맞춰 찾으므로, 찾았는지를 여기서 알 수 없어 받는다.
+/// 티켓 하나로 할 수 있는 일을 담은 바텀시트. 시안에는 없다. 위 자리는 안 올라가
+/// 있으면 `양도 등록하기`, 올라가 있으면 `양도 등록 취소하기` 고, 아래는 예매 취소다.
+/// 할 수 없는 항목은 비활성으로 두고 이유를 적는다. [listingFound] 는 매물을 찾았는지다.
 Future<TicketMoreAction?> showTicketMoreSheet(
   BuildContext context, {
   required MyTicket ticket,
@@ -95,9 +79,7 @@ class _TicketMoreSheet extends StatelessWidget {
               label: TicketStrings.cancelListing,
               // 매물을 못 찾았으면 보낼 번호가 없다. 눌러서 아무 일도 안
               // 일어나게 두는 대신 왜 못 하는지 적고 양도 목록 탭으로 보낸다.
-              reason: listingFound
-                  ? null
-                  : TicketStrings.cancelListingUnknown,
+              reason: listingFound ? null : TicketStrings.cancelListingUnknown,
               onTap: () =>
                   Navigator.pop(context, TicketMoreAction.cancelListing),
             )

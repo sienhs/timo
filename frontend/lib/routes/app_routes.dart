@@ -126,7 +126,7 @@ class AppRoutes {
   /// 회원가입. 단계 화면은 앞 단계까지 채운 SignupDraft 를 arguments 로 받는다.
   static const signupPhone = '/signup/phone';
 
-  /// 아이디와 비밀번호를 한 화면에서 받는다. 예전에는 따로였다.
+  /// 아이디와 비밀번호를 한 화면에서 받는다.
   static const signupAccount = '/signup/account';
   static const signupNickname = '/signup/nickname';
 
@@ -136,9 +136,8 @@ class AppRoutes {
 
   static final Map<String, WidgetBuilder> routes = {
     splash: (_) => const SplashScreen(),
-    // 홈은 하단 바를 두른 셸이다. 탭 본문(홈·마이페이지)은 셸이 들고 있어
-    // 라우트로 노출하지 않는다. 빠른 메뉴에서 연 화면이 하단 바로 돌아올 때는
-    // 열 탭 번호를 arguments 로 넘긴다.
+    // 홈은 하단 바를 두른 셸이다. 탭 본문은 셸이 들고 있어 라우트로 노출하지
+    // 않고, 빠른 메뉴에서 돌아올 때는 열 탭 번호를 arguments 로 넘긴다.
     home: (context) => MainShellScreen(
       initialTab: ModalRoute.of(context)!.settings.arguments as int? ?? 0,
     ),
@@ -176,9 +175,8 @@ class AppRoutes {
     seatSelection: (context) => SeatSelectionScreen(
       zoneId: ModalRoute.of(context)!.settings.arguments! as int,
     ),
-    // 고른 좌석으로 주문을 만들어 넘긴다. 이 연결이 없으면 어떤 좌석을 골라도
-    // 결제 화면에 더미 좌석(A구역 9열 6번)이 찍힌다. 예매 흐름을 거치지 않고
-    // 열린 경우는 ticketOrderOrSample 이 더미로 대체한다.
+    // 고른 좌석으로 주문을 만들어 넘긴다. 예매 흐름을 거치지 않고 열린 경우는
+    // ticketOrderOrSample 이 더미로 대체한다.
     payment: (context) {
       final booking = BookingScope.maybeRead(context);
       final hold = booking?.hold;
@@ -194,9 +192,8 @@ class AppRoutes {
             : OrderTarget(concertId: booking.concertId, seatId: hold.seatId),
       );
     },
-    // 결제 화면이 주문 정보와 예매 번호를 인자로 넘긴다. 인자 없이 열리면
-    // (딥링크 · 화면 단위 테스트) 예매 흐름의 주문이나 더미로 대신하고, 서버에
-    // 만든 주문이 없으니 발행 상태는 묻지 않는다.
+    // 결제 화면이 주문 정보와 예매 번호를 인자로 넘긴다. 인자 없이 열리면 예매
+    // 흐름의 주문이나 더미로 대신하고, 서버 주문이 없어 발행 상태는 안 묻는다.
     paymentComplete: (context) {
       final placed = ModalRoute.of(context)!.settings.arguments as PlacedOrder?;
       return PaymentCompleteScreen(
@@ -231,10 +228,8 @@ class AppRoutes {
     signupComplete: (_) => const SignupCompleteScreen(),
   };
 
-  /// 공연 상세가 받는 라우트 인자. 서버가 준 공연 번호다.
-  ///
-  /// 번호 없이 열리면(딥링크, 화면 단위 실행) 기본 공연으로 대신한다. 예매
-  /// 흐름이 [BookingConstants.fallbackConcertId] 로 하는 것과 같다.
+  /// 공연 상세가 받는 라우트 인자. 번호 없이 열리면(딥링크, 화면 단위 실행)
+  /// 예매 흐름처럼 [BookingConstants.fallbackConcertId] 로 대신한다.
   static int _showIdArg(BuildContext context) =>
       ModalRoute.of(context)!.settings.arguments as int? ??
       BookingConstants.fallbackConcertId;

@@ -44,10 +44,8 @@ class TradeDetailCard extends StatelessWidget {
   }
 }
 
-/// 완료 화면 위쪽의 원형 포스터. 코랄 테두리를 두른다.
-///
-/// 결제 도메인의 `PosterAvatar` 와 같은 모양이지만 그림 그리는 일은 공통
-/// 위젯([PosterImage])에 맡긴다. 저쪽은 그 위젯이 생기기 전 코드다.
+/// 완료 화면 위쪽의 원형 포스터. 코랄 테두리를 두르고, 그림은 공통
+/// 위젯([PosterImage])에 맡긴다.
 class TradePosterAvatar extends StatelessWidget {
   const TradePosterAvatar({
     super.key,

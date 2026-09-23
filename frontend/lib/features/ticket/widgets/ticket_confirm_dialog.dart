@@ -9,16 +9,8 @@ import '../constants.dart';
 typedef TicketConfirmSummary = ({String title, String seat, String amount});
 
 /// 되돌릴 수 없는 일을 하기 전에 한 번 묻는 팝업. 예매 취소와 양도 등록 취소가
-/// 같은 틀을 쓴다.
-///
-/// 무엇을 하는지(공연·좌석)와 금액을 함께 보여준다 — "정말 취소할까요?" 만
-/// 띄우면 어느 티켓인지 모른 채 누르게 된다.
-///
-/// 틀은 다른 팝업과 같되 테두리는 없다(사용자 결정). 되돌릴 수 없는 행동임은
-/// 확인 버튼의 강조색(코랄)으로만 알리고, [keepLabel] 은 같은 크기의 흰 바탕·
-/// 초록 테두리 버튼으로 나란히 둔다.
-///
-/// 하기로 했으면 true, 아니면 false.
+/// 같은 틀을 쓴다. 어느 티켓인지 알고 누르게 공연·좌석과 금액을 함께 보여주고,
+/// 되돌릴 수 없음은 확인 버튼의 강조색으로만 알린다. 하기로 했으면 true.
 Future<bool> showTicketConfirmDialog(
   BuildContext context, {
   required String title,
@@ -83,7 +75,6 @@ class _TicketConfirmDialog extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          // 안내문이 한 줄이 되면서 20 은 아래가 비어 보였다(사용자 피드백).
           const SizedBox(height: 12),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -94,8 +85,8 @@ class _TicketConfirmDialog extends StatelessWidget {
             child: Text(agreeLabel),
           ),
           const SizedBox(height: 8),
-          // 확인 버튼과 같은 크기의 흰 바탕·초록 테두리 버튼(사용자 결정). 글자만
-          // 있는 버튼이면 두 선택지의 무게가 달라 보인다.
+          // 확인 버튼과 같은 크기의 흰 바탕·초록 테두리 버튼. 글자만 있는
+          // 버튼이면 두 선택지의 무게가 달라 보인다.
           OutlinedButton(
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(44),

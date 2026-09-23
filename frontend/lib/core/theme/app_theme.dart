@@ -3,16 +3,12 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_metrics.dart';
 
-/// 앱 공통 테마. 색은 [AppColors], 크기·굵기는 여기서만 정의한다.
-///
-/// 화면 코드에서는 `Theme.of(context).textTheme.xxx` 로 가져다 쓴다.
-/// TextStyle 을 위젯마다 새로 만들면 시안이 바뀔 때 전수 수정해야 하고
-/// 스타일 객체도 매 빌드마다 새로 생성된다.
+/// 앱 공통 테마. 색은 [AppColors], 크기·굵기는 여기서만 정의한다. 화면에서는
+/// `Theme.of(context).textTheme.xxx` 로 가져다 쓴다.
 class AppTheme {
   AppTheme._();
 
-  /// 브랜드 메인 색(S15P21D206-49). Material 3 팔레트를 생성하는 시드로 쓴다.
-  /// 값은 [AppColors.brand] 로 옮겼고, 이 이름을 참조하는 코드가 있어 유지한다.
+  /// 브랜드 메인 색. [AppColors.brand] 와 같은 값이며 [dark] 의 시드로 쓴다.
   static const seedColor = AppColors.brand;
 
   /// 시안 폰트는 Pretendard 계열로 보인다. 폰트 파일을 assets 에 넣고
@@ -94,16 +90,11 @@ class AppTheme {
     ),
   );
 
-  /// 브랜드 강조 색. 금액·경고처럼 시선을 끌어야 하는 곳에 쓴다.
-  /// 값은 [AppColors.accent] 로 옮겼고, 이 이름을 참조하는 코드가 있어 유지한다.
+  /// 브랜드 강조 색. [AppColors.accent] 와 같다. 참조하는 코드가 있어 남긴다.
   static const accentColor = AppColors.accent;
 
-  /// 폰트를 입힌 최종 텍스트 테마.
-  ///
-  /// ThemeData(fontFamily:) 는 textTheme 에만 폰트를 입히고, 컴포넌트 테마에
-  /// 직접 넣은 TextStyle(버튼 textStyle, AppBar titleTextStyle 등)에는 적용되지
-  /// 않는다. 그래서 그쪽도 반드시 이 값을 참조해야 한다. 골든 스크린샷에서
-  /// AppBar 제목과 버튼 라벨만 폰트가 안 먹는 것으로 이 문제가 드러났다.
+  /// 폰트를 입힌 최종 텍스트 테마. ThemeData(fontFamily:) 는 컴포넌트 테마에 직접
+  /// 넣은 TextStyle(버튼·AppBar 제목)에는 안 먹으므로 그쪽도 반드시 이 값을 쓴다.
   static final _textTheme = _baseTextTheme.apply(fontFamily: _fontFamily);
 
   static ThemeData get light => ThemeData(
@@ -126,12 +117,8 @@ class AppTheme {
       thickness: 1,
       space: 0,
     ),
-    // 입력칸 공통 모양. 시안의 입력칸은 얇은 회색 테두리·모서리 12 이고,
-    // 포커스가 오면 브랜드색으로 바뀐다.
-    //
-    // Material 3 에서는 border 하나만 주면 포커스·오류 상태의 색이 따라오지
-    // 않고 ColorScheme 기본값(primary·error)이 쓰인다. 오류색을
-    // AppColors.error 로 맞추려면 상태별 테두리를 전부 명시해야 한다.
+    // 입력칸 공통 모양. Material 3 는 border 하나만 주면 포커스·오류 상태 색이
+    // 따라오지 않으므로 상태별 테두리를 전부 명시한다.
     inputDecorationTheme: InputDecorationThemeData(
       isDense: true,
       // 글자를 bodyMedium(14 × 1.5 = 21) 으로 두면 칸 높이가
@@ -185,9 +172,8 @@ class AppTheme {
         ),
       ),
     ),
-    // 시안의 다이얼로그는 얇은 그린 테두리를 가지는데, shape.side 로는
-    // Material 이 테두리를 그려주지 않는다. 테두리는 다이얼로그 위젯이
-    // 직접 그리므로 여기서는 모양만 잡는다.
+    // 다이얼로그의 얇은 그린 테두리는 shape.side 로 안 그려져 위젯이 직접 그린다.
+    // 여기서는 모양만 잡는다.
     dialogTheme: const DialogThemeData(
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -215,12 +201,8 @@ class AppTheme {
         borderSide: BorderSide(color: color, width: width),
       );
 
-  /// 다크 테마 시안은 아직 없다. develop 에 있던 시드 기반 구현을 그대로
-  /// 남겨둔다(참조하는 코드가 있을 수 있어 API 를 없애지 않는다).
-  ///
-  /// 다만 [light] 는 흰 배경·회색 테두리를 명시적으로 지정하므로 이 다크
-  /// 테마와 짝이 맞지 않는다. 다크 시안이 나오면 [AppColors] 에 다크 토큰을
-  /// 추가해 [light] 와 같은 방식으로 조립해야 한다.
+  /// 다크 테마 시안은 아직 없어 시드 기반 기본 구현만 남긴다. [light] 와 짝이
+  /// 맞지 않으므로 시안이 나오면 [AppColors] 에 다크 토큰을 추가해 조립한다.
   static ThemeData get dark => ThemeData(
     colorSchemeSeed: seedColor,
     brightness: Brightness.dark,

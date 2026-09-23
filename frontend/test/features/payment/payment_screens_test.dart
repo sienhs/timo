@@ -208,12 +208,9 @@ Future<void> _pumpFlow(
   await _settleTransition(tester);
 }
 
-/// 화면 전환 애니메이션만큼 기다린다.
-///
-/// `pumpAndSettle` 을 쓰지 않는다. 결제 화면의 카운트다운이 매초 프레임을
-/// 예약해 끝나지 않는다. 기본 전환(Material 3 의 FadeForwards)이 800ms 라
-/// 1초를 보내고, 마지막 `pump` 는 애니메이션이 끝난 뒤 밀려난 화면이 트리에서
-/// 빠지는 프레임이다.
+/// 화면 전환 애니메이션만큼 기다린다. 결제 화면의 카운트다운이 매초 프레임을
+/// 예약해 `pumpAndSettle` 은 끝나지 않는다. 기본 전환(M3 FadeForwards)이 800ms 라
+/// 1초를 보내고, 마지막 `pump` 는 밀려난 화면이 트리에서 빠지는 프레임이다.
 Future<void> _settleTransition(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(seconds: 1));
@@ -337,9 +334,8 @@ void main() {
       expect(results, [null]);
     });
 
-    // 서버는 이 넷 중 셋을 같은 409 로 준다(남의 선점만 403). 상태 코드로는 못
-    // 가르므로 예외 이름을 본다. 서버 문구를 그대로 띄우면 `(seatId=1009)` 같은
-    // 디버깅용 꼬리까지 사용자에게 보인다.
+    // 서버는 이 넷 중 셋을 같은 409 로 준다(남의 선점만 403). 예외 이름으로 가르고,
+    // 서버 문구의 `(seatId=1009)` 같은 디버깅용 꼬리는 사용자에게 보이지 않게 한다.
     final rejections =
         <({String reason, ApiException failure, String expected})>[
           (

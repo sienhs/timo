@@ -1,10 +1,7 @@
 import 'wallet_transaction.dart';
 
-/// 내 지갑. 잔액과 최근 거래 내역을 함께 든다.
-///
-/// 시안에서 두 카드(내 Mushroom · 사용 내역)로 나뉘어 있지만 둘은 같은
-/// 원장에서 나오는 값이고 한쪽만 실패할 이유가 없어 한 번에 받는다. 서버도
-/// 같은 이유로 조회·충전 응답을 이 한 덩어리로 내려준다.
+/// 내 지갑. 잔액과 최근 거래 내역을 함께 든다. 같은 원장에서 나오는 값이라
+/// 서버도 조회·충전 응답을 이 한 덩어리로 내려준다.
 class WalletSummary {
   const WalletSummary({required this.balance, required this.transactions});
 

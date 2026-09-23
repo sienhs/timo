@@ -17,14 +17,9 @@ import '../widgets/duplicate_check_button.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 3/3 닉네임 설정. 회원가입의 마지막 입력 화면.
-///
-/// 중복 확인 흐름은 아이디 칸과 같다. 칸에서 포커스가 빠지면 저절로 확인한다. '인증하고 시작하기' 를 누르면 지금까지
-/// 모은 초안으로 가입을 요청하고 완료 화면으로 간다. 이때 입력 화면들은
-/// 스택에서 전부 지워서, 완료 화면에서 뒤로가기를 눌러도 입력 화면으로
-/// 돌아가지 않고 홈으로 간다.
-///
-/// 가입이 거절되면 원인에 따라 다르게 안내한다. [_handleSignUpFailure] 참고.
+/// 3/3 닉네임 설정. 회원가입의 마지막 입력 화면. 중복 확인은 아이디 칸과 같이
+/// 포커스가 빠지면 저절로 한다. 가입을 요청해 성공하면 입력 화면들을 스택에서
+/// 전부 지우고 완료 화면으로 간다. 거절 안내는 [_handleSignUpFailure] 참고.
 class SignupNicknameScreen extends StatefulWidget {
   const SignupNicknameScreen({
     super.key,
@@ -142,13 +137,8 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
       return;
     }
     if (!mounted) return;
-    // 뒤로가기로 입력 화면에 돌아올 일이 없으니 _busy 는 풀지 않는다.
-    //
-    // 스택을 [홈 탭, 지갑 연출] 로 다시 세운다. 연출 화면이 제 자리를 완료
-    // 화면으로 바꿔치우므로(pushReplacement) 결국 [홈 탭, 완료 화면] 이 된다. 로그인 화면과 같은 규칙 —
-    // 로그인이 끝나면 어디서 시작했든 홈으로 간다. 완료 화면 아래에 홈 탭을
-    // 깔아 두면 '티켓 보러 가기' 든 뒤로가기든 홈 탭에 닿는다. 그냥 첫 화면까지
-    // 걷어내면 가입을 시작한 탭(마이페이지)으로 돌아간다.
+    // 입력 화면으로 돌아올 일이 없으니 _busy 는 풀지 않는다. 스택을 [홈 탭, 지갑
+    // 연출] 로 다시 세우면 연출이 완료 화면으로 바뀌어 홈 탭 위에 완료만 남는다.
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.home,
@@ -157,15 +147,10 @@ class _SignupNicknameScreenState extends State<SignupNicknameScreen> {
     Navigator.pushNamed(context, AppRoutes.signupWallet);
   }
 
-  /// 가입 거절 원인별 안내.
-  ///
-  /// - 닉네임 중복(409): 중복 확인과 가입 사이에 남이 채간 경우. 이 칸의
-  ///   문제라 칸 아래 문구로 알리고 다시 확인하게 한다.
-  /// - 인증 만료(400): 티켓(30분)이 지났다. 다시 인증받아야 하므로 스낵바로
-  ///   알린 뒤 전화번호 화면으로 되돌아간다. 이름·아이디·비밀번호는 다시
-  ///   입력한다.
-  /// - 그 외(아이디·전화번호 중복, 네트워크, 서버 오류): 스낵바로 알리고
-  ///   버튼을 풀어 다시 시도할 수 있게 한다.
+  /// 가입 거절 원인별 안내. 닉네임 중복(409)은 칸 아래 문구로 알리고 다시
+  /// 확인하게 한다 · 인증 만료(400)는 스낵바로 알린 뒤 전화번호 화면으로
+  /// 되돌아간다 · 그 외(아이디·전화번호 중복, 네트워크)는 스낵바로 알리고
+  /// 버튼을 풀어 다시 시도하게 한다.
   void _handleSignUpFailure(ApiException e) {
     final nicknameTaken =
         e.exceptionName == AuthServerErrors.nicknameDuplicated;

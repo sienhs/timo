@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_search_field.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
@@ -27,25 +28,17 @@ import '../widgets/past_ticket_card.dart';
 import '../widgets/ticket_more_sheet.dart';
 import '../widgets/ticket_empty_view.dart';
 import '../widgets/ticket_list_skeleton.dart';
-import '../widgets/ticket_search_field.dart';
 import '../widgets/ticket_tab_bar.dart';
 import '../widgets/upcoming_ticket_card.dart';
 
-/// 내 티켓. 예정 공연 · 지난 공연 · 양도 목록 세 탭이다.
-///
-/// 예정과 지난은 **같은 응답**(내 티켓 목록, 소유 기준)을 공연 날짜로 가른다.
-/// 서버에 그 필터가 없어서 한 번 받아 화면이 나눈다.
-///
-/// 양도 목록은 **다른 조회**다. 마켓 API 의 내 거래 내역에서 내가 올린 매물만
-/// 골라 그린다. 예매 목록과 따로 받는 이유는 한쪽이 실패해도 다른 쪽은 보여야
-/// 해서다 — 마켓이 안 되는데 내 티켓까지 안 보이면 안 된다.
+/// 내 티켓. 예정 공연 · 지난 공연 · 양도 목록 세 탭이다. 예정과 지난은 같은
+/// 응답(내 티켓 목록)을 공연 날짜로 가르고, 양도 목록은 마켓 API 의 내 거래
+/// 내역에서 내가 올린 매물만 골라 그린다 — 한쪽이 실패해도 다른 쪽은 보여야 한다.
 class MyTicketsScreen extends StatefulWidget {
   const MyTicketsScreen({super.key, this.clock = DateTime.now});
 
-  /// 지금 시각을 읽는 함수. D-day 와 QR 창 판정이 이 값을 본다.
-  ///
-  /// 테스트에서 시각을 고정하려고 받는다(공연 상세 화면과 같은 방식이다).
-  /// 목 데이터도 같은 시각을 받아야 배지가 흔들리지 않는다.
+  /// 지금 시각을 읽는 함수. D-day 와 QR 창 판정이 이 값을 본다. 테스트에서
+  /// 시각을 고정하려고 받는다.
   final DateTime Function() clock;
 
   @override
@@ -60,15 +53,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 양도 목록 탭의 조회. 시작하고 버리는 조건은 [_data] 와 같다.
   Future<List<MyTrade>>? _trades;
 
-  /// 카드에서 시작한 흐름(더보기 · 가격 수정 · 등록 취소)이 도는 중.
-  ///
-  /// 시트도 다이얼로그도 **여는 데 한 프레임이 걸린다.** 그 사이 같은 버튼이
-  /// 한 번 더 눌리면 시트가 두 장 겹치고, 확인까지 두 번 받으면 취소 요청도
-  /// 두 번 나간다. 여기 셋이 이 화면에서 서버를 바꾸는 유일한 입구라
-  /// [_guard] 하나로 막는다.
-  ///
-  /// `setState` 를 부르지 않는다. 눌린 직후부터 시트·다이얼로그가 화면을 덮어
-  /// 버튼이 어차피 안 보이므로, 이 값 때문에 목록을 다시 그릴 이유가 없다.
+  /// 카드에서 시작한 흐름(더보기 · 가격 수정 · 등록 취소)이 도는 중. 시트도
+  /// 다이얼로그도 여는 데 한 프레임이 걸려, 그 사이 다시 눌리면 시트가 겹치고
+  /// 요청도 두 번 나가 [_guard] 로 막는다. 시트가 화면을 덮으므로 setState 는 안 한다.
   bool _acting = false;
 
   final _searchController = TextEditingController();
@@ -82,10 +69,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 양도 목록 탭의 개수용. [_loaded] 와 같은 이유로 한 벌 기억해 둔다.
   List<MyTrade>? _sales;
 
-  /// 마켓 운영 상태. 카드가 두 가지에 쓴다 — 열려 있는 동안은 가격을 못
-  /// 바꾸므로(서버 409) 가격 수정 버튼을 빼고, 아직 안 올라간 매물에는 노출
-  /// 대기 배지와 노출 시각을 붙인다. 못 받았으면 null 이라 버튼은 그대로 두고
-  /// 배지는 안 붙인다 — 최종 판정은 서버 몫이고, 거절되면 그 문구를 보여 준다.
+  /// 마켓 운영 상태. 열려 있는 동안은 가격을 못 바꾸므로(서버 409) 가격 수정
+  /// 버튼을 뺀다. 못 받았으면 null — 버튼은 두고 최종 판정은 서버에 맡긴다.
   MarketHours? _hours;
 
   /// 소장품 카탈로그를 받아 보는 중인 티켓([MyTicket.ticketId]). 그 카드의
@@ -93,10 +78,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 누른 쪽만 간다.
   int? _creatingFor;
 
-  /// 목록을 그리는 기준 시각. D-day 와 QR 창이 이 값을 본다.
-  ///
-  /// 카드마다 `DateTime.now()` 를 부르면 같은 목록 안에서 기준이 미세하게
-  /// 갈린다. 새로 고칠 때 함께 갱신한다.
+  /// 목록을 그리는 기준 시각. D-day 와 QR 창이 이 값을 본다. 카드마다
+  /// `DateTime.now()` 를 부르면 기준이 미세하게 갈려 새로 고칠 때 함께 갱신한다.
   late DateTime _now;
 
   /// 충전 화면과 같은 판단. 스코프가 없으면(스코프 없이 띄우는 테스트) 비로그인.
@@ -141,14 +124,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     return data;
   }
 
-  /// 내 거래 내역에서 판매만 남긴다. 구매(양도로 산 티켓)는 이 탭 것이 아니다 —
-  /// 시안이 그렇고, 산 티켓은 "내 티켓" 이라 예정 공연 탭이 맞다(지금 서버가
-  /// 못 주는 사정은 [MyTrade] 주석). 팔린 것·내린 것은 남긴다. 지우면 결과가
-  /// 안 보인다.
-  ///
-  /// 운영 상태도 함께 받는다. 카드가 가격 수정 버튼을 낼지가 이 값에 달려
-  /// 있어 목록과 같은 시점에 알아야 한다. 안내용 값이라 못 받아도 목록은 그대로
-  /// 보여 준다.
+  /// 내 거래 내역에서 판매만 남긴다. 양도로 산 티켓은 "내 티켓" 이라 예정 공연
+  /// 탭 몫이다. 팔린 것·내린 것은 결과가 보이게 남긴다. 운영 상태도 함께 받되
+  /// 안내용이라 못 받아도 목록은 그대로 보여 준다.
   Future<List<MyTrade>> _loadTrades() async {
     final api = ResaleApiScope.of(context);
     final trades = await api.fetchMyTrades();
@@ -181,10 +159,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     showInfoSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
   }
 
-  /// 카드에서 시작한 흐름을 한 번에 하나만 돌린다([_acting]).
-  ///
-  /// 흐름 안에서 서로를 부르는 것(더보기 → 등록 취소)은 이미 이 안이라 막히지
-  /// 않는다. 감싸는 자리는 카드의 버튼뿐이다.
+  /// 카드에서 시작한 흐름을 한 번에 하나만 돌린다([_acting]). 흐름 안에서 서로를
+  /// 부르는 것(더보기 → 등록 취소)은 이미 이 안이라 막히지 않는다.
   Future<void> _guard(Future<void> Function() action) async {
     if (_acting) return;
     _acting = true;
@@ -195,10 +171,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     }
   }
 
-  /// 카드 더보기(⋮). 고른 것이 있으면 그 흐름으로 이어간다.
-  ///
-  /// 매물은 시트를 열 때와 고른 뒤 **두 번** 찾는다. 시트가 열려 있는 동안
-  /// 목록이 다시 도착해 그새 팔렸을 수 있어, 눌린 시점의 값으로 보낸다.
+  /// 카드 더보기(⋮). 고른 것이 있으면 그 흐름으로 이어간다. 매물은 시트를 열 때와
+  /// 고른 뒤 두 번 찾는다 — 시트가 열린 사이 목록이 다시 와 그새 팔렸을 수 있다.
   Future<void> _openMore(MyTicket ticket) async {
     final action = await showTicketMoreSheet(
       context,
@@ -223,14 +197,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     }
   }
 
-  /// 이 티켓으로 올려 둔 매물. 없으면 null.
-  ///
-  /// 티켓 응답에 매물 번호가 없고 매물 응답에 티켓 번호가 없어([MyTrade] 주석)
-  /// **좌석으로 맞춘다** — 한 공연에 같은 좌석은 하나뿐이라 공연·구역·행·번호가
-  /// 같으면 같은 티켓이다. 서버가 한쪽에 번호를 실어 주면 이 함수가 사라진다.
-  ///
-  /// 올라가 있는 매물([MyTrade.isOnSale])만 본다. 같은 좌석을 내렸다 다시 올린
-  /// 이력이 여럿 있어도 지금 올라가 있는 것은 한 건이다.
+  /// 이 티켓으로 올려 둔 매물. 없으면 null. 티켓 응답에 매물 번호가 없고 매물
+  /// 응답에 티켓 번호가 없어 공연·구역·행·번호로 맞춘다. 지금 올라가 있는 매물
+  /// ([MyTrade.isOnSale])만 본다 — 내렸다 다시 올린 이력이 있어도 한 건이다.
   MyTrade? _listingFor(MyTicket ticket) {
     final sales = _sales;
     if (sales == null) return null;
@@ -246,16 +215,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     return null;
   }
 
-  /// 양도마켓의 등록 화면으로 간다. 등록하고 돌아왔으면 목록을 다시 받는다 —
-  /// 양도 목록 탭에 새 매물이 보여야 한다.
-  ///
-  /// 누른 티켓의 번호를 얹어 등록 화면이 그 티켓을 미리 골라 두게 한다. 어느
-  /// 티켓을 팔지 이미 정하고 누른 것이라 다시 고르게 하지 않는다. 등록이 받는
-  /// 번호는 예매 번호가 아니라 [MyTicket.ticketId] 다.
-  ///
-  /// 결과 타입을 `pushNamed<bool>` 로 못 박지 않는다. 라우트 등록부가 만드는
-  /// 라우트는 `Route<dynamic>` 이라 타입을 지정하면 실기기에서 캐스팅 예외로
-  /// 눌러도 아무 일이 안 일어난다(마켓 첫 화면과 같은 사정).
+  /// 양도마켓의 등록 화면으로 간다. 누른 티켓의 [MyTicket.ticketId] 를 얹어 미리
+  /// 골라 두게 하고, 등록하고 돌아왔으면 목록을 다시 받는다. 결과 타입을
+  /// `pushNamed<bool>` 로 못 박지 않는다 — `Route<dynamic>` 이라 실기기에서 캐스팅 예외가 난다.
   Future<void> _openRegister(MyTicket ticket) async {
     final registered = await Navigator.pushNamed(
       context,
@@ -318,14 +280,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     }
   }
 
-  /// 예매를 취소한다.
-  ///
-  /// 확인을 받고 서버에 보낸 뒤 목록을 **다시 받는다.** 카드 하나만 회색으로
-  /// 바꿔치기하면 화면이 서버와 어긋날 수 있다 — 취소가 성공해도 그 사이에
-  /// 다른 티켓이 달라졌을 수 있고, 실패했다면 아무것도 바뀌지 않아야 한다.
-  ///
-  /// 서버가 거절하면(예: 그새 24시간 안으로 들어옴) 그 문구를 그대로 띄운다.
-  /// 화면이 미리 걸러도 시점 차이로 통과할 수 있어 최종 판정은 서버 몫이다.
+  /// 예매를 취소한다. 확인을 받고 서버에 보낸 뒤 목록을 다시 받는다 — 카드 하나만
+  /// 회색으로 바꿔치기하면 서버와 어긋날 수 있다. 서버가 거절하면(그새 24시간
+  /// 안으로 들어옴 등) 그 문구를 그대로 띄운다. 최종 판정은 서버 몫이다.
   Future<void> _cancelReservation(MyTicket ticket) async {
     final confirmed = await showCancelReservationDialog(
       context,
@@ -343,19 +300,14 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       return;
     }
     if (!mounted) return;
-    // 성공 안내를 따로 띄우지 않는다. 목록을 다시 받으면 그 자리에 "예매를
-    // 취소했어요" 회색 카드가 남아 결과가 이미 보인다. 스낵바까지 띄우면 같은
-    // 말을 두 번 하면서 카드를 잠깐 가린다.
+    // 성공 안내는 따로 없다. 다시 받은 목록에 "예매를 취소했어요" 회색 카드가
+    // 남아 결과가 이미 보인다.
     _reload();
   }
 
-  /// 양도 등록을 취소한다(매물을 내린다). 예매 취소와 같은 흐름이다.
-  ///
-  /// 확인을 받고 서버에 보낸 뒤 목록을 **다시 받는다.** 카드 하나만 바꿔치기하지
-  /// 않는 이유도 같다 — 그 사이 팔렸을 수 있고, 실패했다면 아무것도 바뀌지
-  /// 않아야 한다. 서버가 거절하면(그새 팔렸거나 이미 내려감) 그 문구를 그대로
-  /// 띄운다. 성공 안내는 따로 없다. 다시 받은 목록에 "등록을 취소했어요" 회색
-  /// 카드가 남는다.
+  /// 양도 등록을 취소한다(매물을 내린다). 예매 취소와 같은 흐름이다 — 확인을
+  /// 받고 서버에 보낸 뒤 목록을 다시 받고, 거절되면 서버 문구를 그대로 띄운다.
+  /// 성공 안내는 따로 없다. 다시 받은 목록에 "등록을 취소했어요" 카드가 남는다.
   Future<void> _delist(MyTrade trade) async {
     final confirmed = await showDelistListingDialog(
       context,
@@ -378,13 +330,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   }
 
   /// 등록가를 바꾼다. 등록 취소와 같은 흐름이다 — 시트에서 새 값을 받고 서버에
-  /// 보낸 뒤 목록을 **다시 받는다.** 카드 한 장의 숫자만 바꿔치기하지 않는
-  /// 이유도 같다. 그 사이 팔렸을 수 있고, 실패했다면 아무것도 바뀌지 않아야
-  /// 한다.
-  ///
-  /// 상한은 등록 시점 정가([MyTrade.faceValue])다. 시트가 먼저 거르고, 서버도
-  /// 같은 자리에서 거절한다. 서버가 거절하면(그새 팔렸거나 내려감) 그 문구를
-  /// 그대로 띄운다.
+  /// 보낸 뒤 목록을 다시 받는다. 상한은 등록 시점 정가([MyTrade.faceValue])로
+  /// 시트가 먼저 거르고 서버도 같은 자리에서 거절한다.
   Future<void> _editPrice(MyTrade trade) async {
     final price = await showListingPriceSheet(
       context,
@@ -408,16 +355,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     _reload();
   }
 
-  /// 하단 바의 홈·마이페이지로 간다.
-  ///
-  /// 이 화면은 빠른 메뉴에서 얹힌 것이라 아래에 셸이 깔려 있다. 그런데
-  /// `popUntil` 로는 셸에 "어느 탭을 열지" 를 알릴 방법이 없어, 셸을 탭을 지정해
-  /// 새로 세운다. 홈은 앱의 뿌리라 그 위에 쌓인 것을 전부 걷어내는 게 맞다 —
-  /// 홈에서 뒤로 가기를 누르면 앱이 닫혀야지 티켓 목록으로 돌아가면 이상하다.
-  ///
-  /// 셸이 새로 만들어져 홈의 스크롤 위치는 초기화된다. 그걸 지키려면 탭 상태를
-  /// 앱 최상단의 컨트롤러로 올려야 하는데, 하단 바를 다는 화면이 아직 둘뿐이라
-  /// 그만한 장치를 두지 않았다. 세 번째가 생기면 그때 올린다.
+  /// 하단 바의 홈·마이페이지로 간다. 이 화면은 셸 위에 얹힌 것인데 `popUntil`
+  /// 로는 셸에 어느 탭을 열지 알릴 수 없어, 탭을 지정해 셸을 새로 세운다. 그래서
+  /// 홈의 스크롤 위치는 초기화된다.
   void _goToShellTab(int index) {
     Navigator.pushNamedAndRemoveUntil(
       context,
@@ -434,10 +374,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
     final trades = _trades;
 
     return Scaffold(
-      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 하단 바 위의 원형 버튼이
-      // 키보드 위로 따라 올라와 본문 한가운데에 떠 있게 된다(공연 검색 화면과
-      // 같은 사정). 대신 목록 아래 여백에 키보드 높이를 더해 마지막 카드까지
-      // 스크롤로 닿게 한다([_listPadding]).
+      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 원형 버튼이 키보드 위로
+      // 따라 올라온다. 대신 목록 아래 여백에 키보드 높이를 더한다([_listPadding]).
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text(TicketStrings.screenTitle),
@@ -465,17 +403,15 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         : [
                             loaded.upcoming(_now).length,
                             loaded.past(_now).length,
-                            // 판매중인 것만 센다. 팔렸거나 내린 매물은 "지금
-                            // 올라가 있는 매물" 이 아니다. 아직 안 도착했으면
-                            // 숫자 없이 이름만.
+                            // 판매중인 것만 센다. 팔렸거나 내린 매물은 "지금 올라가
+                            // 있는 매물" 이 아니다. 아직 안 도착했으면 이름만.
                             _sales?.where((trade) => trade.isOnSale).length,
                           ],
                     onSelected: (index) => setState(() => _tabIndex = index),
                   ),
                   Expanded(
-                    // 두 조회를 각각 기다린다. 둘 다 살려 두고 하나만 보이는
-                    // 이유는, 탭을 오갈 때마다 경계 위젯을 새로 세우면 이미
-                    // 받아 둔 결과인데도 뼈대 카드가 한 프레임 스치기 때문이다.
+                    // 두 조회를 각각 기다린다. 탭을 오갈 때마다 경계 위젯을 새로
+                    // 세우면 받아 둔 결과인데도 뼈대 카드가 한 프레임 스친다.
                     child: IndexedStack(
                       index: _tabIndex == _listingsTab ? 1 : 0,
                       sizing: StackFit.expand,
@@ -498,9 +434,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                 ],
               ),
       ),
-      // 시안에 하단 바가 그려져 있다. 이 화면은 셸 위에 얹힌 것이라 셸의 바가
-      // 가려지므로 여기서 한 벌 더 단다. 어느 탭도 고르지 않은 상태(-1)라
-      // 홈·마이페이지 둘 다 회색이다 — 시안도 그렇다.
+      // 셸 위에 얹힌 화면이라 셸의 하단 바가 가려져 여기서 한 벌 더 단다. 어느
+      // 탭도 고르지 않은 상태(-1)라 홈·마이페이지 둘 다 회색이다 — 시안도 그렇다.
       bottomNavigationBar: AppBottomNavBar(
         selectedIndex: -1,
         onTabSelected: _goToShellTab,
@@ -545,9 +480,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
             AppRoutes.showDetail,
             arguments: ticket.concertId,
           ),
-          // 취소가 안 되는 티켓·양도 등록 중인 티켓에도 더보기를 연다. 시트가
-          // 이유를 알려준다 — 버튼 자체를 지우면 왜 못 하는지 물어볼 자리가 없다.
-          // 발행 중·입장 완료·회수·환불은 할 수 있는 일이 없어 열지 않는다.
+          // 취소가 안 되는 티켓·양도 등록 중인 티켓에도 더보기를 열어 시트가
+          // 이유를 알려준다. 발행 중·입장 완료·회수·환불은 할 일이 없어 안 연다.
           onMore: ticket.isHeld ? () => _guard(() => _openMore(ticket)) : null,
         ),
       ),
@@ -612,8 +546,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
               TicketMetrics.horizontalPadding,
               0,
             ),
-            child: TicketSearchField(
+            child: AppSearchField(
               controller: _searchController,
+              hintText: TicketStrings.searchHint,
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
@@ -649,8 +584,6 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         .toList();
   }
 }
-
-/// 안내 스낵바와 하단 바(원형 버튼 포함) 사이 틈.
 
 /// 양도 목록 탭의 자리. [TicketTabBar.labels] 순서다.
 const _listingsTab = 2;

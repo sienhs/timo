@@ -8,23 +8,9 @@ import 'ticket_badge.dart';
 import 'ticket_card.dart';
 import 'ticket_card_header.dart';
 
-/// 양도 목록 카드. 내가 마켓에 올린 매물 하나다.
-///
-/// 시안대로 공연장 줄이 없다. 내가 올린 내 티켓이라 어디서 하는 공연인지는
-/// 이미 아는 정보고, 대신 등록가와 마감이 그 자리를 쓴다.
-///
-/// 아래쪽은 매물 상태가 정한다.
-///
-/// | 상태 | 배지 | 아래쪽 |
-/// | --- | --- | --- |
-/// | 판매중 | `판매중` | 등록가 · 마감, `가격 수정` + `등록 취소` |
-/// | 판매중(마켓 열림) | `판매중` | 등록가 · 마감, `등록 취소` 만 |
-/// | 팔림 | `판매 완료` | 등록가, "판매가 완료됐어요" 안내 |
-/// | 내림 | 없음(회색 카드) | 등록가, "등록을 취소했어요" 안내 |
-///
-/// 시안에는 판매중만 있다. 팔린 것과 내린 것도 서버가 같은 목록으로 주는데,
-/// 지우면 결과가 안 보인다 — 예매 취소한 티켓을 회색 카드로 남기는 것과 같은
-/// 판단이다.
+/// 양도 목록 카드. 내가 마켓에 올린 매물 하나다. 시안대로 공연장 줄이 없고 그
+/// 자리에 등록가와 마감이 온다. 아래쪽은 매물 상태가 정한다 — 판매중이면 `가격
+/// 수정`(마켓 열림 중엔 뺀다) + `등록 취소`, 팔렸거나 내렸으면 결과 안내만 남긴다.
 class ListingCard extends StatelessWidget {
   const ListingCard({
     super.key,
@@ -80,7 +66,9 @@ class ListingCard extends StatelessWidget {
 
   /// 내린 매물에는 배지를 안 붙인다. 회색 카드와 아래 안내가 이미 말해 준다.
   Widget? _badge() => switch (trade.status) {
-    MyTradeStatus.listed => const TicketBadge(label: TicketStrings.listingBadge),
+    MyTradeStatus.listed => const TicketBadge(
+      label: TicketStrings.listingBadge,
+    ),
     MyTradeStatus.sold => const TicketBadge(label: TicketStrings.soldBadge),
     _ => null,
   };

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../ticket/models/reservation_detail.dart';
 import '../constants.dart';
 
-/// 티켓 발행이 어디까지 갔는지 알리는 배지. 발행 중 · 완료 · 실패.
-///
-/// 시안에는 '발행 중' 하나만 있다. 나머지 둘은 같은 자리에 같은 모양으로,
-/// 색과 아이콘과 문구만 바꿔 그린다 — 결제 직후 화면에서 상태가 바뀌는 것이
-/// 눈에 들어오면서도 화면 구조는 시안 그대로다.
+/// 티켓 발행이 어디까지 갔는지 알리는 배지. 발행 중 · 완료 · 실패. 시안에는
+/// '발행 중' 하나만 있고, 나머지 둘은 같은 자리에 색·아이콘·문구만 바꿔 그린다.
 class IssueStatusBadge extends StatelessWidget {
   const IssueStatusBadge({super.key, required this.status});
 

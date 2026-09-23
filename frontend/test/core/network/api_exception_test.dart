@@ -2,11 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 
-/// 네트워크 실패 번역.
-///
-/// 서버 없이 검증할 수 있는 부분이라 지금 굳혀 둔다. 백엔드가 내려주는
-/// ProblemDetail 의 실제 모양(errorMessage, errors)을 그대로 재현해,
-/// 포맷이 바뀌면 이 테스트가 먼저 깨지게 한다.
+/// 네트워크 실패 번역. 백엔드 ProblemDetail 의 실제 모양(errorMessage, errors)을
+/// 그대로 재현해, 포맷이 바뀌면 이 테스트가 먼저 깨지게 한다.
 void main() {
   /// 서버가 에러 응답을 내려준 상황.
   DioException badResponse(Object? body, {int status = 400}) {

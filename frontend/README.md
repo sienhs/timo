@@ -11,18 +11,31 @@ flutter run -d chrome   # 웹으로 실행. 기기 목록은 flutter devices
 
 ```
 lib/
-├── main.dart                 # 앱 실행 진입점 (runApp만)
-├── app.dart                  # MaterialApp: 테마·라우트 연결
-├── core/
-│   └── theme/app_theme.dart  # 공통 테마 (색상 등 디자인 토큰)
+├── main.dart                 # 앱 실행 진입점. 기기 저장소·푸시·로그인 되살리기 뒤 runApp
+├── app.dart                  # MaterialApp: 테마·라우트·API 구현 선택·화면이 읽는 범위(Scope) 연결
+├── core/                     # 기능과 무관한 공통 모듈
+│   ├── network/              # dio 클라이언트, 인증 인터셉터, 서버 오류 형식
+│   ├── theme/                # 색·치수·테마
+│   ├── utils/                # 포매터 같은 순수 함수
+│   └── widgets/              # 여러 기능이 같이 쓰는 위젯 (검색창·버튼·스켈레톤·안내 상자 등)
 ├── routes/
 │   └── app_routes.dart       # 라우트 이름 상수 + 화면 등록부
-├── common/
-│   └── widgets/              # 여러 기능에서 같이 쓰는 공용 위젯
-└── features/                 # 기능 단위 폴더 (기능별로 담당자가 작업)
-    ├── splash/               # 앱 첫 화면(로딩). 끝나면 홈으로 넘어간다
-    └── home/
-        └── screens/home_screen.dart
+└── features/                 # 기능 단위 폴더. 안은 constants / data / models / screens / state / widgets
+    ├── splash/               # 로딩 화면
+    ├── auth/                 # 로그인·회원가입·세션
+    ├── home/                 # 홈·검색·공연 목록
+    ├── show/                 # 공연 상세
+    ├── booking/              # 구역·좌석 선택
+    ├── payment/              # 결제·발행 대기
+    ├── ticket/               # 내 티켓·입장 QR
+    ├── resale/               # 양도마켓
+    ├── favorite/             # 찜
+    ├── alarm/                # 예매 오픈·양도 알림 신청
+    ├── notification/         # 알림함·푸시
+    ├── mypage/               # 마이페이지·충전
+    ├── settings/             # 환경 설정
+    ├── shell/                # 하단 탭·빠른 메뉴
+    └── memory/               # 메모리 티켓(소장품)
 ```
 
 ## 새 기능 작업 방법
@@ -39,7 +52,7 @@ lib/
   - 클래스·enum: UpperCamelCase (`SeatSelectionScreen`)
   - 파일·폴더 이름: snake_case (`seat_selection_screen.dart`)
 - 색상·테마 값은 위젯에 하드코딩하지 말고 `AppTheme`/`Theme.of(context)`에서 가져온다.
-- 두 개 이상의 기능에서 쓰는 위젯만 `common/widgets/`로 올린다.
+- 두 개 이상의 기능에서 쓰는 위젯만 `core/widgets/`로 올린다.
 
 ## 서버 주소
 

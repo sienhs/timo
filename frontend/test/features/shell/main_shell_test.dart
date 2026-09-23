@@ -86,7 +86,7 @@ void main() {
       expect(find.text(item.label), findsWidgets, reason: item.label);
     }
     expect(find.byType(MushroomOutlineIcon), findsOneWidget);
-    // 시안 순서(입장QR → ... → 환경 설정)가 목록 순서다.
+    // 항목 순서(입장QR → ... → 환경 설정)를 굳힌다.
     expect(quickMenuItems.map((item) => item.label).toList(), [
       '입장QR',
       '마이 티켓',
@@ -138,9 +138,8 @@ void main() {
     expect(item.routeName, AppRoutes.settings);
   });
 
-  /// 한때 카테고리와 환경 설정은 화면이 없어 '준비 중' 안내만 띄웠다. 이제
-  /// 여덟 항목 모두 갈 곳이 있다. 항목을 새로 넣으면서 라우트를 빠뜨리면 눌러도
-  /// 안내만 뜨는 항목이 되므로 여기서 잡는다.
+  /// 항목을 새로 넣으면서 라우트를 빠뜨리면 눌러도 안내만 뜨는 항목이 되므로
+  /// 여기서 잡는다.
   test('빠른 메뉴 항목은 모두 등록된 화면으로 간다', () {
     for (final item in quickMenuItems) {
       expect(item.routeName, isNotNull, reason: item.label);

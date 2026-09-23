@@ -1,13 +1,10 @@
 import 'listing.dart';
 import 'wire_time.dart';
 
-/// 양도 등록 화면에서 고를 수 있는 내 티켓 한 장.
-///
-/// **이 목록만 주는 서버 주소는 없다.** 마켓 API 에는 등록(`POST /listings`)
-/// 만 있고 "내가 등록할 수 있는 티켓" 을 주는 경로가 없어, [HttpResaleApi] 는
-/// 내 티켓 목록(`GET /api/v1/tickets/me`)에서 팔 수 있는 것만 골라 만든다.
-/// 등록 요청이 받는 [ticketId] 는 그 응답의 `ticketId` 다 — 예매 번호
-/// (`reservationId`)와는 **다른 값**이라 바꿔 넣으면 서버가 거절한다.
+/// 양도 등록 화면에서 고를 수 있는 내 티켓 한 장. 이 목록만 주는 서버 주소는
+/// 없어 [HttpResaleApi] 가 내 티켓 목록(`GET /api/v1/tickets/me`)에서 골라
+/// 만든다. 등록 요청이 받는 [ticketId] 는 그 응답의 `ticketId` 다 — 예매 번호
+/// (`reservationId`)와 다른 값이라 바꿔 넣으면 서버가 거절한다.
 class ListableTicket {
   const ListableTicket({
     required this.ticketId,

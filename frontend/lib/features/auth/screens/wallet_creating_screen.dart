@@ -10,17 +10,8 @@ import '../../../routes/app_routes.dart';
 import '../constants.dart';
 
 /// 가입 직후 지갑을 준비하는 동안 보여주는 화면. 영상이 끝나면 완료 화면으로
-/// 저절로 넘어간다.
-///
-/// 지갑은 서버가 가입 요청 안에서 만든다(백엔드 `SignupService`). 그러니 이
-/// 화면이 기다리는 대상은 지갑 생성 자체가 아니라 **연출**이다. 가입 버튼을
-/// 누르자마자 완료 화면이 튀어나오면 계정과 지갑이 생겼다는 사실이 그냥 지나가
-/// 버려서, 한 박자를 두어 무슨 일이 있었는지 보여준다.
-///
-/// 영상이 안 뜨는 상황을 두 가지로 나눠 막는다. 읽지 못하면 마스코트로 대신
-/// 그리고 짧게 넘어가고([AuthMetrics.walletCeremonyFallback]), 재생이 끝을
-/// 알리지 못하면 [AuthMetrics.walletCeremonyMaxWait] 뒤에 넘어간다. 어느 쪽이든
-/// 이 화면에 갇히지 않는다.
+/// 저절로 넘어간다. 지갑은 서버가 가입 요청 안에서 만들므로 기다리는 것은
+/// 연출뿐이다. 영상을 못 읽거나 끝을 알리지 못해도 타이머로 넘어가 갇히지 않는다.
 class WalletCreatingScreen extends StatefulWidget {
   const WalletCreatingScreen({super.key});
 
@@ -156,14 +147,9 @@ class _WalletCreatingScreenState extends State<WalletCreatingScreen> {
   }
 }
 
-/// 영상 자리. 준비되기 전과 못 읽었을 때는 마스코트로 같은 자리를 채운다.
-///
-/// 빈 칸을 두지 않는 이유는 높이 때문이다. 영상이 늦게 뜨면 아래 문구가 밀려
-/// 내려가 화면이 한 번 출렁인다.
-///
-/// 테두리도 배경도 두르지 않는다. 자산의 배경을 페이지와 같은 흰색으로 눌러
-/// 두어서(`docs/video-assets.md` 참고) 너구리가 화면 위에 바로 놓인 것처럼
-/// 보인다. 여기에 카드나 모서리를 주면 그 카드가 대신 떠 보인다.
+/// 영상 자리. 준비 전과 못 읽었을 때는 마스코트로 같은 자리를 채워 아래 문구가
+/// 출렁이지 않게 한다. 자산 배경이 페이지와 같은 흰색이라 테두리도 배경도
+/// 두르지 않는다(`docs/video-assets.md`).
 class _Clip extends StatelessWidget {
   const _Clip({required this.controller});
 

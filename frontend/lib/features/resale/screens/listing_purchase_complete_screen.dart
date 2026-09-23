@@ -10,19 +10,9 @@ import '../widgets/resale_summary_card.dart';
 import '../widgets/trade_detail_card.dart';
 import '../widgets/transfer_status_badge.dart';
 
-/// 양도 결제 완료 화면. 결제 결과와 양도 상태를 보여 준다.
-///
-/// **결제가 끝났다면 양도도 끝나 있다.** 코인 전송과 소유권 이전이 체결 응답
-/// 전에 동기로 끝나므로(서버 `PurchaseService`), 200 을 받았다는 것 자체가
-/// 양도까지 끝났다는 뜻이고 상태는 언제나 `CONFIRMED` 다.
-///
-/// 그래서 이 화면은 아무것도 묻지 않는다. 예전에는 체결 응답이 `PENDING`(202)
-/// 으로 와서 같은 체결 번호로 상태를 되풀이해 물었는데, 서버가 동기 처리로
-/// 바뀌면서 물어볼 것이 없어졌다.
-///
-/// 그래도 배지와 문구는 [PurchasedTrade.status] 를 그대로 읽는다. 값을 안 보고
-/// '완료' 를 박으면, 서버가 언젠가 다른 상태를 주기 시작했을 때 화면이 모르는
-/// 채로 거짓말을 한다.
+/// 양도 결제 완료 화면. 결제가 끝났다면 양도도 끝나 있어(응답 상태는 언제나
+/// `CONFIRMED`) 아무것도 묻지 않는다. 그래도 배지와 문구는 [PurchasedTrade.status]
+/// 를 그대로 읽는다 — 서버가 다른 상태를 주기 시작해도 화면이 거짓말하지 않게.
 class ListingPurchaseCompleteScreen extends StatelessWidget {
   const ListingPurchaseCompleteScreen({super.key, required this.result});
 
@@ -90,9 +80,8 @@ class ListingPurchaseCompleteScreen extends StatelessWidget {
             ResaleBottomBar(
               child: Column(
                 children: [
-                  // 양도가 끝나지 않은 상태로 올 일은 없지만, 그때도 티켓
-                  // 화면으로는 갈 수 있다. 다만 가장 중요한 행동은 아니므로
-                  // 끝난 뒤에만 꽉 찬 버튼이다.
+                  // 양도가 끝나지 않은 상태로 올 일은 없지만 그때도 티켓
+                  // 화면으로는 갈 수 있다. 끝난 뒤에만 꽉 찬 버튼이다.
                   ResaleActionButton(
                     label: ResaleStrings.viewTicketLabel,
                     onPressed: () => _openMyTickets(context),

@@ -6,9 +6,7 @@ import '../constants.dart';
 import '../models/favorite_show.dart';
 
 /// 찜한 공연 한 장. 왼쪽 포스터, 오른쪽에 제목·일시·공연장, 귀퉁이에 하트.
-///
-/// 판매가 끝난 공연은 아래에 `판매 종료` 뱃지가 붙는다. 데이터 출처는 모른다 —
-/// [FavoriteShow] 하나와 콜백 둘만 받는다.
+/// 판매가 끝난 공연은 아래에 `판매 종료` 뱃지가 붙는다.
 class FavoriteShowCard extends StatelessWidget {
   const FavoriteShowCard({
     super.key,

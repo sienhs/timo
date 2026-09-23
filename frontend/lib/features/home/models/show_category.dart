@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// 카테고리 화면의 장르 한 칸.
-///
-/// 이름과 순서는 서버의 공연 장르(`ConcertGenre`)를 따른다. [isAvailable] 은
-/// 그 장르의 공연이 실제로 있는지다 — MVP 는 콘서트만 다루므로 콘서트만
-/// 참이다. 서버가 장르별 공연 수를 주게 되면 이 값을 서버에서 받는 것으로
-/// 바꾼다.
+/// 카테고리 화면의 장르 한 칸. 이름과 순서는 서버의 공연 장르(`ConcertGenre`)를
+/// 따른다. [isAvailable] 은 그 장르의 공연이 실제로 있는지다 — MVP 는 콘서트만
+/// 다루므로 콘서트만 참이다.
 @immutable
 class ShowCategory {
   const ShowCategory({
