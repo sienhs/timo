@@ -242,6 +242,10 @@ class HomeMetrics {
   /// 검색 결과 카드 포스터의 위아래 여백. 배너와 같다.
   static const searchCardPosterInset = bannerPosterInset;
   static const searchCardGap = 12.0;
+
+  /// 목록 카드 왼쪽 위 뱃지의 여백. 오른쪽 위 하트([favoriteButtonInset] +
+  /// 버튼 안쪽 여백)와 눈높이를 맞춘다.
+  static const searchCardBadgeInset = 12.0;
   static const favoriteIconSize = 24.0;
   static const favoriteButtonInset = 4.0;
 

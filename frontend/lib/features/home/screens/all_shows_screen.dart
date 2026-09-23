@@ -7,6 +7,7 @@ import '../../../routes/app_routes.dart';
 import '../constants.dart';
 import '../models/show_summary.dart';
 import '../state/home_api_scope.dart';
+import '../widgets/show_card_badges.dart';
 import '../widgets/show_list_app_bar.dart';
 import '../widgets/show_list_skeleton.dart';
 import '../widgets/show_list_view.dart';
@@ -74,6 +75,9 @@ class _AllShowsScreenState extends State<AllShowsScreen> {
                 selectedIndex: _selectedTab,
                 onSelected: (index) => setState(() => _selectedTab = index),
               ),
+              // 두 탭 모두 단다. `모두 보기` 에는 끝난 공연이 섞이고, `예매
+              // 가능` 에도 오픈 전과 예매중이 섞여 카드만 보고는 구분이 안 된다.
+              badgeBuilder: (show) => BookingStatusBadge(show: show),
               onShowPressed: (show) => Navigator.pushNamed(
                 context,
                 AppRoutes.showDetail,

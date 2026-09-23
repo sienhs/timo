@@ -16,6 +16,8 @@ import '../models/show_summary.dart';
 /// [onFavoritePressed] 를 주면 오른쪽 위에 하트가 붙는다. 찜한 공연([isFavorite])은
 /// 하트가 초록으로 채워진다 — 흰 빈 하트와 채운 초록 하트가 앱 공통의 찜
 /// 표시다. 상태는 화면이 알고 카드는 받은 대로 그린다.
+///
+/// [badge] 를 주면 왼쪽 위에 얹는다. 하트와 부딪히지 않게 반대편이다.
 class ShowBannerCard extends StatelessWidget {
   const ShowBannerCard({
     super.key,
@@ -23,17 +25,20 @@ class ShowBannerCard extends StatelessWidget {
     required this.onPressed,
     this.onFavoritePressed,
     this.isFavorite = false,
+    this.badge,
   });
 
   final ShowSummary show;
   final VoidCallback onPressed;
   final VoidCallback? onFavoritePressed;
   final bool isFavorite;
+  final Widget? badge;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final onFavorite = onFavoritePressed;
+    final overlay = badge;
     return GestureDetector(
       onTap: onPressed,
       child: PosterStage(
@@ -79,6 +84,12 @@ class ShowBannerCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (overlay != null)
+              Positioned(
+                top: HomeMetrics.searchCardBadgeInset,
+                left: HomeMetrics.searchCardBadgeInset,
+                child: overlay,
+              ),
             if (onFavorite != null)
               Positioned(
                 top: HomeMetrics.favoriteButtonInset,

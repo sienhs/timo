@@ -27,6 +27,7 @@ import '../widgets/related_artist_row.dart';
 import '../widgets/search_field.dart';
 import '../widgets/search_top_bar.dart';
 import '../widgets/show_banner_card.dart';
+import '../widgets/show_card_badges.dart';
 import '../widgets/show_card_list_skeleton.dart';
 import '../widgets/trending_keyword_list.dart';
 import '../widgets/trending_keyword_skeleton.dart';
@@ -482,6 +483,8 @@ class _ResultSection extends StatelessWidget {
                 child: ShowBannerCard(
                   show: show,
                   isFavorite: favoriteShowIds.contains(show.id),
+                  // 섹션 제목이 "오픈 예정 / 예매중" 이라 둘이 한데 섞인다.
+                  badge: BookingStatusBadge(show: show),
                   onPressed: () => onShowPressed(show),
                   onFavoritePressed: () => onFavoritePressed(show),
                 ),
