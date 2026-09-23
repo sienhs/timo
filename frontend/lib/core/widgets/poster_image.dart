@@ -15,6 +15,7 @@ class PosterImage extends StatelessWidget {
     this.borderRadius = 0,
     this.decodeWidth,
     this.fit = BoxFit.cover,
+    this.fallback,
   }) : _image = AssetImage(assetPath);
 
   /// 서버가 준 주소의 이미지. 주소가 없으면(포스터 없는 공연) 바로 회색 자리를
@@ -26,6 +27,7 @@ class PosterImage extends StatelessWidget {
     this.borderRadius = 0,
     this.decodeWidth,
     this.fit = BoxFit.cover,
+    this.fallback,
   }) : _image = _networkImageOrNull(url);
 
   /// 서버 주소를 붙여 [NetworkImage] 를 만든다. 붙일 주소가 없으면 null 이라
@@ -47,14 +49,19 @@ class PosterImage extends StatelessWidget {
   /// 두고 남는 자리를 따로 메우는 자리에서만 [BoxFit.contain] 을 넘긴다.
   final BoxFit fit;
 
+  /// 그림이 없거나 못 읽었을 때 회색 자리 대신 그릴 위젯. 아티스트 사진처럼
+  /// '없음' 을 사진 아이콘이 아닌 다른 얼굴로 보여야 하는 자리가 넘긴다.
+  final Widget? fallback;
+
   @override
   Widget build(BuildContext context) {
     final image = _image;
     final width = decodeWidth;
+    final Widget missing = fallback ?? const _Placeholder();
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: image == null
-          ? const _Placeholder()
+          ? missing
           : Image(
               image: ResizeImage.resizeIfNeeded(
                 width == null
@@ -70,7 +77,7 @@ class PosterImage extends StatelessWidget {
                   wasSynchronouslyLoaded || frame != null
                   ? child
                   : const _LoadingBox(),
-              errorBuilder: (_, _, _) => const _Placeholder(),
+              errorBuilder: (_, _, _) => missing,
             ),
     );
   }

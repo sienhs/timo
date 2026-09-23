@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/poster_image.dart';
+import '../../../core/widgets/artist_photo.dart';
 import '../constants.dart';
 import '../models/favorite_artist.dart';
 
@@ -44,7 +44,10 @@ class FavoriteArtistTile extends StatelessWidget {
                 ClipOval(
                   child: SizedBox.square(
                     dimension: FavoriteMetrics.artistAvatarSize,
-                    child: _ArtistFace(artist: artist),
+                    child: ArtistPhoto(
+                      url: artist.profileImageUrl,
+                      size: FavoriteMetrics.artistAvatarSize,
+                    ),
                   ),
                 ),
                 const SizedBox(width: FavoriteMetrics.artistAvatarGap),
@@ -79,36 +82,6 @@ class FavoriteArtistTile extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 프로필 사진. 사진이 없는 아티스트는 이름 첫 글자로 대신한다. 홈의
-/// `ArtistFace` 와 같은 규칙이되 저쪽은 홈 모델을 받아서 따로 둔다.
-class _ArtistFace extends StatelessWidget {
-  const _ArtistFace({required this.artist});
-
-  final FavoriteArtist artist;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = artist.profileImageUrl;
-    if (photo != null) {
-      return PosterImage.network(
-        url: photo,
-        decodeWidth: FavoriteMetrics.artistAvatarSize,
-      );
-    }
-    return ColoredBox(
-      color: AppColors.surfaceMuted,
-      child: Center(
-        child: Text(
-          artist.name.characters.first,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
         ),
       ),
     );

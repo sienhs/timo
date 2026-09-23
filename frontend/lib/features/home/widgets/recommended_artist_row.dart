@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants.dart';
 import '../models/artist_summary.dart';
+import '../../../core/widgets/artist_photo.dart';
 import 'artist_avatar_cell.dart';
 
 /// 추천 검색어. 아티스트 원형 아바타 한 줄이고, 누르면 그 이름으로 검색한다.
@@ -35,7 +36,10 @@ class RecommendedArtistRow extends StatelessWidget {
                     label: artist.name,
                     semanticLabel: HomeStrings.searchFor(artist.name),
                     onPressed: () => onArtistPressed(artist),
-                    child: ArtistFace(artist: artist),
+                    child: ArtistPhoto(
+                      url: artist.profileImageUrl,
+                      size: HomeMetrics.artistAvatarSize,
+                    ),
                   ),
                 ),
             ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/artist_summary.dart';
+import '../../../core/widgets/artist_photo.dart';
 import 'artist_avatar_cell.dart';
 
 /// 검색 결과의 관련 아티스트. 하트가 붙은 원형 아바타를 가로로 늘어놓는다.
@@ -44,7 +45,10 @@ class RelatedArtistRow extends StatelessWidget {
                   isFavorite: favoriteNames.contains(artist.name),
                   onPressed: () => onFavoritePressed(artist),
                 ),
-                child: ArtistFace(artist: artist),
+                child: ArtistPhoto(
+                  url: artist.profileImageUrl,
+                  size: HomeMetrics.artistAvatarSize,
+                ),
               ),
             ),
         ],

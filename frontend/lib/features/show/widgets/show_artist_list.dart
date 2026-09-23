@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/poster_image.dart';
+import '../../../core/widgets/artist_photo.dart';
 import '../constants.dart';
 import '../models/show_artist.dart';
 
@@ -37,7 +37,10 @@ class _ArtistCell extends StatelessWidget {
             child: SizedBox(
               width: ShowDetailMetrics.artistAvatarSize,
               height: ShowDetailMetrics.artistAvatarSize,
-              child: _ArtistFace(artist: artist),
+              child: ArtistPhoto(
+                url: artist.photoUrl,
+                size: ShowDetailMetrics.artistAvatarSize,
+              ),
             ),
           ),
           const SizedBox(height: ShowDetailMetrics.artistNameGap),
@@ -51,35 +54,6 @@ class _ArtistCell extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// 프로필 사진. 사진이 없는 아티스트는 이름 첫 글자로 대신한다.
-class _ArtistFace extends StatelessWidget {
-  const _ArtistFace({required this.artist});
-
-  final ShowArtist artist;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = artist.photoUrl;
-    if (photo != null) {
-      return PosterImage.network(
-        url: photo,
-        decodeWidth: ShowDetailMetrics.artistAvatarSize,
-      );
-    }
-    return ColoredBox(
-      color: AppColors.surfaceMuted,
-      child: Center(
-        child: Text(
-          artist.name.characters.first,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
-        ),
       ),
     );
   }

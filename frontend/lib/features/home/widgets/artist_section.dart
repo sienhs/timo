@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants.dart';
 import '../models/artist_summary.dart';
+import '../../../core/widgets/artist_photo.dart';
 import 'artist_avatar_cell.dart';
 
 /// 인기 아티스트 4×2 격자. 받은 만큼만 그리고 '더보기' 칸은 없다. 칸을 누르면
@@ -36,7 +37,10 @@ class ArtistSection extends StatelessWidget {
                     label: artist.name,
                     semanticLabel: HomeStrings.searchFor(artist.name),
                     onPressed: () => onArtistPressed(artist),
-                    child: ArtistFace(artist: artist),
+                    child: ArtistPhoto(
+                      url: artist.profileImageUrl,
+                      size: HomeMetrics.artistAvatarSize,
+                    ),
                   ),
                 ),
             ],

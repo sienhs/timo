@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/poster_image.dart';
 import '../constants.dart';
-import '../models/artist_summary.dart';
 
 /// 원형 이미지 + 아래 이름. 홈의 인기 아티스트 격자와 검색 화면의 추천 검색어·
 /// 관련 아티스트가 같은 칸을 쓴다. 이미지 부분만 [child] 로 갈아끼우고, [badge]
@@ -72,35 +70,6 @@ class ArtistAvatarCell extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 프로필 사진. 사진이 없는 아티스트는 이름 첫 글자로 대신한다.
-class ArtistFace extends StatelessWidget {
-  const ArtistFace({super.key, required this.artist});
-
-  final ArtistSummary artist;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = artist.profileImageUrl;
-    if (photo != null) {
-      return PosterImage.network(
-        url: photo,
-        decodeWidth: HomeMetrics.artistAvatarSize,
-      );
-    }
-    return ColoredBox(
-      color: AppColors.surfaceMuted,
-      child: Center(
-        child: Text(
-          artist.name.characters.first,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
         ),
       ),
     );

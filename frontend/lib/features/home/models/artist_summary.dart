@@ -11,6 +11,6 @@ class ArtistSummary {
 
   final String name;
 
-  /// 프로필 사진 주소. 없으면 이름 첫 글자로 대체한다.
+  /// 프로필 사진 주소. 없으면 마스코트 얼굴로 대체한다.
   final String? profileImageUrl;
 }
