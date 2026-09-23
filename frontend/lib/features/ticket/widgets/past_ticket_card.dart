@@ -16,10 +16,15 @@ class PastTicketCard extends StatelessWidget {
     super.key,
     required this.ticket,
     required this.onCreateCollectible,
+    this.creating = false,
   });
 
   final MyTicket ticket;
   final VoidCallback onCreateCollectible;
+
+  /// 소장품 제작 화면으로 갈 수 있는지 알아보는 중. 카탈로그를 받아 봐야
+  /// 알 수 있어([MyTicket] 에는 입장 여부가 없다) 버튼에 잠깐 머문다.
+  final bool creating;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +49,7 @@ class PastTicketCard extends StatelessWidget {
           TicketCardButton(
             label: TicketStrings.createCollectible,
             onPressed: onCreateCollectible,
+            isBusy: creating,
           ),
         ],
       ),

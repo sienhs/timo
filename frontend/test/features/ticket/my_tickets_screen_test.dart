@@ -6,6 +6,10 @@ import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
 import 'package:timo/features/auth/state/auth_session_scope.dart';
+import 'package:timo/features/memory/data/memory_concert_api.dart';
+import 'package:timo/features/memory/models/concert_kit.dart';
+import 'package:timo/features/memory/models/memory_concert.dart';
+import 'package:timo/features/memory/screens/creator_screen.dart';
 import 'package:timo/features/resale/constants.dart';
 import 'package:timo/features/resale/data/mock_resale_api.dart';
 import 'package:timo/features/resale/data/resale_api.dart';
@@ -25,6 +29,9 @@ import 'package:timo/features/ticket/widgets/ticket_list_skeleton.dart';
 import 'package:timo/features/ticket/widgets/ticket_tab_bar.dart';
 import 'package:timo/features/ticket/widgets/upcoming_ticket_card.dart';
 
+import 'package:timo/routes/app_routes.dart';
+
+import '../memory/memory_scopes.dart';
 import 'spy_resale_api.dart';
 
 void main() {
@@ -56,32 +63,51 @@ void main() {
     ResaleApi? resaleApi,
     ResaleMockScenario resaleScenario = ResaleMockScenario.design,
     bool loggedIn = true,
+    MemoryConcertApi? concertApi,
   }) async {
     final session = AuthSession(storage: InMemoryTokenStorage());
     if (loggedIn) await session.signIn(MockAuthApi.tokens);
     addTearDown(session.dispose);
     await tester.pumpWidget(
-      AuthSessionScope(
-        session: session,
-        child: TicketApiScope(
-          api:
-              api ??
-              MockTicketApi(
-                latency: Duration.zero,
-                scenario: scenario,
-                clock: now,
-              ),
-          child: ResaleApiScope(
+      withMemoryScopes(
+        AuthSessionScope(
+          session: session,
+          child: TicketApiScope(
             api:
-                resaleApi ??
-                MockResaleApi(
+                api ??
+                MockTicketApi(
                   latency: Duration.zero,
-                  scenario: resaleScenario,
+                  scenario: scenario,
                   clock: now,
                 ),
-            child: MaterialApp(home: MyTicketsScreen(clock: now)),
+            child: ResaleApiScope(
+              api:
+                  resaleApi ??
+                  MockResaleApi(
+                    latency: Duration.zero,
+                    scenario: resaleScenario,
+                    clock: now,
+                  ),
+              child: MaterialApp(
+                home: MyTicketsScreen(clock: now),
+                // 소장품이 이미 있는 티켓은 컬렉션으로 보낸다. 그 화면까지
+                // 띄울 일은 없으니 도착지만 세워 둔다.
+                routes: {
+                  AppRoutes.collection: (_) =>
+                      const Scaffold(body: Text('컬렉션')),
+                  // 공연 상세는 공연 번호를 받는다. 그 화면까지 띄울 일은
+                  // 없으니 받은 번호만 찍어 둔다.
+                  AppRoutes.showDetail: (context) => Scaffold(
+                    body: Text(
+                      '공연 ${ModalRoute.of(context)!.settings.arguments}',
+                    ),
+                  ),
+                },
+              ),
+            ),
           ),
         ),
+        concertApi: concertApi,
       ),
     );
   }
@@ -265,6 +291,17 @@ void main() {
       expect(find.text(TicketStrings.qrOpensBeforeShow), findsOneWidget);
     });
 
+    // 티켓 번호가 아니라 공연 번호로 간다. 버튼이 붙는 카드(아이유 콘서트)는
+    // 티켓 102 · 공연 12 라, 둘을 바꿔 쓰면 없는 공연을 열게 된다.
+    testWidgets('상세정보를 누르면 그 공연의 상세 화면으로 간다', (tester) async {
+      await pumpScreen(tester);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(TicketStrings.showDetail));
+      await tester.pumpAndSettle();
+      expect(find.text('공연 12'), findsOneWidget);
+    });
+
     testWidgets('D-day 배지가 남은 날만큼 찍힌다', (tester) async {
       await pumpScreen(tester);
       await tester.pumpAndSettle();
@@ -272,6 +309,87 @@ void main() {
       // 목의 두 티켓은 각각 오늘과 9일 뒤다.
       expect(find.text('D-DAY'), findsOneWidget);
       expect(find.text('D-9'), findsOneWidget);
+    });
+  });
+
+  group('지난 카드의 공연 추억 만들기', () {
+    /// 소장품 카탈로그 목. 목 지난 공연 두 장(104 · 105)에 맞춰 준다 —
+    /// 104 는 아직 안 만든 티켓, 105 는 이미 만든 티켓이다.
+    ///
+    /// [ticketIds] 를 비우면 카탈로그에 아무것도 없다 = 입장 기록이 없는
+    /// 티켓만 남은 경우다.
+    MemoryConcertApi catalog({
+      List<String> ticketIds = const ['104'],
+      String? goodsFor,
+    }) => _FakeConcertApi([
+      for (final id in ticketIds)
+        MemoryConcert(
+          ticketId: id,
+          id: 'concert-$id',
+          title: '공연 $id',
+          artist: 'TIMO',
+          date: '2025.03.01',
+          venue: '메모리 홀',
+          poster: 'assets/demo/stage_blue.png',
+          videoUrl: '',
+          goodsId: id == goodsFor ? 'goods-$id' : null,
+        ),
+    ]);
+
+    /// 지난 탭을 열고 [index] 번째 카드의 버튼을 누른다.
+    Future<void> tapCreate(WidgetTester tester, {int index = 0}) async {
+      await tester.tap(find.text('${TicketStrings.tabPast} 2'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PastTicketCard).at(index),
+          matching: find.text(TicketStrings.createCollectible),
+        ),
+      );
+    }
+
+    testWidgets('카탈로그에 있으면 그 공연의 제작 화면으로 간다', (tester) async {
+      await pumpScreen(tester, concertApi: catalog());
+      await tester.pumpAndSettle();
+
+      await tapCreate(tester);
+      // 제작 화면은 앰비언트 모션이 계속 돌아 pumpAndSettle 이 끝나지 않는다.
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+
+      final creator = tester.widget<CreatorScreen>(find.byType(CreatorScreen));
+      // 누른 티켓의 공연을 들고 간다 — 제작 화면이 공연 고르는 단계를 건너뛴다.
+      expect(creator.initialConcert?.ticketId, '104');
+    });
+
+    testWidgets('이미 만든 소장품이면 컬렉션으로 보낸다', (tester) async {
+      await pumpScreen(
+        tester,
+        concertApi: catalog(ticketIds: const ['104', '105'], goodsFor: '105'),
+      );
+      await tester.pumpAndSettle();
+
+      // 목의 지난 공연은 최근 순이 아니라 목록 순이다. 두 번째가 105 다.
+      await tapCreate(tester, index: 1);
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.collectibleAlready), findsOneWidget);
+      expect(find.text('컬렉션'), findsOneWidget);
+      expect(find.byType(CreatorScreen), findsNothing);
+    });
+
+    // 지난 공연 탭은 날짜로만 가른다. 표를 사고 안 간 공연도 여기 서 있는데,
+    // 소장품은 입장을 마친 티켓으로만 만들어진다.
+    testWidgets('입장 기록이 없으면 이유를 알리고 그대로 있는다', (tester) async {
+      await pumpScreen(tester, concertApi: catalog(ticketIds: const []));
+      await tester.pumpAndSettle();
+
+      await tapCreate(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text(TicketStrings.collectibleNotEntered), findsOneWidget);
+      expect(find.byType(CreatorScreen), findsNothing);
     });
   });
 
@@ -548,4 +666,17 @@ class _ManyTicketsApi implements TicketApi {
   @override
   Future<EntryPass> issueEntryPass(int ticketId) =>
       _base.issueEntryPass(ticketId);
+}
+
+/// 카탈로그만 흉내 내는 목. 소재([getKit])는 쓰지 않으므로 데모를 준다.
+class _FakeConcertApi implements MemoryConcertApi {
+  _FakeConcertApi(this.concerts);
+
+  final List<MemoryConcert> concerts;
+
+  @override
+  Future<List<MemoryConcert>> getConcerts() async => concerts;
+
+  @override
+  Future<ConcertKit> getKit(String concertId) async => ConcertKit.demo;
 }

@@ -45,6 +45,9 @@ class UpcomingTicketCard extends StatelessWidget {
   final DateTime now;
 
   final VoidCallback onEnterQr;
+
+  /// 이 티켓의 공연 상세로 간다. QR 이 아직 안 열린 카드에만 붙는다 — 열린
+  /// 카드에서는 입장이 할 일이라 그 자리를 QR 이 가져간다.
   final VoidCallback onShowDetail;
 
   /// 더보기(⋮). 양도 등록과 예매 취소가 들어간다. null 이면 안 그린다.

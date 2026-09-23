@@ -7,6 +7,9 @@ import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/constants.dart';
 import '../../auth/state/auth_session_scope.dart';
+import '../../memory/screens/creator_screen.dart';
+import '../../memory/screens/memory_page_route.dart';
+import '../../memory/state/memory_concert_api_scope.dart';
 import '../../resale/models/market_hours.dart';
 import '../../resale/models/my_trade.dart';
 import '../../resale/state/resale_api_scope.dart';
@@ -84,6 +87,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   /// 대기 배지와 노출 시각을 붙인다. 못 받았으면 null 이라 버튼은 그대로 두고
   /// 배지는 안 붙인다 — 최종 판정은 서버 몫이고, 거절되면 그 문구를 보여 준다.
   MarketHours? _hours;
+
+  /// 소장품 카탈로그를 받아 보는 중인 티켓([MyTicket.ticketId]). 그 카드의
+  /// 버튼에만 동그라미가 돈다. 한 번에 하나다 — 두 장을 동시에 눌러도 먼저
+  /// 누른 쪽만 간다.
+  int? _creatingFor;
 
   /// 목록을 그리는 기준 시각. D-day 와 QR 창이 이 값을 본다.
   ///
@@ -255,6 +263,59 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       arguments: ticket.ticketId,
     );
     if (registered == true && mounted) _reload();
+  }
+
+  /// 지난 공연 카드의 '공연 추억 만들기'. 그 티켓의 소장품 제작 화면을 연다.
+  ///
+  /// 제작 화면은 공연 하나를 받아야 공연 고르는 단계를 건너뛴다. 카드가 든
+  /// 것은 티켓 정보뿐이라 소장품 카탈로그에서 같은 티켓 번호의 줄을 찾아
+  /// 넘긴다. 카탈로그를 여기서 미리 받아 두지 않는 이유는 지난 공연 탭을 여는
+  /// 사람 대부분이 이 버튼을 누르지 않아서다 — 누른 사람만 기다린다.
+  ///
+  /// 카탈로그가 답을 셋으로 가른다.
+  ///
+  /// | 카탈로그 | 가는 곳 |
+  /// | --- | --- |
+  /// | 그 티켓이 있고 소장품은 없음 | 그 공연 제작 화면 |
+  /// | 소장품이 이미 있음 | 컬렉션 (한 티켓에 소장품은 하나다) |
+  /// | 그 티켓이 없음 | 안내 한 줄 — 입장을 마친 티켓만 카탈로그에 든다 |
+  ///
+  /// 기기에 만들다 만 임시본이 있으면 제작 화면이 덮어쓴다. 컬렉션 화면도
+  /// 같은 규칙이라 여기서 따로 막지 않는다.
+  ///
+  /// 두 번 눌리는 것은 [_guard] 가 아니라 [_creatingFor] 가 막는다. 그 값이
+  /// 버튼의 동그라미까지 함께 맡아서다 — 시트·다이얼로그와 달리 이 흐름은
+  /// 기다리는 동안 화면을 덮지 않아, 눌린 버튼이 계속 보인다.
+  Future<void> _createCollectible(MyTicket ticket) async {
+    if (_creatingFor != null) return;
+    final api = MemoryConcertApiScope.of(context);
+    setState(() => _creatingFor = ticket.ticketId);
+    try {
+      final concerts = await api.getConcerts();
+      if (!mounted) return;
+      // 카탈로그의 티켓 번호는 문자열이다(서버가 준 번호를 그대로 담는다).
+      final concert = concerts
+          .where((c) => c.ticketId == '${ticket.ticketId}')
+          .firstOrNull;
+      if (concert == null) {
+        _notify(TicketStrings.collectibleNotEntered);
+        return;
+      }
+      if (concert.goodsId != null) {
+        _notify(TicketStrings.collectibleAlready);
+        await Navigator.pushNamed(context, AppRoutes.collection);
+        return;
+      }
+      await Navigator.push(
+        context,
+        memoryRoute<void>(CreatorScreen(initialConcert: concert)),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showErrorSnackBar(context, e.message);
+    } finally {
+      if (mounted) setState(() => _creatingFor = null);
+    }
   }
 
   /// 예매를 취소한다.
@@ -477,14 +538,17 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
             AppRoutes.entryQr,
             arguments: ticket,
           ),
-          onShowDetail: () =>
-              _notify(TicketStrings.notReady(TicketStrings.showDetail)),
+          // 공연 상세로 보낸다. 티켓이 든 것은 좌석과 시각뿐이라, 그 밖을
+          // 알고 싶으면 공연 쪽이다. 받는 번호는 티켓이 아니라 공연 번호다.
+          onShowDetail: () => Navigator.pushNamed(
+            context,
+            AppRoutes.showDetail,
+            arguments: ticket.concertId,
+          ),
           // 취소가 안 되는 티켓·양도 등록 중인 티켓에도 더보기를 연다. 시트가
           // 이유를 알려준다 — 버튼 자체를 지우면 왜 못 하는지 물어볼 자리가 없다.
           // 발행 중·입장 완료·회수·환불은 할 수 있는 일이 없어 열지 않는다.
-          onMore: ticket.isHeld
-              ? () => _guard(() => _openMore(ticket))
-              : null,
+          onMore: ticket.isHeld ? () => _guard(() => _openMore(ticket)) : null,
         ),
       ),
       1 => _ticketList(
@@ -492,8 +556,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
         emptyMessage: TicketStrings.emptyPast,
         cardBuilder: (ticket) => PastTicketCard(
           ticket: ticket,
-          onCreateCollectible: () =>
-              _notify(TicketStrings.notReady(TicketStrings.createCollectible)),
+          creating: _creatingFor == ticket.ticketId,
+          onCreateCollectible: () => _createCollectible(ticket),
         ),
       ),
       // 양도 목록은 다른 조회가 그린다([_listingList]). 이 경계는 그때 가려져
