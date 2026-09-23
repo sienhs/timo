@@ -92,6 +92,14 @@ const quickMenuItems = <QuickMenuItem>[
     label: '양도마켓',
     routeName: AppRoutes.resaleMarket,
   ),
-  QuickMenuItem(icon: Icons.menu, label: '카테고리'),
-  QuickMenuItem(icon: Icons.settings_outlined, label: '환경 설정'),
+  QuickMenuItem(
+    icon: Icons.menu,
+    label: '카테고리',
+    routeName: AppRoutes.categories,
+  ),
+  QuickMenuItem(
+    icon: Icons.settings_outlined,
+    label: '환경 설정',
+    routeName: AppRoutes.settings,
+  ),
 ];

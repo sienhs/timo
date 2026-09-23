@@ -128,30 +128,23 @@ void main() {
     expect(item.routeName, AppRoutes.entryQr);
   });
 
-  testWidgets('화면이 없는 항목을 고르면 준비 중 안내가 뜬다', (tester) async {
-    await pumpShell(tester);
-
-    await tester.tap(quickMenuButton());
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('카테고리'));
-    await tester.pumpAndSettle();
-
-    expect(find.text(ShellStrings.notReady('카테고리')), findsOneWidget);
+  test('카테고리 는 카테고리 화면으로 간다', () {
+    final item = quickMenuItems.singleWhere((item) => item.label == '카테고리');
+    expect(item.routeName, AppRoutes.categories);
   });
 
-  /// 이 안내는 한때 검정 기본 스낵바로 떴다. 앱의 다른 안내와 생김새가 달라
-  /// 같은 앱으로 보이지 않았다. 공통 상자로 돌아가지 않게 굳혀 둔다.
-  testWidgets('준비 중 안내는 앱 공통 상자로 뜬다', (tester) async {
-    await pumpShell(tester);
+  test('환경 설정 은 설정 화면으로 간다', () {
+    final item = quickMenuItems.singleWhere((item) => item.label == '환경 설정');
+    expect(item.routeName, AppRoutes.settings);
+  });
 
-    await tester.tap(quickMenuButton());
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('카테고리'));
-    await tester.pump();
-
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    // 공통 상자는 SnackBar 를 비워 두고 안쪽 Container 가 모양을 그린다.
-    expect(snackBar.backgroundColor, Colors.transparent);
-    expect(snackBar.clipBehavior, Clip.none);
+  /// 한때 카테고리와 환경 설정은 화면이 없어 '준비 중' 안내만 띄웠다. 이제
+  /// 여덟 항목 모두 갈 곳이 있다. 항목을 새로 넣으면서 라우트를 빠뜨리면 눌러도
+  /// 안내만 뜨는 항목이 되므로 여기서 잡는다.
+  test('빠른 메뉴 항목은 모두 등록된 화면으로 간다', () {
+    for (final item in quickMenuItems) {
+      expect(item.routeName, isNotNull, reason: item.label);
+      expect(AppRoutes.routes, contains(item.routeName), reason: item.label);
+    }
   });
 }

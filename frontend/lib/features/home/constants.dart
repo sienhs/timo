@@ -132,6 +132,29 @@ class HomeMetrics {
   /// 버튼에 가리지 않도록 이만큼 띄운다.
   static const bottomGap = 40.0;
 
+  // 카테고리 화면
+  /// 장르 격자. 3열 × 2행이다.
+  static const categoryColumns = 3;
+  static const categoryGap = 12.0;
+  static const categoryVerticalPadding = 20.0;
+  static const categoryCardRadius = AppMetrics.cardRadius;
+
+  /// 칸 비율(가로/세로). 정사각이라 폰 폭이 달라도 칸 모양이 같다.
+  static const categoryCardAspectRatio = 1.0;
+
+  /// 아이콘은 빠른 메뉴 패널의 것과 같은 크기다. 패널에서 눌러 들어온 화면이라
+  /// 아이콘 크기가 갈리면 다른 곳의 것처럼 보인다.
+  static const categoryIconSize = 28.0;
+  static const categoryLabelGap = 8.0;
+
+  /// 공연이 없는 장르 칸의 오른쪽 위 뱃지.
+  static const categoryBadgeInset = 8.0;
+  static const categoryBadgeHorizontalPadding = 6.0;
+  static const categoryBadgeVerticalPadding = 2.0;
+
+  /// 격자 아래 안내 한 줄까지의 간격.
+  static const categoryNoteGap = 20.0;
+
   // 서버 요청
   /// 카드 한 줄에 받아 오는 공연 수. 가로로 넘기는 줄이라 이보다 많이 받아도
   /// 끝까지 넘겨 보는 사람이 없고, '더보기' 가 나머지를 맡는다.
@@ -311,6 +334,20 @@ class HomeStrings {
   static const emptyOpenSoonList = '오픈 예정인 공연이 없어요.';
   static const emptyAllShowsList = '아직 등록된 공연이 없어요.';
   static const emptyBookableList = '지금 예매할 수 있는 공연이 없어요.';
+
+  // 카테고리 화면
+  /// 빠른 메뉴의 항목 이름과 같다. 눌렀던 이름과 화면 제목이 다르면 다른
+  /// 곳에 온 것처럼 읽힌다.
+  static const categoryTitle = '카테고리';
+
+  /// 공연이 없는 장르 칸에 다는 뱃지.
+  static const categoryNotReadyBadge = '준비 중';
+
+  /// 공연이 없는 장르를 눌렀을 때.
+  static String categoryNotReady(String label) => '$label 공연은 준비 중이에요.';
+
+  /// 격자 아래 한 줄. 다섯 칸이 흐린 이유를 미리 알려 준다.
+  static const categoryNote = '지금은 콘서트만 예매할 수 있어요.';
 
   /// 인기 공연 카드의 예매 상태 뱃지.
   ///
