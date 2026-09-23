@@ -173,7 +173,9 @@ resource "aws_instance" "this" {
                           "ADMIN_PRIVATE_KEY", "SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "SMS_LIVE_TEST_TO",
                           "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "S3_PUBLIC_BUCKET_NAME", "IMAGE_BASE_URL",
                             "FIREBASE_MESSAGING_ENABLED", "PUSH_CHANNEL_GENERAL", "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64",
-                            "REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
+                            "REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD",
+                            "SEED_ORGANIZER_PHONE", "SEED_ORGANIZER_NAME", "SEED_ORGANIZER_NICKNAME",
+                            "SEED_ADMIN_PHONE", "SEED_ADMIN_NAME", "SEED_ADMIN_NICKNAME", "SEED_ADMIN_USERNAME", "SEED_ADMIN_PASSWORD")
               values = json.load(open(os.environ["SECRET_FILE"], encoding="utf-8"))
               for key in required:
                   value = values.get(key)
