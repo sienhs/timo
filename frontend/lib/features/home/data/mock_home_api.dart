@@ -167,11 +167,8 @@ class MockHomeApi implements HomeApi {
     id: 6,
     title: '페기구 THE LOUD SHOW',
     venueName: '잠실실내체육관',
-    status: closedStatus,
+    status: ShowSummary.closedStatus,
     startAt: DateTime(2026, 8, 15),
   );
 
-  /// 백엔드 `ConcertStatus.CLOSED`. 화면이 구분하지 않는 상태라 [ShowSummary]
-  /// 에는 없고, 걸러지는 예시를 만들기 위해 목에만 둔다.
-  static const closedStatus = 'CLOSED';
 }

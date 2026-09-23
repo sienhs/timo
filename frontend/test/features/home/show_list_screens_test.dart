@@ -97,14 +97,32 @@ void main() {
   });
 
   group('공연 전체 조회', () {
-    testWidgets('예매 가능 탭으로 시작해 끝난 공연을 빼고 센다', (tester) async {
+    testWidgets('예매 가능 탭으로 시작해 오픈 예정과 끝난 공연을 빼고 센다', (tester) async {
       await pumpScreen(tester, AppRoutes.allShows);
 
       expect(find.text(HomeStrings.allShowsListTitle), findsOneWidget);
-      // 목 데이터 여섯 건 중 페기구만 끝난 공연이다.
-      expect(find.text('${HomeStrings.bookableTab} 5'), findsOneWidget);
+      // 목 데이터 여섯 건 중 예매 중인 아이유·김준수만 이 탭에 든다.
+      expect(find.text('${HomeStrings.bookableTab} 2'), findsOneWidget);
+      expect(find.text('${HomeStrings.closedTab} 1'), findsOneWidget);
       expect(find.text('${HomeStrings.allTab} 6'), findsOneWidget);
       expect(find.text(MockHomeApi.peggyGou.title), findsNothing);
+      expect(find.text(MockHomeApi.remind.title), findsNothing);
+    });
+
+    testWidgets('예매 마감 탭에는 종료·취소 공연만 나오고 매진은 예매 가능 탭에 둔다', (tester) async {
+      await pumpScreen(tester, AppRoutes.allShows, api: _StatusGroupsApi());
+
+      expect(find.text('${HomeStrings.bookableTab} 2'), findsOneWidget);
+      expect(find.text('${HomeStrings.closedTab} 2'), findsOneWidget);
+      expect(find.text(_StatusGroupsApi.soldOut.title), findsOneWidget);
+
+      await tester.tap(find.text('${HomeStrings.closedTab} 2'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(_StatusGroupsApi.closed.title), findsOneWidget);
+      expect(find.text(_StatusGroupsApi.canceled.title), findsOneWidget);
+      expect(find.text(_StatusGroupsApi.soldOut.title), findsNothing);
+      expect(find.text(_StatusGroupsApi.onSale.title), findsNothing);
     });
 
     testWidgets('모두 보기로 바꾸면 끝난 공연까지 나온다', (tester) async {
@@ -235,7 +253,7 @@ class _DatedApi extends MockHomeApi {
     id: 102,
     title: '다음 달 공연',
     venueName: '가까운 곳',
-    status: ShowSummary.upcomingStatus,
+    status: ShowSummary.onSaleStatus,
     startAt: DateTime(_today.year, _today.month + 1, 5),
     endAt: DateTime(_today.year, _today.month + 1, 7),
     ticketOpenAt: _today.add(const Duration(days: 3)),
@@ -259,6 +277,43 @@ class _DatedApi extends MockHomeApi {
 
   @override
   Future<List<ShowSummary>> fetchAllShows() async => [far, nextMonth, soon];
+}
+
+class _StatusGroupsApi extends MockHomeApi {
+  _StatusGroupsApi() : super(latency: Duration.zero);
+
+  static const onSale = ShowSummary(
+    id: 101,
+    title: '예매 중 공연',
+    venueName: '공연장',
+    status: ShowSummary.onSaleStatus,
+  );
+  static const soldOut = ShowSummary(
+    id: 102,
+    title: '매진 공연',
+    venueName: '공연장',
+    status: ShowSummary.soldOutStatus,
+  );
+  static const closed = ShowSummary(
+    id: 103,
+    title: '종료 공연',
+    venueName: '공연장',
+    status: ShowSummary.closedStatus,
+  );
+  static const canceled = ShowSummary(
+    id: 104,
+    title: '취소 공연',
+    venueName: '공연장',
+    status: ShowSummary.canceledStatus,
+  );
+
+  @override
+  Future<List<ShowSummary>> fetchAllShows() async => [
+    onSale,
+    soldOut,
+    closed,
+    canceled,
+  ];
 }
 
 /// 오픈 시각이 지났는데도 오픈 예정(SCHEDULED)으로 남은 공연을 섞어 주는 서버.
