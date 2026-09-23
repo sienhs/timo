@@ -292,13 +292,15 @@ class _LoadedShowState extends State<_LoadedShow> {
                       title: ShowDetailStrings.artistSection,
                       child: ShowArtistList(artists: detail.artists),
                     ),
-                    if (detail.imageUrls.isNotEmpty) ...[
-                      const SizedBox(height: ShowDetailMetrics.sectionGap),
-                      _Section(
-                        title: ShowDetailStrings.noticeSection,
-                        child: ShowNotice(imageUrls: detail.imageUrls),
-                      ),
-                    ],
+                    // 안내 이미지가 없어도 자리를 접지 않는다. 이미지가
+                    // 없으면 ShowNotice 가 공통 규정을 대신 적는다 - 예매
+                    // 마감·양도·환불은 공연과 무관하게 늘 같은 규칙이라,
+                    // 주최사가 이미지를 안 올렸다고 안 보여 줄 이유가 없다.
+                    const SizedBox(height: ShowDetailMetrics.sectionGap),
+                    _Section(
+                      title: ShowDetailStrings.noticeSection,
+                      child: ShowNotice(imageUrls: detail.imageUrls),
+                    ),
                   ],
                 ),
               ),

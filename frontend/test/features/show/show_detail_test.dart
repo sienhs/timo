@@ -536,7 +536,23 @@ void main() {
     expect(find.text('154,000원'), findsOneWidget);
     expect(find.text(ShowDetailStrings.artistSection), findsOneWidget);
     expect(find.text('아이유'), findsOneWidget);
-    expect(find.text(ShowDetailStrings.noticeSection), findsNothing);
+  });
+
+  testWidgets('안내 이미지가 없으면 NOTICE 에 공통 규정을 적는다', (tester) async {
+    await pumpDetail(tester, detailOpening());
+
+    await tester.scrollUntilVisible(
+      find.text(ShowDetailStrings.noticeSection),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    // 자리를 접지 않는다. 예매 마감·양도·환불은 이미지 유무와 무관하다.
+    expect(find.text(ShowDetailStrings.noticeSection), findsOneWidget);
+    for (final line in ShowDetailStrings.defaultNoticeLines) {
+      expect(find.text(line), findsOneWidget);
+    }
+    expect(find.byType(Image), findsNothing);
   });
 
   testWidgets('NOTICE 이미지를 서버 순서대로 표시한다', (tester) async {
@@ -557,6 +573,8 @@ void main() {
     );
 
     expect(find.text(ShowDetailStrings.noticeSection), findsOneWidget);
+    // 이미지가 있으면 공통 규정은 물러난다 - 주최사 안내가 우선이다.
+    expect(find.text(ShowDetailStrings.defaultNoticeLines.first), findsNothing);
     final images = tester.widgetList<Image>(find.byType(Image)).toList();
     expect(images.map((image) => (image.image as NetworkImage).url), [
       'https://example.com/first.jpg',
