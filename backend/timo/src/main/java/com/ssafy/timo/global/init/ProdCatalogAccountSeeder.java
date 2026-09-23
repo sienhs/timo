@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -60,9 +61,17 @@ class ProdCatalogAccountSeeder {
     /**
      * 온체인 등록을 대신 서명하는 admin 지갑과는 별개로, {@code chargeForBooking} 이 예매 대금을
      * 적립할 실제 지갑 주소가 필요해 회원+지갑을 만든다.
+     *
+     * <p>이미 있으면 그대로 재사용한다 - {@link #adminAlreadyExists}가 false인 동안은
+     * {@code ProdCatalogSeeder}가 재기동마다 이 메서드를 다시 부를 수 있어서, 매번 새 회원을
+     * 만들면 재시도할 때마다 중복 주최자가 쌓인다.
      */
     @Transactional
     Member seedOrganizer(String phone, String name, String nickname) {
+        Optional<Member> existing = memberRepository.findByPhoneNumber(phone);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
         Member organizer = memberRepository.save(Member.builder()
                 .phoneNumber(phone)
                 .name(name)
@@ -70,6 +79,15 @@ class ProdCatalogAccountSeeder {
                 .build());
         walletService.createWallet(organizer);
         return organizer;
+    }
+
+    /**
+     * 운영 카탈로그 시드가 이미 완료됐는지의 기준. {@code concert} 테이블은 {@code seed-concerts.sql}이
+     * {@code ApplicationRunner}보다 먼저 무조건 채워 두므로 가드로 쓸 수 없다 - 이 시더가 실제로
+     * 끝까지 실행됐는지는 이 시더만 만드는 관리자 로그인 계정의 존재로 판단한다.
+     */
+    boolean adminAlreadyExists(String username) {
+        return loginInfoRepository.existsByUsername(username);
     }
 
     /**

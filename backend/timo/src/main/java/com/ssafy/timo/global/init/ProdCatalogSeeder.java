@@ -100,19 +100,20 @@ public class ProdCatalogSeeder implements ApplicationRunner {
     }
 
     /**
-     * 공연이 하나라도 있으면 아무것도 하지 않는다. {@code seed-concerts.sql}이 이미 48건을 넣어 둔
-     * 뒤라면(정상적인 매 기동), 이 가드가 바로 걸려 아래 온체인 등록·계정 생성이 반복되지 않는다 -
-     * 실제로 무언가 하는 건 RDS가 완전히 빈 최초 1회뿐이다.
+     * 관리자 계정이 이미 있으면 아무것도 하지 않는다. {@code concertRepository.count() > 0}로는 판단할
+     * 수 없다 - {@code seed-concerts.sql}이 {@code ApplicationRunner}보다 먼저 48건을 무조건 넣어 두기
+     * 때문에, 그 값은 이 시더가 실제로 실행됐는지와 무관하게 매 기동 항상 0보다 크다. 그래서 이 시더가
+     * 직접 만드는 것 중 가장 확실한 신호인 관리자 로그인 계정 존재 여부로 가드한다
+     * ({@link ProdCatalogAccountSeeder#adminAlreadyExists}).
      */
     @Override
     public void run(ApplicationArguments args) {
-        long existing = concertRepository.count();
-        if (existing > 0) {
-            log.info("공연이 이미 {}건 있어 운영 카탈로그 시드를 건너뛴다.", existing);
+        Long venueId = venueSeatCatalogSeeder.seedVenueAndSeats();
+
+        if (accountSeeder.adminAlreadyExists(adminUsername)) {
+            log.info("운영 카탈로그 시드용 관리자 계정이 이미 있어 나머지 시드를 건너뛴다.");
             return;
         }
-
-        Long venueId = venueSeatCatalogSeeder.seedVenueAndSeats();
 
         if (!blockchainProperties.hasRealAdminPrivateKey()) {
             // ADMIN_PRIVATE_KEY는 infra 변수 검증에서 항상 실값을 요구하지만, 방화벽 등으로 체인에
@@ -129,8 +130,11 @@ public class ProdCatalogSeeder implements ApplicationRunner {
 
         Member organizer = accountSeeder.seedOrganizer(organizerPhone, organizerName, organizerNickname);
 
+        // 관리자 계정이 만들어지기 전에 재기동되면 이 메서드가 다시 실행될 수 있으므로, 이미 온체인
+        // 등록까지 끝난 공연(isReadyForBooking)은 다시 등록하지 않는다.
         List<Concert> onSaleConcerts = concertRepository.findAll().stream()
                 .filter(concert -> concert.getStatus() == ConcertStatus.ON_SALE)
+                .filter(concert -> !concert.isReadyForBooking())
                 .toList();
 
         List<Concert> registered = new ArrayList<>(onSaleConcerts.size());
