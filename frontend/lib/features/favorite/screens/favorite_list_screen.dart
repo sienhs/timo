@@ -149,11 +149,17 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
 
   /// 하단 바와 원형 버튼에 가리지 않게 그 위로 띄운다. 이전 안내가 남아 있으면
   /// 걷어낸다 — 연달아 뺐을 때 안내가 줄지어 기다릴 이유가 없다.
+  ///
+  /// 떠 있는 시간은 다른 토스트와 같은 2초다. Flutter 는 버튼이 달린 토스트를
+  /// 기본으로 저절로 사라지지 않게 두므로, [SnackBar.persist] 를 꺼야 시간이
+  /// 지나면 내려간다.
   void _showUndo(VoidCallback onUndo) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
+        duration: toastDuration,
+        persist: false,
         content: const Text(FavoriteStrings.removed),
         action: SnackBarAction(
           label: FavoriteStrings.undo,

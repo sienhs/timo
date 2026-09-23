@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -147,7 +148,7 @@ void main() {
       expect(find.byType(SignupPhoneScreen), findsOneWidget);
       fields = find.byType(TextField);
       expect(fields, findsNWidgets(3));
-      expect(find.text(AuthStrings.codeSent), findsOneWidget);
+      expect(find.text(toastText(AuthStrings.codeSent)), findsOneWidget);
       expect(find.text('03:00'), findsOneWidget);
 
       await tester.enterText(fields.at(2), '123456');
@@ -418,7 +419,7 @@ void main() {
 
     Finder snackBarText(String message) => find.descendant(
       of: find.byType(SnackBar),
-      matching: find.text(message),
+      matching: find.text(toastText(message)),
     );
 
     testWidgets('전화번호: 발송 횟수 초과(429)는 스낵바로 알리고 버튼을 다시 켠다', (tester) async {

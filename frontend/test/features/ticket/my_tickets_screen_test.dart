@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/utils/formatters.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -374,7 +375,10 @@ void main() {
       await tapCreate(tester, index: 1);
       await tester.pumpAndSettle();
 
-      expect(find.text(TicketStrings.collectibleAlready), findsOneWidget);
+      expect(
+        find.text(toastText(TicketStrings.collectibleAlready)),
+        findsOneWidget,
+      );
       expect(find.text('컬렉션'), findsOneWidget);
       expect(find.byType(CreatorScreen), findsNothing);
     });
@@ -388,7 +392,10 @@ void main() {
       await tapCreate(tester);
       await tester.pumpAndSettle();
 
-      expect(find.text(TicketStrings.collectibleNotEntered), findsOneWidget);
+      expect(
+        find.text(toastText(TicketStrings.collectibleNotEntered)),
+        findsOneWidget,
+      );
       expect(find.byType(CreatorScreen), findsNothing);
     });
   });

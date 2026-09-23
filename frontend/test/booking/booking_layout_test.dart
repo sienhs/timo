@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
@@ -127,7 +128,10 @@ void main() {
     await tester.tap(find.text('FLOOR B'));
     await tester.pumpAndSettle();
 
-    expect(find.text('FLOOR B 구역은 매진됐어요. 다른 구역을 골라주세요.'), findsOneWidget);
+    expect(
+      find.text(toastText('FLOOR B 구역은 매진됐어요. 다른 구역을 골라주세요.')),
+      findsOneWidget,
+    );
     expect(find.text('STAGE'), findsOneWidget); // 여전히 배치도 화면
   });
 }

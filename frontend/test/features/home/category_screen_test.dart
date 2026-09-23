@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/home/constants.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/models/show_category.dart';
@@ -73,7 +74,10 @@ void main() {
     await tester.tap(find.text('뮤지컬'));
     await tester.pump();
 
-    expect(find.text(HomeStrings.categoryNotReady('뮤지컬')), findsOneWidget);
+    expect(
+      find.text(toastText(HomeStrings.categoryNotReady('뮤지컬'))),
+      findsOneWidget,
+    );
     expect(find.byType(AllShowsScreen), findsNothing);
   });
 }

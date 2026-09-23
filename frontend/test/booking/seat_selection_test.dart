@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/network/server_errors.dart';
 import 'package:timo/core/theme/app_theme.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/booking/data/booking_api.dart';
 import 'package:timo/features/booking/models/performance.dart';
 import 'package:timo/features/booking/models/seat.dart';
@@ -366,7 +367,7 @@ void main() {
 
       await checkout(tester);
 
-      expect(find.text('이미 선점된 좌석입니다.'), findsOneWidget);
+      expect(find.text(toastText('이미 선점된 좌석입니다.')), findsOneWidget);
       expect(controller.selectedSeat, isNull);
       expect(api.fetchCount, 2);
       expect(find.text('결제 화면'), findsNothing);
@@ -385,8 +386,8 @@ void main() {
 
       await checkout(tester);
 
-      expect(find.textContaining('한 공연에 한 장만'), findsOneWidget);
-      expect(find.text('이미 선점된 좌석입니다.'), findsNothing);
+      expect(find.textContaining(toastText('한 공연에 한 장만')), findsOneWidget);
+      expect(find.text(toastText('이미 선점된 좌석입니다.')), findsNothing);
       // 다른 자리를 골라도 결과가 같다. 배치도를 다시 받을 것도, 고른 자리를
       // 풀 것도 없다.
       expect(api.fetchCount, 1);
@@ -404,7 +405,7 @@ void main() {
 
       await checkout(tester);
 
-      expect(find.text('지금은 예매할 수 있는 공연이 아니에요.'), findsOneWidget);
+      expect(find.text(toastText('지금은 예매할 수 있는 공연이 아니에요.')), findsOneWidget);
       expect(api.fetchCount, 1);
       expect(controller.selectedSeat?.id, 11);
       expect(find.text('결제 화면'), findsNothing);

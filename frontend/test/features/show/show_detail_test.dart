@@ -4,6 +4,7 @@ import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/alarm/constants.dart';
 import 'package:timo/features/alarm/data/mock_alarm_api.dart';
 import 'package:timo/features/alarm/models/alarm_status.dart';
@@ -226,7 +227,10 @@ void main() {
       await tester.pump();
       await tester.pump(FavoriteLimits.toggleDebounce);
 
-      expect(find.text(ShowDetailStrings.openAlarmOn), findsOneWidget);
+      expect(
+        find.text(toastText(ShowDetailStrings.openAlarmOn)),
+        findsOneWidget,
+      );
       expect(find.text(ShowDetailStrings.unnotifyAction), findsOneWidget);
       expect(find.text(ShowDetailStrings.notifyAction), findsNothing);
 
@@ -234,7 +238,10 @@ void main() {
       await tester.pump();
       await tester.pump(FavoriteLimits.toggleDebounce);
 
-      expect(find.text(ShowDetailStrings.openAlarmOff), findsOneWidget);
+      expect(
+        find.text(toastText(ShowDetailStrings.openAlarmOff)),
+        findsOneWidget,
+      );
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
 
@@ -262,13 +269,19 @@ void main() {
       await tester.tap(find.text(ShowDetailStrings.marketAlarmAction));
       await tester.pump();
 
-      expect(find.text(ShowDetailStrings.marketAlarmOn), findsOneWidget);
+      expect(
+        find.text(toastText(ShowDetailStrings.marketAlarmOn)),
+        findsOneWidget,
+      );
       expect(find.text(ShowDetailStrings.marketAlarmOffAction), findsOneWidget);
 
       await tester.tap(find.text(ShowDetailStrings.marketAlarmOffAction));
       await tester.pump();
 
-      expect(find.text(ShowDetailStrings.marketAlarmOff), findsOneWidget);
+      expect(
+        find.text(toastText(ShowDetailStrings.marketAlarmOff)),
+        findsOneWidget,
+      );
       expect(find.text(ShowDetailStrings.marketAlarmAction), findsOneWidget);
       // 예매 버튼은 알림을 켜고 끄는 동안에도 자리를 지킨다.
       expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
@@ -313,8 +326,8 @@ void main() {
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
 
-      expect(find.text(AlarmStrings.toggleFailed), findsOneWidget);
-      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
+      expect(find.text(toastText(AlarmStrings.toggleFailed)), findsOneWidget);
+      expect(find.text(toastText(ShowDetailStrings.openAlarmOn)), findsNothing);
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
     });
 
@@ -354,7 +367,10 @@ void main() {
       await tester.tap(find.text(ShowDetailStrings.notifyAction));
       await tester.pump();
 
-      expect(find.text(ShowDetailStrings.alarmLoginRequired), findsOneWidget);
+      expect(
+        find.text(toastText(ShowDetailStrings.alarmLoginRequired)),
+        findsOneWidget,
+      );
       expect(find.text(ShowDetailStrings.unnotifyAction), findsNothing);
       expect(alarmApi.sendCount, 0);
     });
@@ -386,7 +402,7 @@ void main() {
       expect(favorites.favorites.hasShow(1), isTrue);
       expect(favoriteApi.wishedIds, [1]);
       expect(find.text(ShowDetailStrings.notifyAction), findsOneWidget);
-      expect(find.text(ShowDetailStrings.openAlarmOn), findsNothing);
+      expect(find.text(toastText(ShowDetailStrings.openAlarmOn)), findsNothing);
     });
   });
 
@@ -760,7 +776,10 @@ void main() {
       await tester.pump(FavoriteLimits.toggleDebounce);
 
       expect(favorites.favorites.shows, isEmpty);
-      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      expect(
+        find.text(toastText(FavoriteStrings.loginRequired)),
+        findsOneWidget,
+      );
       expect(find.byTooltip(ShowDetailStrings.favoriteAction), findsOneWidget);
     });
 

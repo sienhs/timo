@@ -6,6 +6,7 @@ import 'package:timo/core/theme/app_colors.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/utils/formatters.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -268,7 +269,10 @@ void main() {
       expect(api.charged, [5000]);
       expect(result, isTrue);
       expect(find.byType(CoinChargeScreen), findsNothing);
-      expect(find.text(MyPageStrings.chargeSucceeded('5,000')), findsOneWidget);
+      expect(
+        find.text(toastText(MyPageStrings.chargeSucceeded('5,000'))),
+        findsOneWidget,
+      );
     });
 
     testWidgets('응답을 기다리는 동안 다시 눌러도 요청은 한 번만 나간다', (tester) async {
@@ -299,7 +303,7 @@ void main() {
       await tester.tap(submit);
       await tester.pumpAndSettle();
 
-      expect(find.text(_RecordingMyPageApi.message), findsOneWidget);
+      expect(find.text(toastText(_RecordingMyPageApi.message)), findsOneWidget);
       expect(find.byType(CoinChargeScreen), findsOneWidget);
       expect(find.text('10,000'), findsOneWidget);
       expect(submitEnabled(tester), isTrue);

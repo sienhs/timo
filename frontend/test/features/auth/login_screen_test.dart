@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -229,7 +230,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(SnackBar),
-          matching: find.text(suspended.message),
+          matching: find.text(toastText(suspended.message)),
         ),
         findsOneWidget,
       );

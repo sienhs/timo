@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
@@ -123,7 +124,7 @@ void main() {
         find.text(TicketStrings.listedPrice('120,000 MSR')),
         findsOneWidget,
       );
-      expect(find.text(TicketStrings.priceUpdated), findsOneWidget);
+      expect(find.text(toastText(TicketStrings.priceUpdated)), findsOneWidget);
       // 매물은 그대로 팔리는 중이다.
       expect(find.text(TicketStrings.listingBadge), findsOneWidget);
     });
@@ -146,7 +147,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(api.priceUpdates, isEmpty);
-      expect(find.text('이미 팔렸거나 내려간 매물이에요.'), findsOneWidget);
+      expect(find.text(toastText('이미 팔렸거나 내려간 매물이에요.')), findsOneWidget);
       expect(
         find.text(TicketStrings.listedPrice('132,000 MSR')),
         findsOneWidget,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
@@ -133,7 +134,9 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text(SettingsStrings.notReady(SettingsStrings.changePassword)),
+      find.text(
+        toastText(SettingsStrings.notReady(SettingsStrings.changePassword)),
+      ),
       findsOneWidget,
     );
     expect(find.byType(NotificationScreen), findsNothing);

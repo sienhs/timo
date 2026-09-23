@@ -37,7 +37,10 @@ void main() {
   BoxDecoration boxOf(WidgetTester tester, String message) {
     final container = tester.widget<Container>(
       find
-          .ancestor(of: find.text(message), matching: find.byType(Container))
+          .ancestor(
+            of: find.text(toastText(message)),
+            matching: find.byType(Container),
+          )
           .first,
     );
     return container.decoration! as BoxDecoration;
@@ -79,6 +82,81 @@ void main() {
     expect(decorations[1].color, decorations[2].color);
     expect(decorations[0].border, decorations[1].border);
     expect(decorations[1].border, decorations[2].border);
+  });
+
+  testWidgets('토스트는 2초 동안 떠 있다', (tester) async {
+    final snackBar = await showAndFind(
+      tester,
+      (context) => showInfoSnackBar(context, '잠깐 떠요'),
+    );
+    expect(snackBar.duration, const Duration(seconds: 2));
+  });
+
+  testWidgets('화면 읽기는 줄 바꿈 기호가 들어가기 전 문구로 한다', (tester) async {
+    const message = '저장하지 못했어요. 다시 시도해주세요.';
+    await showAndFind(tester, (context) => showErrorSnackBar(context, message));
+
+    final text = tester.widget<Text>(find.text(toastText(message)));
+    expect(text.semanticsLabel, message);
+  });
+
+  group('토스트 문구', () {
+    /// 폭 없는 단어 묶음 기호를 걷어낸, 눈에 보이는 그대로의 문구.
+    String visible(String message) =>
+        toastText(message).replaceAll('\u2060', '');
+
+    test('문장이 둘이면 문장 사이에서 줄을 넘긴다', () {
+      expect(
+        visible('오픈 알림을 신청했어요. 예매가 열리기 전에 알려드릴게요.'),
+        '오픈 알림을 신청했어요.\n예매가 열리기 전에 알려드릴게요.',
+      );
+      expect(visible('정말요? 네!'), '정말요?\n네!');
+    });
+
+    test('이미 줄을 나눠 둔 문구는 그대로 둔다', () {
+      expect(
+        visible('인증번호 요청 횟수를 초과했어요.\n잠시 후 다시 시도해주세요'),
+        '인증번호 요청 횟수를 초과했어요.\n잠시 후 다시 시도해주세요',
+      );
+    });
+
+    test('한 문장이거나 끝에 공백이 있으면 줄을 넘기지 않는다', () {
+      expect(visible('마켓에 등록했어요'), '마켓에 등록했어요');
+      expect(visible('로그인이 필요해요. '), '로그인이 필요해요. ');
+    });
+
+    testWidgets('폭이 모자라면 단어 중간이 아니라 띄어쓰기에서 넘어간다', (tester) async {
+      /// [text] 를 [width] 폭에 그렸을 때 줄마다의 글자(기호 제외, 앞뒤 공백 제외).
+      List<String> linesOf(String text, double width) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: const TextStyle(fontSize: 14)),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: width);
+        final lines = <String>[];
+        var start = 0;
+        while (start < text.length) {
+          final end = painter.getLineBoundary(TextPosition(offset: start)).end;
+          if (end <= start) break;
+          lines.add(text.substring(start, end).replaceAll('\u2060', '').trim());
+          start = end;
+          while (start < text.length && '\n '.contains(text[start])) {
+            start++;
+          }
+        }
+        return lines;
+      }
+
+      const message = '찜을 저장하지 못했어요. 잠시 후 다시 시도해주세요.';
+      // 테스트 글꼴은 글자마다 폭이 글자 크기와 같다. 9칸이면 그냥 그렸을 때
+      // "못" / "했어요" 처럼 단어 중간에서 끊긴다.
+      expect(linesOf(message, 14 * 9).first, '찜을 저장하지 못');
+      expect(linesOf(toastText(message), 14 * 9), [
+        '찜을 저장하지',
+        '못했어요.',
+        '잠시 후 다시',
+        '시도해주세요.',
+      ]);
+    });
   });
 
   testWidgets('아래 여백은 기본이 하단 고정 버튼 높이고, 주면 그 값을 쓴다', (tester) async {

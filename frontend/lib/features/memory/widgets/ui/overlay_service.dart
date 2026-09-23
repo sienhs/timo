@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/error_snack_bar.dart';
 import '../../motion/ambient_motion.dart';
 
 class OverlayService {
@@ -39,7 +40,13 @@ class OverlayService {
     }
   }
 
+  /// 소장품 화면의 검정 토스트. 모양은 소장품 테마를 따르고, 줄 바꿈과 떠
+  /// 있는 시간은 앱 공통 토스트와 같게 맞춘다.
   static void notify(BuildContext context, String message) =>
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: toastDuration,
+          content: Text(toastText(message), semanticsLabel: message),
+        ),
+      );
 }

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../ui/overlay_service.dart';
+
 class RepairStroke {
   RepairStroke(this.restore, this.width, this.points);
   final bool restore;
@@ -175,9 +177,7 @@ class _CutoutRepairEditorState extends State<CutoutRepairEditor> {
     } catch (_) {
       if (mounted) {
         setState(() => saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('보정을 저장하지 못했어요. 다시 시도해주세요.')),
-        );
+        OverlayService.notify(context, '보정을 저장하지 못했어요. 다시 시도해주세요.');
       }
     }
   }

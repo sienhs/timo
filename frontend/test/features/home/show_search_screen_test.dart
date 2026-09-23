@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/app.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
@@ -363,7 +364,10 @@ void main() {
       await tester.tap(find.byTooltip(HomeStrings.favorite).first);
       await tester.pumpAndSettle();
 
-      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      expect(
+        find.text(toastText(FavoriteStrings.loginRequired)),
+        findsOneWidget,
+      );
       // 서버에 보내지 않았고 하트도 채워지지 않았다.
       expect(favoriteApi.wishedIds, isEmpty);
       expect(find.byTooltip(HomeStrings.unfavorite), findsNothing);
@@ -409,7 +413,10 @@ void main() {
       await tester.tap(heart);
       await tester.pumpAndSettle();
 
-      expect(find.text(FavoriteStrings.loginRequired), findsOneWidget);
+      expect(
+        find.text(toastText(FavoriteStrings.loginRequired)),
+        findsOneWidget,
+      );
       expect(favorites.favorites.artists, isEmpty);
       expect(
         find.descendant(
