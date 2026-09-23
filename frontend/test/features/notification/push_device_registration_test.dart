@@ -78,4 +78,7 @@ class _RecordingPush implements PushNotifications {
 
   @override
   NotificationDestination? takeLaunchDestination() => null;
+
+  @override
+  Stream<int> get unreadCounts => const Stream.empty();
 }

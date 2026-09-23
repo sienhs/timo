@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/state/auth_session_scope.dart';
+import '../../notification/push_notification_scope.dart';
 import '../../notification/state/notification_api_scope.dart';
 import '../constants.dart';
 import 'my_page_top_bar.dart';
@@ -14,8 +17,8 @@ import 'my_page_top_bar.dart';
 /// 두 화면이 이것을 함께 쓴다.
 ///
 /// **되풀이해 묻지 않는다.** 화면에 들어올 때와 알림함에서 돌아왔을 때만 묻는다.
-/// 서버 규약이 그렇고, 이 점은 상단 바가 보일 때만 뜻이 있어 그 사이에 맞춰 둘
-/// 이유가 없다.
+/// 그 사이에 앱이 켜진 채로 푸시가 오면, 서버가 푸시에 실어 보낸 개수로 바로
+/// 맞춘다. 서버 규약이 그렇다 — 폴링하지 않고 푸시가 실시간 갱신을 맡는다.
 ///
 /// 개수를 못 받아도 아무것도 알리지 않는다. 점이 안 찍힐 뿐이고, 알림함은 종을
 /// 눌러 그대로 들어갈 수 있다. 상단 바에 실패 문구를 띄우면 정작 보러 온 화면을
@@ -40,9 +43,15 @@ class _MyPageTopBarHostState extends State<MyPageTopBarHost> {
   /// 이 화면에 들어와 한 번 물었는지. 다시 그려질 때마다 묻지 않으려고 둔다.
   bool _asked = false;
 
+  /// 푸시로 오는 개수를 듣는 구독. 화면이 처음 뜰 때 한 번만 건다.
+  StreamSubscription<int>? _pushedCounts;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _pushedCounts ??= PushNotificationScope.maybeOf(
+      context,
+    )?.unreadCounts.listen(_onPushedCount);
     final isLoggedIn = AuthSessionScope.maybeOf(context)?.isLoggedIn ?? false;
     if (!isLoggedIn) {
       // 로그아웃하면 직전 회원의 개수가 남지 않게 지운다. 다시 로그인하면 아래
@@ -69,6 +78,20 @@ class _MyPageTopBarHostState extends State<MyPageTopBarHost> {
     } on ApiException {
       // 위 설명대로 알리지 않는다.
     }
+  }
+
+  /// 앱이 켜진 채로 푸시가 왔을 때. 로그아웃 상태면 직전 회원 몫이 늦게 온
+  /// 것이라 받지 않는다.
+  void _onPushedCount(int count) {
+    if (!mounted) return;
+    if (!(AuthSessionScope.maybeRead(context)?.isLoggedIn ?? false)) return;
+    setState(() => _unreadCount = count);
+  }
+
+  @override
+  void dispose() {
+    _pushedCounts?.cancel();
+    super.dispose();
   }
 
   /// 알림함을 열고, 돌아오면 개수를 다시 받는다. 거기서 읽었으면 점이 사라져야

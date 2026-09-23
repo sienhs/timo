@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +14,9 @@ import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/features/mypage/widgets/my_page_top_bar.dart';
 import 'package:timo/features/notification/constants.dart';
 import 'package:timo/features/notification/data/mock_notification_api.dart';
+import 'package:timo/features/notification/notification_destination.dart';
+import 'package:timo/features/notification/push_notification_scope.dart';
+import 'package:timo/features/notification/push_notification_service.dart';
 import 'package:timo/features/notification/state/notification_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
@@ -36,6 +41,7 @@ void main() {
     required bool loggedIn,
     MockNotificationScenario scenario = MockNotificationScenario.normal,
     bool withNotificationScope = true,
+    PushNotifications? push,
   }) async {
     usePhoneSize(tester);
     final session = AuthSession(storage: InMemoryTokenStorage());
@@ -43,7 +49,7 @@ void main() {
     addTearDown(session.dispose);
 
     final api = MockNotificationApi(latency: Duration.zero, scenario: scenario);
-    final app = MaterialApp(
+    final Widget app = MaterialApp(
       theme: AppTheme.light,
       home: const Scaffold(body: MyPageScreen()),
       routes: Map.of(AppRoutes.routes)..remove(AppRoutes.home),
@@ -54,9 +60,12 @@ void main() {
         session: session,
         child: MyPageApiScope(
           api: const MockMyPageApi(latency: Duration.zero),
-          child: withNotificationScope
-              ? NotificationApiScope(api: api, child: app)
-              : app,
+          child: PushNotificationScope(
+            push: push ?? const NoopPushNotifications(),
+            child: withNotificationScope
+                ? NotificationApiScope(api: api, child: app)
+                : app,
+          ),
         ),
       ),
     );
@@ -118,4 +127,63 @@ void main() {
 
     expect(hasDot(tester), isFalse);
   });
+
+  // 화면을 보고 있는 동안 푸시가 오면 다시 묻지 않고 푸시에 실린 개수로 맞춘다.
+  group('앱이 켜진 채로 푸시가 오면', () {
+    testWidgets('실린 개수로 점을 바로 켜고 끈다', (tester) async {
+      final push = _FakePush();
+      addTearDown(push.dispose);
+      await pumpMyPage(
+        tester,
+        loggedIn: true,
+        scenario: MockNotificationScenario.empty,
+        push: push,
+      );
+      expect(hasDot(tester), isFalse);
+
+      push.receive(2);
+      // 한 프레임은 스트림이 개수를 넘기는 데, 한 프레임은 그리는 데 쓴다.
+      await tester.pump();
+      await tester.pump();
+      expect(hasDot(tester), isTrue);
+
+      push.receive(0);
+      await tester.pump();
+      await tester.pump();
+      expect(hasDot(tester), isFalse);
+    });
+
+    testWidgets('로그아웃 상태면 받지 않는다', (tester) async {
+      final push = _FakePush();
+      addTearDown(push.dispose);
+      await pumpMyPage(tester, loggedIn: false, push: push);
+
+      push.receive(3);
+      await tester.pump();
+      await tester.pump();
+
+      expect(hasDot(tester), isFalse);
+    });
+  });
+}
+
+/// 푸시가 왔다고 흉내 내는 가짜. 개수만 흘려보낸다.
+class _FakePush implements PushNotifications {
+  final _counts = StreamController<int>.broadcast();
+
+  void receive(int unreadCount) => _counts.add(unreadCount);
+
+  Future<void> dispose() => _counts.close();
+
+  @override
+  Stream<int> get unreadCounts => _counts.stream;
+
+  @override
+  NotificationDestination? takeLaunchDestination() => null;
+
+  @override
+  Future<void> registerDevice() async {}
+
+  @override
+  Future<void> unregisterDevice() async {}
 }

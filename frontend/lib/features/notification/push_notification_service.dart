@@ -41,6 +41,18 @@ abstract class PushNotifications implements PushDeviceRegistrar {
   /// 로그인할 때는 세션이 바뀌면서 저절로 등록되므로 이 호출이 필요 없다. 저장된
   /// 로그인으로 앱을 다시 켠 경우에만 빈자리가 생긴다.
   Future<void> registerDevice();
+
+  /// 앱이 켜져 있을 때 푸시가 오면, 서버가 같이 실어 보낸 안 읽은 알림 개수.
+  ///
+  /// 종 위의 점이 이걸 듣고 바로 바뀐다. 서버 규약상 개수는 화면에 들어올 때 한 번
+  /// 묻고, 그 뒤로는 되풀이해 묻지 않고 이 값으로 맞춘다.
+  ///
+  /// 값이 같아도 매번 흘려보낸다. 알림함에서 읽고 돌아와 점이 꺼진 뒤에 같은 개수가
+  /// 다시 와도 점이 켜져야 하기 때문이다(`ValueNotifier` 로는 안 된다).
+  ///
+  /// 앱이 뒤에 있거나 꺼져 있을 때 온 푸시는 여기 오지 않는다. 그때는 화면에 다시
+  /// 들어오면서 묻는 개수가 맞춘다.
+  Stream<int> get unreadCounts;
 }
 
 /// 아무것도 하지 않는 구현. Firebase 를 띄우지 않는 실행(위젯 테스트 등)에서
@@ -56,6 +68,9 @@ class NoopPushNotifications implements PushNotifications {
 
   @override
   Future<void> registerDevice() async {}
+
+  @override
+  Stream<int> get unreadCounts => const Stream.empty();
 }
 
 /// FCM 권한, 토큰 등록·해제, 앱이 열린 상태의 배너, 알림을 눌렀을 때의 화면 이동을
@@ -104,6 +119,7 @@ class PushNotificationService implements PushNotifications {
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedAppSubscription;
+  final StreamController<int> _unreadCounts = StreamController.broadcast();
   String? _token;
   bool _started = false;
 
@@ -136,13 +152,27 @@ class PushNotificationService implements PushNotifications {
       unawaited(_registerCurrentToken());
     });
     _session.addListener(_onSessionChanged);
-    _foregroundSubscription = FirebaseMessaging.onMessage.listen(
-      _showForegroundNotification,
-    );
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
+      final unread = unreadCountOf(message.data);
+      if (unread != null) _unreadCounts.add(unread);
+      _showForegroundNotification(message);
+    });
     // 앱이 뒤에 떠 있을 때 트레이의 알림을 누른 경우. 화면이 이미 있어 바로 옮긴다.
     _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
       (message) => _goTo(destinationForPushData(message.data)),
     );
+  }
+
+  @override
+  Stream<int> get unreadCounts => _unreadCounts.stream;
+
+  /// 푸시 `data` 의 안 읽은 알림 개수. 푸시 `data` 는 값이 전부 문자열이라 숫자로
+  /// 바꾼다. 없거나 숫자가 아니면 null 이고, 그때는 점을 건드리지 않는다.
+  @visibleForTesting
+  static int? unreadCountOf(Map<String, dynamic> data) {
+    final raw = data['unreadCount'];
+    final parsed = raw is String ? int.tryParse(raw) : null;
+    return parsed == null || parsed < 0 ? null : parsed;
   }
 
   @override
@@ -329,5 +359,6 @@ class PushNotificationService implements PushNotifications {
     await _tokenRefreshSubscription?.cancel();
     await _foregroundSubscription?.cancel();
     await _openedAppSubscription?.cancel();
+    await _unreadCounts.close();
   }
 }

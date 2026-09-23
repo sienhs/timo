@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../core/widgets/poster_stage.dart';
 import '../../../routes/app_routes.dart';
+import '../../alarm/constants.dart';
+import '../../alarm/models/alarm_status.dart';
+import '../../alarm/state/alarm_api_scope.dart';
 import '../../auth/state/auth_session_scope.dart';
 import '../../booking/models/performance.dart';
 import '../../booking/state/booking_scope.dart';
@@ -130,23 +134,58 @@ class _LoadedShowState extends State<_LoadedShow> {
   /// 하단 바. 안내 스낵바를 그 위로 띄우려고 높이를 잰다.
   final GlobalKey _bottomBarKey = GlobalKey();
 
-  /// 예매 오픈 알림을 신청했는가.
+  /// 이 공연에 대한 내 알림 신청 상태. 버튼 두 개가 이것으로 켜짐과 꺼짐을 그린다.
   ///
-  /// **아직 화면 안에서만 켜지고 꺼진다.** 서버에 알림 신청 API 가 이미 있지만
-  /// (`AlarmController` — `PUT/DELETE /api/v1/alarms/{concertId}/{type}`,
-  /// 상태는 `GET /api/v1/alarms/{concertId}`) 붙이는 일은 다른 사람 몫이라
-  /// 여기서는 버튼이 갈리는 모양까지만 만들어 둔다. 붙일 때는 이 두 필드를
-  /// 서버에서 받은 값으로 바꾸고 아래 두 함수 안에서 요청을 보내면 된다 —
-  /// 화면 트리와 버튼 쪽은 그대로 둘 수 있다.
-  bool _openAlarmOn = false;
+  /// 공연 상세 응답에는 이 값이 없어(로그인 없이 열리는 화면이라) 따로 묻는다.
+  /// 로그아웃 상태면 묻지 않고 둘 다 꺼진 채로 둔다.
+  AlarmStatus _alarms = AlarmStatus.none;
 
-  /// 양도 매물 알림을 신청했는가. 오픈 알림과 따로 켜고 끈다.
-  bool _marketAlarmOn = false;
+  /// 신청 상태를 어느 로그인 상태에서 물었는가. 로그인 상태가 바뀔 때만 다시
+  /// 묻거나 비우려고 둔다. 처음에는 아무 상태에서도 묻지 않았으므로 null.
+  bool? _alarmsLoggedIn;
+
+  /// 신청 상태를 받기 전에 버튼을 눌렀는가. 그랬다면 늦게 도착한 응답이 방금
+  /// 누른 결과를 덮지 않게 버린다.
+  bool _alarmsTouched = false;
+
+  /// 서버에 보내는 중인 알림 종류. 끝나기 전에 같은 버튼을 또 누르면 무시한다 —
+  /// 켜기와 끄기가 겹쳐 나가면 어느 쪽이 나중에 도착할지 알 수 없다.
+  final Set<AlarmType> _sendingAlarms = {};
 
   @override
   void initState() {
     super.initState();
     _startTickingIfUpcoming();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final loggedIn = AuthSessionScope.maybeOf(context)?.isLoggedIn ?? false;
+    if (loggedIn == _alarmsLoggedIn) return;
+    _alarmsLoggedIn = loggedIn;
+    _alarmsTouched = false;
+    if (loggedIn) {
+      _loadAlarms();
+    } else {
+      // 로그아웃하면 직전 회원의 신청 상태가 남지 않게 지운다.
+      _alarms = AlarmStatus.none;
+    }
+  }
+
+  /// 신청 상태를 서버에 묻는다. 못 받아도 알리지 않는다 — 버튼이 꺼진 채로
+  /// 보일 뿐이고, 눌러서 신청하는 데는 지장이 없다.
+  Future<void> _loadAlarms() async {
+    final api = AlarmApiScope.maybeOf(context);
+    if (api == null) return;
+    try {
+      final status = await api.fetchStatus(widget.detail.id);
+      // 기다리는 사이 버튼을 눌렀거나 로그아웃했으면 이 응답은 낡았다.
+      if (!mounted || _alarmsTouched || _alarmsLoggedIn != true) return;
+      setState(() => _alarms = status);
+    } on ApiException {
+      // 위 설명대로 알리지 않는다.
+    }
   }
 
   @override
@@ -167,25 +206,61 @@ class _LoadedShowState extends State<_LoadedShow> {
     });
   }
 
-  /// 오픈 알림 버튼을 눌렀을 때.
-  void _toggleOpenAlarm() {
-    setState(() => _openAlarmOn = !_openAlarmOn);
-    _notify(
-      _openAlarmOn
-          ? ShowDetailStrings.openAlarmOn
-          : ShowDetailStrings.openAlarmOff,
-    );
+  /// 알림 버튼을 눌렀을 때. 버튼부터 바꾸고 서버에 보낸다.
+  ///
+  /// 찜 하트와 같은 규칙이다. 로그아웃 상태면 부르지 않고 안내만 한다(서버가
+  /// 401 을 준다). 실패하면 버튼을 되돌리고 서버가 준 문구로 알린다. 신청했다는
+  /// 안내는 서버가 받은 뒤에 띄운다 — 먼저 띄우면 실패했을 때 '신청했어요' 와
+  /// 실패 안내가 연달아 뜬다.
+  Future<void> _toggleAlarm(AlarmType type) async {
+    if (!(AuthSessionScope.maybeRead(context)?.isLoggedIn ?? false)) {
+      showInfoSnackBar(
+        context,
+        ShowDetailStrings.alarmLoginRequired,
+        bottomMargin: _snackBarBottomMargin,
+      );
+      return;
+    }
+    final api = AlarmApiScope.maybeOf(context);
+    if (api == null || _sendingAlarms.contains(type)) return;
+
+    final on = !_alarms.isOn(type);
+    _alarmsTouched = true;
+    setState(() {
+      _alarms = _alarms.copyWith(type, on: on);
+      _sendingAlarms.add(type);
+    });
+
+    final concertId = widget.detail.id;
+    try {
+      if (on) {
+        await api.subscribe(concertId, type);
+      } else {
+        await api.unsubscribe(concertId, type);
+      }
+      if (mounted) _notify(_alarmMessage(type, on: on));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _alarms = _alarms.copyWith(type, on: !on));
+      showErrorSnackBar(
+        context,
+        e is ApiException ? e.message : AlarmStrings.toggleFailed,
+        bottomMargin: _snackBarBottomMargin,
+      );
+    } finally {
+      if (mounted) setState(() => _sendingAlarms.remove(type));
+    }
   }
 
-  /// 양도 마켓 알림 버튼을 눌렀을 때.
-  void _toggleMarketAlarm() {
-    setState(() => _marketAlarmOn = !_marketAlarmOn);
-    _notify(
-      _marketAlarmOn
-          ? ShowDetailStrings.marketAlarmOn
-          : ShowDetailStrings.marketAlarmOff,
-    );
-  }
+  static String _alarmMessage(AlarmType type, {required bool on}) =>
+      switch (type) {
+        AlarmType.concertOpen =>
+          on ? ShowDetailStrings.openAlarmOn : ShowDetailStrings.openAlarmOff,
+        AlarmType.marketListing =>
+          on
+              ? ShowDetailStrings.marketAlarmOn
+              : ShowDetailStrings.marketAlarmOff,
+      };
 
   /// 알림 신청 결과를 한 줄로 알린다. 앱 공통 안내 상자를 쓴다.
   ///
@@ -314,11 +389,11 @@ class _LoadedShowState extends State<_LoadedShow> {
             detail: detail,
             now: now,
             // 상단 하트(찜)와는 별개다. 찜을 풀어도 알림 신청은 그대로다.
-            isOpenAlarmOn: _openAlarmOn,
-            isMarketAlarmOn: _marketAlarmOn,
+            isOpenAlarmOn: _alarms.concertOpen,
+            isMarketAlarmOn: _alarms.marketListing,
             onBookPressed: _startBooking,
-            onOpenAlarmPressed: _toggleOpenAlarm,
-            onMarketAlarmPressed: _toggleMarketAlarm,
+            onOpenAlarmPressed: () => _toggleAlarm(AlarmType.concertOpen),
+            onMarketAlarmPressed: () => _toggleAlarm(AlarmType.marketListing),
           ),
         ),
       ],
