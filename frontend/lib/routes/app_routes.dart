@@ -14,6 +14,8 @@ import '../features/booking/state/booking_scope.dart';
 import '../features/booking/state/ticket_order_adapter.dart';
 import '../features/favorite/screens/favorite_list_screen.dart';
 import '../features/home/screens/all_shows_screen.dart';
+import '../features/home/screens/category_screen.dart';
+import '../features/settings/screens/settings_screen.dart';
 import '../features/home/screens/open_soon_shows_screen.dart';
 import '../features/home/screens/show_search_screen.dart';
 import '../features/memory/screens/collection_screen.dart';
@@ -65,6 +67,12 @@ class AppRoutes {
 
   /// 공연 전체 조회. 홈의 "인기 공연" 더보기에서 들어온다.
   static const allShows = '/shows';
+
+  /// 카테고리. 빠른 메뉴에서 들어온다.
+  static const categories = '/categories';
+
+  /// 환경 설정. 빠른 메뉴에서 들어온다.
+  static const settings = '/settings';
 
   /// 찜리스트. 빠른 메뉴에서 들어온다.
   static const favorites = '/favorites';
@@ -141,6 +149,8 @@ class AppRoutes {
     ),
     openSoonShows: (_) => const OpenSoonShowsScreen(),
     allShows: (_) => const AllShowsScreen(),
+    categories: (_) => const CategoryScreen(),
+    settings: (_) => const SettingsScreen(),
     favorites: (_) => const FavoriteListScreen(),
     myTickets: (_) => const MyTicketsScreen(),
     coinCharge: (_) => const CoinChargeScreen(),
