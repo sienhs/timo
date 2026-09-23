@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/memory/constants.dart';
 import 'package:timo/features/memory/data/goods_api.dart';
 import 'package:timo/features/memory/data/ticket_store.dart';
@@ -168,13 +169,18 @@ void main() {
       for (var i = 0; i < 20; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 50));
         await tester.pump();
-        if (find.text(GoodsText.alreadyExists).evaluate().isNotEmpty) break;
+        if (find
+            .text(toastText(GoodsText.alreadyExists))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
       }
     });
 
     // 서버가 받지 않았으면 확정도 아니다. 확정해 두면 다시 만들 수도 없다.
     expect(store.readAll().single.confirmed, isFalse);
-    expect(find.text(GoodsText.alreadyExists), findsOneWidget);
+    expect(find.text(toastText(GoodsText.alreadyExists)), findsOneWidget);
   });
 
   testWidgets('확정한 소장품에는 확정 줄이 없다', (tester) async {

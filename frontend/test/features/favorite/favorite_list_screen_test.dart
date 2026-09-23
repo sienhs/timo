@@ -229,6 +229,21 @@ void main() {
       expect(find.byType(FavoriteShowCard), findsNWidgets(3));
     });
 
+    testWidgets('되돌리기 안내는 누르지 않아도 2초 뒤 내려간다', (tester) async {
+      await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
+
+      await tester.tap(find.byTooltip(FavoriteStrings.unfavorite).first);
+      await tester.pumpAndSettle();
+      expect(find.text(FavoriteStrings.removed), findsOneWidget);
+
+      // 버튼이 달린 토스트는 Flutter 기본값이면 누를 때까지 남는다.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.text(FavoriteStrings.removed), findsNothing);
+      // 되돌리지 않았으니 빠진 채다.
+      expect(store.favorites.hasShow(bigbang.id), isFalse);
+    });
+
     testWidgets('카드를 누르면 공연 상세가 열린다', (tester) async {
       await pumpFavorites(tester, shows: seededShows, artists: seededArtists);
 

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/constants.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
@@ -378,7 +379,7 @@ void main() {
       // 충전 화면은 닫히고, 성공 안내와 함께 새 잔액이 보인다.
       expect(find.byType(CoinChargeScreen), findsNothing);
       expect(
-        find.text(MyPageStrings.chargeSucceeded('10,000')),
+        find.text(toastText(MyPageStrings.chargeSucceeded('10,000'))),
         findsOneWidget,
       );
       expect(find.text('133,000'), findsOneWidget);

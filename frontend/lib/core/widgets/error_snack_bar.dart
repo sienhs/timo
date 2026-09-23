@@ -77,6 +77,7 @@ void _showFloatingSnackBar(
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
+        duration: toastDuration,
         // 모양은 안쪽 상자가 그린다. SnackBar 자체는 투명하게 두어 흰 상자만
         // 보이게 한다.
         backgroundColor: Colors.transparent,
@@ -110,7 +111,9 @@ void _showFloatingSnackBar(
               ],
             ),
             child: Text(
-              message,
+              toastText(message),
+              // 화면 읽기는 줄 바꿈·단어 묶음 기호가 들어가기 전 문구로 한다.
+              semanticsLabel: message,
               textAlign: TextAlign.center,
               softWrap: true,
               style: textTheme.bodyMedium?.copyWith(
@@ -122,6 +125,39 @@ void _showFloatingSnackBar(
       ),
     );
 }
+
+/// 토스트가 떠 있는 시간. 한 줄이든 두 줄이든 같다.
+///
+/// Flutter 기본값(4초)은 짧은 안내에 비해 길어서, 다음 동작을 하려는 손을
+/// 붙잡아 둔다.
+const toastDuration = Duration(seconds: 2);
+
+/// 토스트에 실제로 그리는 문구.
+///
+/// 두 가지를 손본다.
+/// - 문장이 둘 이상이면 문장마다 줄을 넘긴다. 서버가 보낸 문구도 여기를
+///   지나므로 문구 쪽을 고치지 않아도 된다.
+/// - 한 줄이 폭을 넘을 때 띄어쓰기에서만 넘어가게 한다. Flutter 는 한글을
+///   글자 단위로 끊어 "시도해주" / "세요" 처럼 단어 중간에서 줄이 바뀐다.
+///   글자 사이에 폭 없는 단어 묶음 기호(U+2060)를 넣어 막는다.
+///
+/// 테스트에서 토스트 문구를 찾을 때도 이 함수를 거친 값으로 찾는다.
+String toastText(String message) => message
+    .replaceAll(_sentenceBoundary, '\n')
+    .split('\n')
+    .map(
+      (line) => line
+          .split(' ')
+          .map((word) => word.characters.join(_wordJoiner))
+          .join(' '),
+    )
+    .join('\n');
+
+/// 마침표·물음표·느낌표 뒤의 띄어쓰기(또는 이미 넣어 둔 줄 바꿈).
+/// 뒤에 글자가 더 있을 때만 — 문구 끝의 공백에서 빈 줄이 생기지 않게.
+final _sentenceBoundary = RegExp(r'(?<=[.!?])\s+(?=\S)');
+
+const _wordJoiner = '\u2060';
 
 /// 하단 고정 버튼 높이(52) + 버튼 아래 여백(16) + 버튼과 스낵바 사이 틈(12).
 ///

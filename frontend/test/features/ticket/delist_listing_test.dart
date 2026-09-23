@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/data/mock_auth_api.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
@@ -134,7 +135,7 @@ void main() {
       await tester.tap(find.text(TicketStrings.delistConfirmAgree));
       await tester.pumpAndSettle();
 
-      expect(find.text('이미 팔렸거나 내려간 매물이에요.'), findsOneWidget);
+      expect(find.text(toastText('이미 팔렸거나 내려간 매물이에요.')), findsOneWidget);
       expect(find.text(TicketStrings.listingBadge), findsOneWidget);
       expect(find.text(TicketStrings.delistedNotice), findsNothing);
     });

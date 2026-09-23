@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/network/server_errors.dart';
+import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/core/widgets/timo_mascot.dart';
 import 'package:timo/features/booking/models/performance.dart';
 import 'package:timo/features/booking/models/seat.dart';
@@ -330,7 +331,7 @@ void main() {
 
       await pay(tester);
 
-      expect(find.text('결제할 수 없는 주문입니다.'), findsOneWidget);
+      expect(find.text(toastText('결제할 수 없는 주문입니다.')), findsOneWidget);
       expect(find.byType(PaymentScreen), findsNothing);
       expect(find.text('결제 화면으로'), findsOneWidget);
       expect(results, [null]);
@@ -386,7 +387,7 @@ void main() {
 
         await pay(tester);
 
-        expect(find.text(rejection.expected), findsOneWidget);
+        expect(find.text(toastText(rejection.expected)), findsOneWidget);
         // 서버 문구의 디버깅용 꼬리가 새어 나오지 않는다.
         expect(find.textContaining('='), findsNothing);
         expect(find.byType(PaymentScreen), findsNothing);
@@ -400,7 +401,10 @@ void main() {
 
       await pay(tester);
 
-      expect(find.text(PaymentConstants.loginRequired), findsOneWidget);
+      expect(
+        find.text(toastText(PaymentConstants.loginRequired)),
+        findsOneWidget,
+      );
       expect(find.byType(PaymentScreen), findsNothing);
     });
 
@@ -411,7 +415,7 @@ void main() {
 
       await pay(tester);
 
-      expect(find.text('인터넷 연결을 확인해주세요.'), findsOneWidget);
+      expect(find.text(toastText('인터넷 연결을 확인해주세요.')), findsOneWidget);
       expect(find.byType(PaymentScreen), findsOneWidget);
       expect(results, isEmpty);
 
