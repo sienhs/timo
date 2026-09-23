@@ -42,6 +42,13 @@ class ShowDetailMetrics {
   /// 상세 안내 이미지 사이 간격.
   static const noticeImageGap = 12.0;
 
+  /// 기본 안내 문구의 줄 사이. 이미지 사이보다 좁다 — 네 줄이 한 덩어리의
+  /// 규정으로 읽혀야 한다.
+  static const noticeLineGap = 8.0;
+
+  /// 기본 안내 문구의 글줄 높이.
+  static const noticeLineHeight = 1.5;
+
   /// 하단 바의 안내 문구와 버튼 사이.
   static const bottomBarGap = 10.0;
 
@@ -93,6 +100,26 @@ class ShowDetailStrings {
 
   static const noticeImageLoading = '안내 이미지를 불러오는 중이에요.';
   static const noticeImageError = '안내 이미지를 불러오지 못했어요.';
+
+  /// 안내 이미지가 없는 공연에 대신 적는 문구.
+  ///
+  /// **서버에서 받지 않고 앱이 들고 있다.** 공연마다 갈리는 내용이 아니라
+  /// 서비스 전체에 걸린 규정이어서다 — 예매 마감 시각도 양도 정가 한도도
+  /// 서버 코드에 상수·검증으로 박혀 있지, 공연 행마다 저장되는 값이 아니다.
+  /// 공연별 안내는 주최사가 올린 이미지(`ShowDetail.imageUrls`)가 맡는다.
+  ///
+  /// 문구가 가리키는 실제 규칙은 이렇다. 고칠 일이 생기면 여기만 고쳐서는
+  /// 안 되고 아래가 함께 움직여야 한다:
+  /// - 예매 마감: 서버 `Concert.BOOKING_CUTOFF_HOURS`
+  /// - 양도 등록가 상한: 서버 `ListingService` 의 정가 이하 검증
+  /// - 캡처 QR: `TicketStrings.qrCaptureNotice`
+  /// - 취소·환불: `TicketStrings.cancelConfirmBody`
+  static const defaultNoticeLines = [
+    '예매는 공연 시작 2시간 전에 마감돼요.',
+    '입장은 티켓 QR로만 할 수 있어요. 캡처한 화면은 입장할 수 없어요.',
+    '티켓 양도는 앱 안에서만 할 수 있고, 등록가는 정가를 넘을 수 없어요.',
+    '예매를 취소하면 티켓이 회수되고 결제 금액이 전액 환불돼요.',
+  ];
 
   /// 상태 뱃지. 오픈 전후로 갈린다.
   ///
