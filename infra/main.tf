@@ -23,6 +23,14 @@ module "backend_secret" {
     FIREBASE_MESSAGING_ENABLED           = "true"
     PUSH_CHANNEL_GENERAL                 = "timo_general_notifications"
     FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = var.firebase_service_account_json_base64
+    SEED_ORGANIZER_PHONE                 = var.seed_organizer_phone
+    SEED_ORGANIZER_NAME                  = var.seed_organizer_name
+    SEED_ORGANIZER_NICKNAME              = var.seed_organizer_nickname
+    SEED_ADMIN_PHONE                     = var.seed_admin_phone
+    SEED_ADMIN_NAME                      = var.seed_admin_name
+    SEED_ADMIN_NICKNAME                  = var.seed_admin_nickname
+    SEED_ADMIN_USERNAME                  = var.seed_admin_username
+    SEED_ADMIN_PASSWORD                  = var.seed_admin_password
   }, var.solapi_environment, module.image_storage.runtime_environment))
 }
 

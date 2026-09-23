@@ -89,7 +89,7 @@ class LocalDataSeederTest {
     private SeatService seatService;
 
     @Autowired
-    private VenueService venueService;
+    private VenueSeatCatalogSeeder venueSeatCatalogSeeder;
 
     @Autowired
     private ConcertRepository concertRepository;
@@ -473,9 +473,8 @@ class LocalDataSeederTest {
         return new LocalDataSeeder(
                 concertService,
                 seatService,
-                venueService,
+                venueSeatCatalogSeeder,
                 concertRepository,
-                venueRepository,
                 seatRepository,
                 sectionRepository,
                 artistRepository,
