@@ -11,7 +11,7 @@ class ShowArtist {
 
   final String name;
 
-  /// 프로필 사진 주소. 없는 아티스트는 null 이고, 이 경우 이름 첫 글자로
+  /// 프로필 사진 주소. 없는 아티스트는 null 이고, 이 경우 마스코트 얼굴로
   /// 대체한다.
   final String? photoUrl;
 }

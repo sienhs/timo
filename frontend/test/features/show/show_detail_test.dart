@@ -643,6 +643,12 @@ void main() {
     expect(find.text('아이유'), findsOneWidget);
   });
 
+  /// NOTICE 영역 안의 이미지. 화면 전체를 세면 아티스트 사진 폴백까지 잡힌다.
+  final noticeImages = find.descendant(
+    of: find.byType(ShowNotice),
+    matching: find.byType(Image),
+  );
+
   testWidgets('안내 이미지가 없으면 NOTICE 에 공통 규정을 적는다', (tester) async {
     await pumpDetail(tester, detailOpening());
 
@@ -657,7 +663,8 @@ void main() {
     for (final line in ShowDetailStrings.defaultNoticeLines) {
       expect(find.text(line), findsOneWidget);
     }
-    expect(find.byType(Image), findsNothing);
+    // 아티스트 사진 폴백(마스코트)도 Image 라 NOTICE 안만 본다.
+    expect(noticeImages, findsNothing);
   });
 
   testWidgets('NOTICE 이미지를 서버 순서대로 표시한다', (tester) async {
@@ -680,7 +687,7 @@ void main() {
     expect(find.text(ShowDetailStrings.noticeSection), findsOneWidget);
     // 이미지가 있으면 공통 규정은 물러난다 - 주최사 안내가 우선이다.
     expect(find.text(ShowDetailStrings.defaultNoticeLines.first), findsNothing);
-    final images = tester.widgetList<Image>(find.byType(Image)).toList();
+    final images = tester.widgetList<Image>(noticeImages).toList();
     expect(images.map((image) => (image.image as NetworkImage).url), [
       'https://example.com/first.jpg',
       'https://example.com/second.jpg',
