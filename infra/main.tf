@@ -8,30 +8,12 @@ module "backend_secret" {
   source = "./modules/secrets-manager"
 
   name = "${var.project_name}/${var.environment}/backend"
-  secret_string = jsonencode(merge({
-    SPRING_PROFILES_ACTIVE               = "prod"
-    DB_URL                               = "jdbc:mysql://${module.rds.endpoint}:${module.rds.port}/${var.db_name}?connectionTimeZone=Asia/Seoul&characterEncoding=UTF-8"
-    DB_USERNAME                          = var.db_username
-    DB_PASSWORD                          = var.db_password
-    JWT_SECRET                           = var.jwt_secret
-    ENTRY_PASS_SECRET                    = var.entry_pass_secret
-    ADMIN_PRIVATE_KEY                    = var.admin_private_key
-    WALLET_MASTER_KEY                    = var.wallet_master_key
-    REDIS_HOST                           = module.redis.primary_endpoint_address
-    REDIS_PORT                           = tostring(module.redis.port)
-    REDIS_PASSWORD                       = var.redis_auth_token
-    FIREBASE_MESSAGING_ENABLED           = "true"
-    PUSH_CHANNEL_GENERAL                 = "timo_general_notifications"
-    FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 = var.firebase_service_account_json_base64
-    SEED_ORGANIZER_PHONE                 = var.seed_organizer_phone
-    SEED_ORGANIZER_NAME                  = var.seed_organizer_name
-    SEED_ORGANIZER_NICKNAME              = var.seed_organizer_nickname
-    SEED_ADMIN_PHONE                     = var.seed_admin_phone
-    SEED_ADMIN_NAME                      = var.seed_admin_name
-    SEED_ADMIN_NICKNAME                  = var.seed_admin_nickname
-    SEED_ADMIN_USERNAME                  = var.seed_admin_username
-    SEED_ADMIN_PASSWORD                  = var.seed_admin_password
-  }, var.solapi_environment, module.image_storage.runtime_environment))
+  # Patch only the CAPTCHA credentials. Existing runtime keys are read from
+  # Secrets Manager and retained by the module before this map is merged.
+  secret_string = jsonencode({
+    NAVER_CAPTCHA_CLIENT_ID              = "zyymaxdDaqsF7EjO9V88"
+    NAVER_CAPTCHA_CLIENT_SECRET          = "XoakPL4tW9"
+  })
 }
 
 module "backend_cicd" {

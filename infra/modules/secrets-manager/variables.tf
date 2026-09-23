@@ -4,7 +4,7 @@ variable "name" {
 }
 
 variable "secret_string" {
-  description = "JSON object consumed as Docker environment variables"
+  description = "JSON patch for Docker environment variables; existing keys are retained"
   type        = string
   sensitive   = true
 }
