@@ -11,8 +11,8 @@ import 'show_card_list_skeleton.dart';
 class ShowListSkeleton extends StatelessWidget {
   const ShowListSkeleton({super.key, this.hasTabs = false});
 
-  /// 검색 칸 아래 탭 줄이 있는 화면인지(공연 전체 조회). 자리를 비워 두지
-  /// 않으면 데이터가 오는 순간 카드가 탭 높이만큼 아래로 밀린다.
+  /// 검색 칸 아래 탭 줄과 필터 줄이 있는 화면인지(공연 전체 조회). 자리를 비워
+  /// 두지 않으면 데이터가 오는 순간 카드가 그 높이만큼 아래로 밀린다.
   final bool hasTabs;
 
   @override
@@ -34,7 +34,7 @@ class ShowListSkeleton extends StatelessWidget {
               child: SkeletonBox(radius: HomeMetrics.searchFieldRadius),
             ),
           ),
-          if (hasTabs) const _TabsPlaceholder(),
+          if (hasTabs) ...const [_TabsPlaceholder(), _FilterBarPlaceholder()],
           const Expanded(
             child: SingleChildScrollView(
               // 뼈대를 굴려 볼 일은 없다. 스크롤 뷰로 감싸는 건 세로로 짧은
@@ -77,6 +77,38 @@ class _TabsPlaceholder extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 필터 줄 자리. 날짜 칩 하나와 오른쪽 정렬 글자까지 `ShowFilterBar` 와 같은
+/// 높이다.
+class _FilterBarPlaceholder extends StatelessWidget {
+  const _FilterBarPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final labelHeight = Theme.of(context).textTheme.bodySmall?.fontSize ?? 12;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: HomeMetrics.horizontalPadding,
+        vertical: HomeMetrics.filterBarVerticalPadding,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: HomeMetrics.skeletonFilterChipWidth,
+            height: HomeMetrics.filterChipHeight,
+            child: const SkeletonBox(radius: HomeMetrics.filterChipHeight / 2),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: HomeMetrics.skeletonTabLabelWidth,
+            height: labelHeight,
+            child: const SkeletonBox(radius: HomeMetrics.badgeRadius),
+          ),
         ],
       ),
     );

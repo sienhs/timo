@@ -171,6 +171,9 @@ class HomeMetrics {
   /// 뼈대에 그리는 탭 글자 한 개의 폭. '예매 가능 12' 정도를 덮는 길이다.
   static const skeletonTabLabelWidth = 64.0;
 
+  /// 뼈대에 그리는 날짜 칩의 폭. '전체 기간' 칩과 비슷한 길이다.
+  static const skeletonFilterChipWidth = 104.0;
+
   /// 뼈대에 그리는 섹션 제목 줄의 폭.
   static const skeletonSectionTitleWidth = 120.0;
 
@@ -233,6 +236,67 @@ class HomeMetrics {
   /// 하트 버튼이 아바타 정사각형 밖으로 나가는 거리. 하트 중심이 원 테두리
   /// (오른쪽 아래 45°)에 오도록 잡은 값이다.
   static const artistFavoriteOverhang = 8.0;
+
+  // 공연 전체 화면의 날짜·정렬 필터 줄
+  /// 탭 줄과 목록 사이에 끼는 필터 줄의 위아래 여백.
+  static const filterBarVerticalPadding = 10.0;
+
+  /// 날짜 칩. 찜 화면의 필터 칩과 같은 높이다.
+  static const filterChipHeight = 36.0;
+  static const filterChipHorizontalPadding = 12.0;
+  static const filterChipIconSize = 16.0;
+  static const filterChipIconGap = 6.0;
+
+  /// 날짜 칩 오른쪽의 해제(×) 버튼. 칩 높이 안에서 누를 수 있을 만큼만.
+  static const filterChipClearSize = 28.0;
+
+  /// 정렬 메뉴 옆 화살표.
+  static const sortIconSize = 18.0;
+
+  // 날짜 선택 시트
+  /// 시트가 차지하는 화면 높이 비율. 달력이 두 달쯤 보이면서 뒤 화면이 살짝
+  /// 남는 선이다.
+  static const dateSheetHeightFraction = 0.88;
+  static const sheetRadius = 16.0;
+  static const sheetHandleWidth = 36.0;
+  static const sheetHandleHeight = 4.0;
+  static const sheetHandleTopGap = 10.0;
+  static const sheetHorizontalPadding = 16.0;
+  static const sheetTitleGap = 4.0;
+  static const sheetSectionGap = 16.0;
+
+  /// 시트 맨 아래 초기화·적용 줄의 위아래 여백과 둘 사이 간격.
+  static const sheetActionVerticalPadding = 12.0;
+  static const sheetActionGap = 12.0;
+
+  /// 빠른 선택 칩(전체 · 이번 주말 · …). 날짜 칩보다 한 단계 작다.
+  static const presetChipHeight = 32.0;
+  static const presetChipGap = 8.0;
+  static const presetChipHorizontalPadding = 14.0;
+
+  // 달력
+  /// 날짜 칸 높이. 터치 최소 크기(44)다. 폭은 화면을 7 등분한다.
+  static const calendarCellHeight = 44.0;
+
+  /// 시작·끝 날짜에 그리는 원의 지름. 칸보다 작아 위아래로 숨이 트인다.
+  static const calendarDayCircleSize = 36.0;
+
+  /// 공연이 있는 날 아래 점.
+  static const calendarDotSize = 4.0;
+  static const calendarDotGap = 2.0;
+
+  /// 달 제목과 요일 줄, 요일 줄과 첫 주, 달과 달 사이 간격.
+  static const calendarMonthTitleGap = 12.0;
+  static const calendarWeekdayGap = 8.0;
+  static const calendarMonthGap = 24.0;
+
+  /// 달력이 보여 주는 달 수의 아래·위 한계. 공연이 없어도 석 달은 펼치고,
+  /// 아무리 먼 공연이 있어도 열두 달을 넘기지 않는다.
+  static const calendarMinMonths = 3;
+  static const calendarMaxMonths = 12;
+
+  /// 시작·끝 원과 구간 띠가 나타나는 시간. 동작 줄이기 설정이면 0 이다.
+  static const calendarSelectDuration = Duration(milliseconds: 150);
 }
 
 /// 홈 화면 문구. 숫자에서 파생되는 문구는 파생 규칙까지 여기 둔다.
@@ -364,4 +428,53 @@ class HomeStrings {
         to.month,
         to.day,
       ).difference(DateTime(from.year, from.month, from.day)).inDays;
+
+  // 공연 전체 화면의 날짜·정렬 필터
+  /// 날짜 칩의 기본 문구. 기간을 고르면 `09.23 ~ 10.05` 로 바뀐다.
+  static const dateFilterAll = '전체 기간';
+
+  /// 날짜 칩 오른쪽 × 의 스크린 리더용 라벨.
+  static const dateFilterClear = '기간 해제';
+
+  /// 정렬 메뉴 툴팁.
+  static const sortMenu = '정렬';
+
+  static const sortPopular = '인기순';
+  static const sortStartDate = '공연일 빠른 순';
+  static const sortOpenSoon = '오픈 임박순';
+
+  /// 날짜를 골랐는데 그 기간에 공연이 없을 때.
+  static const emptyInDateRange = '이 기간엔 공연이 없어요.';
+
+  // 날짜 선택 시트
+  static const dateSheetTitle = '날짜 선택';
+
+  /// 아직 아무 날도 고르지 않았을 때 제목 아래 한 줄.
+  static const dateSheetHint = '가고 싶은 날을 골라 주세요';
+
+  /// 시작일만 고른 상태. 끝을 고르지 않고 적용하면 하루짜리 기간이 된다.
+  static const dateSheetPickEnd = '마지막 날도 고르면 기간이 돼요';
+
+  static const dateSheetReset = '초기화';
+  static const dateSheetApplyAll = '전체 공연 보기';
+  static String dateSheetApply(int count) => '공연 $count건 보기';
+
+  static const presetAll = '전체';
+  static const presetThisWeekend = '이번 주말';
+  static const presetThisMonth = '이번 달';
+  static const presetNextMonth = '다음 달';
+
+  /// 달력 요일 줄. 일요일부터 시작한다.
+  static const calendarWeekdays = ['일', '월', '화', '수', '목', '금', '토'];
+
+  /// 달 제목. (예: `2026년 10월`)
+  static String calendarMonth(DateTime month) =>
+      '${month.year}년 ${month.month}월';
+
+  /// 날짜 칸의 스크린 리더용 라벨. 공연이 있으면 몇 건인지까지 읽는다 —
+  /// 점 하나로는 색을 못 보는 사람에게 전달되지 않는다.
+  static String calendarDay(DateTime day, {required int showCount}) {
+    final date = '${day.month}월 ${day.day}일';
+    return showCount > 0 ? '$date, 공연 $showCount건' : date;
+  }
 }

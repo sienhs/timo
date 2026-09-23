@@ -89,6 +89,11 @@ String formatMonthDayWithWeekday(DateTime at) =>
     '${_twoDigits(at.month)}.${_twoDigits(at.day)} '
     '(${_weekdayNames[at.weekday - 1]})';
 
+/// 연도를 뺀 월·일. (예: `10.05`) 달력에서 고른 기간처럼 연도가 자명하고
+/// 요일까지는 필요 없는 자리에 쓴다.
+String formatMonthDay(DateTime at) =>
+    '${_twoDigits(at.month)}.${_twoDigits(at.day)}';
+
 /// 시:분만. (예: `14:00`) 날짜가 문맥으로 이미 정해진 자리에 쓴다.
 String formatClock(DateTime at) => _formatTime(at);
 
