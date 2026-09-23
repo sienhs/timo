@@ -468,5 +468,3 @@ END //
 DELIMITER ;
 CALL ensure_entity_unique_constraints();
 DROP PROCEDURE ensure_entity_unique_constraints;
-
--- 즉시 좌석 선점 부하 테스트를 할 수 있는 단일 공연장·공연·구역·좌석 1,000석.
