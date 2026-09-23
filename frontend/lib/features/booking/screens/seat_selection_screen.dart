@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
+import '../../mypage/data/my_page_api.dart';
+import '../../mypage/state/my_page_api_scope.dart';
 import '../constants.dart';
 import '../data/booking_api.dart';
 import '../models/seat.dart';
@@ -35,6 +37,9 @@ class SeatSelectionScreen extends StatefulWidget {
 
 class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   late BookingApi _api;
+
+  /// 예매자 실명을 받아 오는 데만 쓴다. 이 화면이 그리는 값은 없다.
+  late MyPageApi _myPageApi;
   late int _concertId;
   late BookingController _controller;
   late Future<ZoneSeats> _seats;
@@ -51,6 +56,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   void initState() {
     super.initState();
     _api = BookingApiScope.of(context);
+    _myPageApi = MyPageApiScope.of(context);
     _controller = BookingScope.read(context);
     _concertId = _controller.concertId;
     _zoneId = widget.zoneId;
@@ -188,6 +194,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   ///
   /// **탭한 순간이 아니라 여기서 잡는다.** 칸이 작아 오탭이 잦은데 탭마다
   /// 요청을 보내면 남의 자리까지 풀렸다 잡혔다 한다.
+  ///
+  /// 결제 화면에 찍을 예매자 실명도 여기서 함께 받는다. 자리를 잡고 나서
+  /// 이어 보내면 그만큼 결제 진입이 늦어지는데, 선점은 이미 임계 경로다.
   Future<void> _onCheckout() async {
     final seat = _controller.selectedSeat;
     final seatLabel = _controller.selectedSeatLabel;
@@ -196,10 +205,15 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     final confirmed = await showSeatConfirmDialog(context, seatLabel);
     if (!confirmed || !mounted) return;
 
+    final bookerName = _fetchBookerName();
+
     setState(() => _holding = true);
     try {
       final hold = await _api.holdSeat(concertId: _concertId, seatId: seat.id);
       if (!mounted) return;
+      final name = await bookerName;
+      if (!mounted) return;
+      if (name != null) _controller.setBookerName(name);
       _controller.holdSeat(hold);
     } on ApiException catch (e) {
       if (mounted) _onHoldFailed(e);
@@ -224,6 +238,23 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
     // 결제를 마치지 않고 돌아왔다. 잡아 둔 자리를 놓아 남이 살 수 있게 한다.
     await _releaseHold();
+  }
+
+  /// 결제 화면에 찍을 예매자 실명. 실패하면 null 이다.
+  ///
+  /// **던지지 않는다.** 이 Future 는 선점 요청과 나란히 떠 있다가 나중에
+  /// 기다려지는데, 그 사이에 예외로 끝나면 아무도 받지 않은 비동기 오류가 된다.
+  /// 게다가 이름을 못 받은 것으로 결제를 막을 생각이 없다 — 자리는 이미
+  /// 잡혔고, 비어 있을 때 화면이 할 일은 `TicketOrder.bookerName` 에 있다.
+  /// 실패를 [ApiException] 으로 좁히지 않는다. 응답에 이름이 없거나 모양이
+  /// 다르면 형 변환 오류로 오는데, 그것까지 여기서 받아 내야 결제가 멈추지
+  /// 않는다. 지도를 못 받아도 좌석 선택은 되게 두는 것과 같다([_loadZones]).
+  Future<String?> _fetchBookerName() async {
+    try {
+      return await _myPageApi.fetchBookerName();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 잡아 둔 자리를 푼다. 실패는 삼킨다 — 5분 뒤 서버가 알아서 푼다.

@@ -13,6 +13,12 @@ import 'package:timo/features/booking/screens/seat_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_api_scope.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/data/mock_my_page_data.dart';
+import 'package:timo/features/mypage/data/my_page_api.dart';
+import 'package:timo/features/mypage/models/member_profile.dart';
+import 'package:timo/features/mypage/models/wallet_summary.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 고정 배치도(랜덤 시드)에 기대면 어느 좌석이 예매 가능한지 알 수 없으므로
@@ -77,6 +83,22 @@ class _FakeBookingApi implements BookingApi {
   }
 }
 
+/// 예매자 실명 요청만 실패하는 목. 자리는 잡혔는데 이름을 못 받은 경우를 만든다.
+class _NamelessMyPageApi implements MyPageApi {
+  @override
+  Future<String> fetchBookerName() =>
+      Future.error(const ApiException('인터넷 연결을 확인해주세요.'));
+
+  @override
+  Future<MemberProfile> fetchProfile() => throw UnimplementedError();
+
+  @override
+  Future<WalletSummary> fetchWallet() => throw UnimplementedError();
+
+  @override
+  Future<WalletSummary> charge(int amount) => throw UnimplementedError();
+}
+
 BookingController _buildController() => BookingController(
   performance: Performance(
     title: '테스트 공연',
@@ -85,13 +107,20 @@ BookingController _buildController() => BookingController(
   ),
 );
 
-Widget _app(BookingController controller, BookingApi api) => MaterialApp(
+Widget _app(
+  BookingController controller,
+  BookingApi api, {
+  MyPageApi myPageApi = const MockMyPageApi(latency: Duration.zero),
+}) => MaterialApp(
   theme: AppTheme.light,
-  home: BookingApiScope(
-    api: api,
-    child: BookingScope(
-      controller: controller,
-      child: const SeatSelectionScreen(zoneId: 1),
+  home: MyPageApiScope(
+    api: myPageApi,
+    child: BookingApiScope(
+      api: api,
+      child: BookingScope(
+        controller: controller,
+        child: const SeatSelectionScreen(zoneId: 1),
+      ),
     ),
   ),
   // 선점이 성공하면 결제로, 인증이 막히면 로그인으로 간다. 목적지가 없으면
@@ -261,6 +290,31 @@ void main() {
       await checkout(tester, select: false);
 
       expect(api.held, [11]);
+      expect(controller.hold?.seatId, 11);
+      expect(find.text('결제 화면'), findsOneWidget);
+    });
+
+    // 결제 화면의 '예매자 성함' 이 여기서 채워진다. 예전에는 목 상수(홍길동)가
+    // 그 자리에 박혀 있어 누가 예매하든 같은 이름이 찍혔다.
+    testWidgets('자리를 잡으면서 예매자 실명도 받아 둔다', (tester) async {
+      await pumpSeats(tester);
+
+      await checkout(tester);
+
+      expect(controller.bookerName, MockMyPageData.bookerName);
+    });
+
+    // 자리는 잡혔는데 이름 요청만 실패한 경우다. 여기서 막으면 잡아 둔 자리를
+    // 날리게 되므로 이름 없이 진행시킨다(결제 화면이 그 줄을 뺀다).
+    testWidgets('이름을 못 받아도 자리는 잡히고 결제로 넘어간다', (tester) async {
+      await tester.pumpWidget(
+        _app(controller, api, myPageApi: _NamelessMyPageApi()),
+      );
+      await tester.pumpAndSettle();
+
+      await checkout(tester);
+
+      expect(controller.bookerName, isNull);
       expect(controller.hold?.seatId, 11);
       expect(find.text('결제 화면'), findsOneWidget);
     });

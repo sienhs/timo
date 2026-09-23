@@ -10,6 +10,12 @@ class MockMyPageData {
 
   static const profile = MemberProfile(memberId: 1, nickname: '엥간한 닉네임');
 
+  /// 본인인증으로 확인된 실명. 결제 화면의 '예매자 성함' 에 찍힌다.
+  ///
+  /// [profile] 에 없는 이유: 실명은 모델에 담지 않고 필요한 화면이 그때만 꺼내
+  /// 쓴다(`MyPageApi.fetchBookerName`).
+  static const bookerName = '홍길동';
+
   /// 충전 내역 한 줄의 이름과 결제 경로. 시안의 사용 내역에 있는 문구 그대로다.
   /// [MockWalletLedger] 가 새 충전을 이 이름으로 쌓는다.
   static const chargeTitle = '버섯 충전';

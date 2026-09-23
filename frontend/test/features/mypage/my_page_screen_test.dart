@@ -81,6 +81,10 @@ class _FlakyMyPageApi implements MyPageApi {
   int profileCalls = 0;
   int walletCalls = 0;
 
+  /// 예매자 실명은 결제 흐름만 쓴다. 이 목이 붙는 화면은 부르지 않는다.
+  @override
+  Future<String> fetchBookerName() => throw UnimplementedError();
+
   static const message = '인터넷 연결을 확인해주세요.';
 
   @override
@@ -455,6 +459,10 @@ class _ManyTransactionsApi implements MyPageApi {
   @override
   Future<MemberProfile> fetchProfile() => Future.value(MockMyPageData.profile);
 
+  /// 예매자 실명은 결제 흐름만 쓴다. 이 목이 붙는 화면은 부르지 않는다.
+  @override
+  Future<String> fetchBookerName() => throw UnimplementedError();
+
   @override
   Future<WalletSummary> fetchWallet() => Future.value(
     WalletSummary(
@@ -479,6 +487,10 @@ class _ManyTransactionsApi implements MyPageApi {
 class _EmptyWalletApi implements MyPageApi {
   @override
   Future<MemberProfile> fetchProfile() => Future.value(MockMyPageData.profile);
+
+  /// 예매자 실명은 결제 흐름만 쓴다. 이 목이 붙는 화면은 부르지 않는다.
+  @override
+  Future<String> fetchBookerName() => throw UnimplementedError();
 
   @override
   Future<WalletSummary> fetchWallet() =>

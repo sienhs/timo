@@ -23,9 +23,6 @@ import '../models/zone.dart';
 class MockBookingData {
   MockBookingData._();
 
-  /// 예매자 이름. 로그인이 붙으면 회원 정보에서 온다.
-  static const bookerName = '홍길동';
-
   /// 예매를 시작하기 전에 세워 두는 공연. 상세 화면에서 들어오면 진짜 공연으로
   /// 바뀐다(`BookingController.startBooking`). 흐름 밖에서 열린 화면이 빈
   /// 머리말을 그리지 않게 하는 자리다.

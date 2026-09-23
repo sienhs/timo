@@ -48,6 +48,15 @@ void main() {
       expect(profile.nickname, '엥간한 닉네임');
     });
 
+    test('예매자 실명은 같은 응답에서 이름만 꺼낸다', () async {
+      final api = build((_) => jsonResponse(me()));
+
+      final name = await api.fetchBookerName();
+
+      expect(adapter.requests.single.path, '${HttpMyPageApi.basePath}/me');
+      expect(name, '홍길동');
+    });
+
     test('로그인이 풀렸으면(401) 서버 문구를 담은 ApiException 을 던진다', () {
       final api = build(
         (_) => problemResponse(

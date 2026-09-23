@@ -51,6 +51,10 @@ class _RecordingMyPageApi implements MyPageApi {
   @override
   Future<MemberProfile> fetchProfile() => throw UnimplementedError();
 
+  /// 예매자 실명은 결제 흐름만 쓴다. 이 목이 붙는 화면은 부르지 않는다.
+  @override
+  Future<String> fetchBookerName() => throw UnimplementedError();
+
   @override
   Future<WalletSummary> fetchWallet() async {
     walletCalls++;

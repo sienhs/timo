@@ -32,6 +32,12 @@ class MockMyPageApi implements MyPageApi {
   }
 
   @override
+  Future<String> fetchBookerName() async {
+    await _respond();
+    return MockMyPageData.bookerName;
+  }
+
+  @override
   Future<WalletSummary> fetchWallet() async {
     await _respond();
     return ledger?.wallet ?? MockMyPageData.wallet;

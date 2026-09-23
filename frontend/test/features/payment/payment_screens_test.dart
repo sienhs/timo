@@ -13,8 +13,10 @@ import 'package:timo/features/booking/state/booking_scope.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/home/state/home_api_scope.dart';
 import 'package:timo/features/payment/constants.dart';
+import 'package:timo/features/payment/models/ticket_order.dart';
 import 'package:timo/features/payment/screens/payment_complete_screen.dart';
 import 'package:timo/features/payment/screens/payment_screen.dart';
+import 'package:timo/features/payment/widgets/order_summary_card.dart';
 import 'package:timo/features/payment/widgets/ticket_issuing_view.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/entry_pass.dart';
@@ -228,6 +230,40 @@ void main() {
     expect(find.text(PaymentConstants.totalLabel), findsOneWidget);
     // 수수료가 없어 티켓 가격 줄과 TOTAL 줄이 같은 금액이다.
     expect(find.text('186,000원'), findsNWidgets(2));
+  });
+
+  group('예매자 성함 줄', () {
+    Future<void> pumpCard(WidgetTester tester, String? bookerName) =>
+        tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: OrderSummaryCard(
+                order: TicketOrder(
+                  concertTitle: '테스트 공연',
+                  performedAt: DateTime(2026, 11, 4, 18),
+                  venue: '테스트홀',
+                  seat: 'A구역 1열 1번',
+                  bookerName: bookerName,
+                  ticketPrice: 100000,
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('이름을 받았으면 라벨과 함께 찍는다', (WidgetTester tester) async {
+      await pumpCard(tester, '김예매');
+
+      expect(find.text(PaymentConstants.bookerLabel), findsOneWidget);
+      expect(find.text('김예매'), findsOneWidget);
+    });
+
+    // 빈 값을 둔 줄은 '이름이 비어 있다' 로 읽혀 잘못 예매된 것처럼 보인다.
+    testWidgets('이름을 못 받았으면 줄째로 뺀다', (WidgetTester tester) async {
+      await pumpCard(tester, null);
+
+      expect(find.text(PaymentConstants.bookerLabel), findsNothing);
+    });
   });
 
   // 예매 흐름 밖에서 열린 결제 화면이다. 서버에 만들 주문이 없으니 부르지

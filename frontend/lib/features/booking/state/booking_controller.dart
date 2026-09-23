@@ -46,8 +46,17 @@ class BookingController extends ChangeNotifier {
   Seat? _selectedSeat;
   Zone? _selectedZone;
   SeatHold? _hold;
+  String? _bookerName;
 
   Seat? get selectedSeat => _selectedSeat;
+
+  /// 결제 화면에 찍을 예매자 실명. 아직 못 받았으면 null.
+  ///
+  /// 자리를 잡을 때 좌석 화면이 함께 받아 `setBookerName` 으로 넣어 준다
+  /// (`SeatSelectionScreen._onCheckout`). 이 컨트롤러는 예매 흐름 하나와 함께
+  /// 사라지므로, 실명이 머무는 곳도 그 흐름뿐이다 — 세션이나 마이페이지 모델에
+  /// 얹지 않기로 한 것과 같은 이유다(`MyPageApi.fetchBookerName`).
+  String? get bookerName => _bookerName;
 
   /// 서버에 잡아 둔 자리. 아직 잡지 않았으면 null.
   ///
@@ -135,6 +144,15 @@ class BookingController extends ChangeNotifier {
     _selectedZone = null;
     _hold = null;
     notifyListeners();
+  }
+
+  /// 받아 온 예매자 실명을 넣는다. 못 받았으면(요청 실패) 부르지 않는다.
+  ///
+  /// **알림을 보내지 않는다.** 이 값을 그리는 화면은 결제 화면뿐이고, 그 화면은
+  /// 아직 열리지도 않았다. 지금 리스너를 깨우면 좌석 수백 칸이 한 번 더
+  /// 리빌드될 뿐이다 — 바로 뒤에 불리는 [holdSeat] 의 알림으로 충분하다.
+  void setBookerName(String name) {
+    _bookerName = name;
   }
 
   /// 서버에 자리를 잡았다. 결제 화면이 남은 시간을 세기 시작한다.
