@@ -11,7 +11,7 @@ provider "aws" {
 }
 variable "region" { default = "ap-northeast-2" }
 variable "vpc_id" { type = string }
-variable "public_subnet_id" { type = string }
+variable "public_subnet_ids" { type = list(string) }
 variable "db_subnet_ids" { type = list(string) }
 variable "load_generator_cidr" {
   description = "Local computer's public IPv4 address, restricted to /32"
@@ -29,13 +29,22 @@ variable "image" {
   }
 }
 variable "db_engine_version" { type = string }
-variable "db_instance_class" { default = "db.t4g.micro" }
-variable "cpu_credits" {
+variable "db_instance_class" { default = "db.t4g.medium" }
+variable "app_instance_count" {
+  type    = number
+  default = 6
+  validation {
+    condition     = var.app_instance_count >= 1 && var.app_instance_count <= 32
+    error_message = "app_instance_count must be between 1 and 32."
+  }
+}
+variable "app_instance_type" {
   type = string
   validation {
-    condition     = contains(["standard", "unlimited"], var.cpu_credits)
-    error_message = "Specify the actual production credit mode."
+    condition     = var.app_instance_type == "c7i.xlarge"
+    error_message = "The load-test topology uses c7i.xlarge (4 vCPU) instances."
   }
+  default = "c7i.xlarge"
 }
 variable "db_password" {
   type      = string
@@ -57,16 +66,32 @@ data "aws_ssm_parameter" "ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 data "aws_subnet" "app" {
-  id = var.public_subnet_id
+  id = var.public_subnet_ids[0]
+}
+resource "aws_security_group" "alb" {
+  name_prefix = "timo-loadtest-alb-"
+  vpc_id      = var.vpc_id
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = [var.load_generator_cidr]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 resource "aws_security_group" "app" {
   name_prefix = "timo-loadtest-app-"
   vpc_id      = var.vpc_id
   ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = [var.load_generator_cidr]
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
   egress {
     from_port   = 0
@@ -132,26 +157,61 @@ resource "aws_iam_instance_profile" "host" {
   role        = aws_iam_role.host.name
 }
 resource "aws_instance" "host" {
-  for_each                    = { app = "t3.medium" }
+  depends_on = [
+    aws_iam_role_policy_attachment.ssm,
+    aws_iam_role_policy_attachment.ecr,
+  ]
+  for_each                    = toset([for index in range(var.app_instance_count) : tostring(index)])
   ami                         = data.aws_ssm_parameter.ami.value
-  instance_type               = each.value
-  subnet_id                   = var.public_subnet_id
+  instance_type               = var.app_instance_type
+  subnet_id                   = element(var.public_subnet_ids, tonumber(each.key) % length(var.public_subnet_ids))
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.app.id]
   iam_instance_profile        = aws_iam_instance_profile.host.name
   monitoring                  = true
-  dynamic "credit_specification" {
-    for_each = each.key == "app" ? [1] : []
-    content { cpu_credits = var.cpu_credits }
-  }
   root_block_device {
     volume_size = 30
     volume_type = "gp3"
     encrypted   = true
   }
   metadata_options { http_tokens = "required" }
-  user_data = "#!/bin/bash\nset -eu\ndnf install -y docker mariadb105\nsystemctl enable --now docker\n"
-  tags      = { Name = "timo-loadtest-${each.key}" }
+  user_data = "#!/bin/bash\nset -eu\n# AL2023 already includes SSM Agent. Register it before package installation so\n# a transient repository delay cannot make the host invisible to the runner.\nsystemctl enable --now amazon-ssm-agent || true\ndnf install -y amazon-ssm-agent docker mariadb105\nsystemctl enable --now amazon-ssm-agent docker\n"
+  tags      = { Name = "timo-loadtest-app-${each.key}" }
+}
+resource "aws_lb" "app" {
+  name               = "timo-loadtest-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnet_ids
+}
+resource "aws_lb_target_group" "app" {
+  name     = "timo-loadtest-app"
+  port     = 8080
+  protocol = "HTTP"
+  vpc_id   = var.vpc_id
+  health_check {
+    path                = "/actuator/health"
+    matcher             = "200-399"
+    interval            = 15
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+resource "aws_lb_target_group_attachment" "app" {
+  for_each         = aws_instance.host
+  target_group_arn = aws_lb_target_group.app.arn
+  target_id        = each.value.id
+  port             = 8080
+}
+resource "aws_lb_listener" "app" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
 }
 resource "aws_db_subnet_group" "test" {
   name_prefix = "timo-loadtest-"
@@ -180,12 +240,14 @@ resource "aws_db_instance" "test" {
 output "test" {
   value = {
     region             = var.region
-    app_id             = aws_instance.host["app"].id
-    base_url           = "http://${aws_instance.host["app"].public_ip}:8080"
+    app_ids            = [for instance in aws_instance.host : instance.id]
+    app_instance_count = var.app_instance_count
+    app_instance_type  = var.app_instance_type
+    base_url           = "http://${aws_lb.app.dns_name}"
     db_host            = aws_db_instance.test.address
-    db_id              = aws_db_instance.test.id
+    db_id              = aws_db_instance.test.identifier
+    target_group_arn   = aws_lb_target_group.app.arn
     image              = var.image
-    cpu_credits        = var.cpu_credits
     db_class           = var.db_instance_class
     db_engine          = var.db_engine_version
     redis_host         = aws_elasticache_replication_group.test.primary_endpoint_address

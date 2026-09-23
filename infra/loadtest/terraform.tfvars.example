@@ -1,10 +1,12 @@
 vpc_id           = "vpc-REPLACE"
 load_generator_cidr = "203.0.113.10/32" # Replace with your local computer's public IPv4.
-# Existing public subnet with an Internet Gateway route (SSM / package downloads).
-public_subnet_id = "subnet-REPLACE"
+# Existing public subnets in at least two AZs (ALB, SSM, package downloads).
+public_subnet_ids = ["subnet-REPLACE-A", "subnet-REPLACE-C"]
 # Existing DB subnets in at least two AZs.
 db_subnet_ids = ["subnet-REPLACE-A", "subnet-REPLACE-C"]
 image = "ACCOUNT.dkr.ecr.ap-northeast-2.amazonaws.com/REPOSITORY@sha256:REPLACE"
 db_engine_version = "8.0.REPLACE"
-cpu_credits = "unlimited"
+app_instance_type = "c7i.xlarge"
+app_instance_count = 6
+db_instance_class = "db.t4g.medium"
 # Supply a new disposable DB password through TF_VAR_db_password.
