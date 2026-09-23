@@ -35,6 +35,7 @@ class TicketCardButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.filled = false,
+    this.isBusy = false,
   });
 
   final String label;
@@ -45,11 +46,17 @@ class TicketCardButton extends StatelessWidget {
   /// 꽉 찬 초록 버튼인지. 카드에서 가장 중요한 행동 하나에만 쓴다.
   final bool filled;
 
+  /// 누른 뒤 서버 응답을 기다리는 중. 글자 자리에 동그라미가 돌고 다시 눌리지
+  /// 않는다. 버튼을 지우거나 카드를 통째로 가리지 않는 이유는 어느 카드를
+  /// 눌렀는지가 그 자리에 남아야 해서다.
+  final bool isBusy;
+
   @override
   Widget build(BuildContext context) {
     return AppActionButton(
       label: label,
       onPressed: onPressed,
+      isBusy: isBusy,
       compact: true,
       variant: filled ? AppActionStyle.primary : AppActionStyle.secondary,
     );
