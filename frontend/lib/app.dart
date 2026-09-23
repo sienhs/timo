@@ -223,6 +223,18 @@ ResaleApi _resaleApiFor(String kind) => switch (kind) {
   _ => HttpResaleApi(),
 };
 
+/// 컬렉션(소장품 카탈로그·제작·목록)이 어느 구현을 쓸지 고르는 실행 인자.
+///
+/// ```bash
+/// flutter run --dart-define=MEMORY_API=mock    # 데모 공연 3개로. 백엔드 불필요
+/// flutter run                                   # 기본값. 실제 서버(v1)
+/// ```
+///
+/// 내 티켓([_ticketApiKind])과 같은 장치다. 누끼·깊이 모델은 기기 안에서만
+/// 돌기 때문에, 서버가 멈춰도 제작 화면을 끝까지 확인할 길을 남긴다. 목으로
+/// 만든 소장품은 앱을 끄면 사라진다.
+const _memoryApiKind = String.fromEnvironment('MEMORY_API');
+
 class _AppState extends State<App> {
   late final AuthSession _session =
       widget.session ?? AuthSession(storage: InMemoryTokenStorage());
@@ -327,9 +339,14 @@ class _AppState extends State<App> {
   );
 
   late final MemoryConcertApi _memoryConcertApi =
-      widget.memoryConcertApi ?? HttpMemoryConcertApi();
+      widget.memoryConcertApi ??
+      (_memoryApiKind == 'mock'
+          ? MockMemoryConcertApi()
+          : HttpMemoryConcertApi());
 
-  late final GoodsApi _goodsApi = widget.goodsApi ?? HttpGoodsApi();
+  late final GoodsApi _goodsApi =
+      widget.goodsApi ??
+      (_memoryApiKind == 'mock' ? MockGoodsApi() : HttpGoodsApi());
 
   /// 양도마켓 화면이 쓰는 API. 다른 API 들과 같은 이유로 앱에 하나만 두고
   /// [ResaleApiScope] 로 내려준다.

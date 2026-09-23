@@ -1,0 +1,67 @@
+{
+  "model": "MODNet photographic portrait matting, fine-tuned on P3M-10K, INT8 weights",
+  "source": {
+    "file": "modnet_finetuned_fp32.onnx",
+    "sha256": "405a2c31d7676bb7eab4681a5a9eade3d9a85539ad049abf6490c446448b7ab4",
+    "bytes": 25961503,
+    "export": "tools/export_matting.py, opset 11"
+  },
+  "finetune": {
+    "base": "official modnet_photographic_portrait_matting.ckpt",
+    "data": {
+      "dataset": "P3M-10K train split (nobg/P3M-10K mirror, MIT)",
+      "shards": [
+        "train-00000.parquet",
+        "train-00001.parquet"
+      ],
+      "total": 1714,
+      "val_count": 150,
+      "seed": 0,
+      "short_edge": 720
+    },
+    "augmentation": "random resized crop 512 (scale 0.5-1.0), horizontal flip, colour jitter 0.25/0.25/0.25/0.04, randomised trimap band 2-12px",
+    "recipe": "official src.trainer.supervised_training_iter, SGD momentum 0.9, StepLR",
+    "args": {
+      "epochs": 12,
+      "batch_size": 4,
+      "lr": 0.001,
+      "workers": 4
+    },
+    "best_epoch": 11
+  },
+  "quantization": {
+    "method": "weight-only INT8, per-channel symmetric, Cast+Mul rebuilt in graph",
+    "op_types": [
+      "Conv",
+      "MatMul"
+    ],
+    "weight_type": "int8",
+    "per_channel": true,
+    "activations": "fp32 (unchanged)",
+    "compute": "fp32 after ONNX Runtime constant folding"
+  },
+  "tool": "tools/export_matting.py (reuses quantize_matting.compress), onnxruntime 1.23.2",
+  "sha256": "f29b0e32e04bd4fca3fce640fc1a2f5d84c0f26c822a17a37c75d84ff4a07a9c",
+  "bytes": 6734509,
+  "verification": {
+    "images": [
+      "person_a.png",
+      "person_b.png",
+      "pose_test.jpg",
+      "pose_upper.jpg"
+    ],
+    "min_iou_vs_fp32": 0.9887,
+    "max_mae_vs_fp32": 0.0041,
+    "host_median_ms": {
+      "fp32": 391,
+      "int8": 400
+    }
+  },
+  "runtime": "ONNX Runtime >= 1.23.2 CPU execution provider",
+  "input": "input: RGB float32 NCHW, (RGB - 127.5) / 127.5, multiples of 32",
+  "output": "output: float32 [1,1,H,W], alpha in [0,1]",
+  "license": "Apache-2.0",
+  "upstream": "https://github.com/ZHKKKe/MODNet",
+  "postprocess": "PortraitMatting.keepMain: drop 8-connected blobs of alpha > 12/255 smaller than 0.3 x the largest",
+  "fallback": "modnet_photographic_portrait_matting_int8.onnx (official weights), kept in the repo, not packaged"
+}
