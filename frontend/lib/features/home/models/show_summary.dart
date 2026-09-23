@@ -40,6 +40,15 @@ class ShowSummary {
   /// "예매 진행 중". 백엔드 `ConcertStatus` 의 상수명과 같다.
   static const onSaleStatus = 'ON_SALE';
 
+  /// 잔여 좌석이 모두 소진된 공연. 목록 탭에서는 예매가 진행된 공연으로
+  /// 분류하지만, 실제 예매 가능 여부는 [isBookableNow] 가 false 로 답한다.
+  static const soldOutStatus = 'SOLD_OUT';
+
+  /// 공연 종료와 취소. 둘 다 더 이상 예매 흐름으로 돌아가지 않으므로 목록의
+  /// `예매 마감` 탭에 함께 둔다.
+  static const closedStatus = 'CLOSED';
+  static const canceledStatus = 'CANCELED';
+
   /// 예매가 마감되는 시점. 공연 시작 이만큼 전부터는 선점·결제가 막힌다.
   /// 백엔드 `Concert.BOOKING_CUTOFF_HOURS` 와 같은 값이다.
   static const bookingCutoff = Duration(hours: 2);
@@ -72,6 +81,15 @@ class ShowSummary {
   /// 홈의 인기 공연 줄이 이걸로 거른다.
   bool get isOpenOrUpcoming =>
       status == upcomingStatus || status == onSaleStatus;
+
+  /// 공연 전체 목록의 `예매 가능` 탭에 들어가는 상태인가. 오픈 예정은 별도
+  /// 목록에서 보여 주므로 제외하고, 매진은 예매가 진행된 공연 묶음에 남긴다.
+  bool get isOnSaleGroup => status == onSaleStatus || status == soldOutStatus;
+
+  /// 목록 탭에서 예매가 끝난 공연인가. 취소 공연도 종료와 같은 묶음으로
+  /// 보여 주고, 매진은 예매 진행 묶음에 남긴다.
+  bool get isBookingClosed =>
+      status == closedStatus || status == canceledStatus;
 
   /// 오픈 시각이 아직 남았는가. 홈의 "티켓 오픈 예정" 줄이 이걸로 거른다.
   /// 서버는 오픈 시각이 지나도 온체인 등록이 안 끝난 공연을 `SCHEDULED` 로 남겨

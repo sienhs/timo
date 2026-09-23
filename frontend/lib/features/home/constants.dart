@@ -372,6 +372,7 @@ class HomeStrings {
 
   /// 전체 조회의 탭. 예매로 이어지는 공연만 보는 쪽이 기본이다.
   static const bookableTab = '예매 가능';
+  static const closedTab = '예매 마감';
   static const allTab = '모두 보기';
 
   /// 목록 화면의 검색 칸. 받아 둔 목록을 그 자리에서 거른다.
@@ -381,6 +382,7 @@ class HomeStrings {
   static const emptyOpenSoonList = '오픈 예정인 공연이 없어요.';
   static const emptyAllShowsList = '아직 등록된 공연이 없어요.';
   static const emptyBookableList = '지금 예매할 수 있는 공연이 없어요.';
+  static const emptyClosedList = '예매가 마감된 공연이 없어요.';
 
   // 카테고리 화면
   /// 빠른 메뉴의 항목 이름과 같다. 눌렀던 이름과 화면 제목이 다르면 다른
