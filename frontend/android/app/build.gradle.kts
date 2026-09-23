@@ -102,7 +102,7 @@ val syncDepthModel by tasks.registering(Sync::class) {
 }
 val syncMattingModel by tasks.registering(Sync::class) {
     from("../../assets/models") {
-        include("modnet_photographic_portrait_matting_int8.onnx", "modnet_photographic_portrait_matting_int8.json", "MODNET_LICENSE.txt")
+        include("modnet_p3m_finetuned_int8.onnx", "modnet_p3m_finetuned_int8.json", "MODNET_LICENSE.txt")
     }
     into(layout.buildDirectory.dir("generated/mattingAssets/models"))
 }

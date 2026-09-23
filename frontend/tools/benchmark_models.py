@@ -39,7 +39,7 @@ REPORT = ROOT / "verification/model_benchmark"
 MODELS = ROOT / "assets/models"
 INT8 = MODELS / "depth_anything_v2_vits_int8.onnx"
 FP32 = MODELS / "depth_anything_v2_vits.onnx"
-MODNET = MODELS / "modnet_photographic_portrait_matting_int8.onnx"  # the shipped model
+MODNET = MODELS / "modnet_p3m_finetuned_int8.onnx"  # the shipped model
 DEMO = ["pose_test.jpg", "pose_upper.jpg", "stage_blue.png", "stage_gold.png", "stage_pink.png"]
 PACKAGE = "com.ssafy.timo"  # applicationId in android/app/build.gradle.kts
 ENGINES = ["modnet", "mlkit", "mlkit_raw"]
@@ -80,6 +80,28 @@ def dilate(mask, r):
 
 def erode(mask, r):
     return ~dilate(~mask, r)
+
+
+# Same cut as the cutout bounding box in PersonProcessor.segment (alpha > 12).
+MAIN_THRESHOLD = 12 / 255
+# A blob survives when it is at least this share of the largest one, so two people
+# of similar size both stay while a bystander or watermark fragment does not.
+MAIN_RATIO = 0.3
+
+
+def keep_main(alpha, threshold=MAIN_THRESHOLD, ratio=MAIN_RATIO):
+    """Zero every 8-connected blob of alpha > threshold smaller than ratio x the largest.
+
+    Mirrors PortraitMatting.keepMain, which runs on the model-resolution alpha.
+    """
+    from scipy import ndimage
+    labels, count = ndimage.label(alpha > threshold, structure=np.ones((3, 3)))
+    if count <= 1:
+        return alpha
+    areas = np.bincount(labels.ravel())
+    dropped = areas < areas[1:].max() * ratio
+    dropped[0] = False
+    return np.where(dropped[labels], 0, alpha).astype(alpha.dtype)
 
 
 def seg_metrics(pred, gt):
@@ -254,7 +276,8 @@ def host(args):
         started = time.perf_counter()
         alpha = session.run(None, {"input": tensor})[0][0, 0]
         infer_ms = (time.perf_counter() - started) * 1000
-        full = Image.fromarray((np.clip(alpha, 0, 1) * 255).round().astype(np.uint8)).resize((w, h), Image.Resampling.BILINEAR)
+        alpha = keep_main(np.clip(alpha, 0, 1))
+        full = Image.fromarray((alpha * 255).round().astype(np.uint8)).resize((w, h), Image.Resampling.BILINEAR)
         full.save(HOST_OUT / "seg" / f"{stem}_modnet.png")
         seg_results.append({"engine": "modnet", "image": stem, "inferMs": infer_ms, "sessionMs": session_ms if n == 0 else 0,
                             "totalMs": None, "warmup": n == 0, "width": w, "height": h})

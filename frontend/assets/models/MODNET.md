@@ -3,13 +3,50 @@
 - Official project: https://github.com/ZHKKKe/MODNet
 - Official ONNX download reference and inference: https://github.com/ZHKKKe/MODNet/tree/master/onnx
 - License: Apache-2.0; code, model and demos covered by upstream README. `MODNET_LICENSE.txt` bundled in APK.
-- Shipped file: `modnet_photographic_portrait_matting_int8.onnx`, 6,656,860 bytes,
-  SHA256 `e8c0a9ca88df6724a93ffc160ad53604e85a4bb81b7ba9eefd37e3bca7da9e6d`. Metadata in
-  `modnet_photographic_portrait_matting_int8.json`.
-- FP32 source (not in the repo, `.gitignore`): `modnet_photographic_portrait_matting.onnx`,
+  Fine-tuning data: P3M-10K train split through the nobg/P3M-10K mirror (MIT).
+- Shipped file: `modnet_p3m_finetuned_int8.onnx`, 6,734,509 bytes,
+  SHA256 `f29b0e32e04bd4fca3fce640fc1a2f5d84c0f26c822a17a37c75d84ff4a07a9c`. Metadata in
+  `modnet_p3m_finetuned_int8.json`. `PortraitMatting.keepMain` drops blobs detached from the subject.
+- Official weights, kept in the repo and not packaged: `modnet_photographic_portrait_matting_int8.onnx`,
+  6,656,860 bytes, SHA256 `e8c0a9ca88df6724a93ffc160ad53604e85a4bb81b7ba9eefd37e3bca7da9e6d`.
+  Rolling back means pointing `PortraitMatting` and the `syncMattingModel` task at it again.
+- Official FP32 source (not in the repo, `.gitignore`): `modnet_photographic_portrait_matting.onnx`,
   25,888,640 bytes, SHA256 `07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9`.
-- Reproduce: `python tools/download_matting.py` (download or verify the FP32 source), then
-  `python tools/quantize_matting.py` (build the INT8 file and check it against FP32 on the demo photos).
+- Reproduce the official INT8: `python tools/download_matting.py`, then `python tools/quantize_matting.py`.
+- Reproduce the shipped file: `python tools/finetune_matting.py fetch|prep|train`, then
+  `python tools/export_matting.py`. Compare with `python tools/eval_matting.py`.
+
+## Fine-tuning on P3M-10K, shipped 2026-09-23
+
+The upstream checkpoint was fine-tuned on the P3M-10K train split with
+the official `src.trainer.supervised_training_iter`, plus the augmentation the upstream
+trainer leaves to the caller (random resized 512 crops, horizontal flip, colour jitter,
+randomised trimap band). 1,714 portraits from 2 of 11 shards, 150 held out for epoch
+selection; P3M-500-NP was not used for training. SGD 1e-3, batch 4, 12 epochs, ~24 min
+on an RTX 4050. The export keeps opset 11 and the same tensor contract.
+
+The fine-tuned weights alone over-segment: they pick up bystanders, watermark fragments and
+background blobs apart from the subject, worst case 0.996 -> 0.844. `PortraitMatting.keepMain`
+zeroes every 8-connected blob of alpha > 12/255 smaller than 0.3x the largest, on the
+model-resolution alpha, so two people of similar size both stay. `tools/benchmark_models.py`
+carries the same filter as `keep_main`.
+
+Host CPU 2 threads, against the official INT8:
+
+| Metric | Official | Fine-tuned | Fine-tuned + keepMain |
+|---|---|---|---|
+| IoU mean, fixed 100 | 0.9669 | 0.9737 | 0.9768 |
+| Boundary +/-10px IoU, fixed 100 | 0.8187 | 0.8710 | 0.8710 |
+| Semi-transparent MAE, fixed 100 | 19.31% | 15.47% | 15.48% |
+| Background leak, fixed 100 | 1.846% | 1.716% | 1.503% |
+| Better / worse, fixed 100 | - | 73 / 27 | 77 / 23 |
+| Worst per-image IoU drop, fixed 100 | - | -0.152 | -0.052 |
+
+On all 500 P3M-500-NP images the filtered model is better on 408 and worse on 92. The
+remaining regressions touch the subject (objects held or worn, gaps between limbs, windblown
+hair), so the filter cannot reach them; crowds pressed against the subject are not covered by
+P3M and still need a check on real concert photos. See
+`docs/memory/verification/matting_finetune/REPORT.md`.
 
 ## INT8 weights, 2026-09-16
 
