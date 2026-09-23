@@ -12,6 +12,8 @@ import 'package:timo/features/booking/screens/seat_selection_screen.dart';
 import 'package:timo/features/booking/state/booking_api_scope.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/booking_scope.dart';
+import 'package:timo/features/mypage/data/mock_my_page_api.dart';
+import 'package:timo/features/mypage/state/my_page_api_scope.dart';
 
 import 'package:timo/features/booking/widgets/venue_map.dart';
 import 'package:timo/features/booking/widgets/zone_info_panels.dart';
@@ -117,11 +119,14 @@ void main() {
         theme: AppTheme.light,
         home: RepaintBoundary(
           key: boundaryKey,
-          child: BookingApiScope(
-            api: api,
-            child: BookingScope(
-              controller: controller,
-              child: SeatSelectionScreen(zoneId: allZones.first.id),
+          child: MyPageApiScope(
+            api: const MockMyPageApi(latency: Duration.zero),
+            child: BookingApiScope(
+              api: api,
+              child: BookingScope(
+                controller: controller,
+                child: SeatSelectionScreen(zoneId: allZones.first.id),
+              ),
             ),
           ),
         ),

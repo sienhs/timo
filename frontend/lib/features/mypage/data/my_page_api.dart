@@ -13,6 +13,15 @@ abstract class MyPageApi {
   /// 로그인한 회원 본인의 정보. 누구인지는 토큰이 정하므로 인자가 없다.
   Future<MemberProfile> fetchProfile();
 
+  /// 결제 화면에 찍을 **예매자 실명**. [fetchProfile] 과 같은 `/members/me` 를
+  /// 부르지만 이름 하나만 꺼내 돌려준다.
+  ///
+  /// 따로 둔 이유는 [MemberProfile] 에 실명을 넣지 않기 위해서다. 그 모델은
+  /// 마이페이지가 화면이 살아 있는 동안 들고 있는 것이라, 실명을 얹으면
+  /// 로그·스냅샷에 실릴 자리가 늘어난다(`MemberProfile` 주석). 이쪽은 받은
+  /// 값을 곧바로 `TicketOrder` 에 넣고 끝내므로 머무는 곳이 결제 흐름뿐이다.
+  Future<String> fetchBookerName();
+
   /// 잔액과 최근 거래 내역.
   Future<WalletSummary> fetchWallet();
 

@@ -31,6 +31,15 @@ class HttpMyPageApi implements MyPageApi {
     return MemberProfile.fromJson(_body(response));
   }
 
+  /// 같은 응답에서 실명만 꺼낸다. 모델에 담지 않고 문자열 하나로 돌려주므로
+  /// 부른 쪽이 쓰고 버릴 수 있다 — 왜 [fetchProfile] 과 나눠 두는지는
+  /// [MyPageApi.fetchBookerName] 주석에 있다.
+  @override
+  Future<String> fetchBookerName() async {
+    final response = await _guard(() => _dio.get<dynamic>('$basePath/me'));
+    return _body(response)['name'] as String;
+  }
+
   /// 누구의 지갑인지는 토큰의 `sub` 가 정하므로 회원 번호를 싣지 않는다.
   @override
   Future<WalletSummary> fetchWallet() async {

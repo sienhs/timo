@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 
 import '../../payment/constants.dart';
 import '../../payment/models/ticket_order.dart';
-import '../data/mock_booking_data.dart';
 import 'booking_controller.dart';
 import 'booking_scope.dart';
 
@@ -37,7 +36,7 @@ TicketOrder? ticketOrderOf(BookingController controller) {
     performedAt: performance.startAt,
     venue: performance.venue,
     seat: seatLabel,
-    bookerName: MockBookingData.bookerName,
+    bookerName: controller.bookerName,
     posterUrl: performance.posterUrl,
     // 잡은 자리의 값을 쓴다. 서버가 선점 응답에 실어 준 값이라 지금 잡고 있는
     // 자리와 반드시 맞는다. 아직 안 잡았으면(결제 화면을 예매 흐름 밖에서 연

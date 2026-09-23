@@ -15,6 +15,8 @@ class OrderSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bookerName = order.bookerName;
+
     return PaymentCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -22,10 +24,13 @@ class OrderSummaryCard extends StatelessWidget {
           _ConcertHeader(order: order),
           const SizedBox(height: 18),
           const _CardDivider(),
-          OrderInfoRow(
-            label: PaymentConstants.bookerLabel,
-            value: order.bookerName,
-          ),
+          // 이름을 못 받았으면 줄째로 뺀다. 빈 값을 둔 줄은 "이름이 비어 있다"
+          // 로 읽혀서, 잘못 예매된 것처럼 보인다([TicketOrder.bookerName]).
+          if (bookerName != null)
+            OrderInfoRow(
+              label: PaymentConstants.bookerLabel,
+              value: bookerName,
+            ),
           // 시안에 있던 '예매 수수료' 줄은 뺐다. 수수료가 없어 정가가 곧 결제
           // 금액이다(`Performance` 주석). TOTAL 줄은 시안대로 남긴다.
           OrderInfoRow(
