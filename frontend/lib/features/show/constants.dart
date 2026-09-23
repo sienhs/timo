@@ -7,13 +7,8 @@ class ShowDetailMetrics {
   /// 좌우 여백. 홈과 같은 값이어야 홈에서 넘어올 때 글의 왼쪽 끝이 안 튄다.
   static const horizontalPadding = 16.0;
 
-  /// 상단 포스터 칸의 비율(가로/세로).
-  ///
-  /// 시안은 2.5:1 로 납작했고 한때 16:9 였는데, 둘 다 포스터를 잘라 쓰는
-  /// 비율이라 세로로 긴 실제 포스터를 넣으면 눈 한쪽만 확대됐다. 반대로
-  /// 포스터 원본 비율(2:3)에 맞추면 포스터가 첫 화면을 다 차지해 제목·가격이
-  /// 스크롤 밖으로 밀린다. 정사각은 포스터를 통째로 넣고도(`PosterStage`)
-  /// 제목·장소·일시가 함께 보이는 선이다.
+  /// 상단 포스터 칸의 비율(가로/세로). 정사각은 세로로 긴 포스터를 통째로 넣고도
+  /// (`PosterStage`) 제목·장소·일시가 첫 화면에 함께 보이는 선이다.
   static const posterAspectRatio = 1.0;
 
   /// 포스터 위아래 여백. 포스터가 칸 높이를 거의 다 쓰되 모서리에 붙지는
@@ -96,8 +91,7 @@ class ShowDetailStrings {
   static const favoriteAction = '찜하기';
   static const unfavoriteAction = '찜 해제';
 
-  /// 시안에는 '좌석별 가격' 이지만 구역별로 낸다. 서버에 좌석 등급이 하나뿐이라
-  /// 금액이 갈리는 단위가 구역이다(`ZonePrice` 주석 참고).
+  /// 시안에는 '좌석별 가격' 이지만 서버에 좌석 등급이 하나뿐이라 구역별로 낸다.
   static const zonePriceSection = '구역별 가격';
   static const artistSection = '아티스트';
   static const noticeSection = 'NOTICE';
@@ -105,19 +99,10 @@ class ShowDetailStrings {
   static const noticeImageLoading = '안내 이미지를 불러오는 중이에요.';
   static const noticeImageError = '안내 이미지를 불러오지 못했어요.';
 
-  /// 안내 이미지가 없는 공연에 대신 적는 문구.
-  ///
-  /// **서버에서 받지 않고 앱이 들고 있다.** 공연마다 갈리는 내용이 아니라
-  /// 서비스 전체에 걸린 규정이어서다 — 예매 마감 시각도 양도 정가 한도도
-  /// 서버 코드에 상수·검증으로 박혀 있지, 공연 행마다 저장되는 값이 아니다.
-  /// 공연별 안내는 주최사가 올린 이미지(`ShowDetail.imageUrls`)가 맡는다.
-  ///
-  /// 문구가 가리키는 실제 규칙은 이렇다. 고칠 일이 생기면 여기만 고쳐서는
-  /// 안 되고 아래가 함께 움직여야 한다:
-  /// - 예매 마감: 서버 `Concert.BOOKING_CUTOFF_HOURS`
-  /// - 양도 등록가 상한: 서버 `ListingService` 의 정가 이하 검증
-  /// - 캡처 QR: `TicketStrings.qrCaptureNotice`
-  /// - 취소·환불: `TicketStrings.cancelConfirmBody`
+  /// 안내 이미지가 없는 공연에 대신 적는 문구. 서비스 전체 규정이라 서버가 아닌 앱이 든다.
+  /// 고칠 때 함께 움직여야 하는 곳: 예매 마감은 서버 `Concert.BOOKING_CUTOFF_HOURS`,
+  /// 양도 등록가 상한은 서버 `ListingService` 의 정가 이하 검증, 캡처 QR 은
+  /// `TicketStrings.qrCaptureNotice`, 취소·환불은 `TicketStrings.cancelConfirmBody`.
   static const defaultNoticeLines = [
     '예매는 공연 시작 2시간 전에 마감돼요.',
     '입장은 티켓 QR로만 할 수 있어요. 캡처한 화면은 입장할 수 없어요.',
@@ -126,26 +111,19 @@ class ShowDetailStrings {
   ];
 
   /// 상태 뱃지. 오픈 전후로 갈린다.
-  ///
-  /// 시안에는 오픈된 공연에도 `오픈 예정` 뱃지가 그려져 있으나 시안 실수로
-  /// 본다 — 두 상태가 같은 뱃지를 달면 뱃지가 상태를 나타내지 못한다.
   static const upcomingBadge = '오픈 예정';
   static const onSaleBadge = '예매중';
 
   static const bookAction = '예매하러 가기';
 
-  /// 오픈 알림 버튼. **찜과는 다른 신청이다.** 상단 하트는 찜 목록에만 넣고,
-  /// 알림은 이 버튼으로 따로 켜고 끈다 — 백엔드가 알림 신청을 찜과 별개로
-  /// 들고 있어(`AlarmController` 의 `CONCERT_OPEN`) 하나를 풀어도 다른 하나는
-  /// 그대로다. 그래서 문구에 찜을 적지 않는다.
+  /// 오픈 알림 버튼. 찜과는 다른 신청이다 — 백엔드가 알림 신청(`CONCERT_OPEN`)을
+  /// 찜과 별개로 들고 있어 하나를 풀어도 다른 하나는 그대로다. 그래서 문구에 찜을 안 적는다.
   static const notifyAction = '오픈 알림 받기';
   static const unnotifyAction = '오픈 알림 해제하기';
 
-  /// 양도 마켓 알림 버튼. 신청한 공연에 새 양도 매물이 올라오면 알려 준다
-  /// (백엔드 `MARKET_LISTING`). 오픈 알림과 따로 신청하고 따로 푼다.
-  ///
-  /// 예매 중인 공연에만 세운다. 끝난 공연에는 사고팔 표가 없고, 오픈 전에는
-  /// 아직 아무도 표를 갖고 있지 않아 올라올 매물이 없다.
+  /// 양도 마켓 알림 버튼. 새 양도 매물이 올라오면 알려 준다(백엔드 `MARKET_LISTING`).
+  /// 오픈 알림과 따로 신청하고 따로 푼다. 예매 중인 공연에만 세운다 — 끝난 공연에는
+  /// 사고팔 표가 없고, 오픈 전에는 아직 아무도 표가 없어 올라올 매물이 없다.
   static const marketAlarmAction = '양도 마켓 알림 받기';
   static const marketAlarmOffAction = '양도 마켓 알림 해제하기';
 
@@ -165,14 +143,9 @@ class ShowDetailStrings {
   static const closedNotice = '종료된 공연입니다';
   static const canceledNotice = '취소된 공연입니다';
 
-  /// 공연 시작이 가까워 예매만 닫힌 공연의 하단 바.
-  ///
-  /// `종료된 공연입니다` 를 돌려쓰지 않는다. 마감은 공연 시작 몇 시간 전부터
-  /// 걸리는데, 그날 저녁 공연을 보러 갈 사람이 상세를 열었을 때 '종료' 가
-  /// 붙으면 공연이 없어진 줄 안다.
-  ///
-  /// 마감까지 몇 시간인지는 적지 않는다. 그 숫자는 서버가 정하고 응답에 담겨
-  /// 오지도 않아, 여기 적으면 서버가 바꾼 날 조용히 거짓말이 된다.
+  /// 공연 시작이 가까워 예매만 닫힌 공연의 하단 바. '종료' 를 돌려쓰면 그날 저녁
+  /// 공연을 보러 갈 사람이 공연이 없어진 줄 안다. 마감까지 몇 시간인지는 적지 않는다 —
+  /// 그 숫자는 서버가 정하고 응답에도 없어, 여기 적으면 서버가 바꾼 날 거짓말이 된다.
   static const bookingClosedNotice = '예매가 마감되었습니다';
 
   static String venueLine(String venue) => '공연 장소: $venue';

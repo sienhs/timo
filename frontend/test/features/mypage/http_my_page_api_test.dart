@@ -10,7 +10,6 @@ import 'package:timo/features/mypage/data/http_my_page_api.dart';
 import '../../core/network/fake_http_adapter.dart';
 
 /// 실제 서버 구현이 백엔드 규약대로 요청하고 응답을 읽는지, 가짜 서버로 검사한다.
-///
 /// 주소·응답 키는 백엔드 회원 API 명세(`/members/me`, `/members/wallet`)에서
 /// 그대로 가져왔다. 백엔드가 바뀌면 이 테스트를 같이 고쳐야 한다.
 void main() {

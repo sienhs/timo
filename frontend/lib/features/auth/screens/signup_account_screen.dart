@@ -16,17 +16,9 @@ import '../widgets/labeled_text_field.dart';
 import '../widgets/obscure_toggle.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 2/3 로그인 정보. 아이디와 비밀번호를 한 화면에서 받는다.
-///
-/// 아이디와 비밀번호는 둘 다 '로그인할 때 쓰는 것' 이라 따로 물을 이유가 없었다.
-/// 칸 하나짜리 화면 둘을 하나로 합쳐 가입 단계를 4 에서 3 으로 줄였다.
-///
-/// 아이디 중복 확인은 **칸에서 포커스가 빠질 때 저절로** 한다. 사용자가 비밀번호
-/// 칸으로 내려가는 사이에 끝나 있어서 '중복 확인' 을 누를 일이 거의 없다. 버튼을
-/// 남겨 둔 건 네트워크가 끊겼을 때 다시 시도할 수단이 필요해서다.
-///
-/// '다음으로' 는 아이디 중복 확인을 통과하고, 비밀번호가 규칙에 맞고, 확인 칸이
-/// 같을 때만 켜진다.
+/// 2/3 로그인 정보. 아이디와 비밀번호를 한 화면에서 받는다. 아이디 중복 확인은
+/// 칸에서 포커스가 빠질 때 저절로 하고, 버튼은 실패 때 재시도용으로 남긴다.
+/// '다음' 은 중복 확인 통과·비밀번호 규칙·확인 칸 일치일 때만 켜진다.
 class SignupAccountScreen extends StatefulWidget {
   const SignupAccountScreen({super.key, required this.draft, this.api});
 
@@ -91,12 +83,8 @@ class _SignupAccountScreenState extends State<SignupAccountScreen> {
     super.dispose();
   }
 
-  /// 아이디 칸을 벗어나는 순간 중복 확인을 대신 눌러 준다.
-  ///
-  /// [AvailabilityStatus.unchecked] 일 때만 부르는 것이 재요청을 막는 장치다.
-  /// 결과가 한 번 나오면 상태가 available·taken 으로 바뀌므로, 글자를 고치지
-  /// 않고 칸을 드나들어도 같은 값으로 다시 묻지 않는다. 요청이 실패하면 상태가
-  /// unchecked 로 돌아가는데, 그때는 다시 들렀다 나갈 때 재시도되는 게 맞다.
+  /// 아이디 칸을 벗어나는 순간 중복 확인을 대신 눌러 준다. unchecked 일 때만
+  /// 불러 같은 값을 다시 묻지 않고, 실패해 unchecked 로 돌아오면 다시 시도된다.
   void _checkOnFocusLost() {
     if (_usernameFocus.hasFocus) return;
     if (!_canCheck || _status != AvailabilityStatus.unchecked) return;
@@ -143,7 +131,7 @@ class _SignupAccountScreenState extends State<SignupAccountScreen> {
     );
   }
 
-  /// 아이디 칸 아래 문구. 중복 오류가 최우선, 그다음 사용 가능(파랑), 형식이
+  /// 아이디 칸 아래 문구. 중복 오류가 최우선, 그다음 사용 가능(초록), 형식이
   /// 틀린 동안에만 규칙 안내.
   String? get _usernameError =>
       _status == AvailabilityStatus.taken ? AuthStrings.usernameTaken : null;

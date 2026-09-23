@@ -7,12 +7,9 @@ import 'show_poster_card.dart';
 /// 카드에 얹을 뱃지를 정한다. 뱃지가 없으면 null 을 준다.
 typedef ShowBadgeBuilder = Widget? Function(ShowSummary show);
 
-/// 공연 카드를 가로로 늘어놓는 줄. 오픈 예정·인기 공연이 함께 쓴다.
-///
-/// 높이를 지정하지 않으려고 ListView 대신 가로 스크롤 + Row 로 짰다. 카드
-/// 높이는 포스터 비율과 글자 크기에서 나오는데, ListView 로 가면 그 높이를
-/// 바깥에서 숫자로 정해 줘야 해서 시스템 글꼴을 키운 기기에서 잘린다.
-/// 한 줄에 들어가는 카드가 열 장 이하라 지연 생성의 이점도 없다.
+/// 공연 카드를 가로로 늘어놓는 줄. 오픈 예정·인기 공연이 함께 쓴다. ListView 로
+/// 가면 카드 높이를 바깥에서 숫자로 정해 줘야 해 시스템 글꼴을 키운 기기에서
+/// 잘리므로, 가로 스크롤 + Row 로 짜 높이가 내용에서 나오게 한다.
 class ShowCardRow extends StatelessWidget {
   const ShowCardRow({
     super.key,
@@ -39,9 +36,7 @@ class ShowCardRow extends StatelessWidget {
           for (var index = 0; index < shows.length; index++)
             Padding(
               padding: EdgeInsets.only(
-                right: index == shows.length - 1
-                    ? 0
-                    : HomeMetrics.showCardGap,
+                right: index == shows.length - 1 ? 0 : HomeMetrics.showCardGap,
               ),
               child: ShowPosterCard(
                 show: shows[index],

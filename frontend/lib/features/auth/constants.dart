@@ -1,7 +1,5 @@
-/// 인증(회원가입·로그인) 도메인의 문구·크기 상수.
-///
-/// 글자수 한계 같은 숫자와 그 숫자를 설명하는 문구를 같은 곳에 두어
-/// 한쪽만 바뀌는 일을 막는다(결제 도메인의 PaymentConstants 와 같은 방식).
+/// 인증(회원가입·로그인) 도메인의 문구·크기 상수. 글자수 한계 같은 숫자와 그
+/// 숫자를 설명하는 문구를 같은 곳에 두어 한쪽만 바뀌는 일을 막는다.
 class AuthMetrics {
   AuthMetrics._();
 
@@ -9,7 +7,6 @@ class AuthMetrics {
   static const totalSteps = 3;
 
   static const pagePadding = 20.0;
-  static const headerLogoHeight = 24.0;
   static const completeLogoHeight = 32.0;
 
   /// 가입 완료 화면 가운데 마스코트 크기. 시안에서 화면 폭의 절반쯤을 차지한다.
@@ -64,39 +61,25 @@ class AuthMetrics {
   static const walletClipAspectRatio = 16 / 9;
 }
 
-/// 서버가 인증 실패 응답의 `errorCode` 에 싣는 이유.
-///
-/// 백엔드 `AuthErrorCode` 열거형의 이름과 같아야 한다. [AuthServerErrors] 와
-/// 역할이 겹쳐 보이지만, 저쪽은 자바 클래스 이름이라 백엔드가 클래스를 옮기면
-/// 조용히 어긋난다. 이건 그러지 말라고 따로 만든 값이다. **인증 판단은 이걸로
-/// 한다.**
+/// 서버가 인증 실패(401) 응답의 `errorCode` 에 싣는 값. 백엔드 `AuthErrorCode`
+/// 열거형의 이름과 같아야 한다. 인터셉터는 공통 모듈이라 이 상수 대신 같은
+/// 문자열을 직접 들고 있다.
 class AuthErrorCodes {
   AuthErrorCodes._();
 
-  /// 액세스 토큰이 수명을 다했다(401). 재발급하면 풀린다.
-  static const tokenExpired = 'TOKEN_EXPIRED';
-
-  /// 토큰이 위조됐거나 폐기됐다(401). **재발급해도 소용없다.**
-  ///
-  /// 이걸 만료와 같이 취급하면 재발급받은 새 토큰도 같은 이유로 막혀서 앱이
-  /// 재발급을 무한히 반복한다. 백엔드가 둘을 굳이 나눠 주는 이유가 이것이다.
+  /// 토큰이 위조됐거나 폐기됐다(401). 재발급해도 소용없다 — 만료와 같이 취급하면
+  /// 새 토큰도 같은 이유로 막혀 재발급을 무한히 반복한다.
   static const tokenInvalid = 'TOKEN_INVALID';
 
   /// 폐기된 리프레시 토큰이 다시 쓰였다(401). 탈취로 보고 세션을 끊은 상태다.
   /// 지금 백엔드는 재사용 탐지를 하지 않아 실제로 오지는 않지만, 오면 [tokenInvalid]
   /// 과 똑같이 다뤄야 한다.
   static const refreshReused = 'REFRESH_REUSED';
-
-  /// 재발급해 봐야 소용없는 이유인지. 참이면 바로 로그아웃한다.
-  static bool isHopeless(String? errorCode) =>
-      errorCode == tokenInvalid || errorCode == refreshReused;
 }
 
-/// 서버가 실패 응답(ProblemDetail)의 `exception` 에 싣는 오류 이름.
-///
-/// 백엔드 `domain/auth/exception` 패키지의 클래스 이름과 같아야 한다. 같은
-/// 상태 코드(400·409) 안에서 원인을 가를 때 문구 대신 이 이름으로 비교한다.
-/// 문구는 다듬느라 바뀌어도 클래스 이름은 잘 안 바뀌기 때문이다.
+/// 서버가 실패 응답(ProblemDetail)의 `exception` 에 싣는 오류 이름. 백엔드
+/// `domain/auth/exception` 패키지의 클래스 이름과 같아야 한다. 같은 상태 코드
+/// 안에서 원인을 가를 때 문구 대신 이 이름으로 비교한다.
 class AuthServerErrors {
   AuthServerErrors._();
 
@@ -117,11 +100,9 @@ class AuthServerErrors {
   /// 가입 시 닉네임 중복(409). 중복 확인과 가입 사이에 남이 채간 경우.
   static const nicknameDuplicated = 'NicknameDuplicatedException';
 
-  /// 이미 가입된 전화번호(409). 가입 요청뿐 아니라 **인증번호 발송에서도** 온다.
-  /// 서버가 가입할 수 없는 번호에는 문자를 보내지 않는다.
-  ///
-  /// 발송 제한 검사보다 뒤에서 걸러지므로 이 거절도 쿨다운(1분)과 횟수를
-  /// 소모한다. 같은 번호로 다시 요청하면 이것 대신 429 가 온다.
+  /// 이미 가입된 전화번호(409). 가입 요청뿐 아니라 인증번호 발송에서도 온다.
+  /// 발송 제한 검사보다 뒤라 이 거절도 쿨다운(1분)과 횟수를 소모하므로 같은
+  /// 번호로 다시 요청하면 이것 대신 429 가 온다.
   static const phoneNumberDuplicated = 'PhoneNumberDuplicatedException';
 
   /// 로그인 실패(400). 아이디 없음과 비밀번호 틀림을 서버가 하나로 묶어 준다.
@@ -136,7 +117,7 @@ class AuthStrings {
   static const duplicateCheck = '중복 확인';
   static String stepCounter(int step) => '$step / ${AuthMetrics.totalSteps}';
 
-  // 1/4 기본 정보와 휴대폰 인증
+  // 1/3 기본 정보와 휴대폰 인증
   static const phoneTitle = '가입 정보를 입력해주세요';
   static const phoneSubtitle = '이름과 휴대폰 번호를 확인할게요';
   static const nameLabel = '이름';
@@ -203,7 +184,6 @@ class AuthStrings {
   static const nicknameTaken = '이미 사용 중이에요';
   static const startSignup = '가입하기';
 
-  // 가입 완료
   // 가입 직후 지갑 준비 연출
   static const walletCreatingTitle = '지갑을 만들고 있어요';
   static const walletCreatingSubtitle = '티켓을 담아 둘 지갑을 준비하는 중이에요';
@@ -211,6 +191,7 @@ class AuthStrings {
   /// 화면이 바뀐 걸 스크린리더가 읽어 주는 문구. 영상은 눈으로만 보인다.
   static const walletCreatingSemantics = '지갑을 만들고 있어요. 잠시만 기다려 주세요';
 
+  // 가입 완료
   static const completeTitle = '가입이 완료됐어요';
   static const completeSubtitle = '이제 티켓을 예매할 수 있어요';
   static const goToTickets = '티켓 보러 가기';

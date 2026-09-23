@@ -45,12 +45,9 @@ class _RecordingAuthApi extends MockAuthApi {
   }
 }
 
-/// 푸시 토큰 해제를 기록하는 가짜. 진짜 구현은 만들 때 Firebase 를 건드려
-/// 테스트에서 못 만든다.
-///
-/// 불린 횟수만이 아니라 **불린 시점에 아직 로그인 상태였는지**를 함께 남긴다.
-/// 해제 API 는 인증 헤더로 요청자를 알아내므로 세션을 비운 뒤에 부르면 401 로
-/// 튕긴다. 순서가 뒤집혀도 호출 횟수만 세면 통과해 버린다.
+/// 푸시 토큰 해제를 기록하는 가짜. 불린 횟수와 함께 불린 시점에 아직 로그인
+/// 상태였는지를 남긴다. 해제 API 는 인증 헤더로 요청자를 알아내므로 세션을
+/// 비운 뒤에 부르면 401 로 튕긴다.
 class _RecordingPushRegistrar implements PushNotifications {
   _RecordingPushRegistrar(this._session);
 
@@ -457,7 +454,6 @@ void main() {
   });
 }
 
-/// 줄어든 거래만 있는 지갑. 필터의 빈 상태를 보는 데 쓴다.
 /// 높이 제한을 보는 목. 카드가 담는 20건을 다 채운다.
 class _ManyTransactionsApi implements MyPageApi {
   @override

@@ -4,10 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/timo_logo.dart';
 import '../constants.dart';
 
-/// 검색 화면 상단 바. 뒤로가기와 로고만 있다.
-///
-/// 홈 상단 바([HomeTopBar])와 같은 높이·같은 로고다. 검색 입구 대신 뒤로가기가
-/// 있는 것만 다르다 — 검색 필드는 이 바 아래 한 줄을 통째로 쓴다(시안).
+/// 검색 화면 상단 바. 뒤로가기와 로고만 있다. 홈 상단 바(`HomeTopBar`)와 같은
+/// 높이·같은 로고이고, 검색 필드는 이 바 아래 한 줄을 통째로 쓴다.
 class SearchTopBar extends StatelessWidget {
   const SearchTopBar({super.key, required this.onBackPressed});
 

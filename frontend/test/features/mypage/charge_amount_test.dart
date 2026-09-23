@@ -1,10 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:timo/core/utils/amount_input_formatter.dart';
 import 'package:timo/features/mypage/data/mock_my_page_data.dart';
 import 'package:timo/features/mypage/data/mock_wallet_ledger.dart';
 import 'package:timo/features/mypage/models/charge_amount.dart';
-import 'package:timo/features/mypage/utils/charge_amount_input_formatter.dart';
 
 void main() {
   group('ChargeAmount', () {
@@ -30,8 +30,8 @@ void main() {
     });
   });
 
-  group('ChargeAmountInputFormatter', () {
-    const formatter = ChargeAmountInputFormatter();
+  group('AmountInputFormatter', () {
+    const formatter = AmountInputFormatter(maxDigits: ChargeAmount.maxDigits);
 
     /// 빈 칸에서 [text] 를 친 결과.
     String typed(String text, {String from = ''}) => formatter

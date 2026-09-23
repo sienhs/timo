@@ -19,14 +19,10 @@ import '../widgets/resale_bottom_bar.dart';
 import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_summary_card.dart';
 
-/// 양도 티켓 구매 확인 화면. 무엇을 얼마에 사는지 확인하고 결제한다.
-///
-/// 매물 번호만 받아 상세는 이 화면이 직접 조회한다. 목록에서 들고 온 값을
-/// 그대로 쓰면 그 사이에 팔린 매물을 결제 화면까지 들고 가게 된다.
-///
-/// **남은 시간은 좌석 선점이 아니다.** 양도 매물에는 선점이 없어, 이 화면을
-/// 열어 둔 사이에도 남이 사 갈 수 있다. 시간을 세는 이유는 화면이 든 가격이
-/// 오래되면 결제가 거절되기 때문이다([ResaleMetrics.priceWindow]).
+/// 양도 티켓 구매 확인 화면. 매물 번호만 받아 상세는 직접 조회한다 — 목록
+/// 값을 그대로 쓰면 그새 팔린 매물을 결제까지 들고 간다. 남은 시간은 좌석
+/// 선점이 아니다. 양도 매물에는 선점이 없고, 든 가격이 오래되면 결제가
+/// 거절되기 때문에 센다([ResaleMetrics.priceWindow]).
 class ListingPurchaseScreen extends StatefulWidget {
   const ListingPurchaseScreen({
     super.key,
@@ -60,11 +56,8 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
   /// 결제 요청을 보내고 응답을 기다리는 중. 그동안 버튼을 잠근다.
   bool _purchasing = false;
 
-  /// 지갑 잔액. 매물가보다 적으면 결제 버튼을 잠근다.
-  ///
-  /// 못 읽었으면 null 이고, 그때는 잠그지 않는다. 이 확인은 안내일 뿐이고
-  /// 판정은 서버가 한다 — 지갑을 못 읽었다는 이유로 앱이 결제를 막으면,
-  /// 서버가 받아 줄 거래를 앱이 대신 거절하는 꼴이 된다.
+  /// 지갑 잔액. 매물가보다 적으면 결제 버튼을 잠근다. 못 읽었으면 null 이고
+  /// 그때는 잠그지 않는다 — 이 확인은 안내일 뿐이고 판정은 서버가 한다.
   int? _balance;
 
   /// 잔액을 읽는 일. 한 번만 걸도록 들고 있는다([_listing] 과 같은 이유다).
@@ -77,11 +70,8 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
     _balanceLoad ??= _loadBalance();
   }
 
-  /// 지갑 잔액을 미리 읽어 둔다.
-  ///
-  /// 매물 상세와 달리 [AsyncBoundary] 에 걸지 않는다. 잔액을 못 읽은 것은
-  /// 매물을 못 읽은 것과 달라서, 화면 전체를 오류로 덮을 일이 아니다. 실패는
-  /// 삼키고 잔액을 모르는 채로 둔다([_balance]).
+  /// 지갑 잔액을 미리 읽어 둔다. [AsyncBoundary] 에 걸지 않는다 — 잔액을 못
+  /// 읽은 것으로 화면 전체를 오류로 덮을 일이 아니라 실패는 삼킨다([_balance]).
   Future<void> _loadBalance() async {
     final api = MyPageApiScope.of(context);
     try {
@@ -174,9 +164,8 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
 
     return Scaffold(
       backgroundColor: resalePageBackground,
-      // 상단 바에 남은 시간을 적지 않는다(사용자 결정). 마켓 화면들과 같다.
-      // 여기서는 세는 일도 없앴다 — 마감 때 할 일이 없던 자리다(구매는 서버가
-      // 거절하고, 그 문구를 그대로 띄운다).
+      // 상단 바에 남은 시간을 적지 않는다. 마감 때 할 일도 없다 — 구매는
+      // 서버가 거절하고 그 문구를 그대로 띄운다.
       appBar: ResaleAppBar(title: ResaleStrings.purchaseTitle),
       body: SafeArea(
         bottom: false,
@@ -230,11 +219,8 @@ class _ListingPurchaseScreenState extends State<ListingPurchaseScreen> {
       );
     }
 
-    // 잔액이 모자란다. 이대로 결제하면 온체인에서 되돌려지는데, 그때 서버가
-    // 주는 문구는 "잠시 후 다시 시도해 주세요" 라(`TRANSFER_FAILED`) 충전하러
-    // 가야 하는 사람을 재시도로 보낸다. 앱이 먼저 잠그고 이유를 적는다.
-    //
-    // 가격 만료보다 먼저 보는 이유는, 모자란 잔액은 다시 불러와도 그대로라서다.
+    // 잔액이 모자란다. 서버 문구는 재시도만 권하므로 앱이 먼저 잠그고 이유를
+    // 적는다. 다시 불러와도 그대로라 가격 만료보다 먼저 본다.
     final balance = _balance;
     if (balance != null && balance < listing.price) {
       return const ResaleBottomBar(

@@ -16,10 +16,8 @@ class BookingDetailCard extends StatelessWidget {
 
   final TicketOrder order;
 
-  /// 발행이 실패해 서버가 결제 금액을 되돌리는 중인가.
-  ///
-  /// 참이면 마지막 줄이 '결제 금액' 이 아니라 '환불 예정 금액' 이 된다. 금액
-  /// 자체는 그대로다 — 되돌려 주는 액수가 낸 액수와 같다.
+  /// 발행이 실패해 서버가 결제 금액을 되돌리는 중인가. 참이면 마지막 줄이 '결제
+  /// 금액' 이 아니라 '환불 예정 금액' 이 된다. 금액 자체는 그대로다.
   final bool refunding;
 
   @override

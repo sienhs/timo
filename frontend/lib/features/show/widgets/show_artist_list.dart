@@ -5,11 +5,8 @@ import '../../../core/widgets/poster_image.dart';
 import '../constants.dart';
 import '../models/show_artist.dart';
 
-/// 출연 아티스트를 원형 사진 + 이름으로 늘어놓는다.
-///
-/// 조작부가 아니다 — 아티스트 상세 화면이 없어서 눌러도 갈 곳이 없다.
-/// 누를 수 있게 그려 놓고 아무 일도 없으면 고장으로 읽히므로, 화면이 생길
-/// 때 [InkWell] 을 붙인다.
+/// 출연 아티스트를 원형 사진 + 이름으로 늘어놓는다. 아티스트 상세 화면이 없어
+/// 누를 수 없게 그린다 — 화면이 생길 때 [InkWell] 을 붙인다.
 class ShowArtistList extends StatelessWidget {
   const ShowArtistList({super.key, required this.artists});
 

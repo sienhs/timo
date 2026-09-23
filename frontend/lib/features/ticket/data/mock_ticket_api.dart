@@ -8,24 +8,15 @@ import '../models/ticket_acquisition.dart';
 import '../models/ticket_status.dart';
 import 'ticket_api.dart';
 
-/// 가짜 [TicketApi] 가 무엇을 돌려줄지.
-///
-/// 서버로는 만들 수 없는 상황을 골라 볼 수 있게 나눠 뒀다. 앱이 모르는 주문
-/// 상태는 서버에 없고, 시안 그대로의 목록(예정 2 · 지난 2)도 서버 시드와는
-/// 다르다([HttpTicketApi] 주석 참고).
+/// 가짜 [TicketApi] 가 무엇을 돌려줄지. 서버로는 만들 수 없는 상황을 골라 볼 수
+/// 있게 나눠 뒀다.
 enum TicketMockScenario {
   /// 시안 그대로. 예정 2장 · 지난 2장.
   design,
 
   /// 시안에 없는 카드 전부. 양도 등록 중 · 발행 중 · 발행 실패 · 환불됨 ·
   /// 회수됨 · 입장 완료 · 앱이 모르는 상태 · 양도로 받은 티켓, 여덟 장이다.
-  ///
-  /// 대부분 서버로는 만들기 어렵다. 발행 중·실패는 체인이 느려지거나 실패해야
-  /// 나오고, 양도로 받은 티켓은 구매자 지갑이 필요하고, 모르는 상태는 서버에
-  /// 상태가 하나 늘어야 나온다. 그 상황을 미리 보려면 여기서 꾸며야 한다.
-  ///
-  /// 결제 완료 화면에서는 **발행 실패** 로 끝난다. 실패는 서버로 만들기가
-  /// 어렵다(잔액을 비워 두고 결제하는 식이라 매번 계정을 준비해야 한다).
+  /// 대부분 서버로는 만들기 어려운 상태다. 결제 완료 화면에서는 발행 실패로 끝난다.
   states,
 
   /// 두 탭 모두 빈 목록.
@@ -35,25 +26,9 @@ enum TicketMockScenario {
   error,
 }
 
-/// 서버 없이 쓰는 가짜 [TicketApi]. 화면 테스트와 눈으로 하는 확인이 쓴다.
-///
-/// `flutter run --dart-define=TICKET_API=mock` 으로 앱에 꽂을 수 있다
-/// (`mock-states` · `mock-empty` · `mock-error` 도 된다). 백엔드를 띄우지 않고
-/// 화면을 시안과 대조할 때 쓴다.
-///
-/// **날짜는 실행 시각 기준 상대값이다.** 시안에 적힌 날짜(2026.05.20 등)를
-/// 그대로 박으면 그 날이 지나는 순간 예정 공연이 전부 지난 공연 탭으로 넘어가,
-/// 카드 두 종류를 한 번에 볼 수 없다. 공연명·장소·좌석은 시안 그대로다.
-///
-/// 취소는 실제로 상태를 바꾼다. 취소 버튼을 눌렀을 때 목록이 어떻게 변하는지
-/// 서버 없이 확인하기 위해서다. 주문도 실제로 만들어져 목록 맨 앞에 붙고,
-/// 상세를 [TicketMetrics.mockIssueAfterPolls] 번 물으면 발행이 끝난다 —
-/// 결제 완료 화면의 배지가 바뀌는 것을 서버 없이 보기 위해서다.
-///
-/// 포스터만은 백엔드가 필요하다. 주소가 백엔드의 정적 파일([_posters])을
-/// 가리켜서, 서버를 안 띄우면 회색 자리가 그려진다. 앱 에셋으로 두면 그 사정이
-/// 없어지지만 카드가 받는 값이 서버 응답과 달라져, 정작 연동했을 때 포스터가
-/// 깨지는 것을 목으로는 못 잡는다.
+/// 서버 없이 쓰는 가짜 [TicketApi]. `flutter run --dart-define=TICKET_API=mock`
+/// 으로 앱에 꽂는다(`mock-states` · `mock-empty` · `mock-error` 도 된다). 날짜는
+/// 실행 시각 기준 상대값이고, 취소·주문은 실제로 상태를 바꾼다.
 class MockTicketApi implements TicketApi {
   MockTicketApi({
     this.latency = TicketMetrics.mockLatency,
@@ -64,13 +39,9 @@ class MockTicketApi implements TicketApi {
   final Duration latency;
   final TicketMockScenario scenario;
 
-  /// 지금 시각을 읽는 함수. 티켓 날짜를 여기서 잰다.
-  ///
-  /// 테스트가 시각을 고정할 수 있게 받는다(공연 상세 화면이 `clock` 을 받는
-  /// 것과 같은 이유다). 진짜 시계를 그대로 쓰면 **언제 돌리느냐에 따라 결과가
-  /// 달라지는 테스트**가 된다 — 실제로 '1시간 뒤 공연' 이 자정을 넘기는
-  /// 밤 11시 이후에는 D-day 배지가 `D-DAY` 가 아니라 `D-1` 로 찍혀 테스트가
-  /// 깨졌다.
+  /// 지금 시각을 읽는 함수. 티켓 날짜를 여기서 잰다. 테스트가 시각을 고정할 수
+  /// 있게 받는다 — 진짜 시계를 쓰면 밤 11시 이후 D-day 배지가 달라지는 식으로
+  /// 언제 돌리느냐에 따라 결과가 바뀐다.
   final DateTime Function() clock;
 
   List<MyTicket>? _tickets;
@@ -173,12 +144,9 @@ class MockTicketApi implements TicketApi {
         : _issued(detail, tokenId: '$reservationId');
   }
 
-  /// 서버 형식(`timo:entry:1:<티켓번호>.<만료>.<서명>`)을 흉내 낸다. 화면은
-  /// 문자열을 해석하지 않으니 모양이 같을 필요는 없지만, 글자 수가 같아야 QR
-  /// 칸의 촘촘함이 실제와 같아 시안과 대조할 때 어긋나지 않는다. 서명 자리는
-  /// 가짜라 검표기에는 통하지 않는다.
-  ///
-  /// 부를 때마다 만료 시각이 달라 문자열도 달라진다 — 실제 서버와 같다.
+  /// 서버 형식(`timo:entry:1:<티켓번호>.<만료>.<서명>`)을 흉내 낸다. 글자 수가
+  /// 같아야 QR 칸의 촘촘함이 실제와 같다. 서명은 가짜라 검표기에는 통하지 않고,
+  /// 부를 때마다 만료 시각이 달라 문자열도 달라진다.
   @override
   Future<EntryPass> issueEntryPass(int ticketId) async {
     await _respond();
@@ -288,10 +256,8 @@ class MockTicketApi implements TicketApi {
         posterImageUrl: _posters[3],
       ),
     ],
-    // 순서에 뜻이 있다. 더보기(⋮)가 붙는 카드는 양도 등록 중(맨 앞)과 양도로
-    // 받은 티켓(맨 뒤) 둘뿐이라, 테스트가 첫 번째·마지막 더보기로 집는다.
-    // 남은 날은 회수·환불 둘만 9일로 같게 두어 "그 카드에 D-day 가 없다" 를
-    // 'D-9' 하나로 볼 수 있게 했다.
+    // 순서에 뜻이 있다. 더보기(⋮)가 붙는 카드는 맨 앞(양도 등록 중)과 맨 뒤(양도로
+    // 받은 티켓) 둘뿐이라 테스트가 첫·마지막 더보기로 집는다. 회수·환불은 둘 다 D-9.
     TicketMockScenario.states => [
       _stateTicket(
         reservationId: 11,
@@ -376,10 +342,9 @@ class MockTicketApi implements TicketApi {
     );
   }
 
-  /// [ticketId] 는 예매 번호와 다른 값으로 둔다 — 둘을 바꿔 써도 목에서는
-  /// 티가 안 나는 일이 없게. 아이유 콘서트(102)만 마켓 목의 등록 가능한
-  /// 티켓과 같은 번호라, 그 카드의 `양도 등록하기` 는 목만으로도 등록 화면에
-  /// 미리 골라진다.
+  /// [ticketId] 는 예매 번호와 다른 값으로 둔다 — 둘을 바꿔 써도 목에서 티가
+  /// 안 나는 일이 없게. 아이유 콘서트(102)만 마켓 목의 등록 가능한 티켓과 같은
+  /// 번호라, 그 카드의 `양도 등록하기` 는 목만으로도 등록 화면에 미리 골라진다.
   MyTicket _ticket({
     required int reservationId,
     required int ticketId,
@@ -416,12 +381,9 @@ class MockTicketApi implements TicketApi {
     );
   }
 
-  /// 공연 시각을 고른다.
-  ///
-  /// 하루 넘게 떨어진 공연은 날짜만 옮기고 시각을 저녁 7시로 맞춘다. 실행
-  /// 시각을 그대로 쓰면 `2026.09.14 04:33` 같은 새벽 공연이 나와 시안과 대조할
-  /// 때 눈에 거슬린다. 오늘 공연만 실제 시각을 써야 입장 QR 창(시작 2시간
-  /// 전부터)에 들어온다.
+  /// 공연 시각을 고른다. 하루 넘게 떨어진 공연은 날짜만 옮기고 저녁 7시로 맞춰
+  /// 새벽 공연이 안 나오게 한다. 오늘 공연만 실제 시각을 써야 입장 QR 창(시작
+  /// 2시간 전부터)에 들어온다.
   static DateTime _startAt(DateTime now, Duration startsIn) {
     final at = now.add(startsIn);
     if (startsIn.inHours.abs() < 24) {
@@ -433,7 +395,8 @@ class MockTicketApi implements TicketApi {
   /// 공연다운 시각. 백엔드 고정 공연들도 19시다.
   static const _showHour = 19;
 
-  /// 백엔드가 정적으로 서빙하는 포스터들. 서버 응답과 같은 상대 경로 모양이다.
+  /// 백엔드가 정적으로 서빙하는 포스터들. 서버 응답과 같은 상대 경로 모양이라
+  /// 서버를 안 띄우면 회색 자리가 그려진다.
   static const _posters = [
     'poster/poster_main_kim_feel.gif',
     'poster/poster_main_lee.gif',

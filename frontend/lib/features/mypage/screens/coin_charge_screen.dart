@@ -17,15 +17,8 @@ import '../widgets/mushroom_balance_card.dart';
 import '../widgets/my_page_top_bar_host.dart';
 
 /// 버섯 충전 화면. 마이페이지의 충전하기와 빠른 메뉴의 코인 충전에서 들어온다.
-///
-/// 충전에 성공하면 결과로 true 를 넘기며 닫힌다. 마이페이지가 그걸 받아 지갑을
-/// 다시 불러 잔액을 맞춘다 — 여기서 새 잔액을 들고 돌아가지 않는 이유는, 부른
-/// 쪽이 마이페이지 하나가 아니고(빠른 메뉴) 지갑을 어떻게 다시 그릴지는 부른
-/// 쪽 사정이라서다.
-///
-/// 잔액과 충전은 각각 서버에 다녀온다. 잔액 조회가 실패해도 충전 카드는 그대로
-/// 보인다(추가 후 잔액 줄만 비어 있다) — 얼마를 넣을지는 잔액을 몰라도 고를 수
-/// 있다.
+/// 충전에 성공하면 결과로 true 를 넘기며 닫히고, 지갑을 다시 그리는 건 부른 쪽
+/// 몫이다. 잔액 조회가 실패해도 충전 카드는 그대로 보인다.
 class CoinChargeScreen extends StatefulWidget {
   const CoinChargeScreen({super.key});
 
@@ -115,10 +108,8 @@ class _CoinChargeScreenState extends State<CoinChargeScreen> {
     try {
       await api.charge(amount.value);
       if (!mounted) return;
-      // 스낵바를 먼저 띄운다. ScaffoldMessenger 는 라우트보다 위에 있어 이
-      // 화면이 닫혀도 남아, 돌아간 마이페이지 위에서 보인다.
-      // 글자 폭에 맞춘다. 돌아간 마이페이지의 카드와 폭이 같으면 안내가 아니라
-      // 카드가 하나 더 생긴 것처럼 보인다.
+      // 스낵바를 먼저 띄운다. ScaffoldMessenger 는 라우트보다 위에 있어 이 화면이
+      // 닫혀도 남는다. 폭은 글자에 맞춰 마이페이지 카드처럼 보이지 않게 한다.
       showSuccessSnackBar(
         context,
         MyPageStrings.chargeSucceeded(formatThousands(amount.value)),

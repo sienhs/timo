@@ -3,16 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'favorite_artist.dart';
 import 'favorite_show.dart';
 
-/// 찜한 공연·아티스트 목록. 최근에 찜한 것이 앞이다.
-///
-/// 규칙(같은 공연은 하나만 · 다시 누르면 빠진다)을 여기 한 곳에 둔다. 저장소는
-/// 이 객체를 통째로 넣고 빼는 것만 알고, 화면은 이 객체의 메서드만 부른다.
-/// 불변 객체라 바꿀 때마다 새 객체를 돌려준다 — 최근 검색어(`RecentSearches`)
-/// 와 같은 짜임이다.
-///
-/// 공연과 아티스트가 한 객체에 있지만 남는 곳은 다르다. 공연은 서버(찜 API),
-/// 아티스트는 기기다. 화면은 둘을 한 화면(탭)에서 함께 그리므로 목록 자체는
-/// 하나로 두고, 어디에 남길지는 [FavoriteStore] 가 가른다.
+/// 찜한 공연·아티스트 목록. 최근에 찜한 것이 앞이다. 같은 공연은 하나만·다시
+/// 누르면 빠진다는 규칙을 여기 한 곳에 두고, 불변 객체라 바꿀 때마다 새 객체를
+/// 돌려준다. 공연은 서버, 아티스트는 기기에 남기며 그 갈래는 `FavoriteStore` 몫이다.
 @immutable
 class Favorites {
   const Favorites({this.shows = const [], this.artists = const []});
@@ -38,12 +31,9 @@ class Favorites {
   Favorites removeArtist(String name) =>
       withArtists(artists.where((artist) => artist.name != name));
 
-  /// 찜한 아티스트의 스냅샷을 [latest] 의 것으로 바꾼다. 순서는 그대로다.
-  ///
-  /// 아티스트 찜은 그 순간의 모습을 기기에 남기는 것이라, 서버가 나중에 사진을
-  /// 붙이거나 바꿔도 목록은 옛 모습에 머문다. 검색 결과처럼 서버가 준 최신
-  /// 모습을 다시 만났을 때 여기로 맞춘다. [latest] 에 없는 아티스트는 건드리지
-  /// 않는다.
+  /// 찜한 아티스트의 스냅샷을 [latest] 의 것으로 바꾼다. 순서는 그대로고 [latest]
+  /// 에 없는 아티스트는 건드리지 않는다. 기기에 남긴 옛 모습을 서버가 준 최신
+  /// 모습으로 맞출 때 쓴다.
   Favorites refreshArtists(Iterable<FavoriteArtist> latest) {
     final byName = {for (final artist in latest) artist.name: artist};
     return withArtists(artists.map((artist) => byName[artist.name] ?? artist));

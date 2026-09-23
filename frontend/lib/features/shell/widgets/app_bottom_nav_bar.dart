@@ -3,13 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 앱 전역 하단 바. 홈 · 빠른 메뉴 · 마이페이지 3분할이다.
-///
-/// 가운데 원형 버튼은 이 위젯에 없다. 탭이 아니라 빠른 메뉴 토글이고 바 위로
-/// 솟아 있어서 `Scaffold.floatingActionButton` 이 그린다([QuickMenuButton]).
-/// 바 안쪽에는 가운데 칸의 라벨만 남는다.
-///
-/// 그래서 [selectedIndex] 는 0(홈) · 1(마이페이지) 둘뿐이다.
+/// 앱 전역 하단 바. 홈 · 빠른 메뉴 · 마이페이지 3분할이다. 가운데 원형 버튼은
+/// 바 위로 솟아 `Scaffold.floatingActionButton` 이 그리고, 바 안에는 가운데 칸의
+/// 라벨만 남는다. 그래서 [selectedIndex] 는 0(홈) · 1(마이페이지) 둘뿐이다.
 class AppBottomNavBar extends StatelessWidget {
   const AppBottomNavBar({
     super.key,
@@ -28,9 +24,8 @@ class AppBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
-    // 선 대신 그림자로 경계를 준다. 1px 선은 바가 화면에 납작하게 붙은 것처럼
-    // 보이는데, 이 바는 내용 위에 떠 있는 것이라 위로 퍼지는 그림자가 맞다.
-    // 아래로는 퍼질 곳이 없으므로 위쪽으로만 밀어 준다.
+    // 선 대신 위로 퍼지는 그림자로 경계를 준다. 1px 선은 바가 화면에 납작하게
+    // 붙은 것처럼 보이는데, 이 바는 내용 위에 떠 있는 것이라서다.
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: AppColors.surface,

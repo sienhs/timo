@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 
-/// 실시간 인기 검색어를 불러오는 동안 그 자리에 두는 뼈대.
-///
-/// 제목 줄과 순위 줄들을 [TrendingKeywordList] 와 같은 높이로 세운다. 이
-/// 섹션은 열 줄짜리([HomeMetrics.trendingCount]) 긴 목록이라, 스피너 하나만
-/// 두면 화면 절반이 비었다가 한 번에 채워진다.
+/// 실시간 인기 검색어를 불러오는 동안 그 자리에 두는 뼈대. 제목 줄과 순위 줄
+/// [HomeMetrics.trendingCount] 개를 `TrendingKeywordList` 와 같은 높이로 세운다.
 class TrendingKeywordSkeleton extends StatelessWidget {
   const TrendingKeywordSkeleton({super.key});
 

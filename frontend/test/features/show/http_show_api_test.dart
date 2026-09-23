@@ -21,10 +21,8 @@ void main() {
     api = HttpShowApi(dio: dio);
   }
 
-  /// 공연 단건 응답. 실제 `ConcertDetailResponseDto` 모양이다.
-  ///
-  /// 가격(`sectionPrices`)이 이 안에 들어 있다. 예전에는 구역 목록을 따로
-  /// 물어야 했다.
+  /// 공연 단건 응답. 실제 `ConcertDetailResponseDto` 모양이다. 가격
+  /// (`sectionPrices`)도 이 안에 들어 있다.
   Map<String, dynamic> concertJson({
     String status = 'ON_SALE',
     bool bookable = true,

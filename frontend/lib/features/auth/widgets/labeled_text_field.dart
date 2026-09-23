@@ -3,21 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// 굵은 라벨 + 입력칸. 회원가입 화면의 모든 입력칸이 이 모양이다.
-///
-/// - [trailing] 을 주면 입력칸 오른쪽에 붙는다('중복 확인' 버튼).
-/// - [errorText] 가 있으면 코랄색으로, 없고 [helperText] 가 있으면 회색
-///   (또는 [helperColor])으로 칸 아래 한 줄을 보여준다. 둘 다 없으면 줄이
-///   생기지 않는다.
-///
-/// 안내 문구는 TextField 의 helperText 가 아니라 **칸 바깥 아래에 전체 폭으로**
-/// 그린다. helperText 는 입력칸 폭 안에서만 그려지는데, 옆에 '중복 확인'
-/// 버튼이 붙으면 칸이 좁아져 규칙 안내가 두 줄로 갈렸다. 대신 오류일 때는
-/// 테두리 색만 직접 코랄로 바꾼다.
-///
-/// 테두리·모서리·힌트 색은 여기서 정하지 않고 AppTheme 의
-/// inputDecorationTheme 이 정한다. 그래서 다른 화면의 TextField 도 같은
-/// 모양이 나온다.
+/// 굵은 라벨 + 입력칸. 회원가입 화면의 모든 입력칸이 이 모양이다. [trailing] 은
+/// 칸 오른쪽에 붙고, [errorText]/[helperText] 는 칸 바깥 아래에 전체 폭으로
+/// 그린다(helperText 는 칸 폭 안에만 그려져 옆에 버튼이 붙으면 두 줄이 된다).
 class LabeledTextField extends StatelessWidget {
   const LabeledTextField({
     super.key,

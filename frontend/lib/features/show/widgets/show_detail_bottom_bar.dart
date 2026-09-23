@@ -4,30 +4,10 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/show_detail.dart';
 
-/// 화면 맨 아래 고정 바. [ShowBookingPhase] 에 따라 버튼이 갈린다.
-///
-/// - 예매 중: `예매하러 가기` + `양도 마켓 알림 받기`
-/// - 오픈 전: 남은 시간(또는 오픈 일시) + `오픈 알림 받기`
-/// - 서버가 아직 안 열어 줌: `오픈 알림 받기` 만 - 남은 시간은 안 적는다
-/// - 마감·종료·취소: 잠긴 버튼만(`예매가 마감되었습니다` 등)
-///
-/// **알림 버튼은 찜과 다른 것이다.** 상단 하트는 찜 목록에만 넣고, 알림은 이
-/// 버튼들이 따로 켜고 끈다. 오픈 알림과 양도 마켓 알림도 서로 따로다 — 한쪽을
-/// 켜도 다른 쪽은 그대로다.
-///
-/// 오픈된 공연에는 안내 문구를 얹지 않는다. 공연일은 바로 위 '일시:' 줄에 이미
-/// 있어서 같은 날짜가 한 화면에 두 번 찍히고, 버튼 바로 위에 붙은 날짜는
-/// 예매와 관련된 마감일처럼 읽힌다. 오픈 전 문구는 남긴다 — 저건 공연일이
-/// 아니라 언제부터 누를 수 있는지를 알리는 말이다.
-///
-/// 매진은 잠그지 않는다. 취소표가 돌아올 수 있어 들어가 볼 이유가 있다. 매진을
-/// 따로 가르지 않는 덕에 양도 마켓 알림도 예매 중인 공연 전부에 같은 자리로
-/// 선다 — 좌석이 언제 동날지는 화면이 알 수 없으므로, 남아 있을 때 미리
-/// 신청해 두는 편이 매진된 뒤에야 버튼이 나타나는 것보다 낫다.
-///
-/// 시각을 스스로 재지 않고 [now] 를 받는다. 타이머를 여기에 두면 상단 상태
-/// 뱃지와 하단 바가 각자 시간을 재게 되어, 오픈 시각을 넘기는 순간 둘 중
-/// 하나만 먼저 바뀌는 프레임이 생긴다.
+/// 화면 맨 아래 고정 바. [ShowBookingPhase] 에 따라 버튼이 갈린다 — 예매 중은 예매 +
+/// 양도 마켓 알림, 오픈 전은 남은 시간(또는 오픈 일시) + 오픈 알림, 서버가 아직 안
+/// 열어 준 공연은 오픈 알림만, 마감·종료·취소는 잠긴 버튼만. 매진은 잠그지 않는다.
+/// 알림 버튼은 찜과 별개고 두 알림도 서로 따로다. 시각은 뱃지와 같은 [now] 를 받는다.
 class ShowDetailBottomBar extends StatelessWidget {
   const ShowDetailBottomBar({
     super.key,
@@ -74,9 +54,8 @@ class ShowDetailBottomBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 남은 시간은 언제 열리는지 아는 동안에만 적는다. 잠긴 버튼은
-              // 이미 이유를 말하고 있고, 서버가 아직 안 열어 준 공연은 열릴
-              // 시각을 앱이 모른다 - 그 자리에 0 을 찍으면 멈춘 시계가 된다.
+              // 남은 시간은 언제 열리는지 아는 동안에만 적는다. 서버가 아직 안 열어 준
+              // 공연은 열릴 시각을 모른다 — 그 자리에 0 을 찍으면 멈춘 시계가 된다.
               if (phase == ShowBookingPhase.upcoming) ...[
                 _Countdown(
                   text: _upcomingCaption(detail.remainingUntilOpenAt(now)),
@@ -113,12 +92,9 @@ class ShowDetailBottomBar extends StatelessWidget {
     return [_openAlarmButton()];
   }
 
-  /// 오픈 알림 버튼. 신청 여부에 따라 채움/테두리로 갈린다. 이미 신청한
-  /// 사람에게까지 화면에서 가장 눈에 띄는 버튼으로 '해제' 를 들이밀 이유가
-  /// 없어서다.
-  ///
-  /// 아이콘도 글자도 **지금 누르면 일어날 일**을 가리킨다. 켜진 상태를
-  /// 그리면 종 아이콘과 '해제하기' 가 서로 반대를 말하게 된다.
+  /// 오픈 알림 버튼. 신청 여부에 따라 채움/테두리로 갈린다. 아이콘도 글자도
+  /// **지금 누르면 일어날 일**을 가리킨다 — 켜진 상태를 그리면 종 아이콘과
+  /// '해제하기' 가 서로 반대를 말하게 된다.
   Widget _openAlarmButton() {
     if (isOpenAlarmOn) {
       return OutlinedButton.icon(
@@ -150,11 +126,8 @@ class ShowDetailBottomBar extends StatelessWidget {
     ),
   );
 
-  /// 버튼을 잠글 단계면 거기 적을 문구, 아니면 null.
-  ///
-  /// `default` 도 `_` 도 두지 않는다. 그걸 두면 [ShowBookingPhase] 에 단계를
-  /// 하나 더 넣어도 조용히 통과해, 잠가야 할 공연에 `예매하러 가기` 가 붙는다.
-  /// 빠짐없이 적어 두면 그 순간 컴파일이 깨진다.
+  /// 버튼을 잠글 단계면 거기 적을 문구, 아니면 null. `default` 도 `_` 도 두지 않는다 —
+  /// [ShowBookingPhase] 에 단계가 늘었을 때 조용히 통과하지 않고 컴파일이 깨지게 한다.
   String? _lockedLabel(ShowBookingPhase phase) => switch (phase) {
     ShowBookingPhase.finished => ShowDetailStrings.closedNotice,
     ShowBookingPhase.canceled => ShowDetailStrings.canceledNotice,

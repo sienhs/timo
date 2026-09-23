@@ -46,10 +46,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   late int _zoneId;
   List<Zone> _zones = [];
 
-  /// 선점 요청이 나가 있는 동안 참. 결제하기 버튼을 잠가 둔다.
-  ///
-  /// 두 번 눌러 두 번 잡히는 것을 막는 것이 첫째지만, 요청이 오가는 몇 백
-  /// 밀리초 동안 버튼이 멀쩡해 보이면 사용자는 눌리지 않았다고 생각한다.
+  /// 선점 요청이 나가 있는 동안 참. 두 번 눌러 두 번 잡히지 않도록 결제하기
+  /// 버튼을 잠가 둔다.
   bool _holding = false;
 
   @override
@@ -69,8 +67,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   @override
   void dispose() {
     // 자리를 잡아 둔 채 화면이 사라지는 경우다(결제 완료 후 홈으로 빠지는 등).
-    // 컨텍스트가 이미 없어 결과를 볼 수 없으므로 요청만 던진다. 실패해도
-    // 5분 뒤 서버가 알아서 푼다.
+    // 컨텍스트가 없어 요청만 던진다. 실패해도 5분 뒤 서버가 알아서 푼다.
     final hold = _controller.hold;
     if (hold != null) {
       _api.cancelHold(concertId: _concertId, seatId: hold.seatId).ignore();
@@ -86,7 +83,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       final zones = await _api.fetchZones(_concertId);
       if (mounted) setState(() => _zones = zones);
     } catch (_) {
-      // Seat selection remains usable if the optional navigation map fails.
+      // 구역도를 못 받아도 좌석 선택은 되게 둔다.
     }
   }
 
@@ -153,11 +150,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     if (mounted && zone != null) _changeZone(zone);
   }
 
-  /// 좌석을 다시 받아 온다. 남이 잡았다 푼 자리가 이때 보인다.
-  ///
-  /// 화살표로 쓰지 않는다. `setState(() => _seats = _fetch())` 는 대입식의
-  /// 값(Future)을 콜백의 반환값으로 넘기게 되어, Flutter 가 "setState 안에서
-  /// 비동기 작업을 한다" 고 보고 막는다.
+  /// 좌석을 다시 받아 온다. 남이 잡았다 푼 자리가 이때 보인다. 화살표로 쓰면
+  /// 대입식의 값(Future)이 콜백 반환값이 되어 Flutter 가 setState 안의 비동기
+  /// 작업으로 보고 막는다.
   void _refresh() {
     final next = _fetch();
     setState(() {
@@ -166,21 +161,14 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   }
 
   void _onSeatTap(ZoneSeats zoneSeats, Seat seat) {
-    // 회색 자리(예매완료·선점중)는 눌러도 아무 말도 하지 않는다. 고를 수 없다는
-    // 것이 색으로 이미 보이고, 배치도를 훑다 보면 회색을 스치듯 누르는 일이
-    // 잦아서 그때마다 안내를 띄우면 스낵바가 떴다 사라지기를 반복한다.
-    //
-    // 알려 줘야 하는 경우는 따로 있다. 초록 자리를 눌러 잡으려는데 그 사이
-    // 남이 채 간 때다(409). 그건 [_onHoldFailed] 가 맡는다.
+    // 회색 자리(예매완료·선점중)는 눌러도 아무 말도 하지 않는다. 초록 자리를
+    // 잡으려는데 그 사이 남이 채 간 경우(409)만 [_onHoldFailed] 가 알린다.
     if (_holding) return;
 
     final controller = BookingScope.read(context);
 
-    // 고른 자리를 다시 누르면 선택을 푼다. 물릴 방법이 없으면 잘못 누른 자리를
-    // 되돌리려고 다른 자리를 아무거나 골라야 한다.
-    //
-    // 고를 수 있는지보다 먼저 본다. 고른 뒤 새로고침 사이에 남이 그 자리를
-    // 가져가면 회색이 되는데, 그때도 선택은 풀 수 있어야 한다.
+    // 고른 자리를 다시 누르면 선택을 푼다. 새로고침 사이에 남이 가져가 회색이
+    // 된 자리도 풀 수 있어야 하므로 고를 수 있는지보다 먼저 본다.
     if (controller.selectedSeat?.id == seat.id) {
       controller.clearSelection();
       return;
@@ -190,13 +178,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     controller.selectSeat(_zoneOf(zoneSeats), seat);
   }
 
-  /// 확인을 받고 서버에 자리를 잡은 뒤 결제 화면으로 보낸다.
-  ///
-  /// **탭한 순간이 아니라 여기서 잡는다.** 칸이 작아 오탭이 잦은데 탭마다
-  /// 요청을 보내면 남의 자리까지 풀렸다 잡혔다 한다.
-  ///
-  /// 결제 화면에 찍을 예매자 실명도 여기서 함께 받는다. 자리를 잡고 나서
-  /// 이어 보내면 그만큼 결제 진입이 늦어지는데, 선점은 이미 임계 경로다.
+  /// 확인을 받고 서버에 자리를 잡은 뒤 결제 화면으로 보낸다. 탭한 순간이 아니라
+  /// 여기서 잡는다 — 오탭이 잦아 탭마다 요청하면 남의 자리까지 풀렸다 잡혔다
+  /// 한다. 예매자 실명은 선점과 나란히 받아 결제 진입이 늦어지지 않게 한다.
   Future<void> _onCheckout() async {
     final seat = _controller.selectedSeat;
     final seatLabel = _controller.selectedSeatLabel;
@@ -228,9 +212,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     if (!mounted) return;
 
     if (paid == true) {
-      // 서버가 선점을 주문으로 바꿨다. 여기서 풀면 안 된다 — 이미 우리
-      // 자리다. 고른 자리를 잊고 배치도를 새로 받아, 완료 화면에서 뒤로
-      // 돌아오면 그 자리가 판매 완료로 보이게 한다.
+      // 서버가 선점을 주문으로 바꿨으니 풀면 안 된다. 고른 자리를 잊고 배치도를
+      // 새로 받아, 완료 화면에서 뒤로 돌아오면 판매 완료로 보이게 한다.
       _controller.clearSelection();
       _refresh();
       return;
@@ -240,15 +223,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     await _releaseHold();
   }
 
-  /// 결제 화면에 찍을 예매자 실명. 실패하면 null 이다.
-  ///
-  /// **던지지 않는다.** 이 Future 는 선점 요청과 나란히 떠 있다가 나중에
-  /// 기다려지는데, 그 사이에 예외로 끝나면 아무도 받지 않은 비동기 오류가 된다.
-  /// 게다가 이름을 못 받은 것으로 결제를 막을 생각이 없다 — 자리는 이미
-  /// 잡혔고, 비어 있을 때 화면이 할 일은 `TicketOrder.bookerName` 에 있다.
-  /// 실패를 [ApiException] 으로 좁히지 않는다. 응답에 이름이 없거나 모양이
-  /// 다르면 형 변환 오류로 오는데, 그것까지 여기서 받아 내야 결제가 멈추지
-  /// 않는다. 지도를 못 받아도 좌석 선택은 되게 두는 것과 같다([_loadZones]).
+  /// 결제 화면에 찍을 예매자 실명. 실패하면 null 이고 던지지 않는다 — 선점과
+  /// 나란히 떠 있다가 나중에 기다려지므로 예외로 끝나면 받는 곳이 없다. 형 변환
+  /// 오류까지 받아 내야 결제가 멈추지 않아 [ApiException] 으로 좁히지 않는다.
   Future<String?> _fetchBookerName() async {
     try {
       return await _myPageApi.fetchBookerName();
@@ -272,26 +249,20 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     if (mounted) _refresh();
   }
 
-  /// 자리를 잡지 못했다. 이유에 따라 알려 줄 말과 할 일이 다르다.
-  ///
-  /// **409 를 한 덩어리로 보면 안 된다.** 서버는 자리를 뺏긴 것, 이 공연 티켓을
-  /// 이미 가진 것(1인 1매), 판매 중이 아닌 공연을 전부 409 로 준다. 뒤의 둘은
-  /// 자리와 무관해서 어느 칸을 눌러도 똑같이 막히는데, 한 문구로 뭉치면
-  /// **전 좌석이 선점중인 것처럼 보인다.**
+  /// 자리를 잡지 못했다. 서버는 자리를 뺏긴 것, 이 공연 티켓을 이미 가진 것,
+  /// 판매 중이 아닌 공연을 전부 409 로 주므로 한 덩어리로 보면 안 된다 — 뒤의
+  /// 둘은 자리와 무관해 한 문구로 뭉치면 전 좌석이 선점중인 것처럼 보인다.
   void _onHoldFailed(ApiException e) {
     if (e.status == 401) {
-      // 서버가 요청자를 알아야 자리를 잡아 준다. 로그인 화면은 성공하면
-      // 홈으로 가며 예매 화면을 걷어내므로, 공연 상세에서 예매를 다시 시작한다.
-      // 상세에서 로그인을 먼저 확인하기 때문에 여기 오는 일은 세션이 도중에
-      // 끊긴 경우뿐이다.
+      // 로그인 화면은 성공하면 홈으로 가며 예매 화면을 걷어내므로, 공연 상세에서
+      // 예매를 다시 시작한다. 세션이 도중에 끊긴 경우에만 여기 온다.
       _showMessage(BookingStrings.loginRequired);
       Navigator.pushNamed(context, AppRoutes.login);
       return;
     }
 
     // 자리 자체가 막힌 게 아니라면 고른 자리를 풀지도, 배치도를 다시 받지도
-    // 않는다. 배치도는 달라질 게 없고, 선택이 저절로 풀리면 사용자는 자기가
-    // 뭘 잘못 눌렀나 싶어 같은 일을 반복하게 된다.
+    // 않는다. 선택이 저절로 풀리면 사용자가 같은 일을 반복하게 된다.
     switch (e.exceptionName) {
       case BookingServerErrors.alreadyReserved:
         _showMessage(BookingStrings.alreadyReserved);
@@ -306,19 +277,15 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
       return;
     }
 
-    // 고르는 사이에 남이 가져갔다. 지금 배치도는 이미 낡았으므로 다시 받는다.
-    //
-    // 예외 이름이 없거나 모르는 값인 409 도 여기로 온다. 자리 경쟁이 409 중
-    // 가장 흔하고, 새로고침은 해가 없다.
+    // 고르는 사이에 남이 가져갔다. 배치도가 낡았으므로 다시 받는다. 예외 이름이
+    // 없거나 모르는 409 도 자리 경쟁으로 본다 — 가장 흔하고 새로고침은 해가 없다.
     _showMessage(BookingStrings.seatTaken);
     _controller.clearSelection();
     _refresh();
   }
 
-  /// 좌석 응답이 함께 준 구역 정보로 [Zone] 을 만든다.
-  ///
-  /// 구역 목록을 다시 받지 않는 이유: 서버가 좌석 응답 머리에 구역 이름과
-  /// 가격을 실어 준다. 결제 금액과 좌석 이름에 필요한 건 그 둘뿐이다.
+  /// 좌석 응답이 함께 준 구역 정보로 [Zone] 을 만든다. 결제 금액과 좌석 이름에
+  /// 필요한 건 그 둘뿐이라 구역 목록을 다시 받지 않는다.
   Zone _zoneOf(ZoneSeats zoneSeats) => Zone(
     id: zoneSeats.zoneId,
     name: zoneSeats.zoneName,
@@ -329,10 +296,8 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     seatsPerRow: zoneSeats.rows.isEmpty ? 0 : zoneSeats.rows.first.length,
   );
 
-  /// 예매를 이어갈 수 없는 이유를 알린다. 앱 공통 안내 상자를 쓴다.
-  ///
-  /// 하단 바를 `Scaffold.bottomNavigationBar` 로 그리므로 바 높이를 더하지
-  /// 않는다 — Flutter 가 이미 그 위로 올려 준다.
+  /// 예매를 이어갈 수 없는 이유를 알린다. 하단 바는 `Scaffold.bottomNavigationBar`
+  /// 라 Flutter 가 그 위로 올려 주므로 바 높이를 더하지 않는다.
   void _showMessage(String message) {
     showErrorSnackBar(context, message, bottomMargin: snackBarGapAboveBar);
   }

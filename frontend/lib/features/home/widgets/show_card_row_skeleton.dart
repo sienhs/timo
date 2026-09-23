@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../../../core/widgets/skeleton_box.dart';
 
-/// 공연 카드 줄을 불러오는 동안 그 자리에 두는 빈 카드들.
-///
-/// 크기와 간격을 [ShowPosterCard] 와 같게 잡아, 데이터가 오는 순간 자리가
-/// 밀리지 않게 한다. 스피너 하나만 두면 줄 높이를 알 수 없어 아래 섹션이
-/// 위로 붙었다가 다시 내려온다.
+/// 공연 카드 줄을 불러오는 동안 그 자리에 두는 빈 카드들. 크기와 간격을
+/// `ShowPosterCard` 와 같게 잡아 데이터가 오는 순간 자리가 밀리지 않게 한다.
 class ShowCardRowSkeleton extends StatelessWidget {
   const ShowCardRowSkeleton({super.key});
 

@@ -11,11 +11,8 @@ import 'package:timo/features/show/data/mock_show_api.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 레이아웃 스모크 테스트.
-///
-/// 시안을 옮기는 작업에서 가장 흔한 사고는 실제 폰 폭에서 Row/Column 이
-/// 넘치는 것인데, analyze 로는 잡히지 않는다. 오버플로는 테스트에서
-/// FlutterError 로 터지므로 화면을 한 번 훑는 것만으로 방어가 된다.
+/// 레이아웃 스모크 테스트. 실제 폰 폭에서 Row/Column 이 넘치는 것은 analyze 로
+/// 안 잡히지만 테스트에서는 FlutterError 로 터지므로, 화면을 한 번 훑는다.
 void main() {
   /// 360 x 800 dp
   void usePhoneSize(WidgetTester tester) {
@@ -24,10 +21,7 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  /// 예매 흐름을 띄운다.
-  ///
-  /// 로그인 상태로 시작한다. 예매 진입(상세의 '예매하러 가기')이 로그인을
-  /// 요구해서, 로그아웃 상태로 두면 좌석 화면 대신 로그인 화면이 열린다.
+  /// 예매 흐름을 띄운다. 예매 진입이 로그인을 요구해서 로그인 상태로 시작한다.
   Future<void> pumpApp(WidgetTester tester) async {
     usePhoneSize(tester);
     final session = AuthSession(storage: InMemoryTokenStorage());
@@ -58,13 +52,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 홈에서 예매 흐름으로 들어간다.
-  ///
-  /// 홈 -> 공연 상세 -> 좌석 선택 순이다. 예매 진입은 상세가 맡으므로 홈에서
-  /// 좌석 선택으로 바로 갈 수는 없다.
-  ///
-  /// 이미 오픈한 공연(아이유)을 고른다. 오픈 전 공연은 상세에 '오픈 알림 받기'
-  /// 만 있어 예매로 들어갈 수 없다.
+  /// 홈에서 예매 흐름으로 들어간다. 홈 -> 공연 상세 -> 좌석 선택 순이고, 오픈 전
+  /// 공연은 예매로 들어갈 수 없어 이미 오픈한 공연(아이유)을 고른다.
   Future<void> enterBookingFromHome(WidgetTester tester) async {
     final card = find.widgetWithText(ShowPosterCard, '2026 아이유 콘서트');
     // 인기 공연 줄은 첫 화면 아래에 있다. 세로 목록(맨 바깥 스크롤)을 끌어
@@ -109,9 +98,9 @@ void main() {
     await tester.tap(find.text('FLOOR A'));
     await tester.pumpAndSettle();
 
-    // 셀이 44px 로 커지면서 열 라벨은 구역명 없이 번호만 둔다.
+    // 열 라벨은 구역명 없이 번호만 둔다.
     expect(find.text('1열'), findsOneWidget);
-    // 시안 범례 3종. '선점중' 은 노출하지 않는다.
+    // 범례는 3종. '선점중' 은 노출하지 않는다.
     expect(find.text('예매가능'), findsOneWidget);
     expect(find.text('선택됨'), findsOneWidget);
     expect(find.text('선택불가'), findsOneWidget);

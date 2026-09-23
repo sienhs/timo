@@ -10,10 +10,8 @@ import 'package:timo/features/resale/models/trade_status.dart';
 
 import '../../core/network/fake_http_adapter.dart';
 
-/// 내 거래 내역·등록 취소·가격 수정·구매가 마켓 API(v1)에 맞는 요청을 보내고
-/// 응답을 제대로 읽는지. 서버 없이 [FakeHttpAdapter] 로 검사한다. 조회는 화면
-/// 테스트가 목으로 덮고 있어, 여기서는 양도 목록 탭이 얹은 요청과 구매 요청이
-/// 들고 가는 것들, 그리고 예매 응답에서 등록 번호를 꺼내는 자리를 본다.
+/// 마켓 API(v1)에 맞는 요청이 나가고 응답을 제대로 읽는지. 서버 없이
+/// [FakeHttpAdapter] 로 검사한다.
 void main() {
   late FakeHttpAdapter adapter;
   late HttpResaleApi api;
@@ -234,9 +232,8 @@ void main() {
       expect(trade.status, TradeStatus.confirmed);
     });
 
-    // 서버는 온체인 체결이 끝날 때까지 붙들고 있다가 답한다(백엔드
-    // `ContractClient` 의 영수증 폴링, 최대 30초). 기본 대기(10초)로 끊으면
-    // 앱만 실패로 돌아서고 결제와 양도는 그대로 끝나, 산 티켓을 못 샀다고 읽는다.
+    // 서버는 온체인 체결(최대 30초)이 끝나야 답한다. 기본 대기(10초)로 끊으면
+    // 결제와 양도는 끝났는데 앱만 실패로 읽는다.
     test('서버의 온체인 대기보다 오래 기다린다', () async {
       givenServer((_) => jsonResponse(purchaseJson()));
 
@@ -421,8 +418,7 @@ void main() {
       expect(ticket.seatLabel, 'R석 12열 24번');
     });
 
-    // 예매 목록으로 만들던 때는 내 예매가 아니라 후보에 없었다. 소유 기준
-    // 목록이라 이제 들어온다.
+    // 소유 기준 목록이라 양도로 받은 티켓도 후보에 들어온다.
     test('양도로 받은 보유 티켓도 다시 팔 수 있다', () async {
       givenServer(
         (_) => jsonResponse(
@@ -470,9 +466,8 @@ void main() {
       expect(request.method, 'POST');
       expect(request.path, '/api/v1/market/listings');
       expect(request.jsonBody, {'ticketId': 501, 'price': 120000});
-      // 등록도 체인을 탄다(백엔드 `TicketNftClient.listForTransferFor`). 기본
-      // 대기로 끊으면 매물은 올라갔는데 앱만 실패로 돌아서고, 다시 올리면
-      // 이번엔 "등록할 수 있는 상태가 아니다" 를 받는다.
+      // 등록도 체인을 탄다. 기본 대기로 끊으면 매물은 올라갔는데 앱만 실패로
+      // 돌아서고, 다시 올리면 "등록할 수 있는 상태가 아니다" 를 받는다.
       expect(request.options.receiveTimeout, ResaleMetrics.onChainTimeout);
     });
   });

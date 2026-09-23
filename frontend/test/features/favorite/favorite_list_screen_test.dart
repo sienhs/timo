@@ -71,10 +71,9 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  /// 홈 셸의 빠른 메뉴에서 '찜' 을 눌러 찜리스트까지 간다.
-  ///
-  /// [shows] 는 **서버가 들고 있는** 찜 공연, [artists] 는 기기에 남아 있던
-  /// 아티스트다. [loggedIn] 을 끄면 로그아웃 상태로 연다.
+  /// 홈 셸의 빠른 메뉴에서 '찜' 을 눌러 찜리스트까지 간다. [shows] 는 서버가
+  /// 들고 있는 찜 공연, [artists] 는 기기에 남아 있던 아티스트다. [loggedIn] 을
+  /// 끄면 로그아웃 상태로 연다.
   Future<void> pumpFavorites(
     WidgetTester tester, {
     List<FavoriteShow> shows = const [],
@@ -366,9 +365,8 @@ void main() {
   testWidgets('다른 곳에서 찜 목록이 바뀌면 화면도 따라 바뀐다', (tester) async {
     await pumpFavorites(tester, shows: [bigbang]);
 
-    // 하트는 바로 반영되고 서버로는 조금 뒤에 나간다. 전송을 기다리려면 그
-    // 시각까지 직접 당겨 줘야 한다 — pumpAndSettle 은 프레임이 예약돼 있는
-    // 동안만 시간을 밀어서, 대기 중인 타이머는 건드리지 못한다.
+    // 하트는 바로 반영되고 서버로는 조금 뒤에 나간다. pumpAndSettle 은 대기
+    // 중인 타이머를 건드리지 못하므로 그 시각까지 직접 당겨 준다.
     final sent = store.toggleShow(iu);
     await tester.pump(FavoriteLimits.toggleDebounce);
     await tester.pumpAndSettle();

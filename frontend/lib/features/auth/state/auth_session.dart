@@ -4,17 +4,9 @@ import '../data/token_storage.dart';
 import '../models/auth_tokens.dart';
 import '../models/reissued_access_token.dart';
 
-/// 앱 전체가 공유하는 로그인 상태.
-///
-/// 로그인·가입에 성공하면 [signIn] 으로 토큰을 담고 기기에 저장한다. 앱을 켤 때
-/// [restore] 로 저장된 것을 되살리고, [signOut] 이면 비우고 지운다. 값이 바뀌면
-/// 알려서(ChangeNotifier) [AuthSessionScope] 아래 화면들이 다시 그려진다.
-///
-/// 로그인이 필요한 API 가 "토큰이 만료됐다"고 하면 인터셉터가 재발급을 시도하고,
-/// 받은 새 토큰을 [renewAccessToken] 으로 갈아끼운다. 재발급까지 실패하면
-/// [signOut] 이 불려 로그아웃 상태가 된다.
-///
-/// [now] 는 테스트에서 시계를 고정하기 위해 받는다. 앱에서는 넘기지 않는다.
+/// 앱 전체가 공유하는 로그인 상태. [signIn] 으로 토큰을 담아 기기에 저장하고,
+/// 앱을 켤 때 [restore] 로 되살리며 [signOut] 이면 비우고 지운다. 인터셉터가
+/// 재발급받은 토큰은 [renewAccessToken] 으로 갈아끼운다. [now] 는 테스트용이다.
 class AuthSession extends ChangeNotifier {
   AuthSession({required this._storage, DateTime Function()? now})
     : _now = now ?? DateTime.now;
@@ -43,11 +35,8 @@ class AuthSession extends ChangeNotifier {
     return expiresAt == null || !_now().isBefore(expiresAt);
   }
 
-  /// 기기에 저장된 로그인 정보를 되살린다. 앱을 켤 때 한 번 부른다.
-  ///
-  /// 네 값 중 하나라도 없거나 깨져 있으면 로그아웃 상태로 두고 남은 값도 지운다.
-  /// 반쪽짜리 상태(토큰은 있는데 회원 번호가 없는 식)로 두는 것보다 다시 로그인
-  /// 하게 하는 쪽이 안전하다.
+  /// 기기에 저장된 로그인 정보를 되살린다. 앱을 켤 때 한 번 부른다. 네 값 중
+  /// 하나라도 없거나 깨져 있으면 로그아웃 상태로 되돌리고 남은 값도 지운다.
   Future<void> restore() async {
     final memberId = int.tryParse(
       await _storage.read(TokenStorageKeys.memberId) ?? '',
@@ -73,10 +62,8 @@ class AuthSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 로그인·가입 성공 응답을 담고 기기에 저장한다.
-  ///
-  /// 서버가 준 "남은 초" 는 지금 시각에 더해 절대 시각으로 바꿔 둔다. 그래야
-  /// 앱을 다시 켰을 때도 만료 여부를 알 수 있다.
+  /// 로그인·가입 성공 응답을 담고 기기에 저장한다. 서버가 준 "남은 초" 는 절대
+  /// 시각으로 바꿔 둬야 앱을 다시 켰을 때도 만료 여부를 알 수 있다.
   Future<void> signIn(AuthTokens tokens) async {
     _memberId = tokens.memberId;
     _accessToken = tokens.accessToken;
@@ -93,15 +80,9 @@ class AuthSession extends ChangeNotifier {
     );
   }
 
-  /// 재발급받은 **액세스 토큰만** 갈아끼운다. 인터셉터가 부른다.
-  ///
-  /// 회원 번호와 리프레시 토큰은 건드리지 않는다. 서버가 리프레시 토큰을
-  /// 회전시키지 않아 그대로 유효하고, 회원도 그대로이기 때문이다.
-  ///
-  /// **로그아웃 상태면 아무것도 하지 않는다.** 재발급 요청이 서버를 다녀오는
-  /// 사이에 사용자가 로그아웃 버튼을 누를 수 있다. 그때 새 토큰을 넣어 버리면
-  /// 로그아웃했는데 다시 로그인 상태가 된다. 이미 비운 세션을 되살리지 않도록
-  /// 넣기 직전에 한 번 더 본다.
+  /// 재발급받은 액세스 토큰만 갈아끼운다. 인터셉터가 부른다. 리프레시 토큰은
+  /// 회전하지 않아 그대로 둔다. 서버를 다녀오는 사이 로그아웃했으면 새 토큰을
+  /// 넣어 다시 로그인 상태가 되지 않도록 로그아웃 상태면 아무것도 하지 않는다.
   Future<void> renewAccessToken(ReissuedAccessToken reissued) async {
     if (!isLoggedIn) return;
 
@@ -116,13 +97,9 @@ class AuthSession extends ChangeNotifier {
     );
   }
 
-  /// 로그아웃. 상태를 비우고 기기에서도 지운다.
-  ///
-  /// 서버 쪽 세션(리프레시 토큰)은 여기서 끊지 않는다. 이 메서드는 마이페이지의
-  /// 로그아웃 버튼과 401 을 받은 인터셉터 둘이 부르는데, 401 은 토큰이 이미 안
-  /// 통한다는 뜻이라 서버에 알릴 게 없다. 서버에 알리는 일은 버튼 쪽이 이 메서드
-  /// 앞뒤로 따로 한다(AuthApi.logout). 세션은 네트워크를 모르는 채로 둔다.
-  /// 기기 식별자는 지우지 않는다([TokenStorageKeys.deviceId]).
+  /// 로그아웃. 상태를 비우고 기기에서도 지운다. 서버 세션은 여기서 안 끊는다.
+  /// 401 을 받은 인터셉터도 부르는데 그땐 알릴 게 없고, 버튼 쪽이 따로
+  /// AuthApi.logout 을 부른다. 기기 식별자([TokenStorageKeys.deviceId])는 남긴다.
   Future<void> signOut() async {
     _memberId = null;
     _accessToken = null;

@@ -1,12 +1,8 @@
 import 'wire_time.dart';
 
 /// 양도 매물이 올라와 있는 공연 하나. 서버 `MarketConcertSummaryResponseDto`
-/// 한 건이다.
-///
-/// 공연마다 **매물 수와 최저가만** 온다. 개별 매물은 공연을 고른 뒤 따로
-/// 받는다 — 목록 응답이 매물 수에 비례해 커지지 않게 한 서버 결정이다.
-///
-/// 매물이 하나도 없는 공연은 아예 오지 않으므로 [listingCount] 는 늘 1 이상이다.
+/// 한 건이다. 공연마다 매물 수와 최저가만 오고 개별 매물은 공연을 고른 뒤 따로
+/// 받는다. 매물이 없는 공연은 아예 오지 않으므로 [listingCount] 는 늘 1 이상이다.
 class MarketConcert {
   const MarketConcert({
     required this.concertId,

@@ -2,20 +2,9 @@ import '../models/artist_summary.dart';
 import '../models/show_summary.dart';
 import '../models/trending_keyword.dart';
 
-/// 홈·검색 화면이 서버에 요청하는 일.
-///
-/// 화면은 이 인터페이스만 안다. 앱에서는 [HttpHomeApi] 가 실제 서버에 요청하고,
-/// 테스트는 [MockHomeApi] 를 쓴다. 인증의 `AuthApi` 와 같은 구조다.
-///
-/// 공연 셋(오픈 예정 · 인기 · 검색)은 서버의 공연 목록 API 하나를 조건만 달리
-/// 부른다. 홈 전용 엔드포인트는 없다. 그래도 메서드를 나눈 이유는, 화면이
-/// "오픈 예정을 달라" 고만 하고 그게 어떤 정렬·필터인지는 몰라야 서버 규약이
-/// 바뀌어도 화면이 그대로기 때문이다. 아티스트 셋(인기 · 추천 · 관련)도 서버의
-/// 아티스트 목록 API 하나를 조건만 달리 부른다. 인기 검색어는 서버 집계 API 가
-/// 아직 없어 구현이 두 목록을 엮어 만든다 — 화면은 그 사정을 모른다.
-///
-/// 반환 규칙: 성공하면 목록을, 실패(네트워크·서버 오류)는 `ApiException` 으로
-/// 던진다. 빈 목록은 실패가 아니라 "해당하는 것이 없다" 는 정상 결과다.
+/// 홈·검색 화면이 서버에 요청하는 일. 앱은 `HttpHomeApi`, 테스트는 `MockHomeApi` 를
+/// 쓴다. 공연 셋과 아티스트 셋은 각각 서버 목록 API 하나를 조건만 달리 부른다.
+/// 실패는 `ApiException` 으로 던지고, 빈 목록은 실패가 아니라 정상 결과다.
 abstract class HomeApi {
   /// 예매 오픈이 가까운 순. 아직 오픈하지 않은 공연만 온다.
   Future<List<ShowSummary>> fetchTicketOpenSoon();
@@ -24,8 +13,7 @@ abstract class HomeApi {
   Future<List<ShowSummary>> fetchPopular();
 
   /// 오픈 예정 공연 전체. [fetchTicketOpenSoon] 과 조건은 같고 개수만 다르다 —
-  /// 저쪽은 홈의 가로 한 줄, 이쪽은 더보기로 들어가는 목록 화면이다. 메서드를
-  /// 나눠 두면 "한 줄에 몇 개" 와 "목록에 몇 개" 가 따로 움직인다.
+  /// 저쪽은 홈의 가로 한 줄, 이쪽은 더보기로 들어가는 목록 화면이다.
   Future<List<ShowSummary>> fetchTicketOpenAll();
 
   /// 공연 전체. 예매 상태로 거르지 않으므로 종료·취소된 공연도 온다 —
@@ -41,7 +29,7 @@ abstract class HomeApi {
   /// 없어 지금은 최근 등록순이다.
   Future<List<ArtistSummary>> fetchPopularArtists();
 
-  /// 검색 화면의 추천 검색어로 내세울 아티스트. 시안의 원형 아바타 한 줄이다.
+  /// 검색 화면의 추천 검색어로 내세울 아티스트. 원형 아바타 한 줄이다.
   Future<List<ArtistSummary>> fetchRecommendedArtists();
 
   /// 실시간 인기 검색어. 순위순이고 기준 시각이 함께 온다.

@@ -2,11 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../data/recent_search_store.dart';
 
-/// 검색 화면에 [RecentSearchStore] 구현을 내려주는 InheritedWidget.
-///
-/// 앱은 맨 위에서 진짜 구현을 하나 만들어 여기에 담고, 화면은 [of] 로 꺼내
-/// 쓴다. [HomeApiScope] 와 같은 방식이다 — 구현 하나를 내려줄 뿐이라 구독은
-/// 하지 않고 읽기만 한다.
+/// 검색 화면에 [RecentSearchStore] 구현을 내려주는 InheritedWidget. `HomeApiScope`
+/// 와 같은 방식이다 — 구독은 하지 않고 [of] 로 읽기만 한다.
 class RecentSearchScope extends InheritedWidget {
   const RecentSearchScope({
     super.key,

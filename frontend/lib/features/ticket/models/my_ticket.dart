@@ -3,16 +3,8 @@ import 'ticket_acquisition.dart';
 import 'ticket_status.dart';
 
 /// 내가 지금 가진 티켓 한 장. 서버 내 티켓 목록 응답
-/// (`MyTicketSummaryResponseDto`, `GET /api/v1/tickets/me`) 한 건이다.
-///
-/// **소유 기준**이다. 예매 목록으로 그리던 때(S15P21D206-168)는 "내가 예매한
-/// 이력" 이라 양도로 판 티켓이 남고 산 티켓은 안 보였다. 이 목록은 판 티켓이
-/// 빠지고 산 티켓이 들어온다(S15P21D206-331). 필드 이름은 백엔드가 예매 목록과
-/// 맞춰 뒀다.
-///
-/// 예정 공연과 지난 공연이 같은 모델이다. 서버가 그 둘을 나눠 주지 않고
-/// ([isPast] 로 화면이 가른다) 카드에 들어가는 값도 같아서, 나누면 똑같은
-/// 필드를 가진 클래스가 둘 생길 뿐이다.
+/// (`MyTicketSummaryResponseDto`, `GET /api/v1/tickets/me`) 한 건이다. 소유
+/// 기준이라 양도로 판 티켓은 빠지고 산 티켓이 들어온다. 예정·지난은 [isPast] 로 가른다.
 class MyTicket {
   const MyTicket({
     required this.ticketId,
@@ -39,9 +31,8 @@ class MyTicket {
     title: json['concertTitle'] as String,
     venueName: json['venueName'] as String,
     sectionName: json['sectionName'] as String,
-    // 서버 필드 이름이 직관과 반대다. `seatNo` 가 구역 안의 **행(열) 번호**,
-    // `seatCol` 이 그 행 안의 **자리 번호**다(백엔드 Seat 엔티티 주석).
-    // 읽는 자리에서 한 번 제 이름으로 바꿔 담아, 화면마다 헷갈릴 일을 없앤다.
+    // 서버 필드 이름이 직관과 반대다. `seatNo` 가 구역 안의 행(열) 번호,
+    // `seatCol` 이 그 행 안의 자리 번호다(백엔드 Seat 엔티티 주석).
     seatRow: (json['seatNo'] as num).toInt(),
     seatNumber: (json['seatCol'] as num).toInt(),
     facePrice: (json['facePrice'] as num).toInt(),
@@ -56,10 +47,8 @@ class MyTicket {
   /// 티켓 id. 이 목록의 주 식별자다. 입장 QR 발급과 양도 등록이 받는 번호다.
   final int ticketId;
 
-  /// 이 티켓을 발행한 예매의 id. 취소할 때 쓴다.
-  ///
-  /// **양도로 받은 티켓이면 판 사람의 예매다**([acquiredBy]). 그 번호로 취소를
-  /// 걸면 404 라, 취소는 [isBooked] 일 때만 연다.
+  /// 이 티켓을 발행한 예매의 id. 취소할 때 쓴다. 양도로 받은 티켓이면 판 사람의
+  /// 예매라([acquiredBy]) 그 번호로 취소를 걸면 404 — 취소는 [isBooked] 일 때만 연다.
   final int reservationId;
 
   final int concertId;
@@ -87,10 +76,8 @@ class MyTicket {
   /// 직접 예매했는지, 양도로 받았는지.
   final TicketAcquisition acquiredBy;
 
-  /// 내 것이 된 시각. 예매면 예매 시각, 양도면 체결 시각이다.
-  ///
-  /// 양도받은 티켓에 판 사람의 예매 시각을 "예매한 날" 로 찍으면 거짓말이라
-  /// 서버가 따로 준다.
+  /// 내 것이 된 시각. 예매면 예매 시각, 양도면 체결 시각이다. 양도받은 티켓에
+  /// 판 사람의 예매 시각을 "예매한 날" 로 찍으면 거짓말이라 서버가 따로 준다.
   final DateTime acquiredAt;
 
   /// 포스터 주소. 포스터가 없는 공연이면 null.
@@ -102,21 +89,16 @@ class MyTicket {
   /// 카드에 찍는 좌석. (예: `R석 12열 24번`)
   String get seatLabel => '$sectionName $seatRow열 $seatNumber번';
 
-  /// 지금 양도 등록 중인가.
-  ///
-  /// 서버가 `listed` 를 따로 주고 상태값 [TicketStatus.listed] 도 있다. 둘 중
-  /// 하나라도 켜져 있으면 등록 중으로 본다 — 백엔드 주석은 `listed` 를 기준으로
-  /// 삼으라고 하고, 상태값은 그 뜻을 한 번 더 말하는 것이다.
+  /// 지금 양도 등록 중인가. 서버가 `listed` 를 따로 주고 상태값 [TicketStatus.listed]
+  /// 도 있어, 둘 중 하나라도 켜져 있으면 등록 중으로 본다.
   bool get isListed => listed || status == TicketStatus.listed;
 
   /// 표가 손에 있고 마켓에 올라가 있지 않다. 입장·취소·양도 등록이 이때만 된다.
   bool get isUsable => status.isOwned && !isListed;
 
   /// 표가 손에 있다 — 쓸 수 있거나, 마켓에 올라가 있어 잠깐 잠긴 상태다.
-  ///
-  /// 더보기(⋮)를 열어 줄 기준이다. 등록 중인 티켓에도 열어서 "왜 못 하는지"
-  /// 를 시트가 알려주게 한다. 발행 중·입장 완료·회수·환불은 할 수 있는 일이
-  /// 없어 열지 않는다.
+  /// 더보기(⋮)를 열어 줄 기준이다. 등록 중인 티켓에도 열어 "왜 못 하는지" 를
+  /// 시트가 알려주게 한다.
   bool get isHeld => status.isOwned || isListed;
 
   /// 표가 사라졌다(회수·환불). 목록에서 지우지 않고 회색 카드로 남긴다.
@@ -125,19 +107,14 @@ class MyTicket {
   /// 직접 예매한 티켓인가. 예매 취소와 주문 상세는 이때만 내 것이다.
   bool get isBooked => acquiredBy == TicketAcquisition.booking;
 
-  /// 이미 끝난 공연인가.
-  ///
-  /// 시작 일시가 없는 공연은 예정으로 본다. 날짜가 미정이라는 뜻이지 지났다는
-  /// 뜻이 아니다.
+  /// 이미 끝난 공연인가. 시작 일시가 없는 공연은 미정이지 지난 게 아니라 예정으로 본다.
   bool isPast(DateTime now) {
     final start = startAt;
     return start != null && start.isBefore(now);
   }
 
   /// 공연까지 남은 날. 오늘이면 0, 이미 지났으면 음수, 날짜 미정이면 null.
-  ///
-  /// 시각이 아니라 날짜로 센다. 오늘 저녁 공연은 `D-DAY` 여야지 시각 차이를
-  /// 반올림해 `D-1` 이 되면 안 된다.
+  /// 시각이 아니라 날짜로 센다 — 오늘 저녁 공연이 `D-1` 로 반올림되면 안 된다.
   int? daysUntil(DateTime now) {
     final start = startAt;
     if (start == null) return null;
@@ -149,12 +126,9 @@ class MyTicket {
     ).difference(today).inDays;
   }
 
-  /// 지금 입장 QR 을 열 수 있는가.
-  ///
-  /// 표가 손에 있고([isUsable]) 공연 시간대에 들어왔을 때만 연다. 창의 앞뒤
-  /// 폭은 [TicketMetrics.qrOpensBefore] · [TicketMetrics.qrClosesAfter] 참고.
-  /// 발행 중·양도 등록 중·입장 완료는 서버가 409 로 거절하는 상태라 여기서
-  /// 미리 잠근다.
+  /// 지금 입장 QR 을 열 수 있는가. 표가 손에 있고([isUsable]) 공연 시간대에
+  /// 들어왔을 때만 연다. 창의 폭은 [TicketMetrics.qrOpensBefore] ·
+  /// [TicketMetrics.qrClosesAfter]. 서버가 409 로 거절할 상태는 여기서 미리 잠근다.
   bool canEnter(DateTime now) {
     final start = startAt;
     if (!isUsable || start == null) return false;
@@ -163,10 +137,7 @@ class MyTicket {
   }
 
   /// 지금 예매를 취소할 수 있는가. 직접 예매한 표가 손에 있을 때만, 공연
-  /// 24시간 전까지다.
-  ///
-  /// 날짜가 미정인 공연은 마감을 계산할 수 없어 막는다. 서버도 같은 자리에서
-  /// 거절하므로, 눌러 놓고 실패를 받느니 버튼을 잠그는 쪽이 낫다.
+  /// 24시간 전까지다. 날짜 미정인 공연은 마감을 계산할 수 없어 막는다.
   bool canCancel(DateTime now) {
     final start = startAt;
     if (!isUsable || !isBooked || start == null) return false;

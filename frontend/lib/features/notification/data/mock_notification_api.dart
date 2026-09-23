@@ -2,13 +2,9 @@ import '../models/app_notification.dart';
 import '../models/notification_page.dart';
 import 'notification_api.dart';
 
-/// 서버 없이 알림함을 보기 위한 [NotificationApi].
-///
-/// 백엔드 없이 화면을 확인할 때와 위젯 테스트가 쓴다. 읽음 처리는 실제로 이 목
-/// 안의 값을 바꾼다 — 눌러서 안 읽음 표시가 사라지는 것까지 봐야 하기 때문이다.
-///
-/// 시각은 만들어질 때의 현재 시각에서 거꾸로 센다. 고정 날짜로 박아 두면 하루만
-/// 지나도 전부 "9월 18일" 이 되어 상대 시간 표기를 볼 수 없다.
+/// 서버 없이 알림함을 보기 위한 [NotificationApi]. 읽음 처리는 실제로 목 안의
+/// 값을 바꾼다. 시각은 만들어질 때의 현재 시각에서 거꾸로 세어, 날짜가 지나도
+/// 상대 시간 표기를 볼 수 있게 한다.
 class MockNotificationApi implements NotificationApi {
   MockNotificationApi({
     this.latency = const Duration(milliseconds: 300),
@@ -70,15 +66,9 @@ class MockNotificationApi implements NotificationApi {
   Future<void> _wait() =>
       latency == Duration.zero ? Future.value() : Future.delayed(latency);
 
-  /// 최신순. 번호가 클수록 최신이다.
-  ///
-  /// **공연 번호는 실제 서버에 있는 값을 쓴다.** 알림함만 가짜로 띄워도 알림을
-  /// 누르면 공연 상세는 진짜 서버에 물어본다. 아무 번호나 넣으면 "존재하지 않는
-  /// 공연입니다" 가 떠서, 이동이 잘못된 것처럼 보인다.
-  ///
-  /// 아래 번호는 배포 서버(api.ticketmoa.site) 기준이다. 로컬 백엔드나 DB 를 다시
-  /// 만든 뒤에는 번호가 달라질 수 있고, 그때는 공연 상세가 다시 비어 보인다 —
-  /// 이동 자체가 고장 난 것이 아니다.
+  /// 최신순. 번호가 클수록 최신이다. 공연 번호는 배포 서버(api.ticketmoa.site)에
+  /// 실제로 있는 값이어야 한다 — 알림을 누르면 공연 상세는 진짜 서버에 묻는다.
+  /// 로컬 DB 를 다시 만들면 번호가 달라져 상세가 비어 보일 수 있다.
   static List<AppNotification> _seed(MockNotificationScenario scenario) {
     if (scenario == MockNotificationScenario.empty) return [];
 

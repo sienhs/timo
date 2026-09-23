@@ -7,29 +7,10 @@ import '../models/seat.dart';
 import 'seat_colors.dart';
 import 'seat_map_layout.dart';
 
-/// 구역 하나의 좌석 배치도.
-///
-/// 격자가 아니라 **공연장 모양으로** 그린다. 무대가 맨 위에 조금 보이고, 그
-/// 아래로 열이 부채꼴로 퍼지며, 중간중간 통로가 지난다. 자리 수와 번호는 서버가
-/// 준 그대로이고 달라지는 것은 그리는 모양뿐이다 — 어느 자리를 눌렀는지는
-/// 바뀌지 않는다.
-///
-/// 셀을 권장 터치 타겟(44px)으로 두면 한 구역(20석 x 10열)이 폰 화면에 들어가지
-/// 않는다. 그래서 [InteractiveViewer] 로 확대·이동하게 했다. 시안의 "구역을 눌러
-/// 확대할 수 있어요" 안내도 이 동작을 가리킨다.
-///
-/// **처음에는 구역 전체가 보이는 배율로 시작한다**(사용자 결정). 어느 구역에
-/// 들어왔는지 먼저 보고, 자리를 고를 때 두 손가락으로 확대한다. 축소 한계도 그
-/// 배율이라 더 줄어들지는 않는다 — 상수로 박지 않고 화면 크기와 배치도 크기로
-/// 그때그때 계산한다.
-///
-/// 더블탭으로 전체 보기를 왕복하는 방식도 만들어 봤지만, 조상에 붙인
-/// onDoubleTap 이 제스처 아레나에서 좌석의 단일 탭을 붙잡아 선택이 한 박자
-/// 늦어졌다. 확대는 핀치만으로 충분하므로 더블탭은 두지 않는다.
-///
-/// 셀 안에 좌석 번호는 넣지 않는다. 색만 칠한 둥근 칸이며, 고른 자리가 몇
-/// 번인지는 결제 직전 확인 다이얼로그가 알려준다. 44px 는 번호를 넣기 위한
-/// 크기가 아니라 터치 타겟 기준이므로, 번호가 없어도 줄이지 않는다.
+/// 구역 하나의 좌석 배치도. 격자가 아니라 공연장 모양(무대·부채꼴·통로)으로
+/// 그리되 자리 수와 번호는 서버가 준 그대로다. 셀은 터치 타겟 44px 라 한 구역이
+/// 폰 화면에 안 들어가므로 [InteractiveViewer] 로 확대·이동하고, 처음에는 구역
+/// 전체가 보이는 배율로 시작한다. 조상에 onDoubleTap 을 달면 좌석 탭이 늦어진다.
 class SeatGrid extends StatefulWidget {
   const SeatGrid({
     super.key,
@@ -45,10 +26,8 @@ class SeatGrid extends StatefulWidget {
   /// 이 구역 둘레에 무엇이 있는지(무대·이웃 구역). 좁아지는 방향도 여기서 온다.
   final ZoneSurroundings surroundings;
 
-  /// 한 열에 들어가는 칸 수. 캔버스 폭을 정한다.
-  ///
-  /// 자리 목록에서 세지 않는 이유: 통로로 끝자리가 비면 줄마다 길이가 달라져
-  /// 캔버스가 들쭉날쭉해진다. 격자 크기는 서버가 알려 준 값을 쓴다.
+  /// 한 열에 들어가는 칸 수. 캔버스 폭을 정한다. 자리 목록에서 세면 통로로
+  /// 끝자리가 빈 줄마다 길이가 달라지므로 서버가 알려 준 격자 크기를 쓴다.
   final int seatsPerRow;
 
   /// 열 → 자리. 자리가 없는 칸(통로)은 null 이다.
@@ -77,10 +56,8 @@ class _SeatGridState extends State<SeatGrid> {
     super.dispose();
   }
 
-  /// 배치도 전체가 화면에 들어오는 배율. 축소 한계로 쓴다.
-  ///
-  /// 상수(예전에는 0.42)로 두면 구역이 조금만 커져도 끝까지 줄여도 다 보이지
-  /// 않는다. 반대로 작은 구역에서는 필요 이상으로 줄어 좌석이 점이 된다.
+  /// 배치도 전체가 화면에 들어오는 배율. 축소 한계로 쓴다. 상수로 두면 구역이
+  /// 조금만 커져도 다 보이지 않고, 작은 구역에서는 좌석이 점이 된다.
   double _fitScale(SeatMapLayout layout, BoxConstraints constraints) {
     if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) return 1;
     if (layout.canvasWidth <= 0 || layout.canvasHeight <= 0) return 1;
@@ -94,16 +71,10 @@ class _SeatGridState extends State<SeatGrid> {
     return fit.clamp(0.05, 1.0);
   }
 
-  /// 축소 한계까지 실제로 줄어들게 하는 경계 여백.
-  ///
-  /// [InteractiveViewer] 는 **화면이 경계 밖으로 나가지 않는 선에서만** 배율을
-  /// 낮춘다. 그래서 여백을 좁게 두면 [minScale] 을 아무리 작게 줘도 배치도가
-  /// 화면을 꽉 채우는 배율에서 멈춘다 — 전체를 보려고 줄이는데 안 줄어든다.
-  /// 가장 작게 줄였을 때 화면이 담길 만큼 벌려 준다.
-  ///
-  /// 대신 확대한 상태에서는 배치도 밖으로 그만큼 더 밀 수 있게 된다. 여백을
-  /// 배율에 따라 바꾸면 해결될 것 같지만 그럴 수 없다 — 지금 배율로 여백을
-  /// 계산하면 그 배율이 곧 새 한계가 되어 더는 줄어들지 않는다.
+  /// 축소 한계까지 실제로 줄어들게 하는 경계 여백. [InteractiveViewer] 는 화면이
+  /// 경계 밖으로 나가지 않는 선에서만 배율을 낮추므로, 여백이 좁으면 [minScale]
+  /// 을 아무리 작게 줘도 안 줄어든다. 배율에 따라 여백을 바꾸면 그 배율이 곧 새
+  /// 한계가 되어 역시 안 줄어든다.
   EdgeInsets _panBoundary(
     SeatMapLayout layout,
     BoxConstraints constraints,
@@ -126,12 +97,9 @@ class _SeatGridState extends State<SeatGrid> {
     );
   }
 
-  /// 손을 뗀 뒤 배치도가 화면 밖으로 나가 있으면 도로 끌어온다.
-  ///
-  /// 축소 한계를 받치려고 경계 여백을 크게 줬는데([_panBoundary]) 그 여백은
-  /// 확대한 상태에서도 살아 있다. 실제로 폰에서 배치도를 위로 밀었더니 10열만
-  /// 걸치고 나머지가 빈 테두리로 남았다. 경계로는 막을 수 없으니 — 여백을 줄이면
-  /// 이번엔 축소가 안 된다 — 손을 뗀 뒤 제자리로 돌린다.
+  /// 손을 뗀 뒤 배치도가 화면 밖으로 나가 있으면 도로 끌어온다. 축소 한계를
+  /// 받치는 큰 경계 여백([_panBoundary])이 확대한 상태에서도 살아 있어, 경계로는
+  /// 막을 수 없기 때문이다.
   void _clampPan(SeatMapLayout layout, BoxConstraints constraints) {
     if (!constraints.hasBoundedWidth || !constraints.hasBoundedHeight) return;
 
@@ -152,8 +120,7 @@ class _SeatGridState extends State<SeatGrid> {
     if (dx == translation.x && dy == translation.y) return;
 
     // 행렬을 새로 조립하지 않고 이동값만 바꾼다. 다시 조립하면 z 축 배율을
-    // 빠뜨리기 쉽고, 그러면 열 라벨이 읽는 getMaxScaleOnAxis() 가 1 이 되어
-    // 좌석은 줄어든 채 라벨만 제 크기로 남는다(실제로 그렇게 어긋났다).
+    // 빠뜨리기 쉽고, 그러면 열 라벨이 읽는 getMaxScaleOnAxis() 가 1 이 된다.
     _transform.value = Matrix4.copy(matrix)..setTranslationRaw(dx, dy, 0);
   }
 
@@ -167,11 +134,8 @@ class _SeatGridState extends State<SeatGrid> {
     return offset.clamp(viewport - content - slack, slack);
   }
 
-  /// 처음에는 구역 전체가 보이는 배율로 시작한다(사용자 결정).
-  ///
-  /// 1.0 으로 시작하면 20석이 폰 폭에 안 들어가 배치도의 한 귀퉁이만 보인다.
-  /// 어느 구역에 들어왔는지, 어디가 비어 있는지를 먼저 보고 확대해 고르는 게
-  /// 순서에 맞다. 축소 한계와 같은 배율이라 여기서 더 줄어들지는 않는다.
+  /// 처음에는 구역 전체가 보이는 배율로 시작한다. 1.0 으로 시작하면 20석이 폰
+  /// 폭에 안 들어가 배치도의 한 귀퉁이만 보인다. 축소 한계와 같은 배율이다.
   void _fitOnFirstLayout(SeatMapLayout layout, BoxConstraints constraints) {
     if (_fitted ||
         !constraints.hasBoundedWidth ||
@@ -197,9 +161,8 @@ class _SeatGridState extends State<SeatGrid> {
         constraints.maxHeight,
       );
 
-      // **z 축까지 같이 줄인다.** 화면에 쓰이는 건 x·y 뿐이지만, 열 라벨이
-      // 배율을 getMaxScaleOnAxis() 로 읽는다 — 그 함수는 세 축 중 최댓값을
-      // 돌려주므로 z 를 1 로 두면 배율이 1 로 읽혀 라벨만 제 크기로 남는다.
+      // z 축까지 같이 줄인다. 열 라벨이 배율을 getMaxScaleOnAxis()(세 축 중
+      // 최댓값)로 읽어서, z 를 1 로 두면 배율이 1 로 읽혀 라벨만 제 크기로 남는다.
       _transform.value = Matrix4.identity()
         ..scaleByDouble(scale, scale, scale, 1)
         ..setTranslationRaw(dx, dy, 0);
@@ -216,10 +179,8 @@ class _SeatGridState extends State<SeatGrid> {
       place: widget.surroundings.place,
     );
 
-    // 프레임으로 감싸는 이유: 44px 셀이면 20석이 폰 폭에 절대 안 들어가고,
-    // 화면 끝에서 셀이 반쯤 잘린다. 테두리 없이 두면 스크롤 가능한 영역이
-    // 아니라 레이아웃이 깨진 것처럼 읽힌다. 테두리 안에서 잘리면 '창 안을
-    // 들여다보는' 것으로 보인다.
+    // 프레임으로 감싼다. 44px 셀이면 20석이 폰 폭에 안 들어가 화면 끝에서
+    // 잘리는데, 테두리 안에서 잘리면 '창 안을 들여다보는' 것으로 보인다.
     return DecoratedBox(
       // 테두리를 자식 위에 그린다. 기본값(background)으로 두면 고정 열 라벨의
       // 불투명 배경이 왼쪽 위 테두리를 덮어 선이 끊겨 보인다.
@@ -263,14 +224,8 @@ class _SeatGridState extends State<SeatGrid> {
                     ),
                   ),
                 ),
-                // 열 라벨은 가로로 밀어도 남아야 한다. 셀에 아무 글자도 없어서
-                // 라벨이 사라지면 어디를 보고 있는지 알 수 있는 단서가 없다.
-                // 캔버스 밖에 두고 세로 이동·배율만 따라간다.
-                //
-                // Positioned 로 감싸는 이유: Stack 의 일반 자식은 Stack 높이로
-                // 제약되어 열이 많으면 내용이 넘친다. top/left 만 준 Positioned
-                // 는 제약이 무제한이라 자연 높이로 그려지고, 넘는 부분은
-                // ClipRRect 가 자른다.
+                // 열 라벨은 가로로 밀어도 남아야 해서 캔버스 밖에 두고 세로만 따라간다.
+                // top/left 만 준 Positioned 는 제약이 무제한이라 열이 많아도 안 넘친다.
                 Positioned(
                   top: 0,
                   left: 0,
@@ -302,10 +257,9 @@ class _SeatGridState extends State<SeatGrid> {
   }
 }
 
-/// 무대와 좌석을 제자리에 놓는 판.
-///
-/// 열마다 배율과 호가 달라 [Column] 으로는 줄을 세울 수 없다. 자리마다 좌표를
-/// 받아 [Positioned] 로 꽂는다. 좌표 계산은 전부 [SeatMapLayout] 이 한다.
+/// 무대와 좌석을 제자리에 놓는 판. 열마다 배율과 호가 달라 [Column] 으로는 줄을
+/// 세울 수 없어 자리마다 좌표를 받아 [Positioned] 로 꽂는다. 좌표 계산은 전부
+/// [SeatMapLayout] 이 한다.
 class _SeatCanvas extends StatelessWidget {
   const _SeatCanvas({
     required this.layout,
@@ -362,14 +316,9 @@ class _SeatCanvas extends StatelessWidget {
   }
 }
 
-/// 구역 둘레에 놓이는 무대·이웃 구역 띠.
-///
-/// 구역마다 무대가 보이는 자리가 다르다. 무대 왼편 구역(A)은 위쪽과 오른쪽이
-/// 무대이고, 오른편 구역(B)은 위쪽과 왼쪽이다. 뒤쪽 구역(C)은 앞 가운데만
-/// 무대이고 좌우로 A·B 구역이 보인다. 2층은 앞에 뒤쪽 구역이 있고 무대는 그
-/// 너머라 얇게만 걸친다.
-///
-/// 캔버스 [Stack] 에 바로 꽂을 수 있도록 [Positioned] 목록으로 돌려준다.
+/// 구역 둘레에 놓이는 무대·이웃 구역 띠. 무대 왼편 구역은 위쪽과 오른쪽이,
+/// 오른편 구역은 위쪽과 왼쪽이 무대다. 뒤쪽 구역은 앞 가운데만 무대이고 좌우로
+/// 이웃 구역이 보인다. 캔버스 [Stack] 에 바로 꽂도록 [Positioned] 목록으로 준다.
 List<Widget> zoneBands({
   required SeatMapLayout layout,
   required ZoneSurroundings surroundings,
@@ -525,10 +474,8 @@ class _NeighborBand extends StatelessWidget {
   }
 }
 
-/// 가로 이동과 무관하게 왼쪽에 붙어 있는 열 라벨.
-///
-/// [InteractiveViewer] 의 변환에서 **세로 이동과 배율만** 뽑아 적용한다.
-/// 그래서 위아래로 밀면 좌석과 같이 움직이고, 좌우로 밀면 제자리에 남는다.
+/// 가로 이동과 무관하게 왼쪽에 붙어 있는 열 라벨. [InteractiveViewer] 의 변환에서
+/// 세로 이동과 배율만 뽑아 적용한다.
 class _PinnedRowLabels extends StatelessWidget {
   const _PinnedRowLabels({required this.transform, required this.layout});
 

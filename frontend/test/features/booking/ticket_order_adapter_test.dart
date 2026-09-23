@@ -7,11 +7,9 @@ import 'package:timo/features/booking/models/zone.dart';
 import 'package:timo/features/booking/state/booking_controller.dart';
 import 'package:timo/features/booking/state/ticket_order_adapter.dart';
 
-/// 예매 상태를 결제 주문으로 옮기는 자리. **금액이 어디서 오는지**가 핵심이다.
-///
-/// 서버는 좌석 선점 응답에 그 자리의 값을 함께 준다. 배치도에서 받은 구역
-/// 가격을 화면 사이로 들고 다니면 구역을 바꿔 다시 잡았을 때 어긋날 수 있어서,
-/// 잡은 자리의 값을 그 자리에서 받아 쓴다.
+/// 예매 상태를 결제 주문으로 옮기는 자리. 금액이 어디서 오는지가 핵심이다.
+/// 서버는 좌석 선점 응답에 그 자리의 값을 함께 주므로, 구역 가격을 들고
+/// 다니지 않고 잡은 자리의 값을 쓴다.
 void main() {
   final performance = Performance(
     title: '김필 단독 콘서트',

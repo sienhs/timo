@@ -60,11 +60,9 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  /// 응답과 화면 전환을 기다린다.
-  ///
-  /// `pumpAndSettle` 을 쓸 수 없다. 화면에 1초마다 도는 카운트다운이 있어
-  /// 다시 그릴 일이 끊이지 않으므로, 정해진 만큼만 흘려 보낸다. 라우트 전환
-  /// 애니메이션(300ms)이 끝날 만큼은 흘려야 새 화면의 위젯을 누를 수 있다.
+  /// 응답과 화면 전환을 기다린다. 1초마다 도는 카운트다운 때문에
+  /// `pumpAndSettle` 은 끝나지 않으므로, 라우트 전환(300ms)이 끝날 만큼만
+  /// 정해서 흘려 보낸다.
   Future<void> settle(WidgetTester tester) async {
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 100));
@@ -311,9 +309,9 @@ void main() {
 
       await tester.tap(find.text('2027 RE:MIND'));
       await settle(tester);
-      final before = tester.widgetList<ListingRowCard>(
-        find.byType(ListingRowCard),
-      ).length;
+      final before = tester
+          .widgetList<ListingRowCard>(find.byType(ListingRowCard))
+          .length;
 
       await tester.tap(find.widgetWithText(ListingRowCard, '132,000 MSR'));
       await settle(tester);
@@ -386,9 +384,8 @@ void main() {
       await tester.tap(find.textContaining(ResaleStrings.purchaseAction));
       await tester.pump();
 
-      // 서버가 온체인 체결까지 끝내고 답할 때까지가 이 연출이 서 있는 시간이다.
-      // 테스트 환경에는 영상 플러그인이 없어 마스코트가 대신 서는데, 영상이
-      // 없을 때도 화면이 제구실을 하는지 함께 보게 된다.
+      // 서버가 체결을 끝내고 답할 때까지 연출이 선다. 테스트 환경에는 영상
+      // 플러그인이 없어 마스코트가 대신 서므로 그 경우도 함께 본다.
       expect(find.byType(PurchaseTransferringView), findsOneWidget);
       expect(find.text(ResaleStrings.transferringTitle), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
@@ -514,9 +511,8 @@ void main() {
       await tester.tap(find.text(ResaleStrings.registerSubmit));
       await settle(tester);
 
-      // 등록한 티켓은 목록에서 빠지고, 그 값으로 매물이 생겨 내 거래 내역과
-      // 마켓 목록에 바로 올라간다. 목의 응답은 타이머를 타므로(fake async)
-      // 시간을 조금 흘려야 돌아온다.
+      // 등록한 티켓은 목록에서 빠지고 그 값의 매물이 내 거래·마켓에 바로 오른다.
+      // 목의 응답은 타이머를 타므로(fake async) 시간을 조금 흘려야 돌아온다.
       final tickets = api.fetchListableTickets();
       final trades = api.fetchMyTrades();
       final listings = api.fetchListings(4);
@@ -585,10 +581,8 @@ void main() {
   });
 }
 
-/// 운영 상태와 공연 목록을 몇 번 요청받았는지 세는 껍데기.
-///
-/// "닫혀 있거나 로그인하지 않았으면 서버를 부르지 않는다" 는 화면에 드러나지
-/// 않는 약속이라 이렇게만 확인할 수 있다. 나머지는 그대로 넘긴다.
+/// 운영 상태와 공연 목록을 몇 번 요청받았는지 세는 껍데기. "닫혀 있거나
+/// 로그인하지 않았으면 서버를 부르지 않는다" 는 약속을 이걸로만 확인할 수 있다.
 class _SpyResaleApi implements ResaleApi {
   _SpyResaleApi(this._delegate);
 

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 목록이 빈 자리. 시안에는 없다.
-///
-/// 탭마다 할 말이 다르다. "예정된 공연이 없어요" 와 "등록한 양도 매물이
-/// 없어요" 는 사용자가 다음에 할 일이 다르므로 문구를 나눠 받는다. 예정 탭만
-/// 갈 곳(공연 목록)이 있어 버튼을 단다.
+/// 목록이 빈 자리. 시안에는 없다. 탭마다 할 말이 달라 문구를 나눠 받고, 예정
+/// 탭만 갈 곳(공연 목록)이 있어 버튼을 단다.
 class TicketEmptyView extends StatelessWidget {
   const TicketEmptyView({
     super.key,

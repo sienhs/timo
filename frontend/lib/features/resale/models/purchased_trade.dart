@@ -2,13 +2,9 @@ import 'listing.dart';
 import 'trade_status.dart';
 import 'wire_time.dart';
 
-/// 방금 체결된 양도 한 건. 서버 `PurchaseResponseDto` 다.
-///
-/// [status] 는 언제나 [TradeStatus.confirmed] 다 — 코인 전송과 소유권 이전이
-/// 응답 전에 끝나므로, 이 값을 받았다는 것이 곧 양도가 끝났다는 뜻이다.
-///
-/// **포스터 주소가 없다.** 완료 화면 위쪽의 원형 포스터는 구매 화면이 들고
-/// 있던 매물 상세의 것을 함께 넘겨 그린다([PurchaseResult]).
+/// 방금 체결된 양도 한 건. 서버 `PurchaseResponseDto` 다. [status] 는 언제나
+/// [TradeStatus.confirmed] 다 — 코인 전송과 소유권 이전이 응답 전에 끝난다.
+/// 포스터 주소가 없어 구매 화면이 들고 있던 것을 함께 넘긴다([PurchaseResult]).
 class PurchasedTrade {
   const PurchasedTrade({
     required this.tradeId,
@@ -38,9 +34,8 @@ class PurchasedTrade {
     seatNumber: (json['seatCol'] as num?)?.toInt(),
   );
 
-  /// 체결 번호. 서버 `ticket_trade` 의 PK 다.
-  ///
-  /// 온체인 `Marketplace.buy` 가 받는 `tradeId`(bytes32)와는 다른 값이다.
+  /// 체결 번호. 서버 `ticket_trade` 의 PK 이고, 온체인 `Marketplace.buy` 가
+  /// 받는 `tradeId`(bytes32)와는 다른 값이다.
   final int tradeId;
 
   final int listingId;
@@ -63,11 +58,8 @@ class PurchasedTrade {
   String get seatLabel => formatSeatLabel(sectionName, seatRow, seatNumber);
 }
 
-/// 결제 완료 화면이 받는 것. 체결 결과와, 응답에 없는 포스터 주소.
-///
-/// 포스터를 위해 완료 화면이 매물 상세를 다시 부르지 않는다. 결제 직후에
-/// 그림 한 장 때문에 네트워크를 한 번 더 타는 셈이고, 그 사이 매물은 이미
-/// `SOLD` 라 응답이 바뀌어 있다.
+/// 결제 완료 화면이 받는 것. 체결 결과와, 응답에 없는 포스터 주소. 포스터
+/// 때문에 완료 화면이 매물 상세를 다시 부르지 않는다.
 class PurchaseResult {
   const PurchaseResult({required this.trade, this.posterImageUrl});
 

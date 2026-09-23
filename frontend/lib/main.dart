@@ -26,8 +26,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 세로로만 쓴다. 가로로 돌리면 좌석 배치도·티켓처럼 세로를 전제로 짠 화면이
-  // 무너진다. 안드로이드 매니페스트에도 같은 값을 박아 두는데, 그쪽은 플러터가
-  // 뜨기 전(런치 화면)까지 막아 준다.
+  // 무너진다. 안드로이드 매니페스트의 같은 값은 플러터가 뜨기 전까지 막아 준다.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   await Firebase.initializeApp();
@@ -35,9 +34,8 @@ Future<void> main() async {
 
   final storage = SecureTokenStorage();
   final session = AuthSession(storage: storage);
-  // 첫 화면부터 로그인 여부가 맞아야 하므로 띄우기 전에 되살린다. 수십 ms 다.
-  // 저장소를 읽지 못하는 상황(키스토어 오류 등)이면 로그아웃 상태로 시작한다.
-  // 앱이 안 켜지는 것보다 다시 로그인하게 하는 쪽이 낫다.
+  // 첫 화면부터 로그인 여부가 맞아야 하므로 띄우기 전에 되살린다. 저장소를 읽지
+  // 못하면(키스토어 오류 등) 앱을 못 켜느니 로그아웃 상태로 시작하는 게 낫다.
   try {
     await DeviceId.restore(storage);
     await session.restore();
@@ -52,20 +50,16 @@ Future<void> main() async {
     );
   }
 
-  // 권한·토큰은 기기 단위, 서버 등록은 로그인 회원 단위다. 로그인/로그아웃을
-  // 구독하므로 앱을 켠 뒤 로그인해도, FCM 토큰이 바뀌어도 자동으로 동기화된다.
-  // 알림을 눌렀을 때 푸시 쪽도 화면을 바꿔야 한다. 앱이 혼자 만들면 푸시가 그
-  // 열쇠에 닿을 수 없어, 여기서 하나 만들어 앱과 푸시 양쪽에 같은 것을 준다.
+  // 푸시 등록은 서비스가 세션을 구독해 알아서 맞춘다. 알림을 눌렀을 때 푸시 쪽도
+  // 화면을 바꿔야 해서 열쇠를 여기서 하나 만들어 앱과 푸시 양쪽에 같은 것을 준다.
   final navigatorKey = GlobalKey<NavigatorState>();
 
   final pushNotificationService = PushNotificationService(
     session,
     navigatorKey: navigatorKey,
   );
-  // 푸시 준비가 실패해도 앱은 켠다. FCM 토큰 발급은 네트워크가 없으면 예외를
-  // 던지는데(`FCM Registration failed`), 여기서 그대로 두면 runApp 에 닿지 못해
-  // 앱이 스플래시에서 멈춘다 — 오프라인으로 켠 사람이 소장품 하나 못 본다.
-  // 토큰은 나중에 갱신 스트림으로 들어오고, 등록은 그때 다시 시도한다.
+  // 푸시 준비가 실패해도 앱은 켠다. 오프라인이면 FCM 토큰 발급이 예외를 던지는데
+  // 그대로 두면 runApp 에 닿지 못한다. 토큰은 나중에 갱신 스트림으로 들어온다.
   try {
     await pushNotificationService.start();
   } catch (error, stackTrace) {
@@ -112,10 +106,8 @@ Future<void> main() async {
       tiltSettingStore: SharedPreferencesTiltSettingStore(),
       // 소장품 조작법 안내를 봤는지도 기기에 남는다.
       viewerGuideStore: SharedPreferencesViewerGuideStore(),
-      // 로그아웃할 때 이 기기의 푸시 토큰을 서버에서 지우려면 화면이 이 서비스에
-      // 닿아야 한다. 등록은 서비스가 세션을 구독해 알아서 하지만, 해제는 세션을
-      // 비우기 전에 일어나야 해서 로그아웃하는 쪽이 직접 불러야 한다. 로딩 화면도
-      // 알림으로 켜진 것인지 여기에 묻는다.
+      // 푸시 해제는 세션을 비우기 전에 일어나야 해서 로그아웃하는 화면이 직접
+      // 부른다. 로딩 화면도 알림으로 켜진 것인지 여기에 묻는다.
       push: pushNotificationService,
       navigatorKey: navigatorKey,
     ),

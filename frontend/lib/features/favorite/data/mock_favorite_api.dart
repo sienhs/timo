@@ -3,15 +3,9 @@ import '../constants.dart';
 import '../models/favorite_show.dart';
 import 'favorite_api.dart';
 
-/// 서버 없이 도는 [FavoriteApi]. 위젯 테스트와 시안 확인에 쓴다.
-///
-/// 찜 목록을 메모리에 들고 있으면서 등록·해제를 그대로 반영한다. 등록은 공연
-/// 번호만 받으므로(서버 규약이 그렇다) 목록에 없던 공연을 찜하면 번호만 남는다
-/// — [fetchShows] 는 그런 공연을 돌려주지 못한다. 목록에 보여야 하는 테스트는
-/// [MockFavoriteApi.new] 의 [shows] 에 미리 넣어 둔다.
-///
-/// [failing] 을 켜면 모든 요청이 실패한다. 낙관적으로 채운 하트가 되돌아가는지
-/// 볼 때 쓴다.
+/// 서버 없이 도는 [FavoriteApi]. 위젯 테스트와 시안 확인에 쓴다. 등록은 공연
+/// 번호만 받으므로 목록에 없던 공연을 찜하면 번호만 남는다 — 목록에 보여야
+/// 하는 테스트는 [shows] 에 미리 넣어 둔다. [failing] 을 켜면 모든 요청이 실패한다.
 class MockFavoriteApi implements FavoriteApi {
   MockFavoriteApi({
     List<FavoriteShow> shows = const [],

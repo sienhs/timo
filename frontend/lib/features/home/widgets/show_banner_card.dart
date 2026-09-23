@@ -6,18 +6,8 @@ import '../constants.dart';
 import '../models/show_summary.dart';
 
 /// 포스터를 자르지 않고 깐 뒤([PosterStage]) 아래에 제목·공연장을 얹은 큰
-/// 카드. 검색 결과 목록이 쓴다. 크기는 부모가 정한다 — 카드 높이에 맞춰
-/// 꽉 채운다.
-///
-/// 홈 배너도 한때 이 카드를 썼지만 [HomeBannerCard] 로 갈라졌다. 포스터를
-/// 다루는 방식은 같지만, 배너는 첫 화면을 차지하는 큰 그림이라 글자 크기와
-/// 줄 수가 목록 한 줄과 다르게 움직인다.
-///
-/// [onFavoritePressed] 를 주면 오른쪽 위에 하트가 붙는다. 찜한 공연([isFavorite])은
-/// 하트가 초록으로 채워진다 — 흰 빈 하트와 채운 초록 하트가 앱 공통의 찜
-/// 표시다. 상태는 화면이 알고 카드는 받은 대로 그린다.
-///
-/// [badge] 를 주면 왼쪽 위에 얹는다. 하트와 부딪히지 않게 반대편이다.
+/// 카드. 검색 결과 목록이 쓰고 크기는 부모가 정한다. [onFavoritePressed] 를 주면
+/// 오른쪽 위에 하트가 붙고 [isFavorite] 면 초록으로 채운다. [badge] 는 왼쪽 위다.
 class ShowBannerCard extends StatelessWidget {
   const ShowBannerCard({
     super.key,

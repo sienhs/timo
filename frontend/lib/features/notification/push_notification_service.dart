@@ -19,39 +19,24 @@ abstract class PushDeviceRegistrar {
   Future<void> unregisterDevice();
 }
 
-/// 앱 화면이 푸시 쪽에 부탁하는 것들.
-///
-/// 구현체([PushNotificationService])는 만들 때 Firebase 를 건드려서 화면 테스트에서
-/// 아예 만들 수가 없다. 그래서 화면이 쓰는 것만 약속으로 떼어 내려주고 테스트는
-/// 가짜를 넣는다. `AuthApi` 와 `HttpAuthApi` 의 관계와 같다.
+/// 앱 화면이 푸시 쪽에 부탁하는 것들. 구현체([PushNotificationService])는 만들 때
+/// Firebase 를 건드려 화면 테스트에서 만들 수 없으므로, 화면이 쓰는 것만 약속으로
+/// 떼어 내려주고 테스트는 가짜를 넣는다.
 abstract class PushNotifications implements PushDeviceRegistrar {
   /// 알림을 눌러 앱이 켜진 것이라면 그 알림이 가리키는 화면. 아니면 null.
-  ///
-  /// **한 번 가져가면 없어진다.** 로딩 화면이 홈으로 넘긴 직후 한 번만 묻고,
-  /// 그 뒤에 앱을 다시 보게 돼도 같은 화면이 또 열리면 안 된다.
+  /// 한 번 가져가면 없어진다 — 로딩 화면이 홈으로 넘긴 직후 한 번만 묻는다.
   NotificationDestination? takeLaunchDestination();
 
   /// 로그인 상태면 이 기기를 서버에 등록한다. 로그아웃 상태면 아무것도 안 한다.
-  ///
-  /// **앱이 요청에 인증 헤더를 붙일 준비를 마친 뒤에 불러야 한다.** 푸시 서비스는
-  /// 앱보다 먼저 시작하는데, 헤더를 붙이는 인터셉터는 앱 위젯이 뜨면서 꽂힌다.
-  /// 그래서 서비스가 시작하면서 혼자 등록하면 헤더 없이 나가 401 로 튕기고,
-  /// 재발급도 그 인터셉터의 일이라 다시 시도되지 않는다.
-  ///
-  /// 로그인할 때는 세션이 바뀌면서 저절로 등록되므로 이 호출이 필요 없다. 저장된
-  /// 로그인으로 앱을 다시 켠 경우에만 빈자리가 생긴다.
+  /// 인증 헤더를 붙이는 인터셉터가 꽂힌 뒤에 불러야 한다 — 서비스 시작 때 혼자
+  /// 등록하면 헤더 없이 나가 401 이고 재시도도 안 된다. 로그인 때는 세션이 바뀌며
+  /// 저절로 등록되므로, 저장된 로그인으로 앱을 다시 켠 경우에만 필요하다.
   Future<void> registerDevice();
 
-  /// 앱이 켜져 있을 때 푸시가 오면, 서버가 같이 실어 보낸 안 읽은 알림 개수.
-  ///
-  /// 종 위의 점이 이걸 듣고 바로 바뀐다. 서버 규약상 개수는 화면에 들어올 때 한 번
-  /// 묻고, 그 뒤로는 되풀이해 묻지 않고 이 값으로 맞춘다.
-  ///
-  /// 값이 같아도 매번 흘려보낸다. 알림함에서 읽고 돌아와 점이 꺼진 뒤에 같은 개수가
-  /// 다시 와도 점이 켜져야 하기 때문이다(`ValueNotifier` 로는 안 된다).
-  ///
-  /// 앱이 뒤에 있거나 꺼져 있을 때 온 푸시는 여기 오지 않는다. 그때는 화면에 다시
-  /// 들어오면서 묻는 개수가 맞춘다.
+  /// 앱이 켜져 있을 때 푸시가 오면, 서버가 같이 실어 보낸 안 읽은 알림 개수. 종 위의
+  /// 점이 이걸 듣고 바로 바뀐다. 값이 같아도 매번 흘려보낸다 — 알림함에서 읽고
+  /// 돌아와 점이 꺼진 뒤 같은 개수가 와도 켜져야 한다(`ValueNotifier` 로는 안 된다).
+  /// 앱이 뒤에 있을 때 온 푸시는 여기 오지 않고, 화면에 다시 들어올 때 묻는 개수가 맞춘다.
   Stream<int> get unreadCounts;
 }
 
@@ -74,11 +59,8 @@ class NoopPushNotifications implements PushNotifications {
 }
 
 /// FCM 권한, 토큰 등록·해제, 앱이 열린 상태의 배너, 알림을 눌렀을 때의 화면 이동을
-/// 한곳에서 관리한다.
-///
-/// 탭이 들어오는 길은 셋이다 — 앱이 켜져 있을 때의 배너, 뒤에 있을 때의 트레이,
-/// 꺼져 있을 때 알림으로 켜진 경우. 어느 화면으로 갈지는 [destinationFor] 가 정하고
-/// 이 서비스는 알림 종류를 모른다.
+/// 한곳에서 관리한다. 어느 화면으로 갈지는 [destinationFor] 가 정하고 이 서비스는
+/// 알림 종류를 모른다.
 class PushNotificationService implements PushNotifications {
   PushNotificationService(
     this._session, {
@@ -134,14 +116,11 @@ class PushNotificationService implements PushNotifications {
     await _initializeLocalNotifications();
     await _messaging.requestPermission();
     _token = await _messaging.getToken();
-    // 여기서 등록하지 않는다. 이 서비스는 앱보다 먼저 시작하는데, 요청에 인증
-    // 헤더를 붙이는 인터셉터는 앱 위젯이 뜨면서 꽂힌다. 지금 보내면 헤더 없이
-    // 나가 401 로 튕기고 재시도도 안 된다. 앱이 준비를 마친 뒤 [registerDevice]
-    // 로 부른다.
+    // 여기서 등록하지 않는다. 인증 헤더 인터셉터가 아직 안 꽂혀 401 로 튕긴다.
+    // 앱이 준비를 마친 뒤 [registerDevice] 로 부른다.
 
-    // 앱이 꺼져 있을 때 온 알림을 눌러 켠 경우. 여기서 바로 화면을 바꾸면 안 된다 —
-    // 로딩 화면이 끝나며 홈으로 갈아치우느라 방금 연 화면이 사라진다. 들고 있다가
-    // 로딩 화면이 [takeLaunchDestination] 으로 물어볼 때 넘긴다.
+    // 앱이 꺼져 있을 때 온 알림을 눌러 켠 경우. 지금 화면을 바꾸면 로딩 화면이 홈으로
+    // 갈아치우며 사라지므로, 들고 있다가 [takeLaunchDestination] 때 넘긴다.
     final launchMessage = await _messaging.getInitialMessage();
     if (launchMessage != null) {
       _launchDestination = destinationForPushData(launchMessage.data);
@@ -187,10 +166,8 @@ class PushNotificationService implements PushNotifications {
   @override
   Future<void> registerDevice() => _registerCurrentToken();
 
-  /// 알림이 가리키는 화면을 연다. 갈 곳이 없으면 아무것도 하지 않는다.
-  ///
-  /// 홈을 갈아치우지 않고 그 위에 쌓는다. 알림으로 들어온 사람이 뒤로가기를
-  /// 눌렀을 때 앱이 꺼지지 않고 홈으로 돌아가야 하기 때문이다.
+  /// 알림이 가리키는 화면을 연다. 갈 곳이 없으면 아무것도 하지 않는다. 홈을
+  /// 갈아치우지 않고 위에 쌓아, 뒤로가기로 홈에 돌아갈 수 있게 한다.
   void _goTo(NotificationDestination? destination) {
     if (destination == null) return;
     navigatorKey?.currentState?.pushNamed(
@@ -213,16 +190,9 @@ class PushNotificationService implements PushNotifications {
     }
   }
 
-  /// 로그인하면 이 기기를 등록하고, 로그아웃하면 기기 토큰을 버린다.
-  ///
-  /// 버리는 쪽이 필요한 이유는 [unregisterDevice] 를 못 부르는 로그아웃이 있어서다.
-  /// 리프레시 토큰까지 만료돼 인터셉터가 세션을 끊을 때가 그렇다 — 그때는 인증이
-  /// 이미 안 통해 서버에 해제를 알릴 방법이 없다. 그대로 두면 서버에는 이 토큰이
-  /// 직전 회원 것으로 남아 알림이 계속 온다.
-  ///
-  /// 로그아웃 버튼으로 나갔을 때도 똑같이 버린다. 조건을 나누지 않는 것은
-  /// **[unregisterDevice] 가 실패했을 수도 있기 때문이다**(기기가 오프라인이면
-  /// 그 요청은 그냥 무시된다). 버리는 쪽은 서버가 필요 없어 그 경우에도 듣는다.
+  /// 로그인하면 이 기기를 등록하고, 로그아웃하면 기기 토큰을 버린다. 버리는 쪽은
+  /// [unregisterDevice] 를 못 부르거나(리프레시 토큰 만료) 실패한 로그아웃의 뒷문이다.
+  /// 안 버리면 서버에 이 토큰이 직전 회원 것으로 남아 알림이 계속 온다.
   void _onSessionChanged() {
     if (_session.isLoggedIn) {
       unawaited(_registerCurrentToken());
@@ -264,17 +234,9 @@ class PushNotificationService implements PushNotifications {
   }
 
   /// 서버에서 이 기기의 푸시 토큰을 지운다. 로그아웃할 때 부른다.
-  ///
-  /// **반드시 세션을 비우기 전에 불러야 한다.** 서버는 이 요청을 보낸 사람이
-  /// 누군지 인증 헤더로 알아내는데, 세션을 먼저 비우면 헤더가 붙지 않아 401 로
-  /// 튕기고 토큰이 서버에 그대로 남는다. 등록 API 와 달리 토큰만으로는 안 된다.
-  ///
-  /// 지우지 않으면 서버에는 이 토큰이 직전 회원 것으로 남는다. 같은 기기에서
-  /// 다른 계정이 로그인하기 전까지는 직전 회원의 알림이 이 기기로 계속 온다.
-  /// 알림 본문에는 공연명이 들어가므로 무엇을 예매했는지가 드러난다.
-  ///
-  /// 기기의 FCM 토큰 자체는 그대로 둔다. 다시 로그인하면 [_onSessionChanged] 가
-  /// 같은 토큰을 새 회원으로 등록한다.
+  /// 반드시 세션을 비우기 전에 불러야 한다 — 서버가 인증 헤더로 누군지 알아내므로
+  /// 세션을 먼저 비우면 401 로 튕기고 토큰이 남아 직전 회원의 알림이 계속 온다.
+  /// 기기의 FCM 토큰 자체는 두어, 다시 로그인하면 같은 토큰이 새 회원으로 등록된다.
   @override
   Future<void> unregisterDevice() async {
     final token = _token;
@@ -290,14 +252,9 @@ class PushNotificationService implements PushNotifications {
     }
   }
 
-  /// 이 기기의 FCM 토큰 자체를 버린다. 로그아웃할 때 [_onSessionChanged] 가 부른다.
-  ///
-  /// 서버에 해제를 알리지 못한 채 로그아웃한 경우의 뒷문이다. 버린 토큰으로 온
-  /// 발송은 FCM 이 "없는 토큰" 으로 답하고, 서버는 그 응답을 보고 자기 쪽 기록을
-  /// 지운다. 우리가 알리지 못해도 결국 정리된다.
-  ///
-  /// 버리면 FCM 이 곧 새 토큰을 내주고 [start] 가 걸어 둔 구독이 [_token] 을
-  /// 갈아끼운다. 다음 로그인 때 그 새 토큰이 등록된다.
+  /// 이 기기의 FCM 토큰 자체를 버린다. 서버에 해제를 알리지 못한 채 로그아웃한
+  /// 경우의 뒷문이다 — 버린 토큰으로 온 발송은 FCM 이 "없는 토큰" 으로 답해 서버가
+  /// 자기 기록을 지운다. FCM 이 곧 새 토큰을 내주고 [start] 의 구독이 갈아끼운다.
   Future<void> _discardToken() async {
     try {
       await _messaging.deleteToken();
@@ -310,13 +267,8 @@ class PushNotificationService implements PushNotifications {
   }
 
   /// 앱이 켜져 있을 때는 시스템이 알림을 그려 주지 않아 우리가 배너를 띄운다.
-  ///
-  /// 이동 정보를 배너에 함께 실어 둔다. 눌렸을 때 [_onBannerTapped] 가 받는 것은
-  /// 여기 넣은 문자열뿐이라, 안 실으면 어느 화면으로 갈지 알 길이 없다.
-  ///
-  /// **본문은 펼침으로 띄운다.** 양도 매물 알림은 공연 목록이 붙어 네 줄까지 오는데,
-  /// 그냥 띄우면 첫 줄만 보이고 잘린다. 앱이 뒤에 있을 때 뜨는 트레이 알림은 시스템이
-  /// 그려 알아서 펼쳐지므로, 여기만 맞춰 주면 두 경우가 같아진다.
+  /// 이동 정보는 payload 에 실어 두고 [_onBannerTapped] 가 되읽는다. 본문은 펼침으로
+  /// 띄운다 — 양도 매물 알림은 네 줄까지 오는데 그냥 띄우면 첫 줄만 보인다.
   Future<void> _showForegroundNotification(RemoteMessage message) async {
     final notification = message.notification;
     if (notification == null) return;
@@ -339,15 +291,9 @@ class PushNotificationService implements PushNotifications {
     );
   }
 
-  /// 배너를 구분하는 번호. 같은 번호로 띄우면 덮어쓰고, 다르면 따로 쌓인다.
-  ///
-  /// 알림함의 알림 번호를 그대로 쓴다. 같은 알림이 두 번 와도 하나로 합쳐지고,
-  /// 다른 알림끼리는 안 섞인다. 번호가 없으면 내용으로 대신하는데, 그때는 문구가
-  /// 같은 두 알림이 서로 덮어쓸 수 있다.
-  ///
-  /// 안드로이드의 알림 번호는 32비트라 서버의 큰 번호가 그대로는 안 들어간다.
-  /// 아래 비트만 남겨 줄인다 — 한 기기에 동시에 떠 있는 알림끼리만 겹치지 않으면
-  /// 되므로 이 정도로 충분하다.
+  /// 배너를 구분하는 번호. 알림함의 알림 번호를 그대로 써서 같은 알림은 하나로
+  /// 합치고 다른 알림은 따로 쌓는다. 번호가 없으면 내용으로 대신한다. 안드로이드
+  /// 알림 번호는 32비트라 아래 비트만 남긴다.
   static int _bannerId(RemoteMessage message, RemoteNotification notification) {
     final raw = message.data['notificationId'];
     final parsed = raw is String ? int.tryParse(raw) : null;

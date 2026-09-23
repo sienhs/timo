@@ -57,19 +57,15 @@ void main() {
     await tester.pump();
   }
 
-  /// 화면의 시계와 테스트의 시계를 함께 돌린다.
-  ///
-  /// 화면은 타이머로 깨어나되 남은 시간은 시계로 잰다(백그라운드에서 타이머가
-  /// 멈춰도 시간은 흐르므로). 둘을 같이 돌려야 실제 흐름과 같아진다.
+  /// 화면의 시계와 테스트의 시계를 함께 돌린다. 화면은 타이머로 깨어나되
+  /// 남은 시간은 시계로 재므로 둘을 같이 돌려야 실제 흐름과 같아진다.
   Future<void> advance(WidgetTester tester, Duration by) async {
     now = now.add(by);
     await tester.pump(by);
   }
 
-  /// 지금 화면에 그려진 QR 문자열.
-  ///
-  /// `QrImageView` 는 그릴 문자열을 private 으로 들고 있어 밖에서 읽을 수 없다.
-  /// 화면이 그 값을 키로 달아 두므로 키에서 꺼낸다.
+  /// 지금 화면에 그려진 QR 문자열. `QrImageView` 는 문자열을 밖에 안 내주므로
+  /// 화면이 키로 달아 둔 값을 꺼낸다.
   String qrData(WidgetTester tester) =>
       (tester.widget<QrImageView>(find.byType(QrImageView)).key
               as ValueKey<String>)
@@ -104,8 +100,7 @@ void main() {
       expect(find.textContaining('화면을 캡처한 QR'), findsOneWidget);
     });
 
-    // 시안에 '입장 게이트: GATE1' 이 있지만 뺐다. 예매 응답에 그 값이 없고,
-    // 없는 정보를 그럴듯하게 채우면 실제 게이트와 다를 때 입장에서 문제가 된다.
+    // 예매 응답에 게이트 값이 없다. 없는 정보를 그럴듯하게 채우지 않는다.
     testWidgets('입장 게이트는 그리지 않는다', (tester) async {
       await pumpScreen(tester);
 
@@ -233,8 +228,8 @@ void main() {
   });
 
   group('만료·새로고침', () {
-    // 자동으로 새로 받지 않는다(사용자 결정). 줄을 서는 동안 30초마다 요청이
-    // 나가고, 검표 직전에 QR 이 바뀌는 순간이 생기기 때문이다.
+    // 자동으로 새로 받지 않는다. 줄을 서는 동안 30초마다 요청이 나가고,
+    // 검표 직전에 QR 이 바뀌는 순간이 생기기 때문이다.
     testWidgets('수명이 다하면 QR 은 남고 새로고침 버튼이 나온다, 서버는 안 부른다', (tester) async {
       await pumpScreen(tester);
       final first = qrData(tester);
@@ -319,10 +314,7 @@ void main() {
 }
 
 /// 입장 QR 발급만 흉내 내는 가짜 API. 요청을 기록하고, 실패·지연을 꾸민다.
-///
-/// [MockTicketApi] 를 쓰지 않는 이유: 그쪽은 시안 목록을 위한 것이라 실패를
-/// 심거나 응답을 붙들어 둘 수 없다. 이 화면은 발급 하나만 부르므로 나머지는
-/// 불리면 안 된다.
+/// 이 화면은 발급 하나만 부르므로 나머지는 불리면 안 된다.
 class _FakeEntryPassApi implements TicketApi {
   _FakeEntryPassApi(this.clock);
 

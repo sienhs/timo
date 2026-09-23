@@ -3,10 +3,8 @@ import 'listing_status.dart';
 import 'wire_time.dart';
 
 /// 매물 한 건의 상세. 서버 `ListingDetailResponseDto` 다. 등록 응답도 같은 모양이다.
-///
-/// 목록 항목([Listing])에 공연 정보와 [status] · [closedAt] 이 더해진 것이다.
-/// 담기지 않는 값의 기준은 목록과 같다 — 좌석번호 · 판매자 · `ticketId` ·
-/// `tokenId` 는 상세라고 해서 예외가 없다.
+/// 목록 항목([Listing])에 공연 정보와 [status] · [closedAt] 이 더해진 것이고,
+/// 담기지 않는 값의 기준은 목록과 같다.
 class ListingDetail {
   const ListingDetail({
     required this.listingId,
@@ -83,10 +81,7 @@ class ListingDetail {
   /// 카드에 찍는 좌석. 좌석이 오면 `S구역 8열 19번`, 아니면 구역명만.
   String get seatLabel => formatSeatLabel(sectionName, seatRow, seatNumber);
 
-  /// 지금 이 화면에서 결제까지 갈 수 있는가.
-  ///
-  /// 내 매물은 서버도 409 로 막지만(`CannotBuyOwnListingException`) 버튼을
-  /// 잠그고 이유를 적는 쪽이 낫다. 눌러 놓고 실패를 받는 것보다 낫다는 판단은
-  /// 내 티켓의 예매 취소 버튼과 같다.
+  /// 지금 이 화면에서 결제까지 갈 수 있는가. 내 매물은 서버도 409 로 막지만
+  /// (`CannotBuyOwnListingException`) 버튼을 잠그고 이유를 적는 쪽이 낫다.
   bool get canPurchase => status.isBuyable && !mine;
 }

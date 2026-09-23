@@ -81,14 +81,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 지갑 연출 화면을 지나 완료 화면까지 간다.
-  ///
-  /// 그 화면은 진행 바가 쉬지 않고 도는데다 타이머로 다음 화면을 띄우므로
-  /// pumpAndSettle 이 영영 멈추지 않는다. 정해진 만큼만 시간을 흘린다. 테스트
-  /// 환경에는 영상 플러그인이 없어 읽기가 실패하고, 그때 쓰는 짧은 대기
-  /// (walletCeremonyFallback)가 걸린다.
-  /// 연출 화면의 대기가 끝나고 완료 화면으로 바뀌는 데까지 시간을 흘린다.
-  /// 전환이 다 끝나야 연출 화면이 스택에서 사라진다.
+  /// 지갑 연출 화면을 지나 완료 화면까지 간다. 그 화면은 진행 바가 쉬지 않고 돌고
+  /// 타이머로 다음 화면을 띄워 pumpAndSettle 이 멈추지 않으므로, 대기 시간을 흘린
+  /// 뒤 전환이 끝나 연출 화면이 스택에서 사라질 때까지 프레임을 더 돌린다.
   Future<void> finishWalletCeremony(WidgetTester tester) async {
     await tester.pump(AuthMetrics.walletCeremonyMaxWait);
     await tester.pump();
@@ -888,10 +883,8 @@ void main() {
   });
 }
 
-/// 정해 둔 요청만 실패하는 가짜 API. 나머지는 목과 같다.
-///
-/// 화면이 서버 실패를 어떻게 보여주는지(칸 아래 문구인지 스낵바인지, 버튼이
-/// 다시 켜지는지) 검사할 때 쓴다. 실패시킬 요청의 예외만 넣어 준다.
+/// 정해 둔 요청만 실패하는 가짜 API. 나머지는 목과 같다. 화면이 서버 실패를
+/// 어떻게 보여주는지(칸 아래 문구인지 스낵바인지) 검사할 때 쓴다.
 class _FailingAuthApi extends MockAuthApi {
   const _FailingAuthApi({
     this.onSend,
@@ -941,10 +934,8 @@ class _FailingAuthApi extends MockAuthApi {
   }
 }
 
-/// 정해 둔 한 번호만 "이미 가입된 번호" 로 거절하는 목.
-///
-/// 발송을 요청받은 번호를 순서대로 적어 두어, 화면이 거절당한 번호로 다시
-/// 요청하지는 않는지 볼 수 있다.
+/// 정해 둔 한 번호만 "이미 가입된 번호" 로 거절하는 목. 발송을 요청받은 번호를
+/// 순서대로 적어 두어, 거절당한 번호로 다시 요청하지 않는지 볼 수 있다.
 class _TakenPhoneApi extends MockAuthApi {
   _TakenPhoneApi({required this.takenPhoneNumber, required this.error})
     : super(latency: Duration.zero);
@@ -975,10 +966,8 @@ class _ShortCodeAuthApi extends MockAuthApi {
 }
 
 /// 이미지 파일이 하나도 없는 에셋 번들. 로고 파일이 없을 때의 폴백을 검사한다.
-///
-/// 에셋 목록(매니페스트)은 비어 있는 채로 정상 응답해야 한다. 목록 자체를
-/// 못 읽으면 이미지 키를 정하는 단계에서 실패하는데, 그 오류는 errorBuilder
-/// 까지 오지 않는다. 실제 기기에서는 목록이 항상 있으므로 이 조건이 맞다.
+/// 에셋 목록(매니페스트)은 비어 있는 채로 정상 응답해야 한다 — 목록 자체를 못
+/// 읽으면 그 오류는 errorBuilder 까지 오지 않는다.
 class _EmptyAssetBundle extends CachingAssetBundle {
   @override
   Future<ByteData> load(String key) async {

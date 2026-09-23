@@ -9,12 +9,8 @@ import 'package:timo/features/splash/screens/splash_screen.dart';
 import 'package:timo/routes/app_routes.dart';
 
 /// 알림을 눌러 앱이 켜졌을 때, 로딩 화면이 홈을 세운 뒤 그 알림의 화면까지 여는지.
-///
-/// 이게 깨지기 쉬운 자리다. 로딩 화면은 홈으로 갈 때 맨 위 화면을 **갈아치우는**
-/// 방식을 쓴다. 알림 목적지를 그보다 먼저 열어 두면 홈이 그걸 덮어써 사라진다.
-///
-/// 홈·공연 상세·마켓은 진짜 화면 대신 빈 화면으로 바꿔 끼운다. 여기서 볼 것은 어느
-/// 화면이 어떤 순서로 쌓이느냐지 그 화면들의 내용이 아니다.
+/// 로딩 화면은 홈으로 갈 때 맨 위 화면을 갈아치우므로, 알림 목적지를 먼저 열어 두면
+/// 홈이 덮어써 사라진다. 홈·공연 상세·마켓은 빈 화면으로 바꿔 끼운다.
 void main() {
   const homeLabel = '홈';
   const marketLabel = '마켓';
@@ -41,10 +37,8 @@ void main() {
     routes: routes,
   );
 
-  /// 장면 넷을 차례로 넘긴 뒤 화면 전환이 끝날 때까지.
-  ///
-  /// 장면마다 타이머가 이어 달리므로 한 번에 몰아 보내면 안 되고 장면 길이대로
-  /// 하나씩 보낸다. 마지막 둘은 화면 전환 애니메이션을 넘기는 시간이다.
+  /// 장면 넷을 차례로 넘긴 뒤 화면 전환이 끝날 때까지. 장면마다 타이머가 이어
+  /// 달리므로 장면 길이대로 하나씩 보내고, 마지막 둘은 전환 애니메이션을 넘긴다.
   Future<void> runSplash(WidgetTester tester) async {
     for (final step in SplashMetrics.stepDurations) {
       await tester.pump(step);

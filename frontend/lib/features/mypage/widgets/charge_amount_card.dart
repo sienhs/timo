@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/amount_input_formatter.dart';
 import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 import '../models/charge_amount.dart';
-import '../utils/charge_amount_input_formatter.dart';
 import 'my_page_card.dart';
 
 /// 충전할 금액 카드. 금액 칸 여섯 개 · 직접 입력 · 요약 두 줄이 한 카드에 있다.
-///
-/// 상태는 들지 않는다. 금액은 [controller] 하나에만 있고([amount] 는 그걸
-/// 해석한 값), 칸을 누르면 [onPresetSelected] 로 알린다. 화면이 컨트롤러에
-/// 값을 써 주면 고른 칸 표시와 요약이 함께 따라온다 — 고른 칸과 입력칸의 값이
-/// 서로 어긋날 자리가 없다.
+/// 상태는 들지 않는다 — 금액은 [controller] 하나에만 있고, 칸을 누르면
+/// [onPresetSelected] 로 알린다. 그래서 고른 칸과 입력칸이 어긋날 자리가 없다.
 class ChargeAmountCard extends StatelessWidget {
   const ChargeAmountCard({
     super.key,
@@ -119,13 +116,9 @@ class _PresetGrid extends StatelessWidget {
   }
 }
 
-/// 금액 칸 하나. 고르면 테두리·배경이 바뀌고 오른쪽에 체크가 붙는다.
-///
-/// 고른 칸의 바탕은 브랜드색을 옅게 깐 [AppColors.primarySurface] 다. 테두리와
-/// 체크가 이미 브랜드색이라 바탕까지 진하게 칠하면 카드에서 이 칸만 튄다.
-///
-/// 체크와 `Semantics(selected:)` 를 함께 두는 이유: 색만으로 고른 칸을 가르면
-/// 색을 못 가리는 사람과 화면 낭독기 사용자가 무엇을 골랐는지 알 수 없다.
+/// 금액 칸 하나. 고르면 테두리·배경이 바뀌고 오른쪽에 체크가 붙는다. 바탕은
+/// 옅은 [AppColors.primarySurface] 다. 색만으로 가르지 않도록 체크와
+/// `Semantics(selected:)` 를 함께 둔다.
 class _PresetOption extends StatelessWidget {
   const _PresetOption({
     required this.value,
@@ -144,10 +137,7 @@ class _PresetOption extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         selected: selected,
-        // 고를 때 색과 체크가 한 번에 튀지 않고 이어서 바뀐다. 0(안 고름)과
-        // 1(고름) 사이를 오가는 값 하나로 테두리·배경·체크 자리를 함께 움직여,
-        // 셋의 타이밍이 어긋날 자리가 없다.
-        //
+        // 0(안 고름)과 1(고름) 사이 값 하나로 테두리·배경·체크 자리를 함께 움직인다.
         // 애니메이션을 끈 기기(접근성 설정)에서는 시간을 0 으로 둬 즉시 바뀐다.
         child: TweenAnimationBuilder<double>(
           tween: Tween(end: selected ? 1 : 0),
@@ -179,9 +169,8 @@ class _PresetOption extends StatelessWidget {
                 horizontal: MyPageMetrics.presetHorizontalPadding,
               ),
             ),
-            // 금액과 체크를 한 덩어리로 가운데 정렬한다. 체크 자리를 미리 비워
-            // 두고 금액만 가운데 두면, 고른 칸에서 체크가 홀로 오른쪽 끝에
-            // 떨어져 금액과 상관없는 표시처럼 보인다.
+            // 금액과 체크를 한 덩어리로 가운데 정렬한다. 체크 자리를 미리 비워 두면
+            // 고른 칸에서 체크가 홀로 오른쪽 끝에 떨어져 보인다.
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -244,7 +233,9 @@ class _AmountField extends StatelessWidget {
         keyboardType: TextInputType.number,
         textAlign: TextAlign.right,
         textInputAction: TextInputAction.done,
-        inputFormatters: const [ChargeAmountInputFormatter()],
+        inputFormatters: const [
+          AmountInputFormatter(maxDigits: ChargeAmount.maxDigits),
+        ],
         style: Theme.of(context).textTheme.titleSmall,
         decoration: InputDecoration(
           hintText: MyPageStrings.chargeAmountHint,

@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 목록 자리에 보여 줄 것이 없을 때. 큰 하트 테두리, 제목, 안내 한 줄, 그리고
-/// 여기서 할 수 있는 일 하나(공연 둘러보기 · 로그인).
-///
-/// 검색어·필터에 걸려 남은 것이 없는 상태와 다르다. 그쪽은 목록 자리에 한 줄
-/// 문구만 두고 칩·정렬은 그대로 남긴다(조건을 되돌릴 수 있어야 한다).
+/// 목록 자리에 보여 줄 것이 없을 때. 큰 하트 테두리, 제목, 안내 한 줄, 여기서
+/// 할 수 있는 일 하나(공연 둘러보기 · 로그인). 검색어·필터에 걸려 빈 상태는
+/// 이걸 쓰지 않고 한 줄 문구만 둔다.
 class FavoriteEmptyView extends StatelessWidget {
   const FavoriteEmptyView({
     super.key,

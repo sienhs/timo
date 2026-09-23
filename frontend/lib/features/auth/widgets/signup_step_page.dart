@@ -5,11 +5,8 @@ import '../constants.dart';
 import 'auth_page.dart';
 import '../../../core/widgets/timo_logo.dart';
 
-/// 회원가입 단계 화면의 공통 틀.
-///
-/// [AuthPage] 에 단계 헤더(로고와 'n/4' → 제목 → 설명)를 끼운 것이다. 배치와
-/// 키보드 처리, 하단 버튼의 비활성·요청 중 표시는 AuthPage 가 맡고, 각 단계
-/// 화면은 문구·입력칸·버튼 동작만 채운다.
+/// 회원가입 단계 화면의 공통 틀. [AuthPage] 에 단계 헤더(로고와 'n/3' → 제목 →
+/// 설명)를 끼운 것이다. 각 단계 화면은 문구·입력칸·버튼 동작만 채운다.
 class SignupStepPage extends StatelessWidget {
   const SignupStepPage({
     super.key,

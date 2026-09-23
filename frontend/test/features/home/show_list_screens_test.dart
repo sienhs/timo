@@ -8,11 +8,9 @@ import 'package:timo/features/home/widgets/show_banner_card.dart';
 import 'package:timo/features/show/screens/show_detail_screen.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 더보기로 들어가는 목록 화면 둘.
-///
-/// 두 화면 모두 "검색 칸 + 공연 카드 목록" 이라 검색·빈 상태는 한쪽에서만
-/// 본다(`ShowListView` 가 같은 위젯이다). 나머지는 화면마다 다른 것 —
-/// 무엇을 거르는가와 탭이 무엇을 가르는가 — 만 본다.
+/// 더보기로 들어가는 목록 화면 둘. 검색·빈 상태는 같은 위젯(`ShowListView`)
+/// 이라 한쪽에서만 보고, 나머지는 무엇을 거르는가와 탭이 무엇을 가르는가만
+/// 본다.
 void main() {
   /// 360 x 800 dp
   void usePhoneSize(WidgetTester tester) {

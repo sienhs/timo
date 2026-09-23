@@ -1,10 +1,7 @@
 import 'reservation_status.dart';
 
-/// 온체인 티켓 발행이 어디까지 갔는지.
-///
-/// 서버 주문 상세에는 이 값이 따로 없다. 발행이 끝났으면 `tokenId` 가 채워지고
-/// 실패했으면 `failureReason` 이 채워지므로, 둘을 읽어 여기로 정리한다
-/// ([ReservationDetail.issueStatus]).
+/// 온체인 티켓 발행이 어디까지 갔는지. 서버 주문 상세에는 이 값이 따로 없고,
+/// `tokenId` 와 `failureReason` 을 읽어 정리한다([ReservationDetail.issueStatus]).
 enum TicketIssueStatus {
   /// 주문은 확정됐고 티켓은 아직 체인에 올라가는 중이다.
   issuing,
@@ -16,12 +13,9 @@ enum TicketIssueStatus {
   failed,
 }
 
-/// 주문 한 건의 상세. 서버 `ReservationDetailResponseDto` 한 건이다.
-///
-/// 주문을 만든 직후의 응답(201)과 진행 상태 조회 응답이 같은 모양이라 모델도
-/// 하나다. 목록 한 건([MyTicket])과 겹치는 필드가 많지만 합치지 않는다 —
-/// 이쪽에만 발행 진행 상태(`tokenId` · `failureReason`)가 있고, 목록은 그
-/// 값을 주지 않는다.
+/// 주문 한 건의 상세. 서버 `ReservationDetailResponseDto` 한 건이다. 주문 생성
+/// 응답(201)과 진행 상태 조회 응답이 같은 모양이라 모델도 하나다. 목록 한 건
+/// (`MyTicket`)과 달리 발행 진행 상태(`tokenId` · `failureReason`)가 있다.
 class ReservationDetail {
   const ReservationDetail({
     required this.reservationId,
@@ -86,26 +80,19 @@ class ReservationDetail {
   /// 공연 시작 일시. 아직 정해지지 않았으면 null.
   final DateTime? startAt;
 
-  /// 발행된 NFT 의 번호. 발행이 끝나기 전에는 null.
-  ///
-  /// 서버가 문자열로 준다(uint256 이라 int 범위를 넘을 수 있다). 화면에 찍을
-  /// 일은 없고 "발행됐는가" 를 가리는 데만 쓴다.
+  /// 발행된 NFT 의 번호. 발행이 끝나기 전에는 null. uint256 이라 문자열로 오고,
+  /// "발행됐는가" 를 가리는 데만 쓴다.
   final String? tokenId;
 
-  /// 발행이 실패한 이유. 실패하지 않았으면 null.
-  ///
-  /// 서버 내부 사정(컨트랙트 오류 문구 등)이 그대로 들어와 사용자에게 보여줄
-  /// 글이 아니다. "실패했는가" 를 가리는 데만 쓴다.
+  /// 발행이 실패한 이유. 실패하지 않았으면 null. 서버 내부 문구가 그대로 와
+  /// 사용자에게 보여줄 글이 아니라 "실패했는가" 를 가리는 데만 쓴다.
   final String? failureReason;
 
   /// 카드에 찍는 좌석. (예: `A구역 9열 6번`)
   String get seatLabel => '$sectionName $seatRow열 $seatNumber번';
 
-  /// 발행 진행 상태.
-  ///
-  /// 실패 사유가 있으면 실패, 토큰이 있으면 완료다. 둘 다 없는데 주문이
-  /// 취소돼 있으면 발행이 실패해 서버가 주문을 되돌린 것이니 실패로 본다.
-  /// 그 밖은 아직 진행 중이다.
+  /// 발행 진행 상태. 실패 사유가 있으면 실패, 토큰이 있으면 완료. 둘 다 없는데
+  /// 주문이 취소돼 있으면 발행 실패로 서버가 되돌린 것이니 실패, 그 밖은 진행 중.
   TicketIssueStatus get issueStatus {
     if (failureReason != null) return TicketIssueStatus.failed;
     if (tokenId != null) return TicketIssueStatus.issued;

@@ -8,14 +8,9 @@ import '../models/show_summary.dart';
 import '../models/trending_keyword.dart';
 import 'home_api.dart';
 
-/// 백엔드 공연 목록·아티스트 목록 API 에 실제로 요청하는 [HomeApi].
-///
-/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
-/// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
-/// [ApiException] 이 맡는다.
-///
-/// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
-/// [clock] 도 테스트용이다 — 인기 검색어의 기준 시각을 고정한다.
+/// 백엔드 공연 목록·아티스트 목록 API 에 실제로 요청하는 [HomeApi]. 서버 주소·
+/// 로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은 [ApiException]
+/// 이 맡는다. [dio] 와 [clock] 은 테스트용이라 앱에서는 넘기지 않는다.
 class HttpHomeApi implements HomeApi {
   HttpHomeApi({Dio? dio, this.clock = DateTime.now})
     : _dio = dio ?? ApiClient.dio;
@@ -106,12 +101,9 @@ class HttpHomeApi implements HomeApi {
     'size': HomeMetrics.recommendedArtistRowSize,
   });
 
-  /// 인기 검색어는 서버에 집계 API 가 아직 없다. 그때까지 있는 목록으로
-  /// 대신한다 — 조회수 순 공연명을 앞에, 최근 등록순 아티스트명을 뒤에 붙여
-  /// 순위를 매긴다. 조회수가 지금 서버가 가진 유일한 인기 신호라서다. 기준
-  /// 시각은 요청한 지금이고, 등락은 이 앱이 직전에 받은 순위와 비교한다.
-  /// 집계 API 가 생기면 이 본문만 `GET` 하나로 바꾼다 — 시그니처가 같으니
-  /// 화면과 [HomeApi] 는 손대지 않는다.
+  /// 인기 검색어는 서버에 집계 API 가 아직 없어 조회수 순 공연명 뒤에 최근
+  /// 등록순 아티스트명을 붙여 순위를 매긴다. 기준 시각은 요청한 지금이고, 등락은
+  /// 이 앱이 직전에 받은 순위와 비교한다. 집계 API 가 생기면 이 본문만 바꾼다.
   @override
   Future<TrendingKeywords> fetchTrendingKeywords() async {
     final [shows, artists] = await Future.wait<List<Object>>([
@@ -157,9 +149,6 @@ class HttpHomeApi implements HomeApi {
   }
 
   /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
-  ///
-  /// `HttpAuthApi` 와 같다. 세 번째 API 가 같은 이유로 필요해지면 그때
-  /// `core/network` 로 올린다.
   Future<T> _guard<T>(Future<T> Function() request) async {
     try {
       return await request();

@@ -261,10 +261,8 @@ void main() {
   });
 
   group('선점', () {
-    /// 좌석을 고르고 결제하기 → 확인 다이얼로그에서 [agree] 를 누른다.
-    ///
-    /// [select] 를 끄면 좌석을 고르는 단계를 건너뛴다. 이미 고른 자리를 또
-    /// 누르면 선택이 풀리기 때문에, 미리 골라 둔 테스트는 이 길로 들어온다.
+    /// 좌석을 고르고 결제하기 → 확인 다이얼로그에서 [agree] 를 누른다. [select] 를
+    /// 끄면 좌석 고르기를 건너뛴다 — 이미 고른 자리를 또 누르면 선택이 풀린다.
     Future<void> checkout(
       WidgetTester tester, {
       bool agree = true,
@@ -295,8 +293,7 @@ void main() {
       expect(find.text('결제 화면'), findsOneWidget);
     });
 
-    // 결제 화면의 '예매자 성함' 이 여기서 채워진다. 예전에는 목 상수(홍길동)가
-    // 그 자리에 박혀 있어 누가 예매하든 같은 이름이 찍혔다.
+    // 결제 화면의 '예매자 성함' 이 여기서 채워진다.
     testWidgets('자리를 잡으면서 예매자 실명도 받아 둔다', (tester) async {
       await pumpSeats(tester);
 
@@ -373,9 +370,8 @@ void main() {
       expect(find.text('결제 화면'), findsNothing);
     });
 
-    // 아래 둘은 자리가 아니라 계정·공연이 막은 경우다. 서버가 같은 409 로
-    // 주기 때문에 예외 이름으로 갈라야 하고, 가르지 않으면 어느 칸을 눌러도
-    // "이미 선점된 좌석입니다" 만 떠서 전 좌석이 선점중인 것처럼 보인다.
+    // 아래 둘은 자리가 아니라 계정·공연이 막은 경우다. 서버가 같은 409 로 주므로
+    // 예외 이름으로 갈라야 하고, 안 가르면 전 좌석이 선점중인 것처럼 보인다.
     testWidgets('이 공연 티켓이 이미 있으면 자리가 아니라 그 사실을 알린다', (tester) async {
       await pumpSeats(tester);
       api.holdError = const ApiException(

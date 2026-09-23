@@ -6,11 +6,8 @@ import '../constants.dart';
 import '../models/artist_summary.dart';
 
 /// 원형 이미지 + 아래 이름. 홈의 인기 아티스트 격자와 검색 화면의 추천 검색어·
-/// 관련 아티스트가 같은 칸을 쓴다.
-///
-/// 이미지 부분만 [child] 로 갈아끼운다 — 아티스트 사진([ArtistFace])일 수도,
-/// '더보기' 의 + 아이콘일 수도 있다. [badge] 를 주면 아바타 오른쪽 아래 원
-/// 테두리에 걸쳐 얹는다(관련 아티스트의 하트).
+/// 관련 아티스트가 같은 칸을 쓴다. 이미지 부분만 [child] 로 갈아끼우고, [badge]
+/// 를 주면 아바타 오른쪽 아래 원 테두리에 걸쳐 얹는다(관련 아티스트의 하트).
 class ArtistAvatarCell extends StatelessWidget {
   const ArtistAvatarCell({
     super.key,

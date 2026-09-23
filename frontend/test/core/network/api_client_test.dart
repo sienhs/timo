@@ -1,10 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_client.dart';
 
-/// 서버가 준 이미지 주소를 앱이 읽을 수 있는 주소로 바꾸는 부분.
-///
-/// 기본 서버 주소(`http://10.0.2.2:8080`)를 그대로 쓴다. 테스트 실행에는
-/// `--dart-define` 이 없으므로 [String.fromEnvironment] 의 기본값이 잡힌다.
+/// 서버가 준 이미지 주소를 앱이 읽을 수 있는 주소로 바꾸는 부분. 테스트에는
+/// `--dart-define` 이 없어 기본 서버 주소(`http://10.0.2.2:8080`)가 잡힌다.
 void main() {
   const baseUrl = 'http://10.0.2.2:8080';
 

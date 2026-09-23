@@ -59,10 +59,8 @@ enum FavoriteArtistSort {
   };
 }
 
-/// 검색어로 거른다. 대소문자는 가리지 않고, 공백만이면 전부 통과다.
-///
-/// 서버 검색이 아니라 기기에 있는 목록을 눈으로 훑는 대신 좁혀 주는 것이라
-/// 제목·이름에 글자가 들어 있는지만 본다.
+/// 검색어로 거른다. 대소문자는 가리지 않고, 공백만이면 전부 통과다. 서버
+/// 검색이 아니라 기기에 있는 목록을 좁히는 것이라 글자가 들어 있는지만 본다.
 bool matchesKeyword(String text, String keyword) {
   final trimmed = keyword.trim();
   if (trimmed.isEmpty) return true;

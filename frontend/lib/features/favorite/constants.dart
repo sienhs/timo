@@ -8,11 +8,6 @@ class FavoriteMetrics {
   /// 탭 아래 검색 칸까지, 검색 칸 아래 필터 줄까지의 간격.
   static const searchFieldTopGap = 16.0;
   static const searchFieldBottomGap = 14.0;
-  static const searchFieldHeight = 44.0;
-  static const searchFieldRadius = 12.0;
-  static const searchFieldIconSize = 20.0;
-  static const searchFieldHorizontalPadding = 14.0;
-  static const searchFieldIconGap = 8.0;
 
   /// 판매 상태 필터 칩 줄.
   static const filterChipHeight = 36.0;
@@ -72,22 +67,13 @@ class FavoriteMetrics {
 class FavoriteLimits {
   FavoriteLimits._();
 
-  /// 한 번에 받아 오는 찜 공연 수. 서버가 허용하는 최대치와 같다.
-  ///
-  /// 페이지를 더 넘기는 UI 는 두지 않았다. 100개를 넘게 찜한 사람은 최근
-  /// 100건만 보인다 — 무한 스크롤은 MVP 범위 밖이고, 그 전에 화면의 필터·정렬이
-  /// 기기에 받아 둔 목록을 기준으로 돈다는 점부터 바꿔야 한다.
+  /// 한 번에 받아 오는 찜 공연 수. 서버가 허용하는 최대치와 같다. 페이지를 더
+  /// 넘기는 UI 는 없어 100개를 넘게 찜하면 최근 100건만 보인다.
   static const showPageSize = 100;
 
-  /// 하트를 누르고 서버로 보내기까지 기다리는 시간.
-  ///
-  /// 하트는 연타된다. 누를 때마다 보내면 요청이 그 수만큼 나가고, 더 나쁜 것은
-  /// **응답이 순서대로 오지 않는다는 것이다** — 켰다 끈 두 요청 중 끄기가 먼저
-  /// 도착하면 서버에는 찜이 남고 화면에는 빈 하트가 남는다. 그래서 화면만 즉시
-  /// 바꾸고, 손이 멈춘 뒤 마지막 의도 하나만 보낸다.
-  ///
-  /// 300ms 는 연타로 읽히는 간격이다. 더 늘리면 한 번만 누르고 바로 앱을 닫는
-  /// 사람의 찜이 나가지 못한다.
+  /// 하트를 누르고 서버로 보내기까지 기다리는 시간. 연타하면 응답이 순서대로
+  /// 오지 않아 서버와 화면이 어긋나므로, 화면만 즉시 바꾸고 손이 멈춘 뒤 마지막
+  /// 의도 하나만 보낸다. 더 늘리면 한 번 누르고 바로 앱을 닫는 찜이 나가지 못한다.
   static const toggleDebounce = Duration(milliseconds: 300);
 }
 

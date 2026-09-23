@@ -6,17 +6,10 @@ import '../constants.dart';
 import '../models/listing.dart';
 import 'resale_card.dart';
 
-/// 매물 목록의 한 줄. 구역 · 등록가 · 회차 · 정가 · 할인율.
-///
-/// 첫 칸은 `S구역 8열 19번` 까지 찍는다(사용자 결정). 서버가 좌석을 아직 안
-/// 실어 주면 구역명만 남는다([Listing.seatLabel]).
-///
-/// [performedAt] 은 공연 회차다. 매물 응답에 공연 정보가 없어(같은 공연의
-/// 매물이라 반복해 실을 이유가 없다) 화면이 고른 공연에서 받아 넘긴다.
-///
-/// 내 매물도 **누를 수 있다.** 살 수는 없지만 내릴 수 있어서다. 어느 쪽인지는
-/// 화면이 [Listing.mine] 을 보고 가른다([onTap] 하나로 받는다) — 카드는 눌린
-/// 것만 알린다.
+/// 매물 목록의 한 줄. 구역 · 등록가 · 회차 · 정가 · 할인율. 첫 칸은 좌석이
+/// 오면 `S구역 8열 19번`, 아니면 구역명이다([Listing.seatLabel]). [performedAt]
+/// 은 매물 응답에 없어 화면이 고른 공연에서 받아 넘긴다. 내 매물도 누를 수
+/// 있다 — 살 수는 없지만 내릴 수 있어서고, 가르는 일은 화면이 [Listing.mine] 으로 한다.
 class ListingRowCard extends StatelessWidget {
   const ListingRowCard({
     super.key,

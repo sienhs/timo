@@ -2,11 +2,8 @@ import '../models/wallet_summary.dart';
 import '../models/wallet_transaction.dart';
 import 'mock_my_page_data.dart';
 
-/// 충전을 기억해 두는 메모리 원장. 서버 없이 도는 `MockMyPageApi` 전용이다.
-///
-/// 충전이 잔액과 사용 내역에 반영되는 걸 화면 테스트가 확인할 수 있어야 해서,
-/// 서버가 하는 일(충전분을 더하고 내역 한 줄을 쌓는 것)을 여기서 흉내 낸다.
-/// 앱은 `HttpMyPageApi` 로 실제 지갑 API 를 보므로 이 원장을 쓰지 않는다.
+/// 충전을 기억해 두는 메모리 원장. `MockMyPageApi` 전용이다. 충전이 잔액과
+/// 사용 내역에 반영되는 걸 화면 테스트가 확인할 수 있게 서버가 하는 일을 흉내 낸다.
 class MockWalletLedger {
   MockWalletLedger({WalletSummary? initial, this.clock = DateTime.now})
     : _wallet = initial ?? MockMyPageData.wallet;

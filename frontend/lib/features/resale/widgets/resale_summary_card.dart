@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// 구매 확인·결제 완료 화면의 흰 카드. 모서리·여백·그림자를 한곳에서 관리한다.
-///
-/// 목록 카드([ResaleCard])와 달리 회색 바탕 위에 떠 있는 카드라 테두리 대신
-/// 옅은 그림자를 쓴다. 결제 도메인의 `PaymentCard` 와 같은 모양이다 — 같은
-/// 흐름(결제)의 연속된 화면이라 생김새가 갈리면 안 된다.
+/// 구매 확인·결제 완료 화면의 흰 카드. 회색 바탕 위에 떠 있는 카드라 테두리
+/// 대신 옅은 그림자를 쓴다. 결제 도메인의 `PaymentCard` 와 같은 모양이다.
 class ResaleSummaryCard extends StatelessWidget {
   const ResaleSummaryCard({super.key, required this.child});
 
@@ -32,10 +29,8 @@ class ResaleSummaryCard extends StatelessWidget {
   }
 }
 
-/// 라벨(좌)과 값(우)을 한 줄에 배치하는 행.
-///
-/// 구매 확인의 금액 줄과 완료 화면의 예약 정보 줄이 같은 모양·같은 이유로
-/// 바뀌므로 도메인 안에서 공용으로 쓴다.
+/// 라벨(좌)과 값(우)을 한 줄에 배치하는 행. 구매 확인의 금액 줄과 완료
+/// 화면의 정보 줄이 같이 쓴다.
 class ResaleInfoRow extends StatelessWidget {
   const ResaleInfoRow({
     super.key,
@@ -93,8 +88,6 @@ class ResaleCardDivider extends StatelessWidget {
   }
 }
 
-/// 회색 바탕 위에 카드를 올리는 화면들의 배경색.
-///
-/// 결제 흐름의 화면(구매 확인·결제 완료)만 이 색을 쓴다. 목록 화면은 흰
-/// 바탕에 테두리 카드다 — 시안이 그렇게 갈라 놓았다.
+/// 회색 바탕 위에 카드를 올리는 화면들의 배경색. 결제 흐름의 화면(구매 확인·
+/// 결제 완료)만 쓰고, 목록 화면은 흰 바탕에 테두리 카드다.
 const resalePageBackground = Color(0xFFF4F5F6);

@@ -3,10 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/features/notification/notification_destination.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 알림을 눌렀을 때 어디로 가는지.
-///
-/// 푸시를 누르든 알림함에서 누르든 같은 화면으로 가야 해서 규칙이 한 곳에 있다.
-/// 화면도 Firebase 도 필요 없는 순수 규칙이라 여기서 전부 확인한다.
+/// 알림을 눌렀을 때 어디로 가는지. 푸시와 알림함이 같은 화면으로 가야 해서 규칙이
+/// 한 곳에 있고, 화면도 Firebase 도 필요 없어 여기서 전부 확인한다.
 void main() {
   group('알림이 가리키는 화면', () {
     test('공연 알림은 그 공연 상세로 간다', () {

@@ -2,11 +2,9 @@ import 'package:flutter/widgets.dart';
 
 import 'auth_session.dart';
 
-/// 앱 전체에 [AuthSession] 을 내려주는 InheritedNotifier.
-///
-/// 예매 흐름의 BookingScope 와 같은 방식이다. 로그인 여부에 따라 달라지는
-/// 화면(마이페이지 버튼 등)은 [of] 로 구독해 로그인·로그아웃 때 다시 그려지고,
-/// 버튼 콜백처럼 값만 쓰는 자리는 [read] 로 꺼낸다.
+/// 앱 전체에 [AuthSession] 을 내려주는 InheritedNotifier. 로그인 여부에 따라
+/// 달라지는 화면은 [of] 로 구독해 로그인·로그아웃 때 다시 그려지고, 버튼 콜백처럼
+/// 값만 쓰는 자리는 [read] 로 꺼낸다.
 class AuthSessionScope extends InheritedNotifier<AuthSession> {
   const AuthSessionScope({
     super.key,
@@ -22,10 +20,8 @@ class AuthSessionScope extends InheritedNotifier<AuthSession> {
     return scope!.notifier!;
   }
 
-  /// [of] 와 같이 구독하되, 스코프가 없으면 null.
-  ///
-  /// 셸(하단 바 + 탭)만 띄우는 테스트처럼 스코프 없이도 그려져야 하는 화면이
-  /// 쓴다. 앱에서는 늘 스코프가 있으므로 null 이 나오면 트리 구성이 잘못된 것.
+  /// [of] 와 같이 구독하되, 스코프가 없으면 null. 스코프 없이도 그려져야 하는
+  /// 화면(셸만 띄우는 테스트)이 쓴다.
   static AuthSession? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AuthSessionScope>()?.notifier;
 

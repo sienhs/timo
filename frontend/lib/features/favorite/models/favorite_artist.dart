@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// 찜한 아티스트 한 명. `FavoriteShow` 와 같은 이유로 기기에 남기는 스냅샷이다.
-///
-/// 아티스트에는 아직 서버 id 가 없다(홈의 `ArtistSummary` 주석). 그래서
+/// 찜한 아티스트 한 명. 기기에 남기는 스냅샷이다. 아직 서버 id 가 없어
 /// **이름**으로 같은 사람인지 가른다. id 가 생기면 그때 바꾼다.
 @immutable
 class FavoriteArtist {

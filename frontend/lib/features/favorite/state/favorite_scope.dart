@@ -2,11 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../data/favorite_store.dart';
 
-/// 하트가 있는 화면들에 [FavoriteStore] 를 내려주는 InheritedNotifier.
-///
-/// `TicketStoreScope` 와 같은 방식이다. 저장소가 알릴 때(찜·해제) [of] 로
-/// 읽은 화면이 함께 리빌드된다 — 검색 결과에서 누른 하트가 상세 화면과
-/// 찜리스트에 그대로 보이게 하는 것이 이 스코프의 일이다.
+/// 하트가 있는 화면들에 [FavoriteStore] 를 내려주는 InheritedNotifier. 저장소가
+/// 알릴 때 [of] 로 읽은 화면이 함께 리빌드된다.
 class FavoriteScope extends InheritedNotifier<FavoriteStore> {
   const FavoriteScope({
     super.key,

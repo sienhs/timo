@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 
-/// 양도마켓 화면들의 상단 바. 뒤로가기 · 가운데 제목 · 오른쪽 자리 하나.
-///
-/// 오른쪽 자리에는 마켓이 열려 있는 동안 남은 시간이 들어간다([trailing]).
-/// 상단 바를 화면마다 적으면 제목 크기와 뒤로가기 색이 조금씩 갈리고, 남은
-/// 시간이 붙는 화면과 안 붙는 화면의 높이가 달라진다.
+/// 양도마켓 화면들의 상단 바. 뒤로가기 · 가운데 제목 · 오른쪽 자리 하나
+/// ([trailing]). 화면마다 적으면 제목 크기와 뒤로가기 색이 조금씩 갈린다.
 class ResaleAppBar extends StatelessWidget implements PreferredSizeWidget {
   const ResaleAppBar({super.key, required this.title, this.trailing});
 
