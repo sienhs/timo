@@ -59,3 +59,10 @@ solapi:
   api-key: demo-api-key
   api-secret: demo-api-secret
   sender-phone-number: "01000000000"
+
+# 네이버 캡차 자격증명. demo 는 이미지 저장소만 실제 S3 로 바꾼 프로필이라 캡차는 로컬과 같이
+# 더미를 쓴다. 실제 값을 쓰려면 환경변수로 내보낸다.
+naver:
+  captcha:
+    client-id: ${NAVER_CAPTCHA_CLIENT_ID:local-dev-only-captcha-client-id}
+    client-secret: ${NAVER_CAPTCHA_CLIENT_SECRET:local-dev-only-captcha-client-secret}

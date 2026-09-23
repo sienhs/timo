@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.seat;
 
+import com.ssafy.timo.domain.captcha.repository.CaptchaPassedStore;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -15,8 +16,11 @@ import com.ssafy.timo.domain.seat.repository.SeatRepository;
 import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
+import com.ssafy.timo.support.Authenticated;
+import com.ssafy.timo.support.CaptchaPassed;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>선행 데이터는 매 테스트 시작 시 리포지토리로 직접 넣는다. {@code @IntegrationTest} 가
  * 트랜잭션을 걸어 두므로 테스트가 끝나면 롤백되어 서로 영향을 주지 않는다.
+ *
+ * <p>좌석 조회(v1)는 {@code @RequireCaptcha} 가 걸려 있다. 여기서는 그 관문 자체를 다시 보지
+ * 않고({@code RequireCaptchaInterceptorTest} 가 본다) {@link CaptchaPassed} 로 항상 통과한 상태를
+ * 만들어 둔다 - 이 테스트의 관심사는 캡차가 아니라 좌석 조회 응답이다.
  */
 @IntegrationTest
 class SeatQueryApiIntegrationTest {
@@ -65,6 +73,9 @@ class SeatQueryApiIntegrationTest {
 
     @Autowired
     private ReservationRepository reservationRepository;
+
+    @Autowired
+    private CaptchaPassedStore captchaPassedStore;
 
     @Autowired
     private EntityManager em;
@@ -98,6 +109,16 @@ class SeatQueryApiIntegrationTest {
                 .name("전재민")
                 .nickname("구매자")
                 .build()).getId();
+
+        // 좌석 조회(v1)는 @RequireCaptcha 가 걸려 있다. 이 클래스의 관심사가 아니므로 항상
+        // 통과한 상태로 시작한다.
+        Authenticated.set(buyerId);
+        CaptchaPassed.grant(captchaPassedStore, concertId, buyerId);
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        Authenticated.clear();
     }
 
     // ---------------------------------------------------------------- 구역 목록
@@ -389,6 +410,8 @@ class SeatQueryApiIntegrationTest {
     @DisplayName("오픈 전 공연의 좌석 조회는 409 BookingNotOpenException 이다")
     void findSeats_isRejectedBeforeOpen() throws Exception {
         Long beforeOpenId = saveConcertOpeningAt(LocalDateTime.now().plusDays(1));
+        // 캡차 관문을 지나야 오픈 여부 판정까지 닿는다 - 이 테스트가 보는 건 그 뒤다.
+        CaptchaPassed.grant(captchaPassedStore, beforeOpenId, buyerId);
 
         mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(beforeOpenId)).param("sectionId", "1"))
                 .andExpect(status().isConflict())
@@ -432,6 +455,25 @@ class SeatQueryApiIntegrationTest {
     void findSeats_rejectsNonNumericSectionId() throws Exception {
         mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(concertId)).param("sectionId", "abc"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("이 공연의 캡차 통과 기록이 없으면 403 이다 - 인터셉터 동작 자체는 " +
+            "RequireCaptchaInterceptorTest 가 보고, 여기서는 실제 엔드포인트에 붙어 있는지만 본다")
+    void findSeats_requiresCaptchaPass() throws Exception {
+        Long unpassedConcertId = concertRepository.save(Concert.builder()
+                .title("캡차 안 푼 공연")
+                .genre(ConcertGenre.CONCERT)
+                .ageRating(AgeRating.ALL)
+                .startDate(LocalDateTime.now().plusDays(20))
+                .endDate(LocalDateTime.now().plusDays(20).plusHours(3))
+                .openAt(LocalDateTime.now().minusDays(1))
+                .venue(venueRepository.getReferenceById(venueId))
+                .build()).getId();
+
+        mvc.perform(get(SEAT_PATH).param("concertId", String.valueOf(unpassedConcertId)).param("sectionId", "1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.exception").value("CaptchaRequiredException"));
     }
 
     // ---------------------------------------------------------------- 헬퍼

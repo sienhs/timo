@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -82,6 +83,21 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.title").value("Not Found"))
                 .andExpect(jsonPath("$.errorMessage").value("테스트 대상을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("retryAfterSeconds 를 채운 BusinessException 은 Retry-After 헤더가 함께 나간다")
+    void businessException_withRetryAfter_addsHeader() throws Exception {
+        mvc.perform(get("/test/business-exception/retryable"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().longValue("Retry-After", ExceptionProbeConfig.ProbeController.RETRY_AFTER_SECONDS));
+    }
+
+    @Test
+    @DisplayName("retryAfterSeconds 를 안 채운 BusinessException 은 Retry-After 헤더가 없다")
+    void businessException_withoutRetryAfter_hasNoHeader() throws Exception {
+        mvc.perform(get("/test/business-exception"))
+                .andExpect(header().doesNotExist("Retry-After"));
     }
 
     @Test

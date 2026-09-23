@@ -42,6 +42,11 @@ public interface SeatApi {
      * 크기가 아니다. 구역 목록은 {@link SectionApi} 에서 받는다.
      *
      * <p>페이지로 나누지 않는다. 배치도는 좌석이 전부 있어야 그려진다.
+     *
+     * <p><b>v1 구현({@code SeatController})은 캡차 통과 기록을 요구한다</b>({@code @RequireCaptcha},
+     * 이 인터페이스가 아니라 그쪽에 붙어 있다 - 이유는 그 클래스 주석 참고). 기록이 없으면 403
+     * {@code CAPTCHA_REQUIRED} 다. 선점({@link #hold})에는 걸지 않는다 - 캡차는 조회 트래픽을
+     * 막는 장치이고, 선점은 좌석 상태와 대기열이 막는다.
      */
     @GetMapping
     ResponseEntity<SectionSeatListResponseDto> findSeats(@RequestParam Long concertId,

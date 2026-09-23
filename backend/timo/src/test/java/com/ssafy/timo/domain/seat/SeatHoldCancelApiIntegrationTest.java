@@ -1,5 +1,6 @@
 package com.ssafy.timo.domain.seat;
 
+import com.ssafy.timo.domain.captcha.repository.CaptchaPassedStore;
 import com.ssafy.timo.domain.concert.entity.AgeRating;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.entity.ConcertGenre;
@@ -19,6 +20,7 @@ import com.ssafy.timo.domain.seat.repository.SectionRepository;
 import com.ssafy.timo.domain.venue.entity.Venue;
 import com.ssafy.timo.domain.venue.repository.VenueRepository;
 import com.ssafy.timo.support.Authenticated;
+import com.ssafy.timo.support.CaptchaPassed;
 import com.ssafy.timo.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -83,6 +85,9 @@ class SeatHoldCancelApiIntegrationTest {
     private MemberRepository memberRepository;
 
     @Autowired
+    private CaptchaPassedStore captchaPassedStore;
+
+    @Autowired
     private EntityManager em;
 
     private Venue venue;
@@ -108,6 +113,10 @@ class SeatHoldCancelApiIntegrationTest {
 
         section = saveSection("1층 A블록", 150000, 2, 2);
         flushAndClear();
+
+        // 좌석 조회(v1)는 @RequireCaptcha 가 걸려 있다. seatsOf() 가 이 회원(me) 몫으로 호출한다.
+        CaptchaPassed.grant(captchaPassedStore, concertA.getId(), me);
+        CaptchaPassed.grant(captchaPassedStore, concertB.getId(), me);
     }
 
     @AfterEach
@@ -281,10 +290,12 @@ class SeatHoldCancelApiIntegrationTest {
                 .with(Authenticated.as(memberId));
     }
 
+    /** 캡차 통과 기록은 {@code setUpFixtures} 에서 {@code me} 몫으로 이미 남겨 두었다. */
     private MockHttpServletRequestBuilder seatsOf(Concert concert) {
         return get(SEAT_PATH)
                 .param("concertId", String.valueOf(concert.getId()))
-                .param("sectionId", String.valueOf(section.getId()));
+                .param("sectionId", String.valueOf(section.getId()))
+                .with(Authenticated.as(me));
     }
 
     private void sell(Concert concert, Long seatId, long memberId) {

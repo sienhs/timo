@@ -49,3 +49,11 @@ wallet:
 # 실제 체인에 트랜잭션을 보내려면 blockchain/.env 의 ADMIN_PRIVATE_KEY 를 환경변수로 내보내야 한다
 # (기본값은 application.yml 공통 설정 참고). 안 내보내면 앱은 정상 기동하고 실제 전송을 시도하는
 # 기능만 막힌다 (EC2 방화벽이 지정 IP만 허용하므로 이 키가 있어도 방화벽 허용 없인 어차피 막힌다).
+
+# 네이버 캡차 자격증명. 로컬은 실제 캡차를 띄우지 않아도 기동해야 하므로 더미를 둔다
+# (NaverCaptchaProperties 가 빈 값을 거부한다). 실제 캡차를 눌러 보려면 발급받은 값을
+# NAVER_CAPTCHA_CLIENT_ID/SECRET 으로 내보낸다.
+naver:
+  captcha:
+    client-id: ${NAVER_CAPTCHA_CLIENT_ID:local-dev-only-captcha-client-id}
+    client-secret: ${NAVER_CAPTCHA_CLIENT_SECRET:local-dev-only-captcha-client-secret}

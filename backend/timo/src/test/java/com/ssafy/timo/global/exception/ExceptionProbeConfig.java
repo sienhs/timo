@@ -37,6 +37,8 @@ public class ExceptionProbeConfig {
         static final String CUSTOM_MESSAGE = "좌석이 이미 선점되었습니다.";
         static final String DUPLICATE_MESSAGE = "이미 배치된 아이템이에요.";
         static final String LEAKY_MESSAGE = "jdbc password is hunter2";
+        static final String RETRYABLE_MESSAGE = "잠시 후 다시 시도해 주세요.";
+        static final long RETRY_AFTER_SECONDS = 1;
 
         @GetMapping("/test/duplicate")
         String duplicate() {
@@ -56,6 +58,16 @@ public class ExceptionProbeConfig {
         @GetMapping("/test/business-exception/domain")
         String businessExceptionWithDomainErrorCode() {
             throw new BusinessException(TestErrorCode.TARGET_NOT_FOUND);
+        }
+
+        /**
+         * {@code retryAfterSeconds} 를 채운 {@code BusinessException} - 원인이 확실하고 곧 풀리는
+         * 실패(예: 캡차 쪽 동시 호출 상한)를 흉내 낸다. 실제 도메인 예외를 안 쓰는 이유는
+         * {@link ExceptionProbeConfig} 클래스 주석과 같다 - 이 메커니즘은 도메인 무관한 횡단 규칙이다.
+         */
+        @GetMapping("/test/business-exception/retryable")
+        String businessExceptionWithRetryAfter() {
+            throw new BusinessException(TestErrorCode.TARGET_NOT_FOUND, RETRYABLE_MESSAGE, RETRY_AFTER_SECONDS);
         }
 
         @PostMapping("/test/validate")

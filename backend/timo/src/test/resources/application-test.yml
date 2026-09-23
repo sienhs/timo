@@ -58,3 +58,10 @@ market:
 # (ConcertStatusSchedulerTest).
 scheduling:
   enabled: false
+
+# 네이버 캡차 자격증명. 테스트는 네이버를 호출하지 않지만 값이 없으면 컨텍스트가 뜨지 않는다
+# (NaverCaptchaProperties 가 빈 값을 거부한다). solapi 와 같은 사정이다.
+naver:
+  captcha:
+    client-id: test-captcha-client-id
+    client-secret: test-captcha-client-secret

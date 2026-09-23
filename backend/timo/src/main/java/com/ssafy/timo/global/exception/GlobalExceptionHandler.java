@@ -67,13 +67,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
-    /** 비즈니스 규칙 위반. 의도된 예외이므로 스택트레이스 없이 warn 으로만 남긴다. */
+    /**
+     * 비즈니스 규칙 위반. 의도된 예외이므로 스택트레이스 없이 warn 으로만 남긴다.
+     *
+     * <p>{@code retryAfterSeconds} 가 실려 있으면 {@code Retry-After} 헤더로 함께 내려준다 - 원인이
+     * 확실하고 곧 풀리는 실패(예: 우리 쪽 동시 호출 상한)에서만 예외가 그 값을 채워 온다. 어느
+     * 도메인 예외가 그런지는 여기서 알 필요가 없다 - {@link BusinessException} 이 들고 오는 값만 본다.
+     */
     @ExceptionHandler(BusinessException.class)
-    public ProblemDetail handleBusinessException(BusinessException e) {
+    public ResponseEntity<ProblemDetail> handleBusinessException(BusinessException e) {
         BaseErrorCode errorCode = e.getErrorCode();
         log.warn("BusinessException: errorCode={}, message={}", errorCode.name(), e.getMessage());
 
-        return problemDetail(errorCode.getStatus(), e.getMessage(), e);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(errorCode.getStatus());
+        if (e.getRetryAfterSeconds() != null) {
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()));
+        }
+        return response.body(problemDetail(errorCode.getStatus(), e.getMessage(), e));
     }
 
     /** {@code @Valid} 검증 실패. 어느 필드가 왜 틀렸는지 errors 확장 속성으로 함께 내려준다. */
