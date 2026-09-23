@@ -3,15 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 
-/// 공연을 불러오는 동안 상세 화면 자리에 두는 뼈대.
-///
-/// 포스터 칸 · 제목 묶음 · 섹션 두 개를 실제 화면과 같은 비율과 간격으로
-/// 세운다([ShowDetailMetrics]). 스피너 하나만 두면 가운데 동그라미가 돌다가
-/// 화면 전체가 한 번에 갈리는데, 이 화면은 홈에서 카드를 누르고 들어오는
-/// 자리라 포스터가 있던 위치에 포스터가 그대로 이어져 보여야 한다.
-///
-/// 하단 바 자리는 비우지 않는다. 바 모양이 공연 상태(오픈 전 · 예매 중)에
-/// 따라 갈리는데, 받아 보기 전에는 어느 쪽인지 알 수 없다.
+/// 공연을 불러오는 동안 상세 화면 자리에 두는 뼈대. 포스터 칸 · 제목 묶음 · 섹션 두 개를
+/// 실제 화면과 같은 비율과 간격으로 세워([ShowDetailMetrics]) 포스터 자리가 그대로 이어진다.
+/// 하단 바 자리는 비우지 않는다. 바 모양이 공연 상태에 따라 갈려 받기 전에는 알 수 없다.
 class ShowDetailSkeleton extends StatelessWidget {
   const ShowDetailSkeleton({super.key});
 

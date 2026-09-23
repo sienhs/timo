@@ -2,18 +2,14 @@ import '../models/member_profile.dart';
 import '../models/wallet_summary.dart';
 import '../models/wallet_transaction.dart';
 
-/// 마이페이지 목업. 시안에 그려진 값 그대로다.
-///
-/// 화면 테스트용이다 — 실제 앱은 `/members/me` 와 `/members/wallet` 으로 받는다.
+/// 마이페이지 목업. 시안에 그려진 값 그대로다. 화면 테스트용이다.
 class MockMyPageData {
   MockMyPageData._();
 
   static const profile = MemberProfile(memberId: 1, nickname: '엥간한 닉네임');
 
-  /// 본인인증으로 확인된 실명. 결제 화면의 '예매자 성함' 에 찍힌다.
-  ///
-  /// [profile] 에 없는 이유: 실명은 모델에 담지 않고 필요한 화면이 그때만 꺼내
-  /// 쓴다(`MyPageApi.fetchBookerName`).
+  /// 본인인증으로 확인된 실명. 결제 화면의 '예매자 성함' 에 찍힌다. 실명은 모델에
+  /// 담지 않고 필요한 화면이 그때만 꺼내 쓰므로 [profile] 에는 없다.
   static const bookerName = '홍길동';
 
   /// 충전 내역 한 줄의 이름과 결제 경로. 시안의 사용 내역에 있는 문구 그대로다.

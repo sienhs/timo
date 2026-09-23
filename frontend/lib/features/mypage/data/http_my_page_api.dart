@@ -7,13 +7,9 @@ import '../models/member_profile.dart';
 import '../models/wallet_summary.dart';
 import 'my_page_api.dart';
 
-/// 백엔드 회원 API(`/api/v1/members`)에 실제로 요청하는 [MyPageApi].
-///
-/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 토큰을 붙이는
-/// 일은 `AuthInterceptor` 가, 서버 주소·시간 제한·로그는 [ApiClient] 가,
-/// 실패 응답을 화면용 문구로 바꾸는 일은 [ApiException] 이 맡는다.
-///
-/// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
+/// 백엔드 회원 API(`/api/v1/members`)에 실제로 요청하는 [MyPageApi]. 토큰은
+/// `AuthInterceptor`, 주소·시간 제한은 [ApiClient], 실패 문구는 [ApiException]
+/// 몫이다. [dio] 는 테스트용이다.
 class HttpMyPageApi implements MyPageApi {
   HttpMyPageApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;
 
@@ -47,11 +43,9 @@ class HttpMyPageApi implements MyPageApi {
     return WalletSummary.fromJson(_body(response));
   }
 
-  /// 충전 응답은 조회와 같은 모양이라, 화면이 [fetchWallet] 을 다시 부르지
-  /// 않고 이 결과만으로 새 잔액과 내역을 그린다.
-  ///
-  /// 0 이하를 보내면 서버가 400 을 주지만, 그 전에 화면(`ChargeAmount`)이
-  /// 거른다.
+  /// 충전 응답은 조회와 같은 모양이라 화면이 [fetchWallet] 을 다시 부르지 않고
+  /// 이 결과만으로 새 잔액과 내역을 그린다. 0 이하는 서버가 400 을 주지만 그 전에
+  /// 화면이 거른다.
   @override
   Future<WalletSummary> charge(int amount) async {
     final response = await _guard(

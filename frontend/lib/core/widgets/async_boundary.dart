@@ -3,18 +3,9 @@ import 'package:flutter/material.dart';
 import '../network/api_exception.dart';
 import '../theme/app_colors.dart';
 
-/// 비동기 데이터의 로딩·실패 분기를 화면 대신 맡는다.
-///
-/// 화면은 성공했을 때의 모양([builder])만 적고, 기다리는 동안 무엇을 보일지
-/// ([loading])와 실패하면 어떻게 되돌릴지([onRetry])만 넘긴다. 로딩·실패
-/// 분기가 화면마다 따로 있으면 문구와 버튼이 화면마다 조금씩 달라진다.
-///
-/// [future] 가 바뀌면(새로 고침·다시 시도) 새 결과를 기다리되, 이미 보여 주던
-/// 데이터가 있으면 그대로 둔다. 당겨서 새로 고칠 때마다 카드가 회색 자리로
-/// 깜빡이면 화면이 비었다가 채워지는 것처럼 보인다.
-///
-/// 실패 문구는 [ApiException.message] 를 그대로 쓴다. 서버 문구·네트워크 상황
-/// 문구가 이미 화면용으로 번역돼 있다. 그 외 예외는 일반 문구로 덮는다.
+/// 비동기 데이터의 로딩·실패 분기를 화면 대신 맡는다. 화면은 성공 모양([builder])
+/// 과 [loading]·[onRetry] 만 넘긴다. [future] 가 바뀌어도 이미 보여 주던 데이터는
+/// 그대로 두고, 실패 문구는 [ApiException.message] 를 쓰며 그 외는 일반 문구다.
 class AsyncBoundary<T> extends StatefulWidget {
   const AsyncBoundary({
     super.key,

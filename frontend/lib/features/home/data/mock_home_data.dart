@@ -2,14 +2,10 @@ import '../models/artist_summary.dart';
 import '../models/trending_keyword.dart';
 
 /// 홈·검색 섹션의 목업 데이터. 테스트용 `MockHomeApi` 만 쓴다.
-///
-/// 앱의 `HttpHomeApi` 는 공연·아티스트·인기 검색어를 모두 서버에서 받아 오므로
-/// 여기서 가져가는 것이 없다.
 class MockHomeData {
   MockHomeData._();
 
-  /// 홈 인기 아티스트(테스트용). 시안의 원형 목록 순서. 마지막 '더보기' 칸은
-  /// 데이터가 아니라 화면이 그린다.
+  /// 홈 인기 아티스트(테스트용). 마지막 '더보기' 칸은 데이터가 아니라 화면이 그린다.
   static const artists = <ArtistSummary>[
     ArtistSummary(name: '김준수'),
     ArtistSummary(name: '옥주현'),
@@ -20,7 +16,7 @@ class MockHomeData {
     ArtistSummary(name: '페기구'),
   ];
 
-  /// 검색 화면의 추천 검색어(테스트용). 시안 순서대로 네 명이다.
+  /// 검색 화면의 추천 검색어(테스트용). 한 줄 칸 수만큼 네 명이다.
   static const recommendedArtists = <ArtistSummary>[
     ArtistSummary(name: '리센느'),
     ArtistSummary(name: '뷔'),
@@ -36,7 +32,7 @@ class MockHomeData {
     ),
   ];
 
-  /// 실시간 인기 검색어(테스트용). 시안의 순위·등락 그대로다.
+  /// 실시간 인기 검색어(테스트용). 순위와 등락이 섞여 있다.
   static const trendingKeywords = <TrendingKeyword>[
     TrendingKeyword(rank: 1, keyword: 'RESCENE', trend: KeywordTrend.up),
     TrendingKeyword(rank: 2, keyword: '제니'),

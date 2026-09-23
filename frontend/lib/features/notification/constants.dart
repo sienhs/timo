@@ -9,9 +9,6 @@ abstract final class NotificationStrings {
   static const empty = '아직 도착한 알림이 없어요';
   static const emptyHint = '예매한 공연 소식과 양도 매물을 여기로 알려드려요';
 
-  static const loadFailed = '알림을 불러오지 못했어요';
-  static const retry = '다시 시도';
-
   /// 목록을 이어 받다 실패했을 때. 첫 화면이 이미 떠 있어 전체를 실패로 바꾸지
   /// 않고 아래쪽에만 알린다.
   static const loadMoreFailed = '더 불러오지 못했어요. 눌러서 다시 시도';
@@ -41,17 +38,13 @@ abstract final class NotificationMetrics {
   static const bodyToTimeGap = 6.0;
   static const timeFontSize = 12.0;
 
-  /// 안 읽음 점과, 점이 차지하는 칸의 너비.
-  ///
-  /// 읽은 알림도 이 칸을 비워서 남긴다. 점이 사라질 때 본문이 왼쪽으로 밀리면
-  /// 목록을 훑을 때 글줄이 들쭉날쭉해 보인다.
+  /// 안 읽음 점과, 점이 차지하는 칸의 너비. 읽은 알림도 이 칸을 비워 두어
+  /// 본문 시작 위치가 들쭉날쭉해지지 않게 한다.
   static const unreadDotSize = 8.0;
   static const unreadDotColumnWidth = 18.0;
 
-  /// 점을 본문 첫 줄의 한가운데에 맞추려고 내리는 만큼.
-  ///
-  /// 첫 줄의 높이에서 점 크기를 뺀 절반이다. 글자 크기나 줄간격을 바꾸면 이 값도
-  /// 따라 바뀌어야 해서 직접 적지 않고 계산해 둔다.
+  /// 점을 본문 첫 줄의 한가운데에 맞추려고 내리는 만큼. 첫 줄 높이에서 점 크기를
+  /// 뺀 절반이라, 글자 크기나 줄간격을 바꾸면 따라 바뀌도록 계산해 둔다.
   static const unreadDotTopInset =
       (bodyFontSize * bodyLineHeight - unreadDotSize) / 2;
 

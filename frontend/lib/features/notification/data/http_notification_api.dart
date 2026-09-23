@@ -7,11 +7,6 @@ import '../models/notification_page.dart';
 import 'notification_api.dart';
 
 /// 백엔드 알림함 API(`/api/v1/notifications`)에 실제로 요청하는 [NotificationApi].
-///
-/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 토큰을 붙이는 일은
-/// `AuthInterceptor` 가, 서버 주소·시간 제한·로그는 [ApiClient] 가, 실패 응답을
-/// 화면용 문구로 바꾸는 일은 [ApiException] 이 맡는다.
-///
 /// [dio] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아 [ApiClient.dio] 를 쓴다.
 class HttpNotificationApi implements NotificationApi {
   HttpNotificationApi({Dio? dio}) : _dio = dio ?? ApiClient.dio;

@@ -4,9 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
 /// 최근 검색어 섹션. 제목 · '전체 삭제' 한 줄 아래 가로로 넘기는 칩 줄이다.
-///
-/// 비어 있을 때는 이 위젯을 쓰지 않는다 — 화면이 섹션 자체를 숨긴다. 그래서
-/// 여기서는 빈 상태를 다루지 않는다.
+/// 비어 있을 때는 화면이 섹션 자체를 숨기므로 여기서 빈 상태를 다루지 않는다.
 class RecentSearchChips extends StatelessWidget {
   const RecentSearchChips({
     super.key,
@@ -77,10 +75,8 @@ class RecentSearchChips extends StatelessWidget {
   }
 }
 
-/// 검색어 한 개. 본문을 누르면 검색, 끝의 X 를 누르면 삭제.
-///
-/// 두 동작이 한 칩에 있어 각각 따로 누를 수 있어야 한다. 그래서 칩 전체를
-/// 하나의 버튼으로 만들지 않고 글자와 X 를 각자 눌리게 나눈다.
+/// 검색어 한 개. 본문을 누르면 검색, 끝의 X 를 누르면 삭제. 두 동작을 각각
+/// 따로 누를 수 있게 글자와 X 를 나눠 눌리게 한다.
 class _RecentChip extends StatelessWidget {
   const _RecentChip({
     required this.keyword,

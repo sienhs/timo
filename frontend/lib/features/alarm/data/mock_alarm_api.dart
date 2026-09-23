@@ -4,11 +4,8 @@ import '../models/alarm_status.dart';
 import 'alarm_api.dart';
 
 /// 서버 없이 도는 [AlarmApi]. 위젯 테스트에 쓴다.
-///
-/// 공연별 신청 상태를 메모리에 들고 있으면서 신청·해제를 그대로 반영한다.
-///
-/// [failing] 을 켜면 모든 요청이 실패한다. 먼저 바꿔 둔 버튼이 되돌아가는지
-/// 볼 때 쓴다.
+/// 공연별 신청 상태를 메모리에 들고 신청·해제를 그대로 반영한다.
+/// [failing] 을 켜면 모든 요청이 실패한다. 먼저 바꿔 둔 버튼이 되돌아가는지 볼 때 쓴다.
 class MockAlarmApi implements AlarmApi {
   MockAlarmApi({
     Map<int, AlarmStatus> statuses = const {},

@@ -5,14 +5,9 @@ import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 import 'show_card_list_skeleton.dart';
 
-/// 공연 목록 화면을 불러오는 동안 [ShowListView] 자리에 두는 뼈대.
-///
-/// 검색 칸 · (있으면) 탭 줄 · 큰 카드 몇 장을 실제 목록과 같은 높이와 간격으로
-/// 세운다. 목록 화면은 검색 칸이 본문과 한 덩어리라, 스피너만 두면 검색 칸까지
-/// 사라졌다가 되돌아온다.
-///
-/// 카드가 세로로 길어([HomeMetrics.searchCardHeight]) 화면에 두세 장밖에 안
-/// 들어가므로 [HomeMetrics.skeletonCardCount] 장만 그린다.
+/// 공연 목록 화면을 불러오는 동안 `ShowListView` 자리에 두는 뼈대. 검색 칸 ·
+/// (있으면) 탭 줄 · 큰 카드 [HomeMetrics.skeletonCardCount] 장을 실제 목록과
+/// 같은 높이와 간격으로 세워, 검색 칸이 사라졌다 되돌아오는 일이 없게 한다.
 class ShowListSkeleton extends StatelessWidget {
   const ShowListSkeleton({super.key, this.hasTabs = false});
 

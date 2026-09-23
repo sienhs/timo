@@ -8,10 +8,8 @@ import 'package:timo/features/notification/screens/notification_screen.dart';
 import 'package:timo/features/notification/state/notification_api_scope.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 알림함 화면.
-///
-/// 읽음과 안 읽음을 글자로 쓰지 않고 **굵기와 점**으로 나누기로 했다. 그래서
-/// 여기서는 문구가 보이는지가 아니라 **굵기가 맞는지**를 본다.
+/// 알림함 화면. 읽음과 안 읽음을 글자가 아니라 굵기와 점으로 나누므로, 문구가
+/// 아니라 굵기가 맞는지를 본다.
 void main() {
   const unreadBody = '로이킴 콘서트, 지금부터 입장할 수 있어요';
   const readBody = '내일은 Bruno Mars 내한공연 보는 날이에요';
@@ -77,9 +75,8 @@ void main() {
     testWidgets('여러 줄로 온 본문은 첫 줄만 그린다', (tester) async {
       await pumpScreen(tester);
 
-      // 양도 매물 알림은 요약 아래에 '· 공연명' 목록이 붙어 온다. 목록에서 두 줄만
-      // 보이면 공연 하나가 점과 함께 덩그러니 남아 어색하다. 첫 줄이 그 자체로
-      // 요약이라 빼도 뜻이 통하고, 눌러 들어가면 마켓에서 전부 볼 수 있다.
+      // 양도 매물 알림은 요약 아래 '· 공연명' 목록이 붙어 온다. 첫 줄이 그 자체로
+      // 요약이라 목록에서는 첫 줄만 그린다.
       final body = tester.widget<Text>(find.textContaining('찜한 공연 3건에'));
       expect(body.data, '찜한 공연 3건에 양도 매물이 올라왔어요');
       expect(body.data, isNot(contains('로이킴')));

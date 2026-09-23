@@ -3,12 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/widgets/error_snack_bar.dart';
 
-/// 앱 공통 안내 상자(오류·성공·안내)의 모양 계약.
-///
-/// 색으로 셋을 구분하던 테두리를 걷어냈으므로, 이제 상자를 보이게 하는 것은
-/// 그림자뿐이다. 그림자가 그려지는 조건을 여기서 굳혀 둔다 — 이 조건이 깨지면
-/// 흰 배경 위의 흰 상자가 통째로 안 보이는데, 문구는 그대로 읽혀서 눈으로
-/// 훑다가는 놓치기 쉽다.
+/// 앱 공통 안내 상자(오류·성공·안내)의 모양 계약. 상자를 보이게 하는 것은
+/// 그림자뿐이라, 그 조건이 깨지면 흰 배경 위의 흰 상자가 통째로 안 보인다.
 void main() {
   /// 버튼 하나를 눌러 안내를 띄우는 화면.
   Widget host(void Function(BuildContext context) show) => MaterialApp(

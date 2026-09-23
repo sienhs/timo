@@ -7,10 +7,8 @@ import '../widgets/app_bottom_nav_bar.dart';
 import '../widgets/quick_menu_button.dart';
 
 /// 하단 바를 소유하는 껍데기 화면. 탭이 바뀌면 본문만 갈아끼운다.
-///
-/// 바 **위젯**은 여기 말고 내 티켓 화면도 단다(시안에 하단 바가 그려져 있다).
-/// 다만 탭 상태를 들고 있는 것은 이 화면 하나다 — 저쪽은 어느 탭도 고르지 않은
-/// 상태로 그리고, 탭을 누르면 [initialTab] 을 지정해 이 셸로 돌아온다.
+/// 바 위젯은 내 티켓 화면도 달지만 탭 상태를 드는 것은 이 화면 하나다 — 저쪽은
+/// 어느 탭도 고르지 않은 상태로 그리고, 탭을 누르면 [initialTab] 을 지정해 돌아온다.
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key, this.initialTab = 0});
 

@@ -5,10 +5,8 @@ import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 import '../models/wallet_transaction.dart';
 
-/// 거래 내역 한 줄. 왼쪽은 무엇·언제·어디서, 오른쪽은 얼마·남은 잔액이다.
-///
-/// 늘어난 거래는 금액을 초록으로, 줄어든 거래는 검정으로 그린다. 부호(`+`/`-`)
-/// 도 같이 붙이므로 색을 못 보는 사람도 가를 수 있다.
+/// 거래 내역 한 줄. 왼쪽은 무엇·언제·어디서, 오른쪽은 얼마·남은 잔액이다. 늘어난
+/// 거래는 초록, 줄어든 거래는 검정이고 부호도 붙여 색을 못 보는 사람도 가른다.
 class TransactionTile extends StatelessWidget {
   const TransactionTile({super.key, required this.transaction});
 

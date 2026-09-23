@@ -5,18 +5,9 @@ import '../models/auth_tokens.dart';
 import '../models/reissued_access_token.dart';
 import 'auth_api.dart';
 
-/// 서버 없이 쓰는 가짜 [AuthApi]. 화면 테스트가 쓴다.
-///
-/// 오류 화면도 눈으로 보고 테스트할 수 있도록 실패하는 값을 고정해 둔다.
-/// 그 외 입력은 모두 성공한다.
-/// - 인증번호 [invalidCode] 는 틀린 번호. 맞으면 [mockTicket] 을 돌려준다
-/// - 아이디 [takenUsernames], 닉네임 [takenNicknames] 는 이미 사용 중
-/// - 로그인 비밀번호 [wrongPassword] 는 틀린 비밀번호(아이디는 무엇이든)
-/// - 로그아웃 리프레시 토큰 [offlineRefreshToken] 은 서버에 닿지 못한 것으로 친다
-/// - 재발급 리프레시 토큰 [rejectedRefreshToken] 은 서버가 거절한 것으로 친다
-///
-/// 응답마다 [latency] 만큼 기다려 실제 서버처럼 로딩 상태가 보이게 한다.
-/// 테스트에서는 `Duration.zero` 를 넣어 바로 응답받는다.
+/// 서버 없이 쓰는 가짜 [AuthApi]. 화면 테스트가 쓴다. 고정값([invalidCode]·
+/// [takenUsernames]·[takenNicknames]·[wrongPassword] 등)만 실패하고 그 외 입력은
+/// 모두 성공한다. 응답마다 [latency] 만큼 기다린다(테스트는 `Duration.zero`).
 class MockAuthApi implements AuthApi {
   const MockAuthApi({this.latency = AuthMetrics.mockLatency});
 

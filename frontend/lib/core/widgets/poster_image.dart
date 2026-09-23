@@ -4,26 +4,11 @@ import '../network/api_client.dart';
 import '../theme/app_colors.dart';
 
 /// 공연 포스터 이미지. 부모가 준 크기를 꽉 채우고, 못 읽으면 회색 자리로
-/// 대체한다.
-///
-/// 앱 에셋([PosterImage.asset])과 서버가 준 주소([PosterImage.network]) 두
-/// 출처를 받는다. 홈 카드는 서버 응답의 URL 을, 배너·아티스트·상세는 아직
-/// 에셋을 그린다. 출처가 무엇이든 그리는 방식(채우기·모서리·대체 자리)은
-/// 같아야 해서 한 위젯이 맡는다.
-///
-/// 홈에 있던 위젯을 여기로 올렸다. 홈 카드 · 아티스트 아바타 · 배너에 이어
-/// 공연 상세까지 같은 이유로 쓰게 되어, 원래 파일에 적어 둔 승격 조건('세
-/// 번째 화면이 같은 이유로 포스터를 그리면')을 채웠다.
-///
-/// 결제 도메인의 `PosterThumbnail` 은 아직 합치지 않는다. 저쪽은 크기가
-/// 고정된 썸네일이고 이쪽은 부모 박스를 채우는 형태여서, 하나로 묶으면
-/// 크기 관련 파라미터가 양쪽 사정을 모두 받아야 한다.
+/// 대체한다. 앱 에셋([PosterImage.asset])과 서버 주소([PosterImage.network])
+/// 어느 출처든 채우기·모서리·대체 자리가 같아야 해서 한 위젯이 맡는다.
 class PosterImage extends StatelessWidget {
-  /// 앱에 들어 있는 이미지.
-  ///
-  /// 생성자가 const 가 아닌 이유: 인자로 받은 경로로 [ImageProvider] 를 만드는
-  /// 일은 컴파일 시점에 할 수 없다. 어차피 경로는 늘 데이터에서 오므로 호출부가
-  /// const 를 잃는 일도 없다.
+  /// 앱에 들어 있는 이미지. 인자로 받은 경로로 [ImageProvider] 를 만들어야 해서
+  /// 생성자가 const 가 아니다.
   PosterImage.asset({
     super.key,
     required String assetPath,
@@ -32,12 +17,9 @@ class PosterImage extends StatelessWidget {
     this.fit = BoxFit.cover,
   }) : _image = AssetImage(assetPath);
 
-  /// 서버가 준 주소의 이미지. 주소가 없으면(포스터 없는 공연) 바로 회색
-  /// 자리를 그린다.
-  ///
-  /// 주소는 [ApiClient.imageUrl] 을 거친다. 서버가 저장소 key 만 주기 때문에
-  /// (`poster/xxx.gif`) 그대로 쓰면 안드로이드에서 한 장도 안 뜬다. 호출부마다
-  /// 서버 주소를 붙이게 하면 빠뜨린 화면만 조용히 깨지므로 여기서 한 번에 한다.
+  /// 서버가 준 주소의 이미지. 주소가 없으면(포스터 없는 공연) 바로 회색 자리를
+  /// 그린다. 서버가 저장소 key 만 주므로 [ApiClient.imageUrl] 로 서버 주소를
+  /// 여기서 한 번에 붙인다(호출부마다 붙이면 빠뜨린 화면만 조용히 깨진다).
   PosterImage.network({
     super.key,
     required String? url,
@@ -82,9 +64,8 @@ class PosterImage extends StatelessWidget {
                 image,
               ),
               fit: fit,
-              // 그림이 내려오는 동안은 회색 자리를 둔다. 응답이 온 뒤에도
-              // 포스터는 한참 더 걸려서, 이게 없으면 목록·배너의 스켈레톤이
-              // 걷힌 자리가 빈 칸으로 남았다가 그림이 튀어 들어온다.
+              // 그림이 내려오는 동안은 회색 자리를 둔다. 없으면 스켈레톤이 걷힌
+              // 자리가 빈 칸으로 남았다가 그림이 튀어 들어온다.
               frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
                   wasSynchronouslyLoaded || frame != null
                   ? child

@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/amount_input_formatter.dart';
 import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 import '../models/listing_price.dart';
-import '../utils/price_input_formatter.dart';
 
-/// 판매가를 정하는 자리. 안내 한 줄 + 입력칸 + 슬라이더.
-///
-/// 값은 화면이 아니라 [controller] 하나가 들고 있다. 슬라이더를 움직이면
-/// 입력칸 글자를 고쳐 쓰는 방식이라, 화면 어디에도 같은 금액이 두 벌로 남지
-/// 않는다(충전 화면의 금액 칸과 같은 방식이다).
-///
-/// 정가를 넘기면 안내 문구·테두리·슬라이더가 함께 붉어지고 등록 버튼이 잠긴다.
-/// 잠그는 판단은 [ListingPrice] 가 하고 이 위젯은 그 결과만 그린다.
+/// 판매가를 정하는 자리. 안내 한 줄 + 입력칸 + 슬라이더. 값은 [controller]
+/// 하나가 들고 있고 슬라이더는 입력칸 글자를 고쳐 쓴다. 정가를 넘기면 안내
+/// 문구·테두리·슬라이더가 함께 붉어지며, 그 판단은 [ListingPrice] 가 한다.
 class ListingPriceEditor extends StatelessWidget {
   const ListingPriceEditor({
     super.key,
@@ -56,7 +51,7 @@ class ListingPriceEditor extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          inputFormatters: [PriceInputFormatter(maxDigits: price.maxDigits)],
+          inputFormatters: [AmountInputFormatter(maxDigits: price.maxDigits)],
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,

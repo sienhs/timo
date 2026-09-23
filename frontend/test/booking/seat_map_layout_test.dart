@@ -229,8 +229,8 @@ void main() {
           tester.getSize(find.byKey(ValueKey(_seatId(row, number)))),
     };
 
-    // 사다리꼴을 만들려고 칸을 줄이지 않는다(사용자 결정). 열마다 길이가
-    // 달라지는 것은 자리 수가 다를 때뿐이다.
+    // 사다리꼴을 만들려고 칸을 줄이지 않는다. 열마다 길이가 달라지는 것은
+    // 자리 수가 다를 때뿐이다.
     expect(sizes, {const Size(SeatMapLayout.cellSize, SeatMapLayout.cellSize)});
   });
 
@@ -337,9 +337,8 @@ void main() {
     // 이 구역은 화면보다 크므로 축소 한계는 1.0 보다 작아야 한다.
     expect(viewer.minScale, lessThan(1));
 
-    // 축소 한계를 낮추는 것만으로는 소용이 없다. InteractiveViewer 는 화면이
-    // 경계 밖으로 나가지 않는 선에서만 줄이기 때문에, 경계 여백이 좁으면 배치도가
-    // 화면을 꽉 채우는 배율에서 멈춘다. 여백이 한계까지 받쳐 주는지 본다.
+    // 경계 여백이 좁으면 InteractiveViewer 는 배치도가 화면을 꽉 채우는 배율에서
+    // 멈춰 축소 한계까지 못 줄인다. 여백이 한계까지 받쳐 주는지 본다.
     final margin = viewer.boundaryMargin;
     final reachable = math.max(
       viewport.width / (layout.canvasWidth + margin.horizontal),

@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 입력칸 오른쪽의 비밀번호 보기/숨기기 눈 아이콘.
-///
-/// LabeledTextField 의 suffixIcon 자리에 넣는다. 가려진 상태([obscured])는
-/// 화면이 들고 있고, 누르면 [onPressed] 로 알려 화면이 뒤집는다. 회원가입
-/// 비밀번호 화면과 로그인 화면이 같이 쓴다.
+/// 입력칸 오른쪽의 비밀번호 보기/숨기기 눈 아이콘. 가려진 상태([obscured])는
+/// 화면이 들고 있고, 누르면 [onPressed] 로 알려 화면이 뒤집는다.
 class ObscureToggle extends StatelessWidget {
   const ObscureToggle({
     super.key,

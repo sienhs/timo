@@ -5,10 +5,8 @@ import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 import 'my_page_card.dart';
 
-/// 내 버섯 카드. 잔액과 충전 입구다. (클래스 이름의 Mushroom 은 코인의 영문
-/// 이름으로 남겨 뒀다 — 화면 문구는 전부 '버섯' 이다.)
-///
-/// 잔액만 받아 그린다. 어디서 온 값인지(서버·목업)는 모른다.
+/// 내 버섯 카드. 잔액과 충전 입구다. 클래스 이름의 Mushroom 은 코인의 영문
+/// 이름이고 화면 문구는 전부 '버섯' 이다.
 class MushroomBalanceCard extends StatelessWidget {
   const MushroomBalanceCard({
     super.key,

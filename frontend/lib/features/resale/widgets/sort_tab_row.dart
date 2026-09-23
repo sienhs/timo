@@ -3,13 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// 목록 오른쪽 위의 정렬 탭. `인기순 | 마감임박순` 처럼 둘을 세로줄로 잇는다.
-///
-/// 내 티켓의 `TicketTabBar`(밑줄 달린 큰 탭)와 다르다. 저쪽은 본문이 아예
-/// 바뀌는 탭이고 이쪽은 같은 목록의 순서만 바꾸는 자리라, 시안도 작은 글자로
-/// 오른쪽에 붙여 두었다.
-///
-/// 고른 항목은 색과 굵기가 함께 바뀐다. 색만으로 구분하지 않는 규칙은 앱 전체가
-/// 같다.
+/// 내 티켓의 `TicketTabBar` 와 달리 같은 목록의 순서만 바꾸는 자리라 작은
+/// 글자다. 고른 항목은 색과 굵기가 함께 바뀐다.
 class SortTabRow extends StatelessWidget {
   const SortTabRow({
     super.key,

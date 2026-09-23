@@ -18,11 +18,8 @@ import '../widgets/resale_list_skeleton.dart';
 import '../widgets/resale_empty_view.dart';
 import '../widgets/sort_tab_row.dart';
 
-/// 공연 하나의 매물 목록.
-///
-/// 고른 공연을 통째로 받는다. 매물 응답에는 공연 정보가 없어(같은 공연의
-/// 매물이라 반복해 실을 이유가 없다) 제목과 회차를 여기서 가져온다. 번호만
-/// 받아 공연을 다시 조회하면 방금 목록에서 본 값을 한 번 더 받는 셈이다.
+/// 공연 하나의 매물 목록. 고른 공연을 통째로 받는다 — 매물 응답에는 공연
+/// 정보가 없어 제목과 회차를 여기서 가져온다.
 class MarketListingsScreen extends StatefulWidget {
   const MarketListingsScreen({
     super.key,
@@ -64,10 +61,8 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
   Future<void> _openListing(Listing listing) =>
       listing.mine ? _delist(listing) : _openPurchase(listing);
 
-  /// 매물을 고르면 구매 확인으로 간다.
-  ///
-  /// 돌아오면 목록을 다시 받는다. 사고 왔든 그냥 나왔든, 보고 있던 사이에
-  /// 남이 사 갔을 수 있다 — 매물에는 선점이 없다.
+  /// 매물을 고르면 구매 확인으로 간다. 돌아오면 목록을 다시 받는다 — 매물에는
+  /// 선점이 없어 보고 있던 사이에 남이 사 갔을 수 있다.
   Future<void> _openPurchase(Listing listing) async {
     await Navigator.pushNamed(
       context,
@@ -77,15 +72,9 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
     if (mounted) _reload();
   }
 
-  /// 내 매물을 내린다. 내 티켓의 양도 목록 탭과 **같은 팝업·같은 요청**이다.
-  ///
-  /// 확인을 받고 서버에 보낸 뒤 목록을 다시 받는다. 카드 한 장을 빼지 않는
-  /// 이유는 그 탭과 같다 — 그새 팔렸을 수 있고, 실패했다면 아무것도 바뀌지
-  /// 않아야 한다. 서버가 거절하면(그새 팔렸거나 이미 내려감) 그 문구를 그대로
-  /// 띄운다.
-  ///
-  /// 성공 안내는 따로 없다. 다시 받은 목록에서 그 줄이 사라져 결과가 이미
-  /// 보인다 — 마켓은 올라가 있는 매물만 주기 때문이다.
+  /// 내 매물을 내린다. 내 티켓의 양도 목록 탭과 같은 팝업·같은 요청이다.
+  /// 확인을 받고 보낸 뒤 목록을 다시 받는다 — 그새 팔렸을 수 있고 실패했다면
+  /// 아무것도 바뀌지 않아야 한다. 성공 안내는 따로 없다. 그 줄이 사라져 결과가 보인다.
   Future<void> _delist(Listing listing) async {
     final confirmed = await showDelistListingDialog(
       context,
@@ -110,14 +99,13 @@ class _MarketListingsScreenState extends State<MarketListingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      // 상단 바에 남은 시간을 적지 않는다(사용자 결정). 공연 목록 화면과 같다.
+      // 상단 바에 남은 시간을 적지 않는다. 공연 목록 화면과 같다.
       appBar: ResaleAppBar(title: widget.concert.title),
       body: SafeArea(
         child: Column(
           children: [
             // 세는 일만 남긴다. 그리지는 않는다([Offstage]) — 마감하면 첫 화면으로
-            // 돌려보내야 하고, 그 화면이 서버에 다시 물어 닫힘 안내와 다음 오픈
-            // 시간을 보여 준다.
+            // 돌려보내고, 그 화면이 서버에 다시 물어 닫힘 안내를 보여 준다.
             Offstage(
               child: MarketClosingCountdown(
                 clock: widget.clock,

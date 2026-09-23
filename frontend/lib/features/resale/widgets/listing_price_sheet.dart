@@ -8,14 +8,8 @@ import 'listing_price_editor.dart';
 import 'resale_bottom_bar.dart';
 
 /// 올라가 있는 매물의 등록가를 고치는 바텀시트. 내 티켓의 양도 목록 탭이 연다.
-///
-/// 판매가 입력 자리([ListingPriceEditor])와 상한 규칙([ListingPrice])은 등록
-/// 화면과 같은 것을 쓴다 — 서버도 등록과 수정에 같은 규칙(등록 시점 정가
-/// 이하)을 대므로, 화면이 두 벌이면 한쪽만 고쳐질 때 어긋난다.
-///
-/// 서버에 보내지는 않는다. 새 가격을 돌려주면 화면이 요청을 보내고 목록을
-/// 다시 받는다(등록 취소 팝업과 같은 역할 분담). 그대로 두거나 값을 안 바꾸고
-/// 닫으면 null 이다.
+/// 입력 자리([ListingPriceEditor])와 상한 규칙([ListingPrice])은 등록 화면과
+/// 같은 것을 쓴다. 서버에 보내지는 않고 새 가격을 돌려주며, 안 바꾸고 닫으면 null.
 Future<int?> showListingPriceSheet(
   BuildContext context, {
   required int currentPrice,

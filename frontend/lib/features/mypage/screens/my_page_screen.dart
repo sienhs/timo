@@ -9,7 +9,6 @@ import '../../auth/state/auth_api_scope.dart';
 import '../../auth/state/auth_session.dart';
 import '../../auth/state/auth_session_scope.dart';
 import '../../notification/push_notification_scope.dart';
-import '../../notification/push_notification_service.dart';
 import '../constants.dart';
 import '../models/member_profile.dart';
 import '../models/wallet_summary.dart';
@@ -18,13 +17,9 @@ import '../widgets/mushroom_balance_card.dart';
 import '../widgets/my_page_top_bar_host.dart';
 import '../widgets/transaction_history_card.dart';
 
-/// 마이페이지 홈. `MainShellScreen` 의 두 번째 탭 본문이다.
-///
-/// Scaffold 를 두지 않는다 — 셸이 이미 Scaffold 와 하단 바를 들고 있다.
-///
-/// 로그인 여부로 본문이 갈린다. 로그인 상태면 인사말·잔액·사용 내역을
-/// 서버에서 받아 그리고([_MemberView]), 아니면 로그인 입구만 보여 준다
-/// ([_GuestView]). 세션이 바뀌면 이 화면도 다시 그려져 본문이 바뀐다.
+/// 마이페이지 홈. `MainShellScreen` 의 두 번째 탭 본문이라 Scaffold 를 두지
+/// 않는다. 로그인 상태면 인사말·잔액·사용 내역을 서버에서 받아 그리고
+/// ([_MemberView]), 아니면 로그인 입구만 보여 준다([_GuestView]).
 class MyPageScreen extends StatelessWidget {
   const MyPageScreen({super.key, this.onBackPressed});
 
@@ -60,10 +55,8 @@ class MyPageScreen extends StatelessWidget {
   }
 }
 
-/// 로그인한 회원의 마이페이지. 인사말과 지갑을 각각 받아 온다.
-///
-/// 둘을 따로 드는 이유: 회원 정보는 실제 서버, 지갑은 아직 목업이라 실패
-/// 양상이 다르다. 한쪽이 실패해도 다른 쪽은 그대로 보인다.
+/// 로그인한 회원의 마이페이지. 인사말과 지갑을 각각 받아 와 한쪽이 실패해도
+/// 다른 쪽은 그대로 보인다.
 class _MemberView extends StatefulWidget {
   const _MemberView({super.key, required this.session});
 
@@ -97,33 +90,17 @@ class _MemberViewState extends State<_MemberView> {
     });
   }
 
-  /// 충전 화면으로 보내고, 충전하고 돌아왔으면 지갑을 다시 받아 온다.
-  ///
-  /// 충전 화면이 새 잔액을 넘겨줄 수도 있지만 그러지 않는다 — 충전과 함께
-  /// 사용 내역도 한 줄 늘어서, 지갑 전체를 다시 받는 쪽이 화면과 서버가
-  /// 어긋나지 않는다.
+  /// 충전 화면으로 보내고, 충전하고 돌아왔으면 지갑을 다시 받아 온다. 충전과 함께
+  /// 사용 내역도 늘어나므로 새 잔액만 넘겨받지 않고 지갑 전체를 다시 받는다.
   Future<void> _openCharge() async {
     final charged = await Navigator.pushNamed(context, AppRoutes.coinCharge);
     if (charged == true && mounted) _reloadWallet();
   }
 
-  /// 로그아웃. 기기 토큰을 먼저 지우고, 서버에는 알려만 준다.
-  ///
-  /// 순서가 중요하다. 세션을 비우면 리프레시 토큰이 사라지므로 서버에 보낼 값을
-  /// 먼저 꺼내 둔다. 세션을 비우는 순간 화면이 로그인 입구로 바뀌어 사용자는
-  /// 서버 응답을 기다리지 않는다.
-  ///
-  /// 서버에 못 알려도(네트워크 끊김) 로그아웃은 된 것으로 친다. 기기 토큰은 이미
-  /// 지웠고, 서버 쪽 세션은 30일 뒤 저절로 만료된다. 여기서 실패를 알려 봐야
-  /// 사용자가 할 수 있는 일이 없다.
-  ///
-  /// 세션([AuthSession.signOut]) 안에 서버 호출을 넣지 않은 이유: 그 메서드는
-  /// 401 을 받은 인터셉터도 부르는데, 그때는 토큰이 이미 안 통하는 상태라 서버에
-  /// 알릴 게 없다. 로그아웃 진입점이 늘면 이 단계들을 헬퍼로 뺀다.
-  ///
-  /// 푸시 토큰 해제만 세션을 비우기 **전에** 한다. 서버가 인증 헤더로 요청자를
-  /// 알아내는 API 라, 세션을 먼저 비우면 401 로 튕기고 이 기기에 직전 회원의
-  /// 알림이 계속 온다([PushDeviceRegistrar.unregisterDevice]).
+  /// 로그아웃. 푸시 토큰 해제 → 세션 비우기 → 서버 통보 순서다. 푸시 해제
+  /// (`PushDeviceRegistrar.unregisterDevice`)는 인증 헤더가 필요해 세션을 비우기
+  /// 전에 해야 하고, 리프레시 토큰은 세션이 비면 사라지므로 먼저 꺼내 둔다. 서버에
+  /// 못 알려도 로그아웃은 된 것으로 친다 — 서버 세션은 30일 뒤 저절로 만료된다.
   Future<void> _logout() async {
     // await 앞에서 context 를 다 쓴다. 뒤에서 쓰면 화면이 사라진 뒤일 수 있다.
     final api = AuthApiScope.of(context);

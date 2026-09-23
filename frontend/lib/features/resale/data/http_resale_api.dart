@@ -15,22 +15,9 @@ import '../utils/market_error.dart';
 import 'resale_api.dart';
 
 /// 백엔드 양도 마켓 API(`/api/v1/market`)에 실제로 요청하는 [ResaleApi].
-///
-/// v0 스텁과 v1 실제 컨트롤러가 같은 규약(`MarketApi`)을 구현하므로 응답
-/// 모양은 같고 [basePath] 만 다르다. 스텁으로 보려면 이 값만 v0 으로 바꾼다.
-///
-/// **등록 가능한 티켓 목록만 마켓 밖에서 온다.** 그 경로가 없어 내 티켓 목록
-/// (`GET /api/v1/tickets/me`)에서 팔 수 있는 것만 골라 만든다([ListableTicket]
-/// 주석). 예전엔 예매 목록으로 만들었는데, 그쪽엔 등록 여부가 없어 이미 올린
-/// 티켓이 후보에 남고 양도로 받은 티켓은 빠졌다(S15P21D206-331 에서 바꿈).
-///
-/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
-/// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
-/// [ApiException] 이 맡는다. 운영 시간 거절처럼 마켓만의 문구 손질은
-/// [translateResaleError] 가 한 번 더 한다.
-///
-/// [dio] 와 [clock] 은 테스트를 위해 받는다. 앱에서는 넘기지 않아
-/// [ApiClient.dio] 와 기기 시계를 쓴다.
+/// 등록 가능한 티켓 목록만 마켓 밖(`GET /api/v1/tickets/me`)에서 골라 만든다.
+/// 실패는 [ApiException] 으로 오고, 마켓만의 문구 손질은 [translateResaleError]
+/// 가 한다. [dio] 와 [clock] 은 테스트를 위해 받는다.
 class HttpResaleApi implements ResaleApi {
   HttpResaleApi({Dio? dio, this.clock = DateTime.now})
     : _dio = dio ?? ApiClient.dio;
@@ -46,8 +33,8 @@ class HttpResaleApi implements ResaleApi {
   /// 을 찍는 데 쓴다.
   final DateTime Function() clock;
 
-  /// 응답을 받은 기기 시각을 함께 넘긴다. 카운트다운이 서버 시각을 이어 셀
-  /// 기준점이라, 요청 전이 아니라 응답이 온 뒤에 읽는다.
+  /// 응답을 받은 기기 시각을 함께 넘긴다. 카운트다운의 기준점이라 요청 전이
+  /// 아니라 응답이 온 뒤에 읽는다.
   @override
   Future<MarketHours> fetchMarketHours() async {
     final response = await _guard(() => _dio.get<dynamic>('$basePath/hours'));
@@ -113,9 +100,8 @@ class HttpResaleApi implements ResaleApi {
     );
   }
 
-  /// `PATCH` 다. 절댓값을 넣는 요청이라 같은 요청이 두 번 도착해도 결과가
-  /// 같고, 그래서 응답을 못 받고 끊겨도 다시 보내면 된다(백엔드 `MarketApi`
-  /// 주석). 이 API 에서 PATCH 를 쓰는 곳은 여기 하나다.
+  /// `PATCH` 다. 절댓값을 넣는 요청이라 두 번 도착해도 결과가 같고, 응답을
+  /// 못 받고 끊겨도 다시 보내면 된다.
   @override
   Future<ListingDetail> updateListingPrice({
     required int listingId,
@@ -130,10 +116,8 @@ class HttpResaleApi implements ResaleApi {
     return ListingDetail.fromJson(_body(response));
   }
 
-  /// 팔 수 있는 티켓만 남긴다 — 발행이 끝나 손에 있고(보유), 지금 마켓에
-  /// 올라가 있지 않은 것. 내 티켓 화면의 "쓸 수 있는가" 와 같은 조건이다.
-  /// 등록 중인 티켓을 남기면 골라서 등록을 눌러야 서버 거절을 받고, 발행 중·
-  /// 입장 완료·회수된 티켓은 서버가 어차피 거절한다.
+  /// 팔 수 있는 티켓만 남긴다 — 보유 상태이고 지금 마켓에 올라가 있지 않은
+  /// 것. 나머지는 서버가 어차피 거절한다.
   @override
   Future<List<ListableTicket>> fetchListableTickets() async {
     final content = await _content(myTicketsPath);
@@ -177,15 +161,8 @@ class HttpResaleApi implements ResaleApi {
     return content.whereType<Map<String, dynamic>>().toList();
   }
 
-  /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거친다.
-  ///
-  /// 운영 시간 거절의 문구는 여기서 앱 문구로 바꾼다([translateResaleError]).
-  /// 화면마다 바꾸면 스낵바는 고쳐지고 목록의 오류 화면은 서버 문구 그대로
-  /// 나오는 식으로 한 곳이 빠진다.
-  ///
-  /// `HttpAuthApi` · `HttpHomeApi` · `HttpTicketApi` 와 같은 코드다. 네 곳이
-  /// 같은 것을 들고 있으니 `core/network` 로 올릴 때가 됐다 — 이 작업(화면
-  /// 구현)에서 네 도메인의 API 구현을 함께 건드리지 않으려고 미뤄 둔다.
+  /// dio 실패를 [ApiException] 으로 바꿔 던진다. 모든 요청이 이걸 거치므로
+  /// 운영 시간 거절의 문구도 여기서 한 번에 바꾼다([translateResaleError]).
   Future<T> _guard<T>(Future<T> Function() request) async {
     try {
       return await request();
@@ -195,7 +172,7 @@ class HttpResaleApi implements ResaleApi {
   }
 
   /// 성공 응답 본문. JSON 객체가 아니면(프록시가 HTML 을 준 경우 등) 화면용
-  /// 예외로 바꿔서, 화면이 형 변환 오류 대신 안내 문구를 받게 한다.
+  /// 예외로 바꾼다.
   Map<String, dynamic> _body(Response<dynamic> response) {
     final data = response.data;
     if (data is Map<String, dynamic>) return data;

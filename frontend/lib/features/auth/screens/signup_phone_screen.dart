@@ -17,12 +17,9 @@ import '../utils/signup_validators.dart';
 import '../widgets/labeled_text_field.dart';
 import '../widgets/signup_step_page.dart';
 
-/// 1/4 기본 정보와 휴대폰 인증.
-///
-/// 이름과 휴대폰 번호를 한 화면에서 받고, 인증번호 발송이 끝나면 같은 화면 아래에
-/// 인증번호 입력 영역을 펼친다. 인증에 성공하면 세 값을 초안에 담아 아이디 화면으로
-/// 이동한다. 발송한 뒤 휴대폰 번호를 고치면 기존 인증번호를 폐기하고 다시 요청하게
-/// 한다.
+/// 1/3 기본 정보와 휴대폰 인증. 이름과 휴대폰 번호를 받고, 인증번호를 보내면
+/// 같은 화면 아래에 입력 영역을 펼친다. 인증에 성공하면 세 값을 초안에 담아
+/// 아이디 화면으로 간다. 발송 뒤 번호를 고치면 인증번호를 폐기하고 다시 요청한다.
 class SignupPhoneScreen extends StatefulWidget {
   const SignupPhoneScreen({
     super.key,
@@ -58,11 +55,9 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
   String? _codeError;
   String? _phoneError;
 
-  /// 서버가 "이미 가입된 번호" 라며 거절한 번호와 그때 받은 문구.
-  ///
-  /// 같은 번호를 도로 입력하면 요청을 보내지 않고 이 문구를 다시 띄운다.
-  /// 거절당한 요청도 발송 쿨다운(1분)을 소모하기 때문에, 다시 물어보면 서버는
-  /// 429 를 주고 화면은 '요청 횟수를 초과했어요' 라는 엉뚱한 안내를 하게 된다.
+  /// 서버가 "이미 가입된 번호" 라며 거절한 번호와 그때 받은 문구. 같은 번호를
+  /// 도로 입력하면 요청 없이 이 문구를 다시 띄운다 — 거절당한 요청도 발송
+  /// 쿨다운(1분)을 소모해서 다시 물으면 429 와 엉뚱한 '횟수 초과' 안내가 나온다.
   final _takenPhoneMessages = <String, String>{};
 
   AuthApi get _api => widget.api ?? AuthApiScope.of(context);
@@ -253,10 +248,8 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     _goToAccount();
   }
 
-  /// 이미 가입된 번호라고 거절당했을 때 로그인 화면으로 보낸다.
-  ///
-  /// 가입 화면은 로그인 화면에서만 들어오므로 보통은 되돌아가면 된다. 화면을
-  /// 단독으로 띄워 돌아갈 곳이 없으면(테스트·딥링크) 로그인으로 갈아탄다.
+  /// 이미 가입된 번호라고 거절당했을 때 로그인 화면으로 보낸다. 보통은 되돌아가면
+  /// 되고, 돌아갈 곳이 없으면(테스트·딥링크) 로그인으로 갈아탄다.
   void _goToLogin() {
     if (Navigator.canPop(context)) {
       Navigator.pop(context);
@@ -301,13 +294,9 @@ class _SignupPhoneScreenState extends State<SignupPhoneScreen> {
     if (!aboutThisInput) showErrorSnackBar(context, e.message);
   }
 
-  /// 인증번호 발송 거절 안내.
-  ///
-  /// - 이미 가입된 번호(409): 이 칸을 고쳐야 풀리는 문제라 칸 아래 문구로
-  ///   알린다(닉네임 중복을 칸 아래에 알리는 것과 같다). 문구는 서버가 준
-  ///   것을 그대로 쓴다.
-  /// - 그 외(발송 제한 429, 발송 실패, 네트워크): 번호를 고쳐도 소용없으니
-  ///   스낵바로 알리고 버튼은 그대로 둔다.
+  /// 인증번호 발송 거절 안내. 이미 가입된 번호(409)는 이 칸을 고쳐야 풀리는
+  /// 문제라 서버 문구를 칸 아래에 그대로 보여 준다 · 그 외(발송 제한 429, 발송
+  /// 실패, 네트워크)는 번호를 고쳐도 소용없으니 스낵바로 알리고 버튼은 둔다.
   void _handleSendFailure(ApiException e, String phoneNumber) {
     final alreadyMember =
         e.exceptionName == AuthServerErrors.phoneNumberDuplicated;

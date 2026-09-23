@@ -2,10 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../data/notification_api.dart';
 
-/// 알림함 화면에 [NotificationApi] 구현을 내려주는 InheritedWidget.
-///
-/// 앱은 맨 위에서 진짜 구현을 하나 만들어 여기에 담고, 화면은 요청을 보낼 때
-/// [of] 로 꺼내 쓴다. 마이페이지의 `MyPageApiScope` 와 같은 방식이다.
+/// 알림함 화면에 [NotificationApi] 구현을 내려주는 InheritedWidget. 앱은 맨 위에서
+/// 진짜 구현을 담고, 화면은 [of] 로 꺼내 쓴다.
 class NotificationApiScope extends InheritedWidget {
   const NotificationApiScope({
     super.key,

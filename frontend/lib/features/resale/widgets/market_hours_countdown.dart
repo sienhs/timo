@@ -8,11 +8,8 @@ import '../state/resale_api_scope.dart';
 import 'market_countdown.dart';
 
 /// 마켓의 다음 경계(닫힘 또는 오픈)까지 남은 시간. 서버 시계로 센다.
-///
-/// [MarketCountdown] 에 [MarketHours] 를 붙인 것이다. 세는 대상은
-/// [MarketHours.nextBoundary] 고, 시계는 기기 시각을 서버 시각으로 옮긴
-/// [MarketHours.serverNow] 다. 이 둘을 화면마다 짝지으면 어느 화면 하나가
-/// 기기 시계로 세어 다른 화면과 어긋난다.
+/// [MarketCountdown] 에 [MarketHours] 를 붙인 것으로, 세는 대상은
+/// [MarketHours.nextBoundary], 시계는 [MarketHours.serverNow] 다.
 class MarketHoursCountdown extends StatelessWidget {
   const MarketHoursCountdown({
     super.key,
@@ -52,15 +49,9 @@ class MarketHoursCountdown extends StatelessWidget {
   }
 }
 
-/// 상단 바의 마켓 마감 카운트다운. 운영 상태를 스스로 받아 온다.
-///
-/// 매물 목록·구매 확인 화면은 공연 목록이 받아 둔 운영 상태를 넘겨받지
-/// 않는다 — 라우트 인자로 실어 나르면 매물 번호 하나만 받던 화면이 운영
-/// 상태까지 받아야 하고, 그 값은 화면을 오가는 사이 낡는다. 한 번 더 묻는
-/// 쪽이 값도 새롭고 화면도 단순하다.
-///
-/// 받아 오는 동안, 못 받았을 때, 닫혀 있을 때는 아무것도 그리지 않는다.
-/// 남은 시간은 안내일 뿐이라 없어도 화면의 일(목록·결제)은 그대로 된다.
+/// 상단 바의 마켓 마감 카운트다운. 운영 상태를 스스로 받아 온다 — 라우트
+/// 인자로 실어 나르면 화면을 오가는 사이 낡는다. 받아 오는 동안, 못 받았을 때,
+/// 닫혀 있을 때는 아무것도 그리지 않는다. 안내일 뿐이라 없어도 화면의 일은 된다.
 class MarketClosingCountdown extends StatefulWidget {
   const MarketClosingCountdown({
     super.key,

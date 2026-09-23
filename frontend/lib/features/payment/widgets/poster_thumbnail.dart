@@ -4,9 +4,7 @@ import '../../../core/network/api_client.dart';
 import 'poster_placeholder.dart';
 
 /// 공연 포스터(사각). 주소가 없거나 이미지를 못 읽으면 플레이스홀더로 대체한다.
-///
-/// 주소는 [ApiClient.imageUrl] 을 거친다. 서버가 저장소 key 만 주기 때문에
-/// (`poster/xxx.gif`) 그대로 쓰면 안드로이드에서 한 장도 안 뜬다.
+/// 서버가 저장소 key 만 주므로 주소는 [ApiClient.imageUrl] 을 거친다.
 class PosterThumbnail extends StatelessWidget {
   const PosterThumbnail({
     super.key,

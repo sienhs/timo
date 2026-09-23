@@ -5,12 +5,9 @@ import '../../../core/widgets/poster_image.dart';
 import '../constants.dart';
 import '../models/favorite_artist.dart';
 
-/// 찜한 아티스트 한 줄. 원형 사진, 이름, 초록 보조 문구, 오른쪽에 하트.
-///
-/// 줄을 누르면 그 이름으로 공연을 검색한다 — 아티스트 상세가 아직 없어서다.
-/// 시안의 보조 문구(`예정된 공연 2개`)는 서버가 있어야 셀 수 있어, 지금은
-/// 누르면 무슨 일이 일어나는지 알리는 말([FavoriteStrings.artistSearchAction])
-/// 을 그 자리에 둔다.
+/// 찜한 아티스트 한 줄. 원형 사진, 이름, 초록 보조 문구, 오른쪽에 하트. 줄을
+/// 누르면 그 이름으로 공연을 검색한다 — 아티스트 상세가 아직 없어서다. 보조
+/// 문구 자리에는 누르면 무슨 일이 나는지 알리는 말을 둔다.
 class FavoriteArtistTile extends StatelessWidget {
   const FavoriteArtistTile({
     super.key,

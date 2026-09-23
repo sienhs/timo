@@ -2,10 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../data/my_page_api.dart';
 
-/// 마이페이지에 [MyPageApi] 구현을 내려주는 InheritedWidget.
-///
-/// 앱은 맨 위에서 진짜 구현(HttpMyPageApi)을 하나 만들어 여기에 담고, 화면은
-/// 요청을 보낼 때 [of] 로 꺼내 쓴다. 홈의 `HomeApiScope` 와 같은 방식이다.
+/// 마이페이지에 [MyPageApi] 구현을 내려주는 InheritedWidget. 앱은 맨 위에서
+/// 진짜 구현을 하나 담고, 화면은 요청을 보낼 때 [of] 로 꺼내 쓴다.
 class MyPageApiScope extends InheritedWidget {
   const MyPageApiScope({super.key, required this.api, required super.child});
 

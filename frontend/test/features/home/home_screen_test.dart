@@ -27,9 +27,7 @@ import 'package:timo/features/home/widgets/show_card_row_skeleton.dart';
 import 'package:timo/features/home/widgets/show_poster_card.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 홈 화면과 검색 화면.
-///
-/// 시안을 옮기는 작업이라 '무엇이 보이는가' 와 '어디로 가는가' 만 본다.
+/// 홈 화면과 검색 화면. '무엇이 보이는가' 와 '어디로 가는가' 만 본다.
 /// 픽셀 값은 시안이 바뀌면 같이 바뀌므로 테스트로 굳히지 않는다.
 void main() {
   /// 360 x 800 dp
@@ -47,20 +45,15 @@ void main() {
       // 로딩 화면을 건너뛰고 홈에서 시작한다.
       App(initialRoute: AppRoutes.home, homeApi: api ?? const MockHomeApi()),
     );
-    // 목 응답 지연만큼 시간을 넘겨 첫 로딩을 끝낸다. 타이머는 프레임을 잡지
-    // 않아 pumpAndSettle 만으로는 기다려지지 않고, 남은 타이머는 테스트가
-    // 끝날 때 실패로 잡힌다.
+    // 목 응답 지연만큼 시간을 넘겨 첫 로딩을 끝낸다. 타이머는 pumpAndSettle
+    // 로 기다려지지 않고, 남은 타이머는 테스트 끝에 실패로 잡힌다.
     await tester.pump(HomeMetrics.mockLatency);
     await tester.pumpAndSettle();
   }
 
-  /// 안내 문구는 글자마다 따로 그려서(물결 효과) 렌더 트리에 통 문자열이
-  /// 없다. 스크린 리더에 읽히는 값 — 문구에 달아 둔 시맨틱스 라벨로 찾는다.
-  ///
-  /// `find.bySemanticsLabel` 이 아니라 위젯을 직접 보는 이유: 그쪽은 시맨틱스
-  /// 엔진을 켜야 하고, 켜면 테스트마다 핸들을 닫아 줘야 한다.
-  /// 스피너도 같은 문구를 라벨로 달고 있으므로(RefreshIndicator
-  /// semanticsLabel) 안내 줄 안으로 범위를 좁힌다.
+  /// 안내 문구는 글자마다 따로 그려 통 문자열이 없어 시맨틱스 라벨로 찾는다.
+  /// `find.bySemanticsLabel` 은 시맨틱스 엔진을 켜야 해서 위젯을 직접 본다.
+  /// 스피너도 같은 라벨을 달고 있어 안내 줄 안으로 범위를 좁힌다.
   Finder hintText(RefreshHint hint) => find.descendant(
     of: find.byType(HomeRefreshHint),
     matching: find.byWidgetPredicate(
@@ -87,13 +80,9 @@ void main() {
     expect(isRefreshing(tester), isTrue, reason: '새로 고침이 시작되지 않았다');
   }
 
-  /// 홈은 ListView 라 화면 밖 섹션은 아직 만들어지지도 않았다. 찾으려는
-  /// 위젯이 실제로 생길 때까지 내린다.
-  /// 세로 목록을 끌어 [target] 이 보이는 자리까지 올린다.
-  ///
-  /// 목록이 보이는 만큼만 만들기 때문에, 섹션 제목이 화면 끝에 걸친 채로
-  /// 멈추면 그 아래 카드 줄은 아직 없는 상태다. 마지막에 [WidgetTester.ensureVisible]
-  /// 로 목표를 위쪽에 붙여, 섹션 안쪽까지 만들어진 뒤에 확인하게 한다.
+  /// 세로 목록을 끌어 [target] 이 보이는 자리까지 올린다. 홈은 ListView 라
+  /// 보이는 만큼만 만들므로, 마지막에 [WidgetTester.ensureVisible] 로 목표를
+  /// 위쪽에 붙여 섹션 안쪽 카드 줄까지 만들어진 뒤에 확인하게 한다.
   Future<void> scrollTo(WidgetTester tester, Finder target) async {
     await tester.scrollUntilVisible(
       target,
@@ -262,9 +251,8 @@ void main() {
 
     await tester.tap(find.text(HomeStrings.searchHint));
     await tester.pumpAndSettle();
-    // 검색 화면이 뜨면서 추천 아티스트·인기 검색어를 부른다. 기다리는 동안은
-    // 뼈대(정지 화면)라 pumpAndSettle 이 그 자리에서 끝나므로, 목 응답 지연만큼
-    // 따로 넘겨 준다 — 안 넘기면 남은 타이머로 테스트가 실패한다.
+    // 검색 화면이 부르는 목 응답을 기다리는 동안은 뼈대(정지 화면)라
+    // pumpAndSettle 이 바로 끝난다. 목 지연만큼 넘겨 남은 타이머를 없앤다.
     await tester.pump(HomeMetrics.mockLatency);
 
     expect(find.byType(ShowSearchScreen), findsOneWidget);

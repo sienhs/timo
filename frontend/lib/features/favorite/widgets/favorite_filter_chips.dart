@@ -4,11 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 import '../models/favorite_filters.dart';
 
-/// 공연 탭의 판매 상태 칩 줄. `전체 4 · 판매 중 3 · 판매 종료 1`.
-///
-/// 개수는 검색어와 상관없이 찜한 공연 전체에서 센다 — 칩은 "무엇이 얼마나
-/// 있는가" 를 알리는 자리라, 검색으로 좁힌 수를 찍으면 검색어를 지울 때마다
-/// 숫자가 널뛴다.
+/// 공연 탭의 판매 상태 칩 줄. `전체 4 · 판매 중 3 · 판매 종료 1`. 개수는
+/// 검색어와 상관없이 찜한 공연 전체에서 센다.
 class FavoriteFilterChips extends StatelessWidget {
   const FavoriteFilterChips({
     super.key,
@@ -60,9 +57,8 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 고른 칩은 [AppColors.primaryPressed] 위에 흰 글자다. 브랜드 그린 위의
-    // 흰 글자는 작은 글자 대비 기준(4.5:1)에 못 미친다(`AppColors.primary`
-    // 주석). 색만으로 구분하지 않도록 굵기도 함께 바꾼다.
+    // 고른 칩은 [AppColors.primaryPressed] 위에 흰 글자다. 브랜드 그린 위 흰 글자는
+    // 작은 글자 대비 기준(4.5:1)에 못 미쳐 굵기도 함께 바꾼다.
     final background = selected ? AppColors.primaryPressed : AppColors.surface;
     final foreground = selected ? AppColors.onPrimary : AppColors.textPrimary;
     final radius = BorderRadius.circular(FavoriteMetrics.filterChipHeight / 2);

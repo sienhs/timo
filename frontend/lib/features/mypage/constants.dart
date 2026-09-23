@@ -34,10 +34,6 @@ class MyPageMetrics {
   static const chargeButtonRadius = 8.0;
 
   // 사용 내역 카드
-  static const filterHeight = 28.0;
-  static const filterRadius = 6.0;
-  static const filterItemHorizontalPadding = 10.0;
-  static const filterInset = 2.0;
   static const historyTopGap = 12.0;
   static const transactionVerticalPadding = 12.0;
   static const transactionLineGap = 4.0;
@@ -45,12 +41,9 @@ class MyPageMetrics {
   /// 코인 내역 카드에 보여 주는 최근 건수.
   static const recentTransactionCount = 20;
 
-  /// 코인 내역 목록이 차지할 수 있는 최대 높이.
-  ///
-  /// 평소 목록 높이는 화면에 남은 자리가 정한다(마이페이지는 굴리지 않으므로
-  /// 인사말·잔액·로그아웃을 뺀 나머지다). 이 값은 그 위에 얹는 상한이다 —
-  /// 큰 화면에서 내역 카드 하나가 본문을 다 차지하지 않게 한 줄 66 기준
-  /// 네 줄쯤에서 끊는다. 넘치는 건 카드 안에서 스크롤로 본다.
+  /// 코인 내역 목록이 차지할 수 있는 최대 높이. 평소 높이는 화면에 남은 자리가
+  /// 정하고, 큰 화면에서 내역 카드가 본문을 다 차지하지 않게 네 줄쯤에서 끊는다.
+  /// 넘치는 건 카드 안에서 스크롤로 본다.
   static const historyMaxHeight = 300.0;
 
   /// 불러오는 동안 카드 자리를 지키는 높이. 응답이 오면 내용 높이로 바뀐다.
@@ -120,12 +113,11 @@ class MyPageStrings {
   /// 그려지므로 둘을 따로 둔다.
   static const greetingSuffix = ' 님 환영해요!';
 
-  /// 코인 이름은 앱 전체에서 **'버섯'** 하나다(사용자 결정, S15P21D206-168). 전에는
-  /// 이 카드가 `Mushroom`, 빠른 메뉴가 `코인 충전` 이라 한 서비스에 이름이 셋이었다.
+  /// 코인 이름은 앱 전체에서 **'버섯'** 하나다.
   static const walletTitle = '내 버섯';
 
-  /// 코인 단위. 서비스 결제 수단은 이 코인 하나다(요구사항 #20). 값은 공용
-  /// 포맷터의 [coinUnit] 하나만 본다 — 티켓 환불 금액도 같은 단위를 쓴다.
+  /// 코인 단위. 결제 수단은 이 코인 하나고, 값은 공용 포맷터의 [coinUnit] 하나만
+  /// 본다 — 티켓 환불 금액도 같은 단위를 쓴다.
   static const currencyUnit = coinUnit;
 
   /// 환율 안내. 충전은 1 MSR = 1원 고정이다.

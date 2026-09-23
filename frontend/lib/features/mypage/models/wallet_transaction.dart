@@ -1,8 +1,5 @@
-/// 코인(MSR) 거래 내역 한 건.
-///
-/// [amount] 는 부호가 있는 정수다. 충전·판매 정산·환불처럼 잔액이 늘면 양수,
-/// 구매처럼 줄면 음수다. 종류를 따로 두지 않고 부호로 가르는 이유: 지갑 API 가
-/// 종류 필드를 주지 않고 부호로 잔액의 증가와 감소를 구분한다.
+/// 코인(MSR) 거래 내역 한 건. [amount] 는 부호가 있는 정수다 — 지갑 API 가 종류
+/// 필드 없이 부호로 잔액의 증가(충전·정산·환불)와 감소(구매)를 가른다.
 class WalletTransaction {
   const WalletTransaction({
     required this.title,
@@ -29,10 +26,8 @@ class WalletTransaction {
   /// 잔액이 늘어난 거래인지. 필터의 '+'가 이쪽, '-'가 줄어든 거래다.
   bool get isCredit => amount > 0;
 
-  /// 서버 응답 한 줄.
-  ///
-  /// [occurredAt] 은 시간대 없는 문자열(`2026-09-16T13:50:01.123456`)로 온다.
-  /// 서버 시각대로 읽으면 되므로 변환 없이 그대로 파싱한다.
+  /// 서버 응답 한 줄. [occurredAt] 은 시간대 없는 문자열로 오고, 서버 시각대로
+  /// 읽으면 되므로 변환 없이 그대로 파싱한다.
   factory WalletTransaction.fromJson(Map<String, dynamic> json) =>
       WalletTransaction(
         title: json['title'] as String,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_search_field.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/error_snack_bar.dart';
 import '../../../routes/app_routes.dart';
@@ -24,7 +25,6 @@ import '../widgets/home_section_header.dart';
 import '../widgets/recent_search_chips.dart';
 import '../widgets/recommended_artist_row.dart';
 import '../widgets/related_artist_row.dart';
-import '../widgets/search_field.dart';
 import '../widgets/search_top_bar.dart';
 import '../widgets/show_banner_card.dart';
 import '../widgets/show_card_badges.dart';
@@ -32,17 +32,9 @@ import '../widgets/show_card_list_skeleton.dart';
 import '../widgets/trending_keyword_list.dart';
 import '../widgets/trending_keyword_skeleton.dart';
 
-/// 공연 검색. 홈 상단의 검색 바를 누르면 열린다.
-///
-/// 검색 전에는 최근 검색어 · 추천 검색어 · 실시간 인기 검색어를, 검색 뒤에는
-/// 오픈 예정·예매중 공연 카드와 관련 아티스트를 보여 준다. 둘은 같은 화면의
-/// 두 상태다 — [_shows] 가 null 이면 검색 전이다.
-///
-/// 검색어를 **제출했을 때만** 요청한다. 글자마다 보내면 요청이 글자 수만큼
-/// 나가고, 늦게 온 앞 글자의 결과가 뒤 결과를 덮는다. 검색으로 이어지는 길은
-/// 넷(키보드 · 최근 검색어 · 추천 검색어 · 인기 검색어)이지만 전부 [_search]
-/// 하나를 거친다. 필터·정렬은 없다 — 요구사항의 검색·필터(#36)는 Could 라
-/// 이번엔 키워드만 붙인다.
+/// 공연 검색. 홈 상단의 검색 바를 누르면 열린다. 검색 전에는 최근·추천·인기
+/// 검색어를, 검색 뒤에는 공연 카드와 관련 아티스트를 보여 준다([_shows] 가 null
+/// 이면 검색 전). 검색어를 제출했을 때만 요청하고 모든 진입 경로가 [_search] 를 거친다.
 class ShowSearchScreen extends StatefulWidget {
   const ShowSearchScreen({super.key, this.initialKeyword});
 
@@ -87,9 +79,8 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     _trending = api.fetchTrendingKeywords();
     _loadRecent();
 
-    // 정해진 검색어가 있으면 바로 결과 화면으로 시작한다. initState 에서는
-    // setState 를 못 부르므로 필드에 직접 넣는다. 최근 검색어에는
-    // [_loadRecent] 가 저장소를 읽은 뒤 넣는다.
+    // 정해진 검색어가 있으면 바로 결과 화면으로 시작한다. initState 라 setState
+    // 없이 필드에 직접 넣고, 최근 검색어에는 [_loadRecent] 가 저장소를 읽은 뒤 넣는다.
     final initial = widget.initialKeyword?.trim();
     if (initial != null && initial.isNotEmpty) {
       _keyword = initial;
@@ -187,14 +178,9 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     });
   }
 
-  /// 아티스트를 검색하고, 결과가 오면 그중 **이미 찜한** 아티스트의 스냅샷을
-  /// 서버가 준 최신 모습으로 맞춘다.
-  ///
-  /// 찜리스트는 찜한 순간의 모습을 기기에 남기므로, 그 뒤 서버에 사진이
-  /// 붙어도 목록은 사진 없는 채로 남는다(실제로 사진 필드명이 어긋났던
-  /// 동안 찜한 아티스트가 그랬다). 서버의 최신 모습을 다시 받는 곳이 여기라
-  /// 이때 맞춘다. 검색 실패는 [AsyncBoundary] 가 화면에 알리므로 동기화
-  /// 쪽에서는 넘긴다.
+  /// 아티스트를 검색하고, 결과 중 이미 찜한 아티스트의 스냅샷을 서버가 준 최신
+  /// 모습으로 맞춘다. 찜리스트는 찜한 순간의 모습을 기기에 남기기 때문이다.
+  /// 검색 실패는 [AsyncBoundary] 가 알리므로 동기화 쪽에서는 넘긴다.
   Future<List<ArtistSummary>> _searchArtistsAndSyncFavorites(String keyword) {
     final store = FavoriteScope.read(context);
     final result = HomeApiScope.of(context).searchArtists(keyword);
@@ -265,9 +251,8 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
     final shows = _shows;
     final artists = _artists;
     return Scaffold(
-      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 하단 바 위의 원형 버튼이
-      // 키보드 위로 따라 올라와 검색 필드 옆에 떠 있게 된다. 대신 목록의 아래
-      // 여백에 키보드 높이를 더해 마지막 항목까지 스크롤로 닿게 한다([_listPadding]).
+      // 키보드가 올라와도 본문을 줄이지 않는다. 줄이면 원형 버튼이 키보드 위로
+      // 따라 올라온다. 대신 목록 아래 여백에 키보드 높이를 더한다([_listPadding]).
       resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
@@ -279,8 +264,10 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
               padding: const EdgeInsets.symmetric(
                 horizontal: HomeMetrics.horizontalPadding,
               ),
-              child: SearchField(
+              child: AppSearchField(
                 controller: _controller,
+                hintText: HomeStrings.searchHint,
+                clearLabel: HomeStrings.clearSearch,
                 // 검색어를 정해 두고 열렸으면 결과를 보러 온 것이라 키보드를
                 // 올리지 않는다.
                 autofocus: widget.initialKeyword == null,
@@ -297,8 +284,8 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
           ],
         ),
       ),
-      // 시안에 하단 바가 그려져 있다. 이 화면은 셸 위에 얹힌 것이라 셸의 바가
-      // 가려지므로 여기서 한 벌 더 단다. 어느 탭도 고르지 않은 상태(-1)다.
+      // 이 화면은 셸 위에 얹혀 셸의 하단 바가 가려지므로 여기서 한 벌 더 단다.
+      // 어느 탭도 고르지 않은 상태(-1)다.
       bottomNavigationBar: AppBottomNavBar(
         selectedIndex: -1,
         onTabSelected: _goToShellTab,
@@ -358,9 +345,7 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
   }
 
   /// 검색 뒤. 공연 카드 → 관련 아티스트. 둘은 따로 기다리고 따로 실패한다.
-  ///
-  /// 찜 목록은 여기서 구독한다. 하트를 누르면 저장소가 알리고 이 화면이 다시
-  /// 그려져 채운 하트가 된다.
+  /// 찜 목록은 여기서 구독해, 하트를 누르면 이 화면이 다시 그려진다.
   Widget _resultBody(
     Future<List<ShowSummary>> shows,
     Future<List<ArtistSummary>> artists,
@@ -387,9 +372,8 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
         AsyncBoundary<List<ArtistSummary>>(
           future: artists,
           onRetry: _retryArtists,
-          // 관련 아티스트는 없을 수도 있는 섹션이라 기다리는 동안 자리를
-          // 비워 둔다. 뼈대를 세우면 아티스트가 없는 검색어에서 잠깐 떴다가
-          // 사라진다.
+          // 관련 아티스트는 없을 수도 있는 섹션이라 뼈대 없이 자리를 비워 둔다.
+          // 뼈대를 세우면 아티스트가 없는 검색어에서 잠깐 떴다가 사라진다.
           loading: const SizedBox.shrink(),
           builder: (context, artists) => artists.isEmpty
               ? const SizedBox.shrink()
@@ -421,12 +405,9 @@ class _ShowSearchScreenState extends State<ShowSearchScreen> {
   }
 }
 
-/// "오픈 예정 / 예매중" 섹션. 받은 공연 중 예매를 앞두거나 진행 중인 것만
-/// 큰 카드로 세운다.
-///
-/// 처음엔 [HomeMetrics.searchPreviewCount] 건만 보이고, 넘치면 헤더의 더보기가
-/// 나머지를 그 자리에서 펼친다. 걸러서 남은 게 없으면 검색어를 되비춘 빈 결과
-/// 문구다.
+/// "오픈 예정 / 예매중" 섹션. 예매를 앞두거나 진행 중인 공연만 큰 카드로 세운다.
+/// 처음엔 [HomeMetrics.searchPreviewCount] 건만 보이고 더보기가 나머지를 펼친다.
+/// 걸러서 남은 게 없으면 검색어를 되비춘 빈 결과 문구다.
 class _ResultSection extends StatelessWidget {
   const _ResultSection({
     required this.shows,
@@ -495,10 +476,7 @@ class _ResultSection extends StatelessWidget {
   }
 }
 
-/// 검색 결과를 기다리는 동안의 자리.
-///
-/// 제목은 뼈대로 두지 않고 그대로 적는다 — 무엇을 기다리는 중인지는 받아
-/// 보기 전에도 알고, 회색 막대로 덮으면 오히려 읽을 것이 하나도 없어진다.
+/// 검색 결과를 기다리는 동안의 자리. 제목은 뼈대로 두지 않고 그대로 적고,
 /// 카드는 미리보기 개수([HomeMetrics.searchPreviewCount])만큼만 세운다.
 class _ResultSkeleton extends StatelessWidget {
   const _ResultSkeleton();

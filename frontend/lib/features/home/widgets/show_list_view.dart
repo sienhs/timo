@@ -7,16 +7,9 @@ import '../models/show_summary.dart';
 import 'show_banner_card.dart';
 import 'show_card_row.dart';
 
-/// 검색 칸 한 줄과 그 아래 공연 카드 목록. 더보기로 들어가는 두 화면
-/// (오픈 예정 전체 · 공연 전체)이 함께 쓴다.
-///
-/// 검색은 **받아 둔 목록을 그 자리에서 거른다**. 서버에 다시 묻지 않는다 —
-/// 목록 화면은 한 번에 다 받아 두고([HomeMetrics.showListPageSize]), 글자마다
-/// 다녀오면 늦게 온 앞 글자의 결과가 뒤를 덮는다. 양도마켓의 공연 고르기
-/// 화면과 같은 짜임이다.
-///
-/// 무엇을 받아 올지, 어떤 카드를 눌렀을 때 어디로 갈지는 화면이 정한다. 이
-/// 위젯은 받은 목록을 검색어로 좁혀 세우는 일만 한다.
+/// 검색 칸 한 줄과 그 아래 공연 카드 목록. 더보기로 들어가는 두 화면(오픈 예정
+/// 전체 · 공연 전체)이 함께 쓴다. 검색은 서버에 다시 묻지 않고 받아 둔 목록을
+/// 그 자리에서 거른다. 무엇을 받아 올지, 카드를 누르면 어디로 갈지는 화면이 정한다.
 class ShowListView extends StatefulWidget {
   const ShowListView({
     super.key,
@@ -60,9 +53,7 @@ class _ShowListViewState extends State<ShowListView> {
   List<ShowSummary> get _matched {
     final needle = _keyword.trim();
     if (needle.isEmpty) return widget.shows;
-    return widget.shows
-        .where((show) => show.title.contains(needle))
-        .toList();
+    return widget.shows.where((show) => show.title.contains(needle)).toList();
   }
 
   @override

@@ -38,10 +38,8 @@ import 'package:timo/features/show/screens/show_detail_screen.dart';
 import 'package:timo/features/show/widgets/show_notice.dart';
 import 'package:timo/routes/app_routes.dart';
 
-/// 정해진 공연 하나만 돌려주는 가짜 API.
-///
-/// 화면이 스스로 조회하게 되면서 필요해졌다. 상태별 화면을 보려면 그 상태의
-/// 공연을 먹여야 하는데, 목 데이터에 없는 조합(끝난 공연 등)도 봐야 한다.
+/// 정해진 공연 하나만 돌려주는 가짜 API. 목 데이터에 없는 조합(끝난 공연
+/// 등)도 먹여 볼 수 있다.
 class _FixedShowApi implements ShowApi {
   const _FixedShowApi(this.detail);
 
@@ -62,11 +60,8 @@ class _FailingShowApi implements ShowApi {
       throw ApiException(message, status: 404);
 }
 
-/// 공연 상세 화면.
-///
-/// 이 화면에서 실제로 갈리는 것은 **예매 상태 하나**다. 그래서 상태별로
-/// 무엇이 보이고 어디로 가는지만 본다. 픽셀 값은 시안이 바뀌면 같이 바뀌므로
-/// 테스트로 굳히지 않는다.
+/// 공연 상세 화면. 예매 상태별로 무엇이 보이고 어디로 가는지만 본다.
+/// 픽셀 값은 시안이 바뀌면 같이 바뀌므로 테스트로 굳히지 않는다.
 void main() {
   /// 360 x 800 dp
   void usePhoneSize(WidgetTester tester) {
@@ -113,10 +108,6 @@ void main() {
     imageUrls: imageUrls,
   );
 
-  /// 화면을 단독으로 띄운다. [clock] 을 주면 그 시계로 시간이 흐른다.
-  ///
-  /// `pumpAndSettle` 을 쓰지 않는다 — 오픈 전 공연은 1초마다 남은 시간을
-  /// 다시 그려서 영원히 '정착'하지 않는다.
   /// 로그인 상태를 만드는 토큰.
   const tokens = AuthTokens(
     memberId: 1,
@@ -125,6 +116,9 @@ void main() {
     accessTokenExpiresIn: Duration(minutes: 30),
   );
 
+  /// 화면을 단독으로 띄운다. [clock] 을 주면 그 시계로 시간이 흐른다.
+  /// 오픈 전 공연은 1초마다 남은 시간을 다시 그려 영원히 정착하지 않으므로
+  /// `pumpAndSettle` 을 쓰지 않는다.
   Future<void> pumpDetail(
     WidgetTester tester,
     ShowDetail detail, {
@@ -141,9 +135,8 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    // 예매 진입은 로그인을 요구한다. 로그인 여부를 보는 화면이므로 세션도
-    // 세워 준다. 기본은 로그인 상태다 — 이 파일의 관심사는 예매 진입 자체가
-    // 아니라 상세 화면의 표시이고, 로그인 분기는 따로 검사한다.
+    // 화면이 로그인 여부를 보므로 세션도 세워 준다. 기본은 로그인 상태이고
+    // 로그인 분기는 따로 검사한다.
     final session = AuthSession(storage: InMemoryTokenStorage());
     if (loggedIn) await session.signIn(tokens);
     addTearDown(session.dispose);
@@ -474,9 +467,8 @@ void main() {
       expect(find.text(ShowDetailStrings.upcomingBadge), findsNothing);
     });
 
-    // 서버는 매진도 '예매 중이 아님(NOT_ON_SALE)' 으로 답한다. 그 말을 곧이
-    // 들으면 매진 공연이 잠기는데, 취소표가 돌아올 수 있어 들어가 볼 이유가
-    // 있다. 실제 응답과 같은 모양으로 먹여서 그 구분이 살아 있는지 본다.
+    // 서버는 매진도 NOT_ON_SALE 로 답하지만, 취소표가 돌아올 수 있어 매진은
+    // 잠그지 않는다. 실제 응답과 같은 모양으로 먹여 그 구분을 본다.
     testWidgets('매진은 서버가 막았다고 해도 잠그지 않는다', (tester) async {
       await pumpDetail(
         tester,
@@ -583,9 +575,8 @@ void main() {
       expect(find.byType(ZoneSelectionScreen), findsOneWidget);
     });
 
-    // 예매 화면 머리말이 상세와 다른 공연을 가리키면, 무엇을 예매하는지 모른 채
-    // 좌석을 고르게 된다. 예매 컨트롤러는 목 공연(아이유)으로 세워 두고, 상세가
-    // 넘긴 공연으로 바뀌는지 본다.
+    // 예매 컨트롤러는 목 공연(아이유)으로 세워 두고, 상세가 넘긴 공연으로
+    // 머리말이 바뀌는지 본다.
     testWidgets('예매로 들어가면 그 공연이 예매 화면 머리말에 올라간다', (tester) async {
       await pumpDetail(tester, detailOpening(title: '검정치마 단독공연 : 401'));
 

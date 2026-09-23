@@ -5,14 +5,9 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/formatters.dart';
 import '../constants.dart';
 
-/// 어떤 시각까지 남은 시간을 1초마다 다시 그리는 글자.
-///
-/// 상단 바의 마켓 마감 시간, 닫힘 화면 한가운데의 오픈까지 남은 시간, 구매
-/// 확인 화면의 결제 버튼이 모두 같은 일을 한다. 타이머와 상태를 이 위젯 안에
-/// 가두므로 화면 전체가 1초마다 다시 그려지지 않는다.
-///
-/// [builder] 를 주면 남은 시간 글자를 원하는 모양으로 감쌀 수 있다(버튼 라벨에
-/// 끼워 넣는 식). 안 주면 [style] 로 글자만 그린다.
+/// 어떤 시각까지 남은 시간을 1초마다 다시 그리는 글자. 타이머와 상태를 이
+/// 위젯 안에 가두므로 화면 전체가 1초마다 다시 그려지지 않는다. [builder] 를
+/// 주면 남은 시간 글자를 원하는 모양으로 감싸고, 안 주면 [style] 로 글자만 그린다.
 class MarketCountdown extends StatefulWidget {
   const MarketCountdown({
     super.key,

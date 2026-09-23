@@ -58,12 +58,9 @@ class _ZoneSelectionScreenState extends State<ZoneSelectionScreen> {
     Navigator.pushNamed(context, AppRoutes.seatSelection, arguments: zone.id);
   }
 
-  /// 구역 목록을 다시 받아 온다.
-  ///
-  /// 취소된 좌석은 3분 1초~15분 사이 랜덤한 시각에 다시 열린다(S15P21D206-347).
-  /// 풀리는 순간을 겨냥할 수 없으니 "취소표를 겨냥한 자동 새로고침이 겨냥할
-  /// 시점을 갖지 못하게 한다"는 요구사항과 이 버튼은 어긋나지 않는다.
-  /// 화살표로 쓰지 않는 이유는 좌석 화면의 같은 메서드 주석 참고.
+  /// 구역 목록을 다시 받아 온다. 취소된 좌석은 3분 1초~15분 사이 랜덤한 시각에
+  /// 다시 열리므로 이 버튼으로 풀리는 순간을 겨냥할 수는 없다. 화살표로 쓰지
+  /// 않는 이유는 좌석 화면의 같은 메서드 주석 참고.
   void _refresh() {
     final next = _api.fetchZones(widget.concertId);
     setState(() {

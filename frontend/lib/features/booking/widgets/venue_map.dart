@@ -4,11 +4,8 @@ import '../../../core/theme/app_colors.dart';
 import '../models/zone.dart';
 
 /// 구역 번호 → 구역색. 구역도·좌석 배치도·잔여좌석 목록이 같은 색을 써야 해서
-/// 한 곳에서만 정한다.
-///
-/// 서버 구역 번호는 1 부터라, 구역 다섯 개면 A·B·C·D·E 가 아래 표의 1·2·3·4·0
-/// 번째 색을 쓴다. C구역은 갈색(#AD6534)이었는데 탁해 보여 진한 주황으로
-/// 바꿨다(사용자 결정).
+/// 한 곳에서만 정한다. 서버 구역 번호는 1 부터라 다섯 구역이면 A·B·C·D·E 가
+/// 아래 표의 1·2·3·4·0 번째 색을 쓴다.
 Color zoneColor(int id) => const [
   Color(0xFF7950B5),
   Color(0xFF356DB5),
@@ -17,19 +14,9 @@ Color zoneColor(int id) => const [
   Color(0xFFB64E79),
 ][id.abs() % 5];
 
-/// 공연장 구역 배치도.
-///
-/// 배치도는 STAGE 아래에 좌(A) · 우(B), 그 밑에 가로로 긴 구역(C), 맨 아래에
-/// 같은 크기의 줄을 좌우로 나눈 2층 구역(D · E) 순이다. 주최사가 배치도를 직접
-/// 구성하는 기능은 이번 범위 밖이라 좌표 데이터를 두지 않고 이 형태에 구역을
-/// **순서대로** 꽂는다. 배치도 편집이 들어오면 이 위젯이 좌표 기반으로 바뀌어야
-/// 한다.
-///
-/// 구역 수가 셋을 넘으면 넷째부터는 맨 아랫줄에 가로로 나눠 넣는다. 서버가 주는
-/// 구역 수가 늘어도 그림이 깨지지 않게 하려는 것이다.
-///
-/// 시안대로 매진 구역도 다른 구역과 같은 색으로 둔다. 매진 여부는 눌렀을 때
-/// 화면이 안내한다.
+/// 공연장 구역 배치도. STAGE 아래에 좌·우, 그 밑에 가로로 긴 구역, 맨 아래에
+/// 2층 줄 순이고, 좌표 데이터 없이 구역을 이 순서대로 꽂는다(넷째부터는 맨
+/// 아랫줄에 가로로 나눔). 매진 구역도 같은 색으로 두고 눌렀을 때 화면이 안내한다.
 class VenueMap extends StatelessWidget {
   const VenueMap({
     super.key,
@@ -279,12 +266,8 @@ class _ZoneOutline extends CustomClipper<Path> {
           ..quadraticBezierTo(w, h, w * .96, h)
           ..lineTo(0, h)
           ..close(),
-      // 아래로 갈수록 넓어진다. 좌석표가 그렇기 때문이다(C구역은 1열 18석에서
-      // 10열 22석으로 늘어난다). 반대로 그려 두면 구역도와 좌석도가 서로 다른
-      // 모양을 말한다.
-      //
-      // 기울기와 호는 옆 구역들과 어울리게 얕게 둔다(사용자 결정). 세게 주면
-      // C구역만 튀어 배치도 전체가 기울어 보인다.
+      // 아래로 갈수록 넓어진다. 좌석표가 그렇기 때문이다. 기울기와 호는 옆 구역과
+      // 어울리게 얕게 둔다 — 세게 주면 이 구역만 튀어 배치도 전체가 기울어 보인다.
       _ZoneShape.rear =>
         Path()
           ..moveTo(w * .035, 0)
@@ -314,7 +297,7 @@ class _ZoneOutline extends CustomClipper<Path> {
   bool shouldReclip(_ZoneOutline oldClipper) => oldClipper.shape != shape;
 }
 
-/// 구역 블록의 면과 테두리를 그린다. 좌석열 질감을 내던 옅은 줄은 뺐다.
+/// 구역 블록의 면과 테두리를 그린다.
 class _ZoneDetailPainter extends CustomPainter {
   const _ZoneDetailPainter(this.shape, this.color, this.selected);
   final _ZoneShape shape;

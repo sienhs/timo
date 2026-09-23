@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../constants.dart';
 
-/// 섹션 제목 한 줄. 오른쪽 '더보기' 는 [onMorePressed] 를 준 섹션에만 붙는다
-/// (시안의 인기 아티스트 섹션에는 더보기가 없다).
+/// 섹션 제목 한 줄. 오른쪽 '더보기' 는 [onMorePressed] 를 준 섹션에만 붙는다.
 class HomeSectionHeader extends StatelessWidget {
   const HomeSectionHeader({
     super.key,

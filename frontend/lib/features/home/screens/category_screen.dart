@@ -7,16 +7,9 @@ import '../constants.dart';
 import '../models/show_category.dart';
 import '../widgets/show_list_app_bar.dart';
 
-/// 카테고리. 빠른 메뉴의 '카테고리' 로 들어온다.
-///
-/// 서버의 공연 장르 여섯을 격자로 늘어놓는다([showCategories]). 공연이 있는
-/// 장르는 콘서트 하나라(`ShowSummary` 참고) 콘서트는 공연 전체 조회로 보내고,
-/// 나머지는 준비 중 안내를 띄운다. 그 다섯은 흐리게 그리고 뱃지를 달아
-/// 눌러 봐야 아는 일이 없게 한다.
-///
-/// 고른 장르를 전체 조회에 넘기지 않는다. 공연 요청이 전부 콘서트로 고정돼
-/// 있어(`HttpHomeApi`) 넘겨도 쓸 곳이 없다. 다른 장르의 공연이 들어오면
-/// 전체 조회가 장르를 받게 하고, 이 화면은 그 값을 넘기기만 하면 된다.
+/// 카테고리. 빠른 메뉴의 '카테고리' 로 들어온다. 서버의 공연 장르 여섯을 격자로
+/// 늘어놓고([showCategories]), 공연이 있는 콘서트만 공연 전체 조회로 보내고
+/// 나머지는 흐리게 그린 채 준비 중 안내를 띄운다.
 class CategoryScreen extends StatelessWidget {
   const CategoryScreen({super.key});
 

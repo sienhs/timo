@@ -4,13 +4,9 @@ import '../../../core/widgets/skeleton_box.dart';
 import '../constants.dart';
 import 'resale_card.dart';
 
-/// 양도마켓 목록을 불러오는 동안 그 자리에 두는 빈 카드들.
-///
-/// 껍데기는 실제 카드와 같은 [ResaleCard] 를 쓴다 — 테두리·모서리·간격을 다시
-/// 적으면 카드 모양을 고칠 때 뼈대만 옛 모양으로 남는다.
-///
-/// 공연 고르기와 등록할 티켓 고르기는 왼쪽에 포스터가 있고, 매물 줄은 글자만
-/// 두 줄이라 [withPoster] 로 갈린다.
+/// 양도마켓 목록을 불러오는 동안 그 자리에 두는 빈 카드들. 껍데기는 실제
+/// 카드와 같은 [ResaleCard] 를 쓴다. 포스터가 있는 목록과 글자만 있는 매물
+/// 줄은 [withPoster] 로 갈린다.
 class ResaleListSkeleton extends StatelessWidget {
   const ResaleListSkeleton({
     super.key,

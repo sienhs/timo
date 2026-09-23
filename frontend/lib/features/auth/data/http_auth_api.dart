@@ -9,16 +9,9 @@ import '../models/reissued_access_token.dart';
 import 'auth_api.dart';
 import 'device_id.dart';
 
-/// 백엔드 인증 API(`/api/v1/auth`)에 실제로 요청하는 [AuthApi].
-///
-/// 어느 주소에 무엇을 보내고 응답에서 무엇을 꺼내는지만 안다. 서버 주소·시간
-/// 제한·로그는 [ApiClient] 가, 실패 응답을 화면용 문구로 바꾸는 일은
-/// [ApiException] 이 맡는다. dio 가 던지는 예외는 전부 [ApiException] 으로 바꿔
-/// 던지므로 화면은 dio 를 모른다.
-///
-/// [dio] 와 [deviceId] 는 테스트를 위해 받는다. 앱에서는 넘기지 않아
-/// [ApiClient.dio] 와 [DeviceId.value] 를 쓰고, 테스트에서는 가짜 어댑터를 꽂은
-/// dio 와 고정된 식별자를 넣어 요청·응답을 서버 없이 검사한다.
+/// 백엔드 인증 API(`/api/v1/auth`)에 실제로 요청하는 [AuthApi]. dio 가 던지는
+/// 예외는 전부 [ApiException] 으로 바꿔 던진다. [dio] 와 [deviceId] 는 테스트를
+/// 위해 받고, 앱에서는 [ApiClient.dio] 와 [DeviceId.value] 를 쓴다.
 class HttpAuthApi implements AuthApi {
   HttpAuthApi({Dio? dio, String? deviceId})
     : _dio = dio ?? ApiClient.dio,
@@ -118,9 +111,8 @@ class HttpAuthApi implements AuthApi {
       );
       return AuthTokens.fromJson(_body(response));
     } on ApiException catch (e) {
-      // 아이디 없음·비밀번호 틀림은 정상 흐름에서 예상되는 결과라 null. 서버는
-      // 둘을 하나로 묶어 400 으로 준다. 정지·탈퇴 계정(403)과 네트워크 실패는
-      // 화면이 다르게 안내해야 하므로 예외로 둔다.
+      // 아이디 없음·비밀번호 틀림은 서버가 하나로 묶어 400 으로 주고 여기선 null.
+      // 정지·탈퇴 계정(403)과 네트워크 실패는 안내가 달라 예외로 둔다.
       if (e.exceptionName == AuthServerErrors.loginFailed) return null;
       rethrow;
     }
@@ -128,9 +120,8 @@ class HttpAuthApi implements AuthApi {
 
   @override
   Future<void> logout(String refreshToken) async {
-    // 응답은 204 로 본문이 없다. _body 를 타면 JSON 객체가 아니라서 예외가 나므로
-    // 응답을 읽지 않는다. 서버가 실패를 돌려주지 않는 API 라(토큰이 틀려도 204)
-    // 여기서 나는 예외는 네트워크가 끊긴 경우뿐이다.
+    // 응답은 204 로 본문이 없어 읽지 않는다. 서버는 토큰이 틀려도 204 라 여기서
+    // 나는 예외는 네트워크가 끊긴 경우뿐이다.
     await _guard(
       () => _dio.post<dynamic>(
         '$basePath/logout',
@@ -143,9 +134,8 @@ class HttpAuthApi implements AuthApi {
 
   @override
   Future<ReissuedAccessToken> reissue(String refreshToken) async {
-    // 이 요청은 인증 주소라 인터셉터가 액세스 토큰을 붙이지 않는다. 그게 맞다 —
-    // 부르는 시점의 액세스 토큰은 이미 만료돼 있어서, 붙이면 재발급 요청 자체가
-    // 401 로 막힌다.
+    // 인증 주소라 인터셉터가 액세스 토큰을 붙이지 않는다. 부르는 시점의 액세스
+    // 토큰은 이미 만료돼 있어 붙이면 재발급 요청 자체가 401 로 막힌다.
     final response = await _guard(
       () => _dio.post<dynamic>(
         '$basePath/reissue',

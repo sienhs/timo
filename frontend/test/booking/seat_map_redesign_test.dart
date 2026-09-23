@@ -165,7 +165,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
-    // Optional local visual review, kept out of the source tree.
+    // 로컬에서 눈으로 확인할 때만 캡처한다. 소스 트리에는 남기지 않는다.
     if (const bool.fromEnvironment('CAPTURE_SEAT_REVIEW')) {
       await tester.runAsync(() async {
         final boundary =

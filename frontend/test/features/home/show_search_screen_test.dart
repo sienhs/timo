@@ -444,7 +444,7 @@ void main() {
 
     testWidgets('검색 결과가 오면 이미 찜한 아티스트의 사진이 최신으로 맞춰진다', (tester) async {
       await pumpSearch(tester, api: _PhotoArtistHomeApi());
-      // 사진 없이 찜해 둔 아티스트. 사진 필드명이 어긋났던 동안 찜한 경우다.
+      // 사진 없이 찜해 둔 아티스트.
       await favorites.toggleArtist(const FavoriteArtist(name: '아이유'));
 
       await submit(tester, '아이유');
@@ -589,11 +589,9 @@ class _FlakySearchHomeApi implements HomeApi {
 
   static const _mock = MockHomeApi(latency: Duration.zero);
 
-  /// 실패는 `Future.error` 가 아니라 잠깐 뒤에 던진다. 진짜 서버 실패도 요청이
-  /// 나간 뒤 돌아오므로 그때는 결과 화면이 이미 그려져 [AsyncBoundary] 가
-  /// 받는다. 즉시 실패한 Future 는 검색 제출 뒤 첫 프레임이 그려지기 전에
-  /// "받는 곳 없는 오류" 로 잡혀 테스트만 깨진다. 지연은 `pumpAndSettle` 의
-  /// 한 프레임(100ms)보다 길어야 한다.
+  /// 실패는 `Future.error` 가 아니라 잠깐 뒤에 던진다. 즉시 실패한 Future 는
+  /// 첫 프레임 전에 "받는 곳 없는 오류" 로 잡혀 테스트만 깨진다. 지연은
+  /// `pumpAndSettle` 의 한 프레임(100ms)보다 길어야 한다.
   @override
   Future<List<ShowSummary>> search(String keyword) => failing
       ? Future.delayed(

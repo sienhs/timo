@@ -1,9 +1,7 @@
 import '../../routes/app_routes.dart';
 
-/// 알림을 눌렀을 때 열 화면.
-///
-/// 푸시를 눌렀을 때와 알림함에서 눌렀을 때가 **같은 화면**으로 가야 해서, 고르는
-/// 규칙을 [destinationFor] 한 곳에 두고 양쪽이 그걸 쓴다.
+/// 알림을 눌렀을 때 열 화면. 푸시와 알림함이 같은 화면으로 가도록 고르는 규칙은
+/// [destinationFor] 한 곳에 둔다.
 class NotificationDestination {
   const NotificationDestination(this.routeName, {this.arguments});
 
@@ -27,21 +25,10 @@ class NotificationDestination {
       'NotificationDestination($routeName, arguments: $arguments)';
 }
 
-/// 서버가 알림에 실어 보낸 종류와 번호로 열 화면을 고른다. 모르면 null 이다.
-///
-/// | 종류 | 여는 화면 | 번호 |
-/// |---|---|---|
-/// | `CONCERT` | 공연 상세 | 공연 번호. 없으면 이동하지 않는다 |
-/// | `MARKET` | 양도 마켓 | 없다 |
-/// | `TRADE` | 내 티켓 | 거래 번호가 오지만 쓰지 않는다 |
-///
-/// **`TRADE` 가 거래 번호를 안 쓰는 이유.** 서버는 거래 상세로 보내라고 번호를
-/// 주는데 그 화면이 앱에 없다. 판매자가 판 티켓은 내 티켓에서 보이므로 거기로
-/// 보낸다. 거래 상세 화면이 생기면 이 한 줄만 고치면 된다.
-///
-/// **모르는 종류에 null 을 주는 이유.** 서버가 알림 종류를 새로 추가해도 옛 앱은
-/// 그 값을 모른다. 그때 예외를 던지면 알림을 누르는 것만으로 앱이 죽는다. 이동만
-/// 하지 않고 문구는 그대로 보여 주는 편이 낫다.
+/// 서버가 알림에 실어 보낸 종류와 번호로 열 화면을 고른다. `CONCERT` 는 공연
+/// 상세(번호 없으면 null), `MARKET` 은 양도 마켓, `TRADE` 는 내 티켓이다(거래
+/// 상세 화면이 없어 거래 번호는 쓰지 않는다). 모르는 종류는 null — 서버가 종류를
+/// 추가해도 옛 앱이 죽지 않고 문구만 보이게 한다.
 NotificationDestination? destinationFor(String? linkType, int? linkId) {
   switch (linkType) {
     case 'CONCERT':
@@ -57,11 +44,8 @@ NotificationDestination? destinationFor(String? linkType, int? linkId) {
   }
 }
 
-/// 푸시에 실려 온 값으로 열 화면을 고른다.
-///
-/// FCM 은 `data` 의 값을 **전부 문자열로** 준다. 번호도 문자열이고, 없을 때는
-/// 빈 문자열이라 숫자로 못 바꾼다. 그래서 여기서 한 번 걸러 [destinationFor] 에
-/// 넘긴다. 알림함은 이미 숫자로 받으므로 [destinationFor] 를 바로 쓴다.
+/// 푸시에 실려 온 값으로 열 화면을 고른다. FCM 은 `data` 값을 전부 문자열로 주고
+/// 없으면 빈 문자열이라, 여기서 숫자로 걸러 [destinationFor] 에 넘긴다.
 NotificationDestination? destinationForPushData(Map<String, dynamic> data) {
   final linkType = data['linkType'];
   final linkId = data['linkId'];

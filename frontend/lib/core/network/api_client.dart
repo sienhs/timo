@@ -15,16 +15,9 @@ class ApiClient {
 
   static final Dio dio = _createDio();
 
-  /// 서버가 준 이미지 주소를 앱이 읽을 수 있는 절대 주소로 바꾼다.
-  ///
-  /// 백엔드는 이미지 저장소의 key 를 그대로 준다(`poster/poster_main_kim_feel.gif`).
-  /// 파일 자체는 백엔드가 서빙하지만 호스트가 빠져 있어 그대로는 못 읽는다 —
-  /// 안드로이드에서 `NetworkImage` 가 이 주소를 받으면 요청이 실패하고 회색
-  /// 자리만 남는다. 실패를 `errorBuilder` 가 삼키므로 로그에도 안 찍힌다.
-  ///
-  /// 이미 절대 주소면 [Uri.resolve] 가 그대로 돌려준다. 그래서 이미지 저장소가
-  /// S3 로 바뀌어(`app.image.base-url` 설정) 완전한 URL 이 와도 이 함수와
-  /// 호출부는 손대지 않아도 된다.
+  /// 서버가 준 이미지 주소를 앱이 읽을 수 있는 절대 주소로 바꾼다. 백엔드는
+  /// 저장소 key(`poster/xxx.gif`)만 주고 호스트가 빠져 있어 그대로는 못 읽는다.
+  /// 이미 절대 주소면 [Uri.resolve] 가 그대로 돌려주므로 S3 로 바뀌어도 된다.
   static String? imageUrl(String? key) => key == null || key.isEmpty
       ? null
       : Uri.parse(_baseUrl).resolve(key).toString();

@@ -9,10 +9,8 @@ import '../models/favorites.dart';
 import 'favorite_api.dart';
 import 'favorite_artist_store.dart';
 
-/// 서버로 보내기를 기다리는 하트 한 건.
-///
-/// 같은 공연을 연타하는 동안 이 객체 하나가 살아 있고, 타이머만 계속 새로
-/// 걸린다. 그래서 몇 번을 누르든 요청은 한 번이다.
+/// 서버로 보내기를 기다리는 하트 한 건. 같은 공연을 연타하는 동안 이 객체
+/// 하나가 살아 있고 타이머만 새로 걸린다. 그래서 몇 번을 누르든 요청은 한 번이다.
 class _PendingToggle {
   _PendingToggle({required this.show, required this.serverState});
 
@@ -20,9 +18,8 @@ class _PendingToggle {
   /// 카드 내용이 바뀌었을 수 있다.
   FavoriteShow show;
 
-  /// 연타가 시작되기 **전**의 상태. 서버가 아는 값이다.
-  ///
-  /// 보낼 때 지금 상태와 견줘 같으면 보내지 않는다(켰다 껐으면 서버는 그대로다).
+  /// 연타가 시작되기 **전**의 상태, 즉 서버가 아는 값. 보낼 때 지금 상태와
+  /// 같으면 보내지 않는다(켰다 껐으면 서버는 그대로다).
   final bool serverState;
 
   /// 이 연타를 기다리는 호출부들. 하나의 전송 결과를 함께 받는다.
@@ -31,24 +28,10 @@ class _PendingToggle {
   Timer? timer;
 }
 
-/// 앱이 들고 있는 찜 목록.
-///
-/// 공연과 아티스트가 남는 곳이 다르다. **공연은 서버**([FavoriteApi]) 라
-/// 기기를 바꿔도 따라오고, **아티스트는 기기**([FavoriteArtistStore]) 라 이
-/// 기기에만 있다. 화면은 그 차이를 모른 채 [favorites] 하나만 본다.
-///
-/// [ChangeNotifier] 인 이유는 하트가 여러 화면에 있기 때문이다. 검색 결과에서
-/// 찜한 공연이 상세 화면의 하트에도, 찜리스트에도 바로 보여야 한다. 그 알림을
-/// `FavoriteScope` 가 화면으로 나른다.
-///
-/// 공연 쪽은 **낙관적**이다. 하트를 누르면 화면을 먼저 바꾸고 서버에 보낸다.
-/// 실패하면 되돌리고 예외를 그대로 던진다 — 화면이 그 사실을 알려야 한다.
-/// 눌린 채로 두면 서버에는 없는 찜이 다음에 앱을 켤 때 조용히 사라진다.
-/// 아티스트 쪽은 예전처럼 저장 실패를 삼킨다. 기기 저장소 오류는 사용자가
-/// 할 수 있는 일이 없고, 이번 실행 동안의 화면은 이미 맞다.
-///
-/// 서버로 **보내는 일만** 미룬다([FavoriteLimits.toggleDebounce]). 화면은
-/// 누르는 즉시 바뀌므로 사용자는 기다림을 느끼지 않는다.
+/// 앱이 들고 있는 찜 목록. 공연은 서버([FavoriteApi]), 아티스트는 기기
+/// ([FavoriteArtistStore])에 남고 화면은 [favorites] 하나만 본다. 공연 쪽은
+/// 낙관적이다 — 화면을 먼저 바꾸고 [FavoriteLimits.toggleDebounce] 뒤에 보내며,
+/// 실패하면 되돌리고 예외를 던진다. 아티스트 쪽은 저장 실패를 삼킨다.
 class FavoriteStore extends ChangeNotifier {
   FavoriteStore({
     required this._api,
@@ -71,20 +54,16 @@ class FavoriteStore extends ChangeNotifier {
   Favorites get favorites => _favorites;
 
   /// 서버에서 찜 공연을 받아 목록을 통째로 바꾼다. 로그인 상태에서만 부른다.
-  ///
-  /// 실패는 그대로 던진다. 찜리스트 화면은 `AsyncBoundary` 로 받아 '다시 시도'
-  /// 를 보여주고, 앱이 켜질 때 부르는 쪽은 삼킨다(하트가 빈 채로 시작할 뿐이다).
+  /// 실패는 그대로 던진다 — 찜리스트 화면은 '다시 시도' 를 보여주고, 앱이 켜질
+  /// 때 부르는 쪽은 삼킨다.
   Future<List<FavoriteShow>> loadShows() async {
     final shows = await _api.fetchShows();
     _apply(_favorites.withShows(shows));
     return shows;
   }
 
-  /// 들고 있던 찜 공연을 버린다. 로그아웃할 때다 — 다음 사람의 하트가 앞사람의
-  /// 찜으로 채워져 보이면 안 된다.
-  ///
-  /// 보내기를 기다리던 하트도 **버린다.** 로그아웃한 뒤에 앞사람의 찜이 나가면
-  /// 안 되고, 나가 봐야 토큰이 없어 401 이다.
+  /// 들고 있던 찜 공연을 버린다. 로그아웃할 때다. 보내기를 기다리던 하트도
+  /// 버린다 — 앞사람의 찜이 나가면 안 되고, 나가 봐야 토큰이 없어 401 이다.
   void clearShows() {
     _discardPending();
     if (_favorites.shows.isEmpty) return;
@@ -98,15 +77,9 @@ class FavoriteStore extends ChangeNotifier {
     _apply(_favorites.withArtists(artists));
   }
 
-  /// 찜하거나 뺀다. 화면을 **먼저** 바꾸고, 손이 멈추면 서버에 보낸다.
-  ///
-  /// 돌려주는 Future 는 그 전송이 끝날 때 완결된다. 연타한 경우 그 안의 모든
-  /// 호출이 같은 Future 를 받으므로, 화면은 지금처럼 `await` 한 자리에서 실패를
-  /// 잡아 알리면 된다. 보낼 것이 없으면(켰다 껐다) 조용히 성공으로 끝난다.
-  ///
-  /// 실패하면 이 공연만 되돌린다. 되돌리는 사이 다른 하트를 눌렀을 수도 있어
-  /// 목록 전체를 이전 것으로 덮지는 않는다. 빼기가 실패해 되살릴 때는 맨 앞에
-  /// 들어간다 — 원래 자리는 잃지만, 다음 [loadShows] 가 서버 순서로 맞춘다.
+  /// 찜하거나 뺀다. 화면을 먼저 바꾸고, 손이 멈추면 서버에 보낸다. 돌려주는
+  /// Future 는 그 전송이 끝날 때 완결되며 연타한 호출은 모두 같은 것을 받는다.
+  /// 실패하면 이 공연만 되돌린다(되살린 공연은 맨 앞, 다음 [loadShows] 가 맞춘다).
   Future<void> toggleShow(FavoriteShow show) {
     _apply(_favorites.toggleShow(show));
     // 방금 뒤집었으니 지금의 반대가 서버가 아는 상태다. 연타 중이면 앞서 잡아
@@ -141,9 +114,8 @@ class FavoriteStore extends ChangeNotifier {
       }
       pending.done.complete();
     } catch (e, stackTrace) {
-      // 요청이 나가 있는 동안 또 눌렀으면 그 의도가 더 최신이다. 되돌리지도,
-      // 실패를 알리지도 않는다 — 곧 나갈 요청이 서버를 맞춘다. 서버가 등록·해제를
-      // 멱등으로 받아 주기 때문에 실패한 요청이 닿았든 아니든 결과는 같다.
+      // 요청이 나가 있는 동안 또 눌렀으면 그 의도가 더 최신이다. 되돌리지도
+      // 알리지도 않는다 — 곧 나갈 요청이 서버를 맞춘다(등록·해제는 멱등).
       if (_pending.containsKey(id)) {
         pending.done.complete();
         return;
@@ -200,10 +172,8 @@ class FavoriteStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 앱이 내려간다. 기다리던 하트는 **보내고** 간다.
-  ///
-  /// 한 번 누르고 곧바로 앱을 닫는 경우가 여기다. 그냥 버리면 눌린 하트가
-  /// 다음에 켤 때 사라져 있다. 화면은 이미 없으므로 결과는 보지 않는다.
+  /// 앱이 내려간다. 기다리던 하트는 보내고 간다 — 한 번 누르고 곧바로 앱을 닫는
+  /// 경우다. 화면은 이미 없으므로 결과는 보지 않는다.
   @override
   void dispose() {
     for (final pending in _pending.values) {

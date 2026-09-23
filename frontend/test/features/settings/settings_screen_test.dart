@@ -142,9 +142,8 @@ void main() {
     expect(find.byType(NotificationScreen), findsNothing);
   });
 
-  /// 이 안내는 한때 셸에서 검정 기본 스낵바로 떴다. 앱의 다른 안내와 생김새가
-  /// 달라 같은 앱으로 보이지 않았다. 빠른 메뉴 항목에 화면이 다 생겨 그 자리를
-  /// 이 화면이 이어받는다 — 공통 상자로 돌아가지 않게 굳혀 둔다.
+  /// 준비 중 안내가 앱 공통 상자로 뜨는지 굳혀 둔다. 기본 스낵바로 돌아가면 앱의
+  /// 다른 안내와 생김새가 달라진다.
   testWidgets('준비 중 안내는 앱 공통 상자로 뜬다', (tester) async {
     await pumpSettings(tester);
 

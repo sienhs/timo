@@ -7,11 +7,9 @@ import 'package:timo/core/network/auth_interceptor.dart';
 
 import 'fake_http_adapter.dart';
 
-/// 토큰 자동 첨부와 만료 시 재발급. 가짜 서버로 무엇이 나가고 무엇을 다시
-/// 보내는지 본다.
-///
-/// 주소와 이유 코드는 백엔드 규약에서 그대로 가져왔다. 인증 주소는
-/// `/api/v1/auth/…`, 만료는 `TOKEN_EXPIRED`, 못 쓰는 토큰은 `TOKEN_INVALID` 다.
+/// 토큰 자동 첨부와 만료 시 재발급을 가짜 서버로 본다. 주소와 이유 코드는 백엔드
+/// 규약 그대로다 — 인증 주소는 `/api/v1/auth/…`, 만료는 `TOKEN_EXPIRED`, 못 쓰는
+/// 토큰은 `TOKEN_INVALID`.
 void main() {
   late FakeHttpAdapter adapter;
   late int unauthorizedCalls;
@@ -21,12 +19,9 @@ void main() {
   /// 재발급이 성공하면 이 값이 바뀌고, 다시 보낸 요청에 그게 붙어야 한다.
   late String? token;
 
-  /// [token] 을 돌려주는 세션이 꽂힌 dio. 응답은 [respond] 가 정한다.
-  ///
-  /// 회원 번호 헤더는 기본으로 끈다. 기본값(`kDebugMode`)은 테스트에서도 참이라,
-  /// 켜고 끄는 동작을 따로 보려면 명시해야 한다.
-  ///
-  /// [onReissue] 를 안 넘기면 재발급은 성공하고 토큰이 `fresh-jwt` 로 바뀐다.
+  /// [token] 을 돌려주는 세션이 꽂힌 dio. 응답은 [respond] 가 정한다. 회원 번호
+  /// 헤더는 기본으로 끈다(기본값 `kDebugMode` 는 테스트에서도 참이다). [onReissue]
+  /// 를 안 넘기면 재발급은 성공하고 토큰이 `fresh-jwt` 로 바뀐다.
   Dio build(
     String? initialToken,
     FutureOr<ResponseBody> Function(RecordedRequest) respond, {
