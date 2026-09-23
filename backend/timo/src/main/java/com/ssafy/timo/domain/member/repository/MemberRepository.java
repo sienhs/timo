@@ -4,6 +4,8 @@ import com.ssafy.timo.domain.member.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
@@ -12,4 +14,6 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     /** 이미 가입된 번호인지. 정규화된(숫자만) 번호로 물어야 한다. */
     boolean existsByPhoneNumber(String phoneNumber);
+
+    Optional<Member> findByPhoneNumber(String phoneNumber);
 }
