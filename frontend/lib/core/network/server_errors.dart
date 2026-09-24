@@ -19,4 +19,17 @@ class BookingServerErrors {
 
   /// 예매 중인 공연이 아니다(409). 오픈 전·매진·종료·취소가 전부 여기로 온다.
   static const concertNotOnSale = 'ConcertNotOnSaleException';
+
+  /// 이 공연의 보안문자를 통과하지 않았거나 통과한 지 5분이 지났다(403).
+  /// 좌석 배치도를 받을 때만 온다. 보안문자를 다시 띄워 복구한다.
+  static const captchaRequired = 'CaptchaRequiredException';
+
+  /// 입력값이 틀렸다(400). 키는 이미 폐기됐다.
+  static const captchaMismatch = 'CaptchaMismatchException';
+
+  /// 키가 없거나 2분이 지났거나 이미 쓰였다(404). 없는 공연도 404 라 이름으로 가른다.
+  static const captchaKeyNotFound = 'CaptchaKeyNotFoundException';
+
+  /// 남에게 발급된 키다(403). 정상적인 앱에서는 나오지 않는다.
+  static const captchaKeyOwnerMismatch = 'CaptchaKeyOwnerMismatchException';
 }

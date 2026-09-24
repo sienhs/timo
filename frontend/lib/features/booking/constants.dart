@@ -38,6 +38,25 @@ class BookingStrings {
   /// 선점하려는데 로그인 상태가 아닐 때(401).
   static const loginRequired = '로그인이 필요해요.';
 
+  static const captchaTitle = '보안문자 입력';
+  static const captchaGuide = '예매를 계속하려면 아래 문자를 입력해주세요.';
+  static const captchaHint = '보안문자';
+  static const captchaRefresh = '새 보안문자 받기';
+  static const captchaImageLabel = '보안문자 그림';
+  static const captchaSubmit = '확인';
+  static const captchaClose = '예매 그만두기';
+
+  // 보안문자 실패 문구는 서버 문구 대신 앱이 정한다(백엔드와 합의). 오답·만료는
+  // 새 그림이 바로 뜨므로 "다시 입력하라" 는 덧붙이지 않는다.
+  static const captchaMismatch = '보안문자가 일치하지 않아요.';
+  static const captchaExpired = '보안문자 입력 시간이 지났어요.';
+  static const captchaRetype = '보안문자를 다시 입력해주세요.';
+  static const captchaTooMany = '잠시 후 다시 시도해주세요.';
+  static const captchaUnavailable = '보안문자를 불러올 수 없어요. 잠시 후 다시 시도해주세요.';
+
+  /// 좌석을 고르다 보안문자 통과 기록이 끝났을 때(403). 공연 상세로 돌려보낸다.
+  static const captchaSessionExpired = '시간이 지나 예매를 다시 시작해주세요.';
+
   /// 매진 구역을 눌렀을 때. 구역명이 모음으로 끝나면 '은' 이 틀리므로
   /// 조사가 필요 없는 형태로 쓴다.
   static String zoneSoldOut(String zoneName) =>

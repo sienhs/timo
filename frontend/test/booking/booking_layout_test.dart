@@ -5,6 +5,7 @@ import 'package:timo/core/widgets/error_snack_bar.dart';
 import 'package:timo/features/auth/data/token_storage.dart';
 import 'package:timo/features/auth/models/auth_tokens.dart';
 import 'package:timo/features/auth/state/auth_session.dart';
+import 'package:timo/features/booking/constants.dart';
 import 'package:timo/features/booking/data/mock_booking_api.dart';
 import 'package:timo/features/home/data/mock_home_api.dart';
 import 'package:timo/features/show/data/mock_show_api.dart';
@@ -52,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 홈에서 예매 흐름으로 들어간다. 홈 -> 공연 상세 -> 좌석 선택 순이고, 오픈 전
+  /// 홈에서 예매 흐름으로 들어간다. 홈 -> 공연 상세 -> 좌석 선택(위에 보안문자) 순이고, 오픈 전
   /// 공연은 예매로 들어갈 수 없어 이미 오픈한 공연(아이유)을 고른다.
   Future<void> enterBookingFromHome(WidgetTester tester) async {
     final card = find.widgetWithText(ShowPosterCard, '2026 아이유 콘서트');
@@ -70,6 +71,14 @@ void main() {
     await tester.tap(card);
     await tester.pumpAndSettle();
     await tester.tap(find.text('예매하러 가기'));
+    await tester.pumpAndSettle();
+    // 구역 화면 위에 보안문자 창이 뜬다. 목 정답으로 푼다.
+    await tester.enterText(
+      find.byType(TextField),
+      MockBookingApi.captchaAnswer,
+    );
+    await tester.pump();
+    await tester.tap(find.text(BookingStrings.captchaSubmit));
     await tester.pumpAndSettle();
   }
 
