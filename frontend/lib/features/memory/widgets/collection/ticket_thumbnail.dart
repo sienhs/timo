@@ -4,6 +4,7 @@ import '../../models/memory_ticket.dart';
 import '../../theme/timo_colors.dart';
 import '../ui/catalog_poster.dart';
 import '../ui/gradient_text.dart';
+import '../ui/holo_frame.dart';
 import '../ui/local_image.dart';
 import '../../constants.dart';
 
@@ -26,9 +27,9 @@ class TicketThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(3),
+    padding: const EdgeInsets.all(CollectionLayout.thumbnailFrame),
     decoration: BoxDecoration(
-      color: const Color(0xFF15181F),
+      color: TimoColors.cardFrame,
       borderRadius: BorderRadius.circular(radius),
       boxShadow: const [
         BoxShadow(
@@ -39,7 +40,9 @@ class TicketThumbnail extends StatelessWidget {
       ],
     ),
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(radius - 3),
+      borderRadius: BorderRadius.circular(
+        radius - CollectionLayout.thumbnailFrame,
+      ),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -73,6 +76,13 @@ class TicketThumbnail extends StatelessWidget {
                   stops: [0, 0.3, 1],
                 ),
               ),
+            ),
+          ),
+          // 선 굵기의 절반만 들여 그려야 클립 안에 온전히 남는다.
+          Positioned.fill(
+            child: HoloFrame(
+              inset: const EdgeInsets.all(CollectionLayout.holoFrameStroke / 2),
+              radius: radius - CollectionLayout.thumbnailFrame,
             ),
           ),
           // 확정하지 않은 소장품은 눌러서 보여준다. 딱지만으로는 목록을 훑을
@@ -297,7 +307,7 @@ class RemoteTicketCard extends StatelessWidget {
     final image = catalogPosterImage(previewUrl ?? poster);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF15181F),
+        color: TimoColors.cardFrame,
         borderRadius: BorderRadius.circular(radius),
       ),
       child: ClipRRect(
