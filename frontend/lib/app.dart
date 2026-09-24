@@ -317,8 +317,9 @@ class _AppState extends State<App> {
       );
 
   /// 직전에 본 로그인 여부. 세션은 토큰을 새로 받을 때도 알리므로, 로그인
-  /// 여부가 실제로 바뀐 순간만 골라내야 찜 목록 요청이 한 번만 나간다.
-  /// 처음엔 로그아웃으로 두어, 이미 로그인된 채 시작해도 한 번은 받아 온다.
+  /// 여부가 실제로 바뀐 순간만 골라내야 찜 목록 요청이 한 번만 나가고 소장품도
+  /// 로그아웃 한 번에 한 번만 비워진다. 처음엔 로그아웃으로 두어, 이미 로그인된
+  /// 채 시작해도 한 번은 받아 온다.
   bool _wasLoggedIn = false;
 
   /// 소장품 저장소. API 들과 같은 이유로 앱에 하나만 두고 [TicketStoreScope] 로
@@ -396,14 +397,21 @@ class _AppState extends State<App> {
     _tiltSetting.restore().ignore();
     _viewerGuide.restore().ignore();
 
-    _session.addListener(_syncFavoriteShows);
-    _syncFavoriteShows();
+    _session.addListener(_syncAccountData);
+    _syncAccountData();
   }
 
-  /// 로그인하면 서버에서 찜 공연을 받아 두고, 로그아웃하면 버린다. 찜리스트를
-  /// 열기 전에도 검색 결과·공연 상세의 하트가 맞아야 해서 미리 받는다. 실패는
-  /// 삼킨다 — 찜리스트를 열면 그 화면이 다시 물어 실패를 알린다.
-  void _syncFavoriteShows() {
+  /// 계정에 딸린 것을 로그인 여부에 맞춘다.
+  ///
+  /// 로그인하면 서버에서 찜 공연을 받아 둔다 — 찜리스트를 열기 전에도 검색
+  /// 결과·공연 상세의 하트가 맞아야 해서 미리 받는다. 실패는 삼킨다. 찜리스트를
+  /// 열면 그 화면이 다시 물어 실패를 알린다.
+  ///
+  /// 로그아웃하면 찜 공연과 기기의 소장품을 버린다. 소장품은 계정의 것인데
+  /// 저장소는 기기에 하나라, 안 비우면 다음 사람이 앞사람 것을 본다
+  /// ([TicketStore.clear]). 파일 삭제 실패는 삼킨다 — 상자는 먼저 비어
+  /// 목록에는 남지 않고, 남은 파일은 다음 로그아웃이 다시 지운다.
+  void _syncAccountData() {
     final isLoggedIn = _session.isLoggedIn;
     if (isLoggedIn == _wasLoggedIn) return;
     _wasLoggedIn = isLoggedIn;
@@ -411,6 +419,7 @@ class _AppState extends State<App> {
       _favoriteStore.loadShows().ignore();
     } else {
       _favoriteStore.clearShows();
+      _ticketStore.clear().ignore();
     }
   }
 
@@ -431,7 +440,7 @@ class _AppState extends State<App> {
   @override
   void dispose() {
     ApiClient.dio.interceptors.remove(_authInterceptor);
-    _session.removeListener(_syncFavoriteShows);
+    _session.removeListener(_syncAccountData);
     _bookingController.dispose();
     _creationJob.dispose();
     _tiltSetting.dispose();

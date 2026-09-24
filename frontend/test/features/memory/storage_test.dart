@@ -9,6 +9,7 @@ import 'package:timo/features/memory/models/person_depth_layer.dart';
 
 import 'dart:ui';
 
+import 'package:timo/features/memory/constants.dart';
 import 'package:timo/features/memory/data/ticket_store.dart';
 import 'package:timo/features/memory/data/creation_service.dart';
 
@@ -82,6 +83,59 @@ void main() {
       await folder.delete(recursive: true);
     },
   );
+  test('clear 는 상자를 비우고 제작·복원이 쓰던 폴더와 수선 파일을 지운다', () async {
+    final folder = await Directory.systemTemp.createTemp('timo_test');
+    Hive.init(folder.path);
+    final box = await Hive.openBox<String>('clear');
+    // 제작·복원·수선이 문서 폴더에 남기는 모양 그대로 흩어 놓는다.
+    for (final name in MemoryFiles.directories) {
+      await File(
+        '${folder.path}/$name/nested/$name.png',
+      ).create(recursive: true);
+    }
+    final repair = await File(
+      '${folder.path}/${MemoryFiles.repairPrefix}1.png',
+    ).create();
+    // 소장품과 상관없는 파일(Hive 상자 자체가 여기 있다)은 남아야 한다.
+    final unrelated = await File('${folder.path}/other.txt').create();
+
+    final store = HiveTicketStore(box, documentsDirectory: () async => folder);
+    var notified = 0;
+    store.addListener(() => notified++);
+    await store.save(
+      const MemoryTicket(
+        ticketId: '1',
+        concertId: 'c',
+        backgroundPath: 'photo.png',
+        personCompositePath: null,
+        effectType: '효과 없음',
+        videoId: 'v',
+        videoUrl: '',
+        details: {},
+        depthLayers: [],
+        demoDepth: true,
+      ),
+    );
+
+    await store.clear();
+
+    expect(store.readAll(), isEmpty);
+    expect(box.isEmpty, isTrue);
+    // 저장 한 번, 비우기 한 번.
+    expect(notified, 2);
+    for (final name in MemoryFiles.directories) {
+      expect(await Directory('${folder.path}/$name').exists(), isFalse);
+    }
+    expect(await repair.exists(), isFalse);
+    expect(await unrelated.exists(), isTrue);
+
+    // 지울 것이 없어도 실패하지 않는다.
+    await store.clear();
+
+    await box.close();
+    await folder.delete(recursive: true);
+  });
+
   test('민팅 키가 남아 있는 예전 레코드도 그대로 읽힌다', () {
     // 블록체인을 쓰지 않기로 하면서 mintStatus·tokenId·transactionHash·
     // metadataUrl 을 지웠다. 이미 기기에 저장된 레코드에는 그 키들이 남아

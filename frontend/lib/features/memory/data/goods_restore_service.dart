@@ -51,7 +51,9 @@ class GoodsRestoreService {
     }
 
     final root = await _documentsDirectory();
-    final folder = Directory('${root.path}/photos/restored/${detail.goodsId}');
+    final folder = Directory(
+      '${root.path}/${MemoryFiles.photos}/restored/${detail.goodsId}',
+    );
     await folder.create(recursive: true);
 
     Future<String?> fetch(String? url, String name) async {

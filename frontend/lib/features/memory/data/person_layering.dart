@@ -149,8 +149,9 @@ class PersonLayering {
     try {
       final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
       final root = await getApplicationDocumentsDirectory();
-      final folder = await Directory('${root.path}/person_layers')
-          .create(recursive: true);
+      final folder = await Directory(
+        '${root.path}/${MemoryFiles.personLayers}',
+      ).create(recursive: true);
       final file = File(
         '${folder.path}/${DateTime.now().microsecondsSinceEpoch}.png',
       );

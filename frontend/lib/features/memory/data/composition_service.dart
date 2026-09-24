@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../constants.dart';
 import 'person_auto_layout.dart';
 import 'person_placement.dart';
 
@@ -132,7 +133,7 @@ class CompositionService {
       final bytes = (await output.toByteData(format: ui.ImageByteFormat.png))!;
       final root = await getApplicationDocumentsDirectory();
       final folder = await Directory(
-        '${root.path}/composites',
+        '${root.path}/${MemoryFiles.composites}',
       ).create(recursive: true);
       final file = File(
         '${folder.path}/${DateTime.now().microsecondsSinceEpoch}.png',
