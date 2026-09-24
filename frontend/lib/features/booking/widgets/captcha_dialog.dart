@@ -165,12 +165,21 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                 children: [
                   Text(BookingStrings.captchaGuide, style: textTheme.bodySmall),
                   const SizedBox(height: 14),
-                  _CaptchaImage(
-                    challenge: _challenge,
-                    loading: _issuing,
-                    onRefresh: _issuing || _verifying ? null : _issue,
+                  _CaptchaImage(challenge: _challenge, loading: _issuing),
+                  // 그림 위에 겹치면 사진 배경에 묻혀서 그림 아래에 따로 둔다.
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _issuing || _verifying ? null : _issue,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text(BookingStrings.captchaRefresh),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 4),
                   TextField(
                     controller: _input,
                     autofocus: true,
@@ -230,76 +239,62 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
   }
 }
 
-/// 보안문자 그림. 새로 받기 버튼은 옆에 따로 빼지 않고 그림 안 오른쪽 아래에 둔다.
+/// 보안문자 그림. 입력칸 폭에 맞춰 네이버 그림 비율 그대로 키운다.
 class _CaptchaImage extends StatelessWidget {
-  const _CaptchaImage({
-    required this.challenge,
-    required this.loading,
-    required this.onRefresh,
-  });
+  const _CaptchaImage({required this.challenge, required this.loading});
 
-  static const _height = 80.0;
+  /// 네이버 캡차 그림은 200×90 이다. 상자를 그 비율로 두어야 양옆이 비지 않는다.
+  static const _aspectRatio = 200 / 90;
 
   final CaptchaChallenge? challenge;
   final bool loading;
-
-  /// 받는 중·확인 중에는 null 이라 버튼이 잠긴다.
-  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final challenge = this.challenge;
     final Widget content;
     if (loading) {
-      content = const SizedBox.square(
-        dimension: 24,
-        child: CircularProgressIndicator(strokeWidth: 2),
+      content = const Center(
+        child: SizedBox.square(
+          dimension: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
       );
     } else if (challenge == null) {
-      // 문제를 못 받았다. 사유는 입력칸 아래에, 다시 받기는 구석 버튼으로 한다.
-      content = const Icon(
-        Icons.image_not_supported_outlined,
-        color: AppColors.textSecondary,
+      // 문제를 못 받았다. 사유는 입력칸 아래에, 다시 받기는 아래 버튼으로 한다.
+      content = const Center(
+        child: Icon(
+          Icons.image_not_supported_outlined,
+          color: AppColors.textSecondary,
+        ),
       );
     } else {
       content = Image.memory(
         challenge.image,
         // 키마다 새 그림이다. 키로 구분해야 같은 크기 그림끼리도 다시 그린다.
         key: ValueKey(challenge.captchaKey),
-        fit: BoxFit.contain,
-        height: _height,
+        // 비율이 조금 달라도 상자를 채운다. 가장자리가 살짝 잘릴 뿐 글자는 가운데다.
+        fit: BoxFit.cover,
         semanticLabel: BookingStrings.captchaImageLabel,
-        errorBuilder: (_, _, _) => const Icon(
-          Icons.broken_image_outlined,
-          color: AppColors.textSecondary,
+        errorBuilder: (_, _, _) => const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            color: AppColors.textSecondary,
+          ),
         ),
       );
     }
 
-    return Container(
-      height: _height,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
-        borderRadius: const BorderRadius.all(Radius.circular(4)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          content,
-          Positioned(
-            right: 4,
-            bottom: 4,
-            child: IconButton(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh, size: 20),
-              color: AppColors.textSecondary,
-              tooltip: BookingStrings.captchaRefresh,
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        ],
+    return AspectRatio(
+      aspectRatio: _aspectRatio,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          border: Border.all(color: AppColors.border),
+          borderRadius: const BorderRadius.all(Radius.circular(4)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: content,
       ),
     );
   }

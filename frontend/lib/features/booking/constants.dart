@@ -41,7 +41,7 @@ class BookingStrings {
   static const captchaTitle = '보안문자 입력';
   static const captchaGuide = '예매를 계속하려면 아래 문자를 입력해주세요.';
   static const captchaHint = '보안문자';
-  static const captchaRefresh = '새 보안문자 받기';
+  static const captchaRefresh = '새로고침';
   static const captchaImageLabel = '보안문자 그림';
   static const captchaSubmit = '확인';
   static const captchaClose = '예매 그만두기';

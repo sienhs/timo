@@ -107,7 +107,7 @@ void main() {
     await openCaptcha(tester, MockBookingApi(latency: Duration.zero));
     await submit(tester, 'wrong');
 
-    await tester.tap(find.byTooltip(BookingStrings.captchaRefresh));
+    await tester.tap(find.text(BookingStrings.captchaRefresh));
     await tester.pumpAndSettle();
 
     expect(captchaImage('mock-captcha-3'), findsOneWidget);
