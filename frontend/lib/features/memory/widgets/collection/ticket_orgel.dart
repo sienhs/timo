@@ -7,6 +7,7 @@ import '../../motion/motion_tokens.dart';
 import '../../models/memory_ticket.dart';
 import '../../theme/timo_colors.dart';
 import '../../constants.dart';
+import 'orgel_card_back.dart';
 import 'ticket_thumbnail.dart';
 
 /// "내가 만든 소장품 보기" as a music box: tickets stand on a ring around a
@@ -14,11 +15,7 @@ import 'ticket_thumbnail.dart';
 /// settle on the nearest ticket, tap a side ticket to bring it round, tap
 /// the front one to open. Left alone it turns slowly by itself.
 class TicketOrgel extends StatefulWidget {
-  const TicketOrgel({
-    super.key,
-    required this.tickets,
-    required this.onOpen,
-  });
+  const TicketOrgel({super.key, required this.tickets, required this.onOpen});
   final List<MemoryTicket> tickets;
   final ValueChanged<MemoryTicket> onOpen;
   @override
@@ -54,10 +51,8 @@ class _TicketOrgelState extends State<TicketOrgel>
     // Create the ticker while this state is active. Creating it lazily from
     // `settleTo` can happen during disposal, when inherited widgets such as
     // TickerMode can no longer be read from the context.
-    settle = AnimationController.unbounded(
-      vsync: this,
-      value: 0,
-    )..addListener(() => setState(() => angle = settle.value));
+    settle = AnimationController.unbounded(vsync: this, value: 0)
+      ..addListener(() => setState(() => angle = settle.value));
     // Open centred so the ring is visible at once; with an even count no
     // slot is centred, so the newest ticket (index 0) takes the front.
     angle = widget.tickets.length.isOdd ? 0 : -slotOffset(0);
@@ -254,7 +249,7 @@ class _TicketOrgelState extends State<TicketOrgel>
       ..rotateY(-theta)
       ..scaleByDouble(boost, boost, 1, 1);
     final ticket = widget.tickets[i];
-    // Past 90° we see the card from behind: a plain white back.
+    // Past 90° we see the card from behind: the dark embossed back.
     final facingAway = math.cos(theta) < 0;
     return Positioned(
       left: centre.dx - cardW / 2,
@@ -274,7 +269,7 @@ class _TicketOrgelState extends State<TicketOrgel>
               fit: StackFit.expand,
               children: [
                 if (facingAway)
-                  const _CardBack()
+                  OrgelCardBack(ticket: ticket)
                 else
                   TicketThumbnail(
                     ticket: ticket,
@@ -304,26 +299,6 @@ class _TicketOrgelState extends State<TicketOrgel>
       ),
     );
   }
-}
-
-/// White reverse of a ticket, shown while it turns behind the axle.
-class _CardBack extends StatelessWidget {
-  const _CardBack();
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: TimoColors.paper,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: TimoColors.line, width: 1.5),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x22000000),
-          blurRadius: 18,
-          offset: Offset(0, 8),
-        ),
-      ],
-    ),
-  );
 }
 
 /// The turntable under the tickets: a soft disc, a hairline rim, the axle

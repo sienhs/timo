@@ -20,6 +20,10 @@ class TimoColors {
   static const textTertiary = Color(0xFF6B7485);
   static const danger = Color(0xFFF87171);
 
+  /// 티켓 카드의 테두리 재질. 앞면 썸네일의 프레임과 오르골 뒷면이 같은 색을
+  /// 써서 한 장의 카드로 읽힌다.
+  static const cardFrame = Color(0xFF15181F);
+
   // Light "paper" chrome used by the collection and creator screens. The
   // ticket itself stays on the dark stage palette above.
   static const paper = Color(0xFFFFFFFF);

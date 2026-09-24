@@ -1,5 +1,5 @@
+import 'package:flutter/painting.dart';
 import 'package:flutter/physics.dart';
-import 'dart:ui';
 
 /// 메모리 티켓(소장품) 기능이 쓰는 문구·치수·처리 상수.
 ///
@@ -43,6 +43,11 @@ class CollectionText {
   static const restoreAllLabel = '모두 가져오기';
   static const swipeHint = '좌우로 돌려 다른 소장품 보기';
 
+  /// 오르골 뒷면에 찍는 글자. 정보가 아니라 각인이다.
+  static const brand = 'TIMO';
+  static const backLabel = 'MEMORY TICKET';
+  static String backNumber(String shortId) => 'No. $shortId';
+
   /// 로그인 전. 소장품은 내가 입장한 공연으로 만드는 것이라 누구인지 모르면
   /// 보여줄 것이 없다.
   static const loginTitle = '로그인하고 소장품을 만들어요';
@@ -73,7 +78,7 @@ class CollectionLayout {
   static const orgelRise = 0.0;
   static const orgelDepthDim = 0.6;
 
-  /// White backs stay white; only a hint of shade for depth.
+  /// Backs are already dark; only a hint more shade for depth.
   static const orgelBackDim = 0.08;
   static const orgelFlingLookahead = 0.18;
 
@@ -88,6 +93,40 @@ class CollectionLayout {
 
   /// Space between the platform and the concert caption.
   static const orgelCaptionGap = 30.0;
+
+  /// 앞면 썸네일의 어두운 프레임 두께. 홀로 선은 이 프레임과 사진의 경계에
+  /// 앉는다.
+  static const thumbnailFrame = 3.0;
+
+  /// 카드 안쪽 홀로그램 하이라인([HoloFrame]). 앞면은 사진 가장자리에,
+  /// 오르골 뒷면은 카드 폭·높이의 [holoFrameInset] 만큼 들어와 그린다.
+  static const holoFrameStroke = 1.0;
+  static const holoFrameOpacity = 0.7;
+  static const holoFrameInset = 0.05;
+  static const holoFrameRadius = 11.0;
+
+  /// 오르골 뒷면([OrgelCardBack]). 비율은 카드 폭 대비이고, Alignment 는
+  /// 카드 안 세로 위치다.
+  static const orgelBackHairlineGap = 7.0;
+  static const orgelBackHairlineAlpha = 0.045;
+  static const orgelBackSilhouetteWidth = 0.56;
+  static const orgelBackSilhouetteAlign = Alignment(0, -0.05);
+
+  /// 음각: 반투명 흰 채움에 1px 어긋난 그림자·하이라이트 한 줄씩.
+  static const orgelBackEmbossAlpha = 0.10;
+  static const orgelBackEmbossShadowAlpha = 0.55;
+  static const orgelBackEmbossHighlightAlpha = 0.12;
+  static const orgelBackEmbossOffset = 1.0;
+  static const orgelBackWordmarkAlign = Alignment(0, 0.49);
+  static const orgelBackLabelAlign = Alignment(0, 0.62);
+  static const orgelBackIdAlign = Alignment(0, 0.82);
+  static const orgelBackWordmarkSize = 0.047;
+  static const orgelBackLabelSize = 0.026;
+  static const orgelBackIdSize = 0.034;
+
+  /// 자간, 글자 크기 대비(em).
+  static const orgelBackWordmarkTracking = 0.14;
+  static const orgelBackLabelTracking = 0.28;
 
   /// The person drifts a little faster than the stage while swiping, which
   /// reads as depth on a flat thumbnail.

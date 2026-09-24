@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/memory_ticket.dart';
 import '../../theme/timo_colors.dart';
+import '../../utils/ticket_id.dart';
 import '../ui/gradient_text.dart';
 import 'holo_overlay.dart';
 
@@ -124,7 +125,7 @@ class TicketBack extends StatelessWidget {
               // 입장권이 아니라 소장품이라 '입장 불가' 를 적지 않는다. 번호만
               // 남겨 어느 소장품인지 가린다.
               Text(
-                '#${_shortId(ticket.ticketId)}',
+                '#${shortTicketId(ticket.ticketId)}',
                 style: const TextStyle(
                   fontSize: 10.5,
                   color: TimoColors.textTertiary,
@@ -138,10 +139,6 @@ class TicketBack extends StatelessWidget {
     );
   }
 }
-
-/// 번호 끝 여섯 자리. 서버 티켓 번호는 `12` 처럼 짧아 그대로 쓴다 — 예전
-/// 목 번호(`ticket-1024`)만 보고 끝을 잘라 내던 것이 짧은 번호에서 터졌다.
-String _shortId(String id) => id.length <= 6 ? id : id.substring(id.length - 6);
 
 class _Field extends StatelessWidget {
   const _Field({required this.label, required this.value});
