@@ -4,7 +4,9 @@ import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/network/server_errors.dart';
 import 'package:timo/core/theme/app_theme.dart';
 import 'package:timo/core/widgets/error_snack_bar.dart';
+import 'package:timo/features/booking/constants.dart';
 import 'package:timo/features/booking/data/booking_api.dart';
+import 'package:timo/features/booking/models/captcha_challenge.dart';
 import 'package:timo/features/booking/models/performance.dart';
 import 'package:timo/features/booking/models/seat.dart';
 import 'package:timo/features/booking/models/seat_hold.dart';
@@ -49,6 +51,9 @@ class _FakeBookingApi implements BookingApi {
   /// 선점 요청에 던질 실패. null 이면 성공한다.
   ApiException? holdError;
 
+  /// 배치도 요청에 던질 실패. null 이면 성공한다.
+  ApiException? seatsError;
+
   @override
   Future<List<Zone>> fetchZones(int concertId) async => const [];
 
@@ -58,6 +63,8 @@ class _FakeBookingApi implements BookingApi {
     required int zoneId,
   }) async {
     fetchCount++;
+    final error = seatsError;
+    if (error != null) throw error;
     return _zoneSeats;
   }
 
@@ -82,6 +89,16 @@ class _FakeBookingApi implements BookingApi {
   Future<void> cancelHold({required int concertId, required int seatId}) async {
     cancelled.add(seatId);
   }
+
+  @override
+  Future<CaptchaChallenge> issueCaptcha() => throw UnimplementedError();
+
+  @override
+  Future<void> verifyCaptcha({
+    required int concertId,
+    required String captchaKey,
+    required String value,
+  }) => throw UnimplementedError();
 }
 
 /// 예매자 실명 요청만 실패하는 목. 자리는 잡혔는데 이름을 못 받은 경우를 만든다.
@@ -416,6 +433,83 @@ void main() {
       expect(find.text('로그인 화면'), findsOneWidget);
       // 고른 자리는 그대로 둔다. 로그인하고 돌아와 한 번 더 누르면 된다.
       expect(controller.selectedSeat?.id, 11);
+    });
+  });
+
+  group('보안문자 통과 기록이 끝나면', () {
+    const captchaRequired = ApiException(
+      '캡차 확인이 필요합니다.',
+      status: 403,
+      exceptionName: BookingServerErrors.captchaRequired,
+    );
+
+    /// 홈 → 공연 상세 → 구역 → 좌석 순으로 쌓는다. 예매를 다시 하게 할 때
+    /// 홈까지가 아니라 공연 상세까지만 닫는지 보려고 앞 화면들을 세운다.
+    Future<void> pumpBookingStack(WidgetTester tester) async {
+      await tester.pumpWidget(
+        MyPageApiScope(
+          api: const MockMyPageApi(latency: Duration.zero),
+          child: BookingApiScope(
+            api: api,
+            child: BookingScope(
+              controller: controller,
+              child: MaterialApp(
+                theme: AppTheme.light,
+                home: const Scaffold(body: Text('홈')),
+              ),
+            ),
+          ),
+        ),
+      );
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      Route<void> page(String name, Widget child) => MaterialPageRoute<void>(
+        settings: RouteSettings(name: name),
+        builder: (_) => child,
+      );
+      navigator
+        ..push(page(AppRoutes.showDetail, const Scaffold(body: Text('공연 상세'))))
+        ..push(page(AppRoutes.zoneSelection, const Scaffold(body: Text('구역'))))
+        ..push(
+          page(AppRoutes.seatSelection, const SeatSelectionScreen(zoneId: 1)),
+        );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('들어오자마자 끝났으면 공연 상세로 돌려보낸다', (tester) async {
+      api.seatsError = captchaRequired;
+
+      await pumpBookingStack(tester);
+
+      expect(find.byType(SeatSelectionScreen), findsNothing);
+      expect(find.text('구역'), findsNothing);
+      expect(find.text('공연 상세'), findsOneWidget);
+      expect(
+        find.text(toastText(BookingStrings.captchaSessionExpired)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('새로고침하다 끝났어도 보안문자를 띄우지 않고 상세로 보낸다', (tester) async {
+      await pumpBookingStack(tester);
+      expect(find.byType(SeatSelectionScreen), findsOneWidget);
+
+      api.seatsError = captchaRequired;
+      await tester.tap(find.byTooltip('좌석 정보 새로고침'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('공연 상세'), findsOneWidget);
+      expect(
+        find.text(toastText(BookingStrings.captchaSessionExpired)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('다른 403 은 예매를 다시 시키지 않는다', (tester) async {
+      api.seatsError = const ApiException('권한이 없습니다.', status: 403);
+
+      await pumpBookingStack(tester);
+
+      expect(find.byType(SeatSelectionScreen), findsOneWidget);
     });
   });
 }

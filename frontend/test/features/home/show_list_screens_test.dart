@@ -259,9 +259,9 @@ class _DatedApi extends MockHomeApi {
     ticketOpenAt: _today.add(const Duration(days: 3)),
   );
 
-  /// 곧. 오늘부터 이틀 뒤라 이번 달일 수도, 다음 달일 수도 있어 다음 달
-  /// 프리셋 테스트가 안 흔들리도록 다음 달 1일 앞으로 잡는다 — 이틀 뒤가
-  /// 다음 달이 되는 월말이면 그 대신 오늘로 둔다.
+  /// 곧. 이틀 뒤 · 하루 뒤 · 오늘 중 이번 달 안이면서 주말이 아닌 첫 날이다.
+  /// 다음 달로 넘어가면 다음 달 프리셋에, 주말이면 이번 주말 프리셋에 걸려
+  /// 그 테스트들이 요일·날짜에 따라 흔들린다.
   static final soon = ShowSummary(
     id: 103,
     title: '곧 하는 공연',
@@ -271,8 +271,14 @@ class _DatedApi extends MockHomeApi {
   );
 
   static DateTime get _soonDate {
-    final candidate = DateTime(_today.year, _today.month, _today.day + 2);
-    return candidate.month == _today.month ? candidate : _today;
+    for (var days = 2; days >= 0; days--) {
+      final candidate = DateTime(_today.year, _today.month, _today.day + days);
+      final weekend = candidate.weekday >= DateTime.saturday;
+      if (candidate.month == _today.month && !weekend) return candidate;
+    }
+    // 월말 토·일(예: 토요일이 30일)이면 이번 달 안에 주말 아닌 날이 없다.
+    // 그날은 이번 주말 테스트가 이 공연을 잡는다.
+    return _today;
   }
 
   @override

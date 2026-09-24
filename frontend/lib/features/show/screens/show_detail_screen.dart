@@ -282,6 +282,7 @@ class _LoadedShowState extends State<_LoadedShow> {
         posterUrl: widget.detail.posterUrl,
       ),
     );
+    // 구역 화면이 뜨자마자 그 위에 보안문자를 띄운다. 대기열이 붙으면 그 앞이다.
     await Navigator.pushNamed(
       context,
       AppRoutes.zoneSelection,

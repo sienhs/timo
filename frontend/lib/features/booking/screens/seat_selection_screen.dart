@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -50,6 +52,9 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   /// 버튼을 잠가 둔다.
   bool _holding = false;
 
+  /// 공연 상세로 돌아가는 중. 배치도 요청이 겹쳐 두 번 닫지 않게 한다.
+  bool _restarting = false;
+
   @override
   void initState() {
     super.initState();
@@ -75,8 +80,33 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     super.dispose();
   }
 
-  Future<ZoneSeats> _fetch() =>
-      _api.fetchSeats(concertId: _concertId, zoneId: _zoneId);
+  /// 좌석 배치도를 받는다. 보안문자 통과 기록이 끝났으면(403) 예매를 처음부터
+  /// 다시 하게 한다 — 보안문자는 예매에 들어갈 때 한 번만 묻고, 이 화면 안에서
+  /// 다시 띄우지 않는다.
+  Future<ZoneSeats> _fetch() async {
+    try {
+      return await _api.fetchSeats(concertId: _concertId, zoneId: _zoneId);
+    } on ApiException catch (e) {
+      if (e.exceptionName != BookingServerErrors.captchaRequired) rethrow;
+      _restartBooking();
+      // 화면이 곧 닫혀 이 결과를 기다리는 곳이 없다. 던지면 받는 곳 없는 오류로
+      // 남으므로 끝나지 않는 Future 를 준다.
+      return Completer<ZoneSeats>().future;
+    }
+  }
+
+  /// 공연 상세로 돌아가 예매하기부터 다시 하게 한다. 잡아 둔 자리는 화면이
+  /// 사라지며 [dispose] 가 푼다.
+  void _restartBooking() {
+    if (!mounted || _restarting) return;
+    _restarting = true;
+    // 안내는 앱 전체의 스낵바 자리에 뜨므로 화면을 닫아도 남는다.
+    showInfoSnackBar(context, BookingStrings.captchaSessionExpired);
+    Navigator.popUntil(
+      context,
+      (route) => route.isFirst || route.settings.name == AppRoutes.showDetail,
+    );
+  }
 
   Future<void> _loadZones() async {
     try {

@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/server_errors.dart';
 import '../constants.dart';
+import '../models/captcha_challenge.dart';
 import '../models/seat.dart';
 import '../models/seat_hold.dart';
 import '../models/zone.dart';
@@ -21,6 +25,19 @@ class MockBookingApi implements BookingApi {
 
   /// 좌석 번호 → 덮어쓴 상태. 여기 없는 좌석은 고정 배치도 그대로다.
   final Map<int, SeatStatus> _overrides = {};
+
+  /// 보안문자 정답. 로컬 백엔드의 가짜 캡차(`StubCaptchaClient`)와 같은 값이다.
+  /// 대소문자는 가리지 않는다.
+  static const captchaAnswer = 'timo';
+
+  /// 1×1 투명 PNG. 테스트에서 `Image.memory` 가 디코딩할 수 있는 가장 작은 그림이다.
+  static const _captchaImageBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  int _issuedCaptchaCount = 0;
+
+  /// 아직 확인에 쓰이지 않은 보안문자 키.
+  final Set<String> _liveCaptchaKeys = {};
 
   @override
   Future<List<Zone>> fetchZones(int concertId) async {
@@ -101,6 +118,44 @@ class MockBookingApi implements BookingApi {
     if (_heldSeats[concertId] != seatId) return;
     _heldSeats.remove(concertId);
     _overrides.remove(seatId);
+  }
+
+  @override
+  Future<CaptchaChallenge> issueCaptcha() async {
+    await _delay();
+    final key = 'mock-captcha-${++_issuedCaptchaCount}';
+    _liveCaptchaKeys.add(key);
+    return CaptchaChallenge(
+      captchaKey: key,
+      image: base64Decode(_captchaImageBase64),
+      expiresIn: const Duration(minutes: 2),
+    );
+  }
+
+  /// 좌석 조회를 막지는 않는다. 막으면 좌석 화면만 보는 테스트가 전부 보안문자를
+  /// 거쳐야 한다. 통과를 요구하는 경우는 테스트가 가짜 API 로 403 을 흉내 낸다.
+  @override
+  Future<void> verifyCaptcha({
+    required int concertId,
+    required String captchaKey,
+    required String value,
+  }) async {
+    await _delay();
+    // 서버처럼 한 번 쓴 키는 맞든 틀리든 사라진다. 문구도 서버 것 그대로다.
+    if (!_liveCaptchaKeys.remove(captchaKey)) {
+      throw const ApiException(
+        '만료되었거나 존재하지 않는 캡차입니다.',
+        status: 404,
+        exceptionName: BookingServerErrors.captchaKeyNotFound,
+      );
+    }
+    if (value.toLowerCase() != captchaAnswer) {
+      throw const ApiException(
+        '캡차 입력값이 올바르지 않습니다.',
+        status: 400,
+        exceptionName: BookingServerErrors.captchaMismatch,
+      );
+    }
   }
 
   Future<void> _delay() =>

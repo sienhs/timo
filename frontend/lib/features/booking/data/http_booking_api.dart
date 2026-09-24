@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../constants.dart';
+import '../models/captcha_challenge.dart';
 import '../models/seat_hold.dart';
 import '../models/zone.dart';
 import '../models/zone_seats.dart';
@@ -17,6 +18,7 @@ class HttpBookingApi implements BookingApi {
 
   static const sectionsPath = '/api/v1/sections';
   static const seatsPath = '/api/v1/seats';
+  static const captchaPath = '/api/v1/captcha';
 
   final Dio _dio;
 
@@ -71,6 +73,35 @@ class HttpBookingApi implements BookingApi {
       () => _dio.delete<dynamic>(
         _holdPath(seatId),
         queryParameters: {'concertId': concertId},
+      ),
+    );
+  }
+
+  @override
+  Future<CaptchaChallenge> issueCaptcha() async {
+    final response = await _guard(() => _dio.post<dynamic>(captchaPath));
+    try {
+      return CaptchaChallenge.fromJson(_body(response));
+    } on FormatException {
+      // 그림이 base64 가 아니다. 디코딩 오류 대신 안내 문구를 준다.
+      throw _unreadable(response);
+    }
+  }
+
+  @override
+  Future<void> verifyCaptcha({
+    required int concertId,
+    required String captchaKey,
+    required String value,
+  }) async {
+    await _guard(
+      () => _dio.post<dynamic>(
+        '$captchaPath/verify',
+        data: {
+          'concertId': concertId,
+          'captchaKey': captchaKey,
+          'value': value,
+        },
       ),
     );
   }

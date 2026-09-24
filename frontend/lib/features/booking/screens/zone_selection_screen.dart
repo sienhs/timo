@@ -9,6 +9,7 @@ import '../data/booking_api.dart';
 import '../models/zone.dart';
 import '../state/booking_api_scope.dart';
 import '../state/booking_scope.dart';
+import '../widgets/captcha_dialog.dart';
 import '../widgets/performance_header.dart';
 import '../widgets/venue_map.dart';
 import '../widgets/zone_info_panels.dart';
@@ -42,6 +43,19 @@ class _ZoneSelectionScreenState extends State<ZoneSelectionScreen> {
     BookingScope.read(context).startBooking(widget.concertId);
     _api = BookingApiScope.of(context);
     _zones = _api.fetchZones(widget.concertId);
+    // 창은 화면이 한 번 그려진 뒤에 띄울 수 있다. 뒤에 구역도가 비쳐 보인다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askCaptcha());
+  }
+
+  /// 보안문자를 푼다. 창을 닫았으면 예매를 그만둔 것이라 이 화면도 닫는다.
+  /// 구역 목록은 보안문자 없이도 받을 수 있어 뒤에서 먼저 받아 둔다.
+  Future<void> _askCaptcha() async {
+    if (!mounted) return;
+    final passed = await showCaptchaDialog(
+      context,
+      concertId: widget.concertId,
+    );
+    if (!passed && mounted) Navigator.pop(context);
   }
 
   void _toggle(_OpenPanel panel) {

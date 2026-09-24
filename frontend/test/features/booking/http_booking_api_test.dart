@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timo/core/network/api_exception.dart';
+import 'package:timo/core/network/server_errors.dart';
 import 'package:timo/features/booking/data/http_booking_api.dart';
 import 'package:timo/features/booking/models/seat.dart';
 
@@ -307,6 +309,107 @@ void main() {
       await expectLater(
         api.cancelHold(concertId: 1, seatId: 5),
         throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)),
+      );
+    });
+  });
+
+  group('보안문자', () {
+    test('POST 로 받고 base64 그림을 바이트로 푼다', () async {
+      givenServer(
+        (_) => jsonResponse({
+          'captchaKey': 'key-1',
+          'image': base64Encode([1, 2, 3]),
+          'imageType': 'image/jpeg',
+          'expiresIn': 120,
+        }),
+      );
+
+      final challenge = await api.issueCaptcha();
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/v1/captcha');
+      expect(challenge.captchaKey, 'key-1');
+      expect(challenge.image, [1, 2, 3]);
+      expect(challenge.expiresIn, const Duration(minutes: 2));
+    });
+
+    test('그림이 base64 가 아니면 화면용 문구로 바꾼다', () async {
+      givenServer(
+        (_) => jsonResponse({
+          'captchaKey': 'key-1',
+          'image': '###',
+          'imageType': 'image/jpeg',
+          'expiresIn': 120,
+        }),
+      );
+
+      await expectLater(
+        api.issueCaptcha(),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            contains('서버 응답을 읽을 수 없어요'),
+          ),
+        ),
+      );
+    });
+
+    test('확인은 공연·키·입력값을 본문에 싣는다', () async {
+      givenServer((_) => jsonResponse({'expiresIn': 300}));
+
+      await api.verifyCaptcha(concertId: 7, captchaKey: 'key-1', value: 'AB12');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/api/v1/captcha/verify');
+      expect(request.jsonBody, {
+        'concertId': 7,
+        'captchaKey': 'key-1',
+        'value': 'AB12',
+      });
+    });
+
+    test('오답이면 서버 문구를 그대로 던진다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 400,
+          errorMessage: '보안문자가 일치하지 않습니다.',
+          exception: 'CaptchaMismatchException',
+        ),
+      );
+
+      await expectLater(
+        api.verifyCaptcha(concertId: 7, captchaKey: 'key-1', value: 'x'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 400)
+              .having((e) => e.message, 'message', '보안문자가 일치하지 않습니다.'),
+        ),
+      );
+    });
+
+    test('통과 기록 없이 좌석을 받으면 예외 이름으로 가려낼 수 있다', () async {
+      givenServer(
+        (_) => problemResponse(
+          status: 403,
+          errorMessage: '보안문자 확인이 필요합니다.',
+          exception: BookingServerErrors.captchaRequired,
+        ),
+      );
+
+      await expectLater(
+        api.fetchSeats(concertId: 7, zoneId: 1),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 403)
+              .having(
+                (e) => e.exceptionName,
+                'exceptionName',
+                BookingServerErrors.captchaRequired,
+              ),
+        ),
       );
     });
   });

@@ -566,13 +566,40 @@ void main() {
       expect(find.text('2026.05.20 (수) 19:00'), findsNothing);
     });
 
-    testWidgets('예매 버튼이 좌석 선택으로 보낸다', (tester) async {
+    /// 구역 화면 위에 뜬 보안문자를 목 정답으로 푼다.
+    Future<void> passCaptcha(WidgetTester tester) async {
+      await tester.enterText(
+        find.byType(TextField),
+        MockBookingApi.captchaAnswer,
+      );
+      await tester.pump();
+      await tester.tap(find.text(BookingStrings.captchaSubmit));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('예매 버튼이 구역 화면을 열고 그 위에 보안문자를 띄운다', (tester) async {
       await pumpDetail(tester, detailOpening());
 
       await tester.tap(find.text(ShowDetailStrings.bookAction));
       await tester.pumpAndSettle();
-
       expect(find.byType(ZoneSelectionScreen), findsOneWidget);
+      expect(find.text(BookingStrings.captchaTitle), findsOneWidget);
+
+      await passCaptcha(tester);
+      expect(find.text(BookingStrings.captchaTitle), findsNothing);
+      expect(find.byType(ZoneSelectionScreen), findsOneWidget);
+    });
+
+    testWidgets('보안문자를 닫으면 구역 화면까지 닫혀 상세로 돌아온다', (tester) async {
+      await pumpDetail(tester, detailOpening());
+
+      await tester.tap(find.text(ShowDetailStrings.bookAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(BookingStrings.captchaClose));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ZoneSelectionScreen), findsNothing);
+      expect(find.text(ShowDetailStrings.bookAction), findsOneWidget);
     });
 
     // 예매 컨트롤러는 목 공연(아이유)으로 세워 두고, 상세가 넘긴 공연으로
@@ -582,6 +609,7 @@ void main() {
 
       await tester.tap(find.text(ShowDetailStrings.bookAction));
       await tester.pumpAndSettle();
+      await passCaptcha(tester);
 
       expect(find.text('검정치마 단독공연 : 401'), findsOneWidget);
       expect(find.text(MockBookingData.performance.title), findsNothing);
