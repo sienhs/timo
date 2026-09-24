@@ -174,9 +174,9 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                   TextField(
                     controller: _input,
                     autofocus: true,
-                    // 대문자 자판을 먼저 띄운다. 값은 바꾸지 않는다 — 대소문자를
-                    // 가릴지는 서버가 정한다.
-                    textCapitalization: TextCapitalization.characters,
+                    // 네이버 보안문자는 대소문자가 섞여 나온다(예: 374vK). 대문자
+                    // 자판을 먼저 띄우면 소문자를 대문자로 치게 되므로 두지 않고,
+                    // 입력값도 바꾸지 않고 보낸다.
                     autocorrect: false,
                     enableSuggestions: false,
                     maxLength: 20,
