@@ -126,11 +126,11 @@ class ShowDetailStrings {
   static const noticeImageError = '안내 이미지를 불러오지 못했어요.';
 
   /// 안내 이미지가 없는 공연에 대신 적는 문구. 서비스 전체 규정이라 서버가 아닌 앱이 든다.
-  /// 고칠 때 함께 움직여야 하는 곳: 예매 마감은 서버 `Concert.BOOKING_CUTOFF_HOURS`,
+  /// 고칠 때 함께 움직여야 하는 곳: 예매 마감은 서버 `Concert.BOOKING_CUTOFF_MINUTES`,
   /// 양도 등록가 상한은 서버 `ListingService` 의 정가 이하 검증, 캡처 QR 은
   /// `TicketStrings.qrCaptureNotice`, 취소·환불은 `TicketStrings.cancelConfirmBody`.
   static const defaultNoticeLines = [
-    '예매는 공연 시작 2시간 전에 마감돼요.',
+    '예매는 공연 시작 30분 전에 마감돼요.',
     '입장은 티켓 QR로만 할 수 있어요. 캡처한 화면은 입장할 수 없어요.',
     '티켓 양도는 앱 안에서만 할 수 있고, 등록가는 정가를 넘을 수 없어요.',
     '예매를 취소하면 티켓이 회수되고 결제 금액이 전액 환불돼요.',

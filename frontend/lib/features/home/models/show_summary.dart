@@ -50,8 +50,8 @@ class ShowSummary {
   static const canceledStatus = 'CANCELED';
 
   /// 예매가 마감되는 시점. 공연 시작 이만큼 전부터는 선점·결제가 막힌다.
-  /// 백엔드 `Concert.BOOKING_CUTOFF_HOURS` 와 같은 값이다.
-  static const bookingCutoff = Duration(hours: 2);
+  /// 백엔드 `Concert.BOOKING_CUTOFF_MINUTES` 와 같은 값이다.
+  static const bookingCutoff = Duration(minutes: 30);
 
   /// 서버가 준 공연 id. 상세 조회에 쓴다.
   final int id;
