@@ -38,7 +38,7 @@ public interface ReservationApi {
      * 같은 공연의 유효한 주문이 이미 있으면 409({@code AlreadyReservedException}),
      * 공연이 예매 진행 중이 아니면 409({@code ConcertNotOnSaleException}), 예매 중이라도 오픈 전이면
      * 409({@code BookingNotOpenException}), 공연 시작
-     * {@value com.ssafy.timo.domain.concert.entity.Concert#BOOKING_CUTOFF_HOURS}시간 전 마감을 지났으면
+     * {@value com.ssafy.timo.domain.concert.entity.Concert#BOOKING_CUTOFF_MINUTES}분 전 마감을 지났으면
      * 409({@code BookingClosedException}) 다.
      * 마감 판정은 선점이 아직 유효해도 결제 시점 기준으로 다시 한다.
      */

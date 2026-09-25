@@ -284,8 +284,8 @@ public class LocalDataSeeder implements ApplicationRunner {
                         "Bruno Mars 내한 단독 공연", AgeRating.ALL, ConcertStatus.ON_SALE, 87,
                         now.plusDays(45), now.plusDays(45).plusHours(2),
                         now.minusDays(10), List.of("Bruno Mars")),
-                // 입장 QR 종단 테스트 전용. 예매 마감(시작 2시간 전)까지 몇 분 남은 채로 시작해서,
-                // 예매를 마치고 몇 분만 기다리면 입장 QR 발급 창(마찬가지로 시작 2시간 전)이 열린다 -
+                // 입장 QR 종단 테스트 전용. 입장 QR 발급 창(시작 2시간 전)이 열리기 몇 분 전에 시작해서,
+                // 예매를 마치고 몇 분만 기다리면 QR 이 열린다(예매 마감은 시작 30분 전이라 그 뒤에도 남는다) -
                 // 실제로 몇 시간을 기다리지 않고도 예매→발행→입장 QR까지 전체 흐름을 검증할 수 있게
                 // 하려는 목적 하나뿐이다. Clock 을 앞당기는 대신 이 시드 자체를 "곧 시작하는 공연"으로
                 // 두는 것이라 DB·온체인·화면이 항상 서로 일치한다.

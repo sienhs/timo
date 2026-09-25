@@ -7,6 +7,6 @@ public enum BookingBlockReason {
     NOT_ON_SALE,
     /** 아직 오픈 시각 전이다. 오픈·시작 시각이 없어 알 수 없는 경우도 포함한다. */
     NOT_OPEN,
-    /** 공연 시작 {@link Concert#BOOKING_CUTOFF_HOURS}시간 전, 마감을 지났다. */
+    /** 공연 시작 {@link Concert#BOOKING_CUTOFF_MINUTES}분 전, 마감을 지났다. */
     CLOSED
 }
