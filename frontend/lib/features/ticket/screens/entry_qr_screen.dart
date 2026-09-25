@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/async_boundary.dart';
 import '../../../core/widgets/poster_image.dart';
+import '../../notification/push_notification_scope.dart';
 import '../constants.dart';
 import '../models/entry_pass.dart';
 import '../models/my_ticket.dart';
@@ -20,6 +21,8 @@ import '../widgets/qr_notice_box.dart';
 /// 발급하고(`TicketApi.issueEntryPass`) 수명도 응답에 실려 온다([EntryPass.lifetime]).
 /// 수명이 다하면 자동으로 새로 받지 않고 흐린 QR 위에 새로고침 버튼을 둔다 —
 /// 검표 직전에 QR 이 바뀌는 순간을 없애기 위해서다. 화면을 벗어나면 타이머를 끈다.
+/// 게이트에서 찍히면 서버의 입장 푸시를 받아 곧바로 "입장 완료" 로 바뀐다.
+/// 푸시가 빠질 때를 대비해 QR 이 떠 있는 동안 티켓 상태도 주기적으로 확인한다.
 class EntryQrScreen extends StatefulWidget {
   const EntryQrScreen({super.key, required this.ticket, this.clock});
 
@@ -52,19 +55,51 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
 
   Timer? _ticker;
 
+  /// 입장 처리 푸시를 듣는 구독. 화면이 처음 뜰 때 한 번만 건다.
+  StreamSubscription<int>? _enteredTicketIds;
+
+  /// 입장 여부 확인 요청이 나가 있는가. 응답이 늦어도 요청이 겹치지 않게 한다.
+  bool _checkingEntry = false;
+
   @override
   void initState() {
     super.initState();
     // 첫 발급. 아직 그린 적이 없으니 setState 없이 값만 두고 요청한다.
     _issuing = true;
     _request();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (timer) => _tick(timer.tick),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _enteredTicketIds ??= PushNotificationScope.maybeOf(context)
+        ?.enteredTicketIds
+        .listen((ticketId) {
+          if (ticketId == widget.ticket.ticketId) _markEntered();
+        });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _enteredTicketIds?.cancel();
     super.dispose();
+  }
+
+  /// 입장 처리가 확인됐다. QR 을 치우고 재시도 없는 "이미 입장한 QR" 안내로
+  /// 바꾼다. 더 셀 것이 없으니 타이머도 끈다.
+  void _markEntered() {
+    if (_alreadyUsed) return;
+    _ticker?.cancel();
+    setState(() {
+      _error = const ApiException(TicketStrings.qrAlreadyUsed, status: 409);
+      _issuing = false;
+      _alreadyUsed = true;
+    });
   }
 
   DateTime get _now => (widget.clock ?? DateTime.now)();
@@ -86,7 +121,8 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
     final api = TicketApiScope.of(context);
     try {
       final pass = await api.issueEntryPass(widget.ticket.ticketId);
-      if (!mounted) return;
+      // 기다리는 사이 입장 푸시가 먼저 왔으면 새 QR 로 덮지 않는다.
+      if (!mounted || _alreadyUsed) return;
       setState(() {
         _pass = pass;
         _measure(pass);
@@ -114,7 +150,7 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
           // 목록 확인이 실패하면 원래 발급 오류를 보여준다.
         }
       }
-      if (!mounted) return;
+      if (!mounted || _alreadyUsed) return;
       setState(() {
         _error = displayError;
         _issuing = false;
@@ -131,13 +167,40 @@ class _EntryQrScreenState extends State<EntryQrScreen> {
     _progress = pass.progress(now);
   }
 
-  /// 매초. 남은 시간만 다시 잰다. 0 이 되면 그 값이 곧 만료 상태다 — 여기서
-  /// 서버를 다시 부르지 않는다(클래스 주석).
-  void _tick() {
+  /// 매초. 남은 시간을 다시 재고, [TicketMetrics.qrEntryCheckInterval] 마다
+  /// 입장 여부를 확인한다. 0 이 되어도 QR 을 새로 받지는 않는다(클래스 주석).
+  /// [tick] 은 타이머가 센 횟수라, 앱이 뒤에 있다 돌아와도 건너뛴 만큼 늘어 있다.
+  void _tick(int tick) {
     final pass = _pass;
     // 첫 발급 전이다. 셀 것이 없다.
     if (pass == null) return;
     setState(() => _measure(pass));
+    if (tick % TicketMetrics.qrEntryCheckInterval.inSeconds == 0) {
+      _checkEntry();
+    }
+  }
+
+  /// 내 티켓 목록에서 이 티켓이 입장 완료인지 본다. 입장 판단은 상태값으로만
+  /// 한다 — 발급 409 는 양도 등록 중 같은 다른 이유로도 온다. QR 이 떠 있을 때만
+  /// 묻고, 실패는 조용히 넘긴다. 검표 줄에서 오류 문구가 튀어나오면 안 되고,
+  /// 다음 차례에 다시 묻는다.
+  Future<void> _checkEntry() async {
+    if (_checkingEntry || _error != null) return;
+    _checkingEntry = true;
+    try {
+      final tickets = await TicketApiScope.of(context).fetchMyTickets();
+      if (!mounted) return;
+      final entered = tickets.any(
+        (ticket) =>
+            ticket.ticketId == widget.ticket.ticketId &&
+            ticket.status == TicketStatus.used,
+      );
+      if (entered) _markEntered();
+    } on ApiException {
+      // 다음 확인에서 다시 묻는다.
+    } finally {
+      _checkingEntry = false;
+    }
   }
 
   @override

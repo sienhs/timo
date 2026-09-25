@@ -38,6 +38,12 @@ abstract class PushNotifications implements PushDeviceRegistrar {
   /// 돌아와 점이 꺼진 뒤 같은 개수가 와도 켜져야 한다(`ValueNotifier` 로는 안 된다).
   /// 앱이 뒤에 있을 때 온 푸시는 여기 오지 않고, 화면에 다시 들어올 때 묻는 개수가 맞춘다.
   Stream<int> get unreadCounts;
+
+  /// 앱이 켜져 있을 때 게이트에서 입장 처리된 티켓 번호. 서버가 검표 직후 보내는
+  /// 조용한 푸시(`TICKET_ENTERED`)에서 꺼낸다. 입장 QR 화면이 이걸 듣고 바로
+  /// "입장 완료" 로 바뀐다. 앱이 뒤에 있을 때 온 푸시는 여기 오지 않는다 — 그때는
+  /// QR 화면의 주기 확인이 잡는다.
+  Stream<int> get enteredTicketIds;
 }
 
 /// 아무것도 하지 않는 구현. Firebase 를 띄우지 않는 실행(위젯 테스트 등)에서
@@ -56,6 +62,9 @@ class NoopPushNotifications implements PushNotifications {
 
   @override
   Stream<int> get unreadCounts => const Stream.empty();
+
+  @override
+  Stream<int> get enteredTicketIds => const Stream.empty();
 }
 
 /// FCM 권한, 토큰 등록·해제, 앱이 열린 상태의 배너, 알림을 눌렀을 때의 화면 이동을
@@ -74,6 +83,9 @@ class PushNotificationService implements PushNotifications {
        _dio = dio ?? ApiClient.dio;
 
   static const _devicePath = '/api/v1/notifications/devices';
+
+  /// 입장 처리 푸시의 `type`. 서버 `TicketEnteredPushListener` 가 싣는 값이다.
+  static const _ticketEnteredType = 'TICKET_ENTERED';
 
   /// 안드로이드 알림 채널. **채널을 만들 때와 알림을 띄울 때 같은 값이어야 한다.**
   /// 없는 채널로 띄우면 안드로이드 8.0 이상에서는 알림이 아예 표시되지 않고 예외도
@@ -102,6 +114,7 @@ class PushNotificationService implements PushNotifications {
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedAppSubscription;
   final StreamController<int> _unreadCounts = StreamController.broadcast();
+  final StreamController<int> _enteredTicketIds = StreamController.broadcast();
   String? _token;
   bool _started = false;
 
@@ -134,6 +147,9 @@ class PushNotificationService implements PushNotifications {
     _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
       final unread = unreadCountOf(message.data);
       if (unread != null) _unreadCounts.add(unread);
+      final entered = enteredTicketIdOf(message.data);
+      if (entered != null) _enteredTicketIds.add(entered);
+      // 입장 푸시는 알림 문구가 없어 여기서 배너 없이 끝난다.
       _showForegroundNotification(message);
     });
     // 앱이 뒤에 떠 있을 때 트레이의 알림을 누른 경우. 화면이 이미 있어 바로 옮긴다.
@@ -152,6 +168,17 @@ class PushNotificationService implements PushNotifications {
     final raw = data['unreadCount'];
     final parsed = raw is String ? int.tryParse(raw) : null;
     return parsed == null || parsed < 0 ? null : parsed;
+  }
+
+  @override
+  Stream<int> get enteredTicketIds => _enteredTicketIds.stream;
+
+  /// 입장 처리 푸시라면 그 티켓 번호. 다른 종류이거나 번호를 읽을 수 없으면 null.
+  @visibleForTesting
+  static int? enteredTicketIdOf(Map<String, dynamic> data) {
+    if (data['type'] != _ticketEnteredType) return null;
+    final raw = data['ticketId'];
+    return raw is String ? int.tryParse(raw) : null;
   }
 
   @override
@@ -306,5 +333,6 @@ class PushNotificationService implements PushNotifications {
     await _foregroundSubscription?.cancel();
     await _openedAppSubscription?.cancel();
     await _unreadCounts.close();
+    await _enteredTicketIds.close();
   }
 }

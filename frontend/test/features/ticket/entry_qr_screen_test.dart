@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:timo/core/network/api_exception.dart';
 import 'package:timo/core/widgets/async_boundary.dart';
+import 'package:timo/features/notification/notification_destination.dart';
+import 'package:timo/features/notification/push_notification_scope.dart';
+import 'package:timo/features/notification/push_notification_service.dart';
 import 'package:timo/features/ticket/constants.dart';
 import 'package:timo/features/ticket/data/ticket_api.dart';
 import 'package:timo/features/ticket/models/entry_pass.dart';
@@ -36,24 +39,37 @@ void main() {
   /// 화면이 보는 시각. [advance] 로 돌린다.
   late DateTime now;
   late _FakeEntryPassApi api;
+  late _FakePush push;
 
   setUp(() {
     now = DateTime(2026, 9, 14, 18);
     api = _FakeEntryPassApi(() => now);
+    push = _FakePush();
   });
+
+  tearDown(() => push.dispose());
 
   /// 화면을 띄우고 첫 발급 응답까지 받는다.
   ///
   /// `pumpAndSettle` 은 쓰지 않는다. 매초 도는 타이머가 있어 끝나지 않는다.
   Future<void> pumpScreen(WidgetTester tester) async {
     await tester.pumpWidget(
-      TicketApiScope(
-        api: api,
-        child: MaterialApp(
-          home: EntryQrScreen(ticket: ticket, clock: () => now),
+      PushNotificationScope(
+        push: push,
+        child: TicketApiScope(
+          api: api,
+          child: MaterialApp(
+            home: EntryQrScreen(ticket: ticket, clock: () => now),
+          ),
         ),
       ),
     );
+    await tester.pump();
+  }
+
+  /// 입장 푸시를 흘려보내고 화면이 받아 그릴 때까지 돌린다.
+  Future<void> pushEntered(WidgetTester tester, int ticketId) async {
+    push.entered(ticketId);
     await tester.pump();
   }
 
@@ -227,6 +243,125 @@ void main() {
     });
   });
 
+  group('입장 확인', () {
+    final checkInterval = TicketMetrics.qrEntryCheckInterval;
+
+    testWidgets('이 티켓의 입장 푸시가 오면 QR 대신 이미 입장했다고 알린다', (tester) async {
+      await pumpScreen(tester);
+
+      await pushEntered(tester, 107);
+
+      expect(find.text(TicketStrings.qrAlreadyUsed), findsOneWidget);
+      expect(find.byType(QrImageView), findsNothing);
+      expect(find.text(TicketStrings.qrRemaining), findsNothing);
+      expect(retryButton, findsNothing);
+    });
+
+    // 티켓을 여러 장 가진 사람이 동행의 표를 먼저 찍었을 수 있다.
+    testWidgets('다른 티켓의 입장 푸시는 무시한다', (tester) async {
+      await pumpScreen(tester);
+
+      await pushEntered(tester, 108);
+
+      expect(find.byType(QrImageView), findsOneWidget);
+      expect(find.text(TicketStrings.qrAlreadyUsed), findsNothing);
+    });
+
+    // 푸시는 빠지거나 늦을 수 있다. 앱이 뒤에 있을 때 온 푸시는 아예 못 받는다.
+    testWidgets('푸시가 없어도 주기마다 확인해 입장 완료면 바뀐다', (tester) async {
+      await pumpScreen(tester);
+
+      await advance(tester, checkInterval - const Duration(seconds: 1));
+      expect(api.ticketFetches, 0);
+
+      api.tickets = [ticket.copyWith(status: TicketStatus.used)];
+      await advance(tester, const Duration(seconds: 1));
+      await tester.pump();
+
+      expect(api.ticketFetches, 1);
+      expect(find.text(TicketStrings.qrAlreadyUsed), findsOneWidget);
+      expect(find.byType(QrImageView), findsNothing);
+    });
+
+    testWidgets('아직 입장 전이면 QR 을 그대로 둔다', (tester) async {
+      api.tickets = [ticket];
+      await pumpScreen(tester);
+      final first = qrData(tester);
+
+      await advance(tester, checkInterval);
+      await tester.pump();
+
+      expect(api.ticketFetches, 1);
+      expect(qrData(tester), first);
+    });
+
+    // 검표 줄에서 오류 문구가 튀어나오면 안 된다. 다음 차례에 다시 묻는다.
+    testWidgets('확인이 실패해도 QR 은 그대로고 다음 차례에 다시 묻는다', (tester) async {
+      await pumpScreen(tester);
+      final first = qrData(tester);
+
+      api.ticketsFailure = const ApiException('인터넷 연결을 확인해주세요.');
+      await advance(tester, checkInterval);
+      await tester.pump();
+
+      expect(qrData(tester), first);
+      expect(find.text('인터넷 연결을 확인해주세요.'), findsNothing);
+
+      api.ticketsFailure = null;
+      await advance(tester, checkInterval);
+      await tester.pump();
+
+      expect(api.ticketFetches, 2);
+    });
+
+    testWidgets('입장 완료 뒤에는 더 확인하지 않는다', (tester) async {
+      await pumpScreen(tester);
+      await pushEntered(tester, 107);
+
+      await advance(tester, checkInterval * 3);
+
+      expect(api.ticketFetches, 0);
+    });
+
+    // 새로고침을 누르고 기다리는 사이 게이트에서 찍혔다. 늦게 온 새 QR 이 입장
+    // 완료 안내를 덮으면 이미 쓴 표가 다시 살아난 것처럼 보인다.
+    testWidgets('새로 받는 중에 입장 푸시가 오면 늦은 응답이 QR 로 덮지 않는다', (tester) async {
+      await pumpScreen(tester);
+      await advance(tester, const Duration(seconds: 30));
+      api.hold = true;
+      await tapInQrArea(tester, refreshButton);
+
+      await pushEntered(tester, 107);
+      api.release();
+      await tester.pump();
+
+      expect(find.text(TicketStrings.qrAlreadyUsed), findsOneWidget);
+      expect(find.byType(QrImageView), findsNothing);
+      expect(retryButton, findsNothing);
+    });
+
+    // 새로고침이 실패하면 QR 자리에 안내만 남는다. 찍힐 QR 이 없으니 물을 것도 없다.
+    testWidgets('새로고침 실패 안내가 떠 있으면 확인하지 않는다', (tester) async {
+      await pumpScreen(tester);
+      await advance(tester, const Duration(seconds: 30));
+      api.failure = const ApiException('인터넷 연결을 확인해주세요.');
+      await tapInQrArea(tester, refreshButton);
+      final fetchesBefore = api.ticketFetches;
+
+      await advance(tester, checkInterval * 2);
+
+      expect(api.ticketFetches, fetchesBefore);
+    });
+
+    testWidgets('화면을 벗어난 뒤 온 입장 푸시는 예외 없이 지나간다', (tester) async {
+      await pumpScreen(tester);
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+
+      await pushEntered(tester, 107);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('만료·새로고침', () {
     // 자동으로 새로 받지 않는다. 줄을 서는 동안 30초마다 요청이 나가고,
     // 검표 직전에 QR 이 바뀌는 순간이 생기기 때문이다.
@@ -379,8 +514,18 @@ class _FakeEntryPassApi implements TicketApi {
 
   List<MyTicket> tickets = [];
 
+  /// 넣어 두면 목록 조회가 이걸 던진다.
+  ApiException? ticketsFailure;
+
+  /// 목록 조회 횟수. 입장 확인이 몇 번 나갔는지 본다.
+  int ticketFetches = 0;
+
   @override
-  Future<List<MyTicket>> fetchMyTickets() async => tickets;
+  Future<List<MyTicket>> fetchMyTickets() async {
+    ticketFetches++;
+    if (ticketsFailure case final failure?) throw failure;
+    return tickets;
+  }
 
   @override
   Future<void> cancelReservation(int reservationId) =>
@@ -395,4 +540,28 @@ class _FakeEntryPassApi implements TicketApi {
   @override
   Future<ReservationDetail> fetchReservation(int reservationId) =>
       throw UnimplementedError('입장 QR 화면은 주문 상세를 부르지 않는다');
+}
+
+/// 입장 푸시만 흘려보내는 가짜 푸시. 나머지는 이 화면이 쓰지 않는다.
+class _FakePush implements PushNotifications {
+  final _enteredTicketIds = StreamController<int>.broadcast();
+
+  void entered(int ticketId) => _enteredTicketIds.add(ticketId);
+
+  Future<void> dispose() => _enteredTicketIds.close();
+
+  @override
+  Stream<int> get enteredTicketIds => _enteredTicketIds.stream;
+
+  @override
+  Stream<int> get unreadCounts => const Stream.empty();
+
+  @override
+  NotificationDestination? takeLaunchDestination() => null;
+
+  @override
+  Future<void> registerDevice() async {}
+
+  @override
+  Future<void> unregisterDevice() async {}
 }
