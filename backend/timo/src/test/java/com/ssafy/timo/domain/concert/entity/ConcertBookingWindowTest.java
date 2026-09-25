@@ -19,7 +19,7 @@ class ConcertBookingWindowTest {
 
     private static final LocalDateTime OPEN_AT = LocalDateTime.of(2026, 9, 1, 20, 0);
     private static final LocalDateTime START_DATE = LocalDateTime.of(2026, 9, 20, 19, 30);
-    private static final LocalDateTime CUTOFF = START_DATE.minusHours(Concert.BOOKING_CUTOFF_HOURS);
+    private static final LocalDateTime CUTOFF = START_DATE.minusMinutes(Concert.BOOKING_CUTOFF_MINUTES);
 
     @Test
     @DisplayName("오픈 1초 전이면 아직 열리지 않은 것이다")
@@ -40,7 +40,7 @@ class ConcertBookingWindowTest {
     }
 
     @Test
-    @DisplayName("마감(공연 시작 2시간 전) 1초 전까지는 예매할 수 있다")
+    @DisplayName("마감(공연 시작 30분 전) 1초 전까지는 예매할 수 있다")
     void bookableOneSecondBeforeCutoff() {
         Concert concert = onSale(OPEN_AT, START_DATE);
 

@@ -46,8 +46,8 @@ import java.util.Optional;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Concert extends BaseEntity {
 
-    /** 공연 시작 이 시간 전까지만 예매(선점·결제)할 수 있다. 마감 시각은 저장하지 않고 매번 유도한다. */
-    public static final int BOOKING_CUTOFF_HOURS = 2;
+    /** 공연 시작 이 분 전까지만 예매(선점·결제)할 수 있다. 마감 시각은 저장하지 않고 매번 유도한다. */
+    public static final int BOOKING_CUTOFF_MINUTES = 30;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -168,7 +168,7 @@ public class Concert extends BaseEntity {
      *
      * <p>{@link #isReadyForBooking()}과는 역할이 다르다 - 그쪽은 주최자·온체인 showId가 갖춰져
      * "예매를 열 수 있는 상태로 등록됐는지"(등록 시점 한 번)를 보고, 이건 지금 이 순간이 예매 가능한
-     * 시간 창(오픈 시각 ~ 공연 시작 {@value #BOOKING_CUTOFF_HOURS}시간 전) 안에 있는지(요청마다 매번)를
+     * 시간 창(오픈 시각 ~ 공연 시작 {@value #BOOKING_CUTOFF_MINUTES}분 전) 안에 있는지(요청마다 매번)를
      * 본다. 값이 비어 있으면 예매할 수 있다는 뜻이다.
      *
      * <p>판정 순서는 상태 → 오픈 전 → 마감 후다. 여러 사유가 겹치면(예: 매진인데 시간도 지남) 앞의
@@ -182,7 +182,7 @@ public class Concert extends BaseEntity {
         if (openAt == null || startDate == null || now.isBefore(openAt)) {
             return Optional.of(BookingBlockReason.NOT_OPEN);
         }
-        if (!now.isBefore(startDate.minusHours(BOOKING_CUTOFF_HOURS))) {
+        if (!now.isBefore(startDate.minusMinutes(BOOKING_CUTOFF_MINUTES))) {
             return Optional.of(BookingBlockReason.CLOSED);
         }
         return Optional.empty();

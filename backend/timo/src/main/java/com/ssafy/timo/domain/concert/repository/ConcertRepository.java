@@ -127,7 +127,7 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
      * 깨진 불변식으로 보고 {@code IllegalStateException} 을 던지기 때문이다.
      *
      * <p>이 컬럼의 {@code ON_SALE} 은 "예매 기간에 들어섰다" 는 거친 라벨이다. 공연 시작
-     * {@code Concert.BOOKING_CUTOFF_HOURS} 시간 전 마감까지는 반영하지 않으므로, 마감부터 공연
+     * {@code Concert.BOOKING_CUTOFF_MINUTES} 분 전 마감까지는 반영하지 않으므로, 마감부터 공연
      * 종료까지는 컬럼이 {@code ON_SALE} 인데 실제 선점·결제는 막혀 있다. 그 구간을 컬럼으로
      * 구분하려면 {@code ConcertStatus} 에 값을 하나 더 만들어 클라이언트 계약까지 바꿔야 한다.
      * 그 구간의 정확한 가능 여부는 {@code Concert.bookingBlockReason} 이 요청마다 답한다.

@@ -57,7 +57,7 @@ class SeatHoldBookingWindowTest {
 
     private static final LocalDateTime OPEN_AT = LocalDateTime.of(2026, 9, 1, 20, 0);
     private static final LocalDateTime START_DATE = LocalDateTime.of(2026, 9, 20, 19, 30);
-    private static final LocalDateTime CUTOFF = START_DATE.minusHours(Concert.BOOKING_CUTOFF_HOURS);
+    private static final LocalDateTime CUTOFF = START_DATE.minusMinutes(Concert.BOOKING_CUTOFF_MINUTES);
 
     @Mock
     private SectionRepository sectionRepository;

@@ -17,9 +17,9 @@ public enum ReservationErrorCode implements BaseErrorCode {
     CONCERT_NOT_ON_SALE(HttpStatus.CONFLICT, "예매 중인 공연이 아닙니다."),
     /** 공연은 예매 중(ON_SALE)이지만 아직 오픈 시각 전이다. */
     BOOKING_NOT_OPEN(HttpStatus.CONFLICT, "아직 예매가 열리지 않았습니다."),
-    /** 공연 시작 {@link Concert#BOOKING_CUTOFF_HOURS}시간 전, 예매 마감을 지났다 - 문구도 그 상수로 만들어 값이 바뀌어도 어긋나지 않게 한다. */
+    /** 공연 시작 {@link Concert#BOOKING_CUTOFF_MINUTES}분 전, 예매 마감을 지났다 - 문구도 그 상수로 만들어 값이 바뀌어도 어긋나지 않게 한다. */
     BOOKING_CLOSED(HttpStatus.CONFLICT,
-            "예매가 마감되었습니다. (공연 시작 " + Concert.BOOKING_CUTOFF_HOURS + "시간 전 마감)"),
+            "예매가 마감되었습니다. (공연 시작 " + Concert.BOOKING_CUTOFF_MINUTES + "분 전 마감)"),
     /**
      * 취소할 수 없는 주문. 발행 전·이미 끝난 주문, 양도 등록 중({@code LISTED})·입장 완료({@code USED}) 티켓,
      * 공연 시작 24시간 이내. 온체인 {@code revoke} 는 {@code OWNED} 에서만 성립한다.

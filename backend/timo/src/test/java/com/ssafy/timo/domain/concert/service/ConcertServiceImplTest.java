@@ -511,7 +511,7 @@ class ConcertServiceImplTest {
         // 그 어긋남을 클라이언트가 겪지 않게 하는 것이 bookable 의 존재 이유다.
         Concert concert = concertWithId(1L);
         ReflectionTestUtils.setField(concert, "status", ConcertStatus.ON_SALE);
-        ReflectionTestUtils.setField(concert, "startDate", NOW.plusHours(1));
+        ReflectionTestUtils.setField(concert, "startDate", NOW.plusMinutes(10));
         given(concertRepository.findByIdWithVenue(1L)).willReturn(Optional.of(concert));
         given(viewCountStore.incrementAndGet(1L, 0)).willReturn(1);
         givenImageStoragePrefixesKeys();

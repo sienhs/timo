@@ -34,8 +34,8 @@ import java.util.List;
  *
  * <p>{@code status} 만으로는 예매 버튼을 그릴 수 없어서 필요하다. {@code status} 는
  * {@code ConcertStatusScheduler} 가 1분마다 미는 거친 라벨이라, 오픈 직후 최대 1분은 아직
- * {@code SCHEDULED} 인데 예매는 이미 열려 있고, 공연 시작 {@link Concert#BOOKING_CUTOFF_HOURS}
- * 시간 전 마감부터 공연 종료까지는 {@code ON_SALE} 인데 예매는 막혀 있다. 그 두 구간에서 라벨과
+ * {@code SCHEDULED} 인데 예매는 이미 열려 있고, 공연 시작 {@link Concert#BOOKING_CUTOFF_MINUTES}
+ * 분 전 마감부터 공연 종료까지는 {@code ON_SALE} 인데 예매는 막혀 있다. 그 두 구간에서 라벨과
  * 실제 판정이 어긋나는데, 클라이언트가 이 두 필드를 보면 어긋남을 겪지 않는다.
  */
 public record ConcertDetailResponseDto(
