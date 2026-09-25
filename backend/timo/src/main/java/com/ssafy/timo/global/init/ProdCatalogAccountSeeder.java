@@ -156,7 +156,7 @@ class ProdCatalogAccountSeeder {
         ticketRepository.save(ticket);
 
         // 실제 게이트 스캔과 같은 경로로 온체인 markUsed를 비동기로 반영한다(TicketEntryOnChainService).
-        eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), minted.tokenId()));
+        eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), minted.tokenId(), admin.getId()));
 
         log.info("운영 시드: 관리자 계정의 소장품용 티켓을 만들었다. tokenId={}", minted.tokenId());
     }

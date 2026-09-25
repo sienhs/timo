@@ -220,14 +220,21 @@ public class FirebasePushNotificationSender implements PushNotificationSender {
         return baseMessage(message, delivery).setToken(token).build();
     }
 
+    /**
+     * 조용한 푸시는 {@code notification} 을 아예 싣지 않는다. 하나라도 실리면 앱이 백그라운드일 때 OS 가
+     * 배너를 띄우고, 채널만 실려도 안드로이드는 알림 메시지로 다룬다.
+     */
     private Message.Builder baseMessage(PushMessage message, PushDelivery delivery) {
-        return Message.builder()
-                .setNotification(Notification.builder().setBody(message.body()).build())
+        Message.Builder builder = Message.builder()
                 .putAllData(message.data())
-                .setAndroidConfig(androidConfig(delivery));
+                .setAndroidConfig(androidConfig(delivery, message.isSilent()));
+        if (!message.isSilent()) {
+            builder.setNotification(Notification.builder().setBody(message.body()).build());
+        }
+        return builder;
     }
 
-    private AndroidConfig androidConfig(PushDelivery delivery) {
+    private AndroidConfig androidConfig(PushDelivery delivery, boolean silent) {
         AndroidConfig.Builder builder = AndroidConfig.builder()
                 .setPriority(delivery.priority() == PushDelivery.Priority.HIGH
                         ? AndroidConfig.Priority.HIGH
@@ -235,7 +242,7 @@ public class FirebasePushNotificationSender implements PushNotificationSender {
         if (delivery.ttl() != null) {
             builder.setTtl(delivery.ttl().toMillis());
         }
-        if (delivery.channelId() != null) {
+        if (!silent && delivery.channelId() != null) {
             builder.setNotification(AndroidNotification.builder().setChannelId(delivery.channelId()).build());
         }
         return builder.build();

@@ -268,6 +268,22 @@ class FirebasePushNotificationSenderTest {
         assertThat(json).doesNotContain("channel_id").doesNotContain("ttl");
     }
 
+    @Test
+    @DisplayName("조용한 푸시는 notification 을 싣지 않아 배너가 뜨지 않고, 채널이 있어도 싣지 않는다")
+    void sendEach_silent_hasOnlyDataAndPriority() throws Exception {
+        doReturn(batch(ok())).when(messaging).sendEach(anyList());
+        PushDelivery delivery = new PushDelivery(PushDelivery.Priority.HIGH, Duration.ofMinutes(5), "entry");
+        PushMessage message = PushMessage.silent(Map.of("type", "TICKET_ENTERED", "ticketId", "123"));
+
+        sender(2).sendEach(List.of(new PushTarget("t1", message)), delivery);
+
+        String json = json(sentBatches(1).get(0).get(0));
+        assertThat(json).contains("\"type\":\"TICKET_ENTERED\"").contains("\"ticketId\":\"123\"");
+        assertThat(json).contains("\"priority\":\"high\"");
+        assertThat(json).doesNotContain("\"notification\"").doesNotContain("\"body\"")
+                .doesNotContain("channel_id");
+    }
+
     // ---------------------------------------------------------------- 헬퍼
 
     private List<List<Message>> sentBatches(int expectedCalls) throws FirebaseMessagingException {
