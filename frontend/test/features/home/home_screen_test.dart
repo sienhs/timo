@@ -425,7 +425,7 @@ void main() {
       expect(find.text(HomeStrings.bookingOnSale), findsOneWidget);
     });
 
-    testWidgets('공연 시작 두 시간 전부터는 상태가 ON_SALE 이어도 마감이다', (tester) async {
+    testWidgets('예매 마감 시각부터는 상태가 ON_SALE 이어도 마감이다', (tester) async {
       // 서버는 이 구간에서도 컬럼을 ON_SALE 로 두고, 공연이 끝나야 내린다.
       // 그대로 믿고 `예매중` 을 찍으면 들어간 상세에서 예매가 막혀 있다.
       await pumpBadge(
