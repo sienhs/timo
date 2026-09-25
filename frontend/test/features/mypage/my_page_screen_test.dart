@@ -72,6 +72,9 @@ class _RecordingPushRegistrar implements PushNotifications {
 
   @override
   Stream<int> get unreadCounts => const Stream.empty();
+
+  @override
+  Stream<int> get enteredTicketIds => const Stream.empty();
 }
 
 /// 처음 몇 번은 실패하고 그다음부터 성공하는 목. 다시 시도를 검사한다.

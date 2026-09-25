@@ -129,4 +129,7 @@ class _FakePush implements PushNotifications {
 
   @override
   Stream<int> get unreadCounts => const Stream.empty();
+
+  @override
+  Stream<int> get enteredTicketIds => const Stream.empty();
 }

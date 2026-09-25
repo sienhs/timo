@@ -177,6 +177,9 @@ class _FakePush implements PushNotifications {
   Stream<int> get unreadCounts => _counts.stream;
 
   @override
+  Stream<int> get enteredTicketIds => const Stream.empty();
+
+  @override
   NotificationDestination? takeLaunchDestination() => null;
 
   @override

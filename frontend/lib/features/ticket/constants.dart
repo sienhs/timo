@@ -19,6 +19,10 @@ class TicketMetrics {
   /// 백엔드 `EntryPassService.ENTRY_CLOSES_AFTER_START` 와 같아야 한다.
   static const qrClosesAfter = Duration(hours: 6);
 
+  /// 입장 QR 화면이 입장 여부를 다시 확인하는 간격. 입장 푸시가 빠지거나 늦을
+  /// 때의 대비책이다. 화면의 1초 타이머에 얹어 세므로 초 단위로 둔다.
+  static const qrEntryCheckInterval = Duration(seconds: 2);
+
   /// 검색 칸을 띄우기 시작하는 티켓 수. 이보다 적으면 눈으로 훑는 편이 빨라 숨긴다.
   static const searchVisibleFrom = 5;
 
