@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../constants.dart';
 import '../ui/overlay_service.dart';
 
 class RepairStroke {
@@ -168,7 +169,8 @@ class _CutoutRepairEditorState extends State<CutoutRepairEditor> {
       }
       final folder = await getApplicationDocumentsDirectory();
       final file = File(
-        '${folder.path}/repair_${DateTime.now().microsecondsSinceEpoch}.png',
+        '${folder.path}/${MemoryFiles.repairPrefix}'
+        '${DateTime.now().microsecondsSinceEpoch}.png',
       );
       await file.writeAsBytes(
         bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),

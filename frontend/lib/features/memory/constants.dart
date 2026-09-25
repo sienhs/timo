@@ -143,6 +143,38 @@ class CatalogConstants {
   static const demoVideoAsset = 'assets/videos/official_demo.mp4';
 }
 
+/// 소장품 제작·복원이 기기 문서 폴더에 쓰는 자리.
+///
+/// 쓰는 쪽(제작·합성·인물 분리·복원·컷아웃 수선)과 지우는 쪽
+/// (`HiveTicketStore.clear`)이 같은 이름을 봐야 한다 — 어느 한쪽이 폴더를
+/// 새로 만들면 여기에 더해야 로그아웃 때 함께 지워진다.
+class MemoryFiles {
+  MemoryFiles._();
+
+  /// 고른 사진 원본·복원한 소장품 이미지(`photos/restored/{goodsId}`).
+  static const photos = 'photos';
+
+  /// 배경을 화면 비율로 잘라 그린 것.
+  static const framedBackgrounds = 'framed_backgrounds';
+
+  /// 인물 여러 명을 한 장으로 합친 것.
+  static const composites = 'composites';
+
+  /// 인물 한 명씩 분리한 컷아웃·깊이 맵.
+  static const personLayers = 'person_layers';
+
+  /// 컷아웃 수선 결과. 폴더 없이 문서 폴더 바로 아래에 이 접두어로 놓인다.
+  static const repairPrefix = 'repair_';
+
+  /// 로그아웃 때 통째로 지우는 폴더들.
+  static const directories = [
+    photos,
+    framedBackgrounds,
+    composites,
+    personLayers,
+  ];
+}
+
 /// 소장품을 서버에 올리고 되받아 올 때의 값들.
 class GoodsConstants {
   /// 이미지 업로드·내려받기의 제한 시간. 공통 설정(연결 5초·수신 10초)은 JSON

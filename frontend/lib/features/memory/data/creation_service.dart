@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../constants.dart';
 import '../models/memory_concert.dart';
 import 'depth_service.dart';
 import 'image_download.dart';
@@ -32,7 +33,7 @@ class CreationService {
     bool remote = false,
   }) async {
     final root = await getApplicationDocumentsDirectory();
-    final folder = Directory('${root.path}/photos');
+    final folder = Directory('${root.path}/${MemoryFiles.photos}');
     await folder.create(recursive: true);
     final extension = remote ? imageExtension(source) : source.split('.').last;
     final target = File(
@@ -371,8 +372,9 @@ class CreationService {
           format: ui.ImageByteFormat.png,
         ))!;
         final root = await getApplicationDocumentsDirectory();
-        final folder = await Directory('${root.path}/framed_backgrounds')
-            .create(recursive: true);
+        final folder = await Directory(
+          '${root.path}/${MemoryFiles.framedBackgrounds}',
+        ).create(recursive: true);
         final file = File(
           '${folder.path}/${DateTime.now().microsecondsSinceEpoch}.png',
         );
