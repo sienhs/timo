@@ -92,7 +92,7 @@ class GateEntryServiceTest {
         assertThat(response.seat()).isEqualTo(new SeatInfo(SECTION_NAME, SEAT_NO, SEAT_COL));
         // 연락처는 서버에서 가려 내린다. 앱이 가리면 프록시·로그를 원문이 그대로 지나간다.
         assertThat(response.holder()).isEqualTo(new HolderInfo(HOLDER_NAME, "010****5678"));
-        then(eventPublisher).should().publishEvent(new TicketEnteredEvent(TICKET_ID, TOKEN_ID));
+        then(eventPublisher).should().publishEvent(new TicketEnteredEvent(TICKET_ID, TOKEN_ID, MEMBER_ID));
     }
 
     @Test

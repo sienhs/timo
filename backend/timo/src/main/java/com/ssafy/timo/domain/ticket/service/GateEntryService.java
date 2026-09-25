@@ -105,7 +105,7 @@ public class GateEntryService {
             return rejectWithSeat(reasonFor(current), seat);
         }
 
-        eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), ticket.getTokenId()));
+        eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), ticket.getTokenId(), ticket.getOwnerMemberId()));
         return GateEntryVerifyResponseDto.admit(seat, holder);
     }
 
