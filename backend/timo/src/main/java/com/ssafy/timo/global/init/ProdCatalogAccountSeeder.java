@@ -8,6 +8,8 @@ import com.ssafy.timo.domain.blockchain.TicketNftClient;
 import com.ssafy.timo.domain.blockchain.TicketVaultClient;
 import com.ssafy.timo.domain.concert.entity.Concert;
 import com.ssafy.timo.domain.concert.repository.ConcertRepository;
+import com.ssafy.timo.domain.goods.entity.GoodsUpload;
+import com.ssafy.timo.domain.goods.repository.GoodsUploadRepository;
 import com.ssafy.timo.domain.member.entity.Member;
 import com.ssafy.timo.domain.member.repository.MemberRepository;
 import com.ssafy.timo.domain.reservation.entity.Reservation;
@@ -45,6 +47,31 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class ProdCatalogAccountSeeder {
 
+    /** S3 {@code goods/} 아래에 수동으로 올린 파일명. 버킷과 한 글자라도 다르면 열리지 않는 key 가 적힌다. */
+    private static final List<String> DEMO_GOODS_FILES = List.of(
+            "artist_1young.png",
+            "artist_1young_2.png",
+            "artist_1young_3.png",
+            "artist_garden.png",
+            "artist_garden_2.png",
+            "artist_imhero.png",
+            "artist_imhero_2.png",
+            "artist_imhero_3.png",
+            "artist_iu.jpg",
+            "artist_roykim.png",
+            "artist_roykim_2.png",
+            "artist_v.jpg",
+            "artist_whoareyou.png",
+            "concert_arena_cube_screen.png",
+            "concert_arena_overview.png",
+            "concert_arena_ring_screen.png",
+            "concert_band_stage_crowd.png",
+            "concert_confetti_lights.png",
+            "concert_hall_lightsticks.jpg",
+            "concert_led_screens_blue.png",
+            "concert_movie.mp4",
+            "concert_stadium_fireworks.png");
+
     private final MemberRepository memberRepository;
     private final LoginInfoRepository loginInfoRepository;
     private final PasswordEncoder passwordEncoder;
@@ -56,6 +83,7 @@ class ProdCatalogAccountSeeder {
     private final TicketVaultClient ticketVaultClient;
     private final TicketNftClient ticketNftClient;
     private final ApplicationEventPublisher eventPublisher;
+    private final GoodsUploadRepository goodsUploadRepository;
     private final EntityManager entityManager;
 
     /**
@@ -125,7 +153,7 @@ class ProdCatalogAccountSeeder {
      * 진짜 tokenId로 발급되고, 온체인 {@code markUsed}까지 반영된다.
      */
     @Transactional
-    void seedUsedTicket(List<Section> sections, Long concertId, Member admin) {
+    Long seedUsedTicket(List<Section> sections, Long concertId, Member admin) {
         Concert concert = concertRepository.getReferenceById(concertId);
         Section section = sections.get(0);
         Seat seat = seatRepository.findAllBySectionIdOrderBySeatNoAscSeatColAsc(section.getId()).get(0);
@@ -159,5 +187,20 @@ class ProdCatalogAccountSeeder {
         eventPublisher.publishEvent(new TicketEnteredEvent(ticket.getId(), minted.tokenId(), admin.getId()));
 
         log.info("운영 시드: 관리자 계정의 소장품용 티켓을 만들었다. tokenId={}", minted.tokenId());
+        return ticket.getId();
+    }
+
+    /**
+     * S3 {@code goods/} 에 손으로 올려 둔 이미지를 관리자 티켓의 업로드분으로 대장에 적는다. 업로드 API 를
+     * 거치지 않았으니 key 가 {@code goods/{memberId}/{ticketId}/} 모양이 아니다.
+     * <b>이 티켓에 굿즈가 없으면 청소 배치가 보존 기간(7일) 뒤 저장소 객체까지 지운다.</b>
+     */
+    @Transactional
+    void seedGoodsUploads(Long adminId, Long ticketId) {
+        List<GoodsUpload> uploads = DEMO_GOODS_FILES.stream()
+                .map(fileName -> GoodsUpload.of(adminId, ticketId, "goods/" + fileName))
+                .toList();
+        goodsUploadRepository.saveAll(uploads);
+        log.info("운영 시드: 굿즈 업로드 대장에 {}건을 적었다. ticketId={}", uploads.size(), ticketId);
     }
 }

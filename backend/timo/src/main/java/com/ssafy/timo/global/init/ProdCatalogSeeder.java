@@ -162,7 +162,9 @@ public class ProdCatalogSeeder implements ApplicationRunner {
         if (alreadyEnded.isEmpty()) {
             log.warn("관리자 시드 - 이미 종료된 공연이 없어 소장품용 티켓은 건너뛴다.");
         } else {
-            accountSeeder.seedUsedTicket(sections, alreadyEnded.get().getId(), admin);
+            Long ticketId = accountSeeder.seedUsedTicket(sections, alreadyEnded.get().getId(), admin);
+            // goods_upload.ticket_id 가 NOT NULL 이라 티켓이 생긴 경우에만 대장을 적는다.
+            accountSeeder.seedGoodsUploads(admin.getId(), ticketId);
         }
 
         log.info("운영 시드: 관리자 계정을 만들었다. id={}", adminUsername);
