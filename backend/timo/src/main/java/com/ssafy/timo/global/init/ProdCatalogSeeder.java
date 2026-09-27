@@ -130,16 +130,14 @@ public class ProdCatalogSeeder implements ApplicationRunner {
 
         Member organizer = accountSeeder.seedOrganizer(organizerPhone, organizerName, organizerNickname);
 
-        // status == ON_SALE로만 거르면 안 된다 - seed-concerts.sql은 소장품 데모용 공연 3건을
-        // 이미 지난 종료일로 넣어 두는데(status는 ON_SALE로 심어 둔다), ConcertStatusScheduler가
-        // initialDelay=0로 기동 즉시 도는 스케줄러라 우리가 이 목록을 읽기 전에 그 3건을 먼저
-        // CLOSED로 바꿔버릴 수 있다. status만 보면 그 순간 이 목록에서 통째로 빠져 온체인 등록
-        // 자체가 안 되므로, "아직 판매 시작 전(SCHEDULED)"과 "취소(CANCELED)"만 제외한다.
-        // 관리자 계정이 만들어지기 전에 재기동되면 이 메서드가 다시 실행될 수 있으므로, 이미 온체인
-        // 등록까지 끝난 공연(isReadyForBooking)은 다시 등록하지 않는다.
+        // SCHEDULED 도 여기서 등록한다. openScheduled 는 organizer 와 showId 가 있어야 여는데 운영에서
+        // registerShow 를 부르는 곳은 이 시더뿐이라, 빼면 오픈 시각이 와도 영영 열리지 않는다.
+        // 등록은 상태를 바꾸지 않으므로 오픈 전 공연은 SCHEDULED 로 남는다. 스케줄러가 기동 즉시
+        // ON_SALE 을 CLOSED 로 바꿀 수 있어 status 로는 거르지 않고 CANCELED 만 뺀다.
+        // 시각이 비면 registerOne 에서 NPE 가 나 기동이 죽으므로 거른다. 재기동 시 중복 등록은 isReadyForBooking 이 막는다.
         List<Concert> registrable = concertRepository.findAll().stream()
-                .filter(concert -> concert.getStatus() != ConcertStatus.SCHEDULED
-                        && concert.getStatus() != ConcertStatus.CANCELED)
+                .filter(concert -> concert.getStatus() != ConcertStatus.CANCELED)
+                .filter(concert -> concert.getOpenAt() != null && concert.getStartDate() != null)
                 .filter(concert -> !concert.isReadyForBooking())
                 .toList();
 
