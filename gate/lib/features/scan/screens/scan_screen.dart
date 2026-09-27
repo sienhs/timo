@@ -177,6 +177,7 @@ class _ScanScreenState extends State<ScanScreen> {
           serverStatus: result == null ? _serverStatus : null,
         ),
         actions: [
+          _CameraSwitchButton(controller: _controller),
           _TorchButton(controller: _controller),
           if (onChangeTarget != null)
             IconButton(
@@ -420,6 +421,36 @@ class _TorchButton extends StatelessWidget {
           tooltip: on ? ScanStrings.torchOff : ScanStrings.torchOn,
           icon: Icon(on ? Icons.flashlight_off : Icons.flashlight_on),
           onPressed: controller.toggleTorch,
+        );
+      },
+    );
+  }
+}
+
+/// 전면·후면 카메라 전환. 단말을 거치대에 세워 두고 관람객이 직접 화면에 폰을
+/// 대는 자리에서는 전면이 편하고, 손에 들고 찍을 때는 후면이 편하다.
+///
+/// 카메라가 하나뿐이면 그리지 않는다. 몇 개인지 아직 모르는 동안(카메라 여는
+/// 중)에는 일단 보여 준다 — 잠깐 사라졌다 나타나면 버튼 자리가 흔들린다.
+class _CameraSwitchButton extends StatelessWidget {
+  const _CameraSwitchButton({required this.controller});
+
+  final MobileScannerController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: controller,
+      builder: (context, state, _) {
+        final cameras = state.availableCameras;
+        if (cameras != null && cameras < 2) return const SizedBox.shrink();
+        final front = state.cameraDirection == CameraFacing.front;
+        return IconButton(
+          tooltip: front
+              ? ScanStrings.useBackCamera
+              : ScanStrings.useFrontCamera,
+          icon: Icon(front ? Icons.camera_rear : Icons.camera_front),
+          onPressed: controller.switchCamera,
         );
       },
     );

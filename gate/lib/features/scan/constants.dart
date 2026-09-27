@@ -92,6 +92,8 @@ class ScanStrings {
   static const verifying = '확인 중…';
   static const torchOn = '손전등 켜기';
   static const torchOff = '손전등 끄기';
+  static const useFrontCamera = '전면 카메라로 전환';
+  static const useBackCamera = '후면 카메라로 전환';
   static const changeTarget = '공연 변경';
   static const cameraUnavailable = '카메라를 열 수 없어요';
   static const cameraPermissionDenied =
